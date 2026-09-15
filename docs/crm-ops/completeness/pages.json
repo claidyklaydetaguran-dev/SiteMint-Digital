@@ -10,7 +10,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "A signed-in session surviving a reload is tested at the API (crmStaffAuth.test.ts), not recorded in a browser" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Wrong passwords refused and sign-in throttled in the database (crmStaffAuth.test.ts)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "No 375px measurement recorded" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -22,31 +22,31 @@
         "persist": { "status": "pass", "env": ["L"], "evidence": "The activated account signs in afterwards and keeps a live session" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Invitations expire and are consumed atomically; a replayed token answers 404 (crmStaffAuth.test.ts)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "No 375px measurement recorded" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
       "route": "/admin/dashboard",
-      "title": "Legacy admin dashboard",
+      "title": "Legacy Discovery Portal",
       "checks": {
-        "open": { "status": "unverified", "env": [], "evidence": "Never opened in a recorded sweep: the 2026-09-15 table listed 47 routes and missed this one" },
-        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "open": { "status": "fail", "env": [], "evidence": "Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix, opening it also wiped the session's CSRF token and bounced the person to sign-in" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable with a staff session" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "unverified", "env": [], "evidence": "Could not be measured as itself: a staff session was redirected to sign-in" }
       }
     },
     {
       "route": "/admin/submissions/:id",
       "title": "Legacy submission detail",
       "checks": {
-        "open": { "status": "unverified", "env": [], "evidence": "Never opened in a recorded sweep: missing from the 2026-09-15 table" },
-        "action": { "status": "unverified", "env": [], "evidence": "Not exercised" },
+        "open": { "status": "fail", "env": [], "evidence": "Its data (/api/admin/submissions/:id) is guarded by the retired shared admin credential and answers 401 to a staff session, so it shows nothing; the CRM's Discovery page is the working equivalent" },
+        "action": { "status": "unverified", "env": [], "evidence": "Unreachable with a staff session" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "unverified", "env": [], "evidence": "Could not be measured as itself: a staff session was redirected to sign-in" }
       }
     },
     {
@@ -58,7 +58,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Filters and figures after a reload not recorded" },
         "permission": { "status": "unverified", "env": [], "evidence": "Mine/Team scoping not exercised with a restricted user" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15, but that table marks 30 pages clean against 26 measured with the clipped-content metric, so which were measured cannot be told. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15, measured both before and after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -70,7 +70,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -94,7 +94,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Export requires data.export; a user without it is refused (crmContacts.test.ts)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -106,7 +106,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -118,7 +118,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -130,7 +130,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -142,7 +142,7 @@
         "persist": { "status": "pass", "env": ["L"], "evidence": "An unsent draft survived a full reload" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised with a restricted user" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -154,7 +154,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -163,10 +163,10 @@
       "checks": {
         "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
         "action": { "status": "pass", "env": ["L", "R"], "evidence": "On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs" },
-        "persist": { "status": "unverified", "env": [], "evidence": "Not recorded after a reload" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload and selecting Sep 17, the card showed the rescheduled 11:00–11:30 time, status cancelled, and “Cancellation sent” for both attendees" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -190,7 +190,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -202,7 +202,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -214,7 +214,7 @@
         "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -226,7 +226,7 @@
         "persist": { "status": "pass", "env": ["L"], "evidence": "The reply sent from this page was read back by the customer's own session in the portal thread" },
         "permission": { "status": "pass", "env": ["L", "T"], "evidence": "The internal note was absent from the customer view; barred by a database CHECK and a route test" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -238,7 +238,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -250,7 +250,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -262,7 +262,7 @@
         "persist": { "status": "pass", "env": ["L"], "evidence": "After a full reload: 7 contacts belong to a person, 0 unresolved, and 3 decisions recorded" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -274,7 +274,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -286,7 +286,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -298,7 +298,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Autosave not checked across a reload in the browser" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used, and the page has changed since. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -310,7 +310,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -334,7 +334,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -346,7 +346,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -358,7 +358,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -382,7 +382,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not reloaded after the merge" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -406,7 +406,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Self-escalation, unauthorised role changes and removing the last owner are refused (crmStaffAuth.test.ts)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -418,7 +418,7 @@
         "persist": { "status": "pass", "env": ["L"], "evidence": "The Asia/Manila timezone persisted" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Recorded clean on 2026-09-15 without saying which metric was used. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -430,7 +430,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "The Automation tab was checked at 375px against a stubbed API only. Re-measure" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport with live data, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -454,7 +454,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -466,7 +466,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -478,7 +478,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -490,7 +490,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {
@@ -502,7 +502,7 @@
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
-        "mobile": { "status": "unverified", "env": [], "evidence": "Not measured" }
+        "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },
     {

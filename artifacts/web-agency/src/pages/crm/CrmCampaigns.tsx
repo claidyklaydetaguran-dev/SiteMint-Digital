@@ -1887,14 +1887,16 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
         <div className="flex flex-col h-full">
 
           {/* ── Page header ── */}
-          <div className="px-6 py-4 border-b border-border/60 bg-white flex items-center justify-between shrink-0">
-            <div>
+          {/* Wraps below the title on a phone: at 375px the three buttons did not
+              fit beside it, and "New sequence" ran past the right edge. */}
+          <div className="px-4 sm:px-6 py-4 border-b border-border/60 bg-white flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="min-w-0">
               <h1 className="text-lg font-bold font-serif text-foreground">Sequences</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {MESSAGING_CONCEPTS.sequence.summary} To send one email once, use Marketing.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* M4 — the broadcast workspace is a separate page with its own
                   tables. Sequences on this screen are unaffected by it, and it
                   is linked rather than merged so neither engine writes the

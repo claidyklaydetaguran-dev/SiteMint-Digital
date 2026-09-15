@@ -213,6 +213,14 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  */
 const TRANSITIONAL_FOREIGN_AUTH: RegExp[] = [
   /^\/api\/admin\/voice\/(invites|beta-requests)(\/|\?|$)/,
+  // The legacy Discovery Portal (`/admin/dashboard`, `/admin/submissions/:id`,
+  // linked from the CRM sidebar) reads `/api/admin/submissions`, still guarded
+  // by the shared admin credential in routes/admin.ts. Its 401 used to count as
+  // a sign-out: it wiped the CSRF token of a perfectly valid staff session, so
+  // every later change in the CRM was refused as "could not be verified" until
+  // the person signed out and in. (The portal's other calls, `/api/crm/stats`
+  // and `/api/crm/import-discovery`, accept staff sessions and stay unlisted.)
+  /^\/api\/admin\/submissions(\/|\?|$)/,
   /^\/api\/crm\/conversations/,
   /^\/api\/crm\/phone\//,
   /^\/api\/crm\/leads\/\d+\/(messages|sms|call|sms-consent)/,

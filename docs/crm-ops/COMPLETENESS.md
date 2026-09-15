@@ -13,9 +13,9 @@
 
 ## Table 1 — the 18 core feature areas
 
-**129 / 150 criteria = 86.0% verified.** At the real provider: 8. In production: **0**.
+**130 / 150 criteria = 86.7% verified.** At the real provider: 8. In production: **0**.
 
-By status: Passed 129 · Built, not proven 3 · Not passed 17 · Deferred by decision 1.
+By status: Passed 130 · Built, not proven 2 · Not passed 17 · Deferred by decision 1.
 
 The denominator is 143 baseline criteria plus 7 added from the owner's brief after the baseline was set; each is listed under "Criteria added after the baseline" with its reason.
 
@@ -27,7 +27,7 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 | 4 | Customer communication | 7 / 9 | **77.8%** | L, T, R | 0 | 4.8 Inbound replies arrive through the real provider; 4.9 Delivery events from the real provider update message state |
 | 5 | Tasks, activities and reminders | 8 / 8 | **100.0%** | L, T | 0 | — |
 | 6 | Support and knowledge base | 8 / 9 | **88.9%** | L, T, R | 0 | 6.9 A customer's emailed reply lands on the right ticket |
-| 7 | Marketing automation | 13 / 17 | **76.5%** | L, T, R | 0 | 7.11 Engagement is measured where the provider supports it; 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.16 Marketing, Sequences and the Sequence queue each say plainly what they are (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
+| 7 | Marketing automation | 14 / 17 | **82.4%** | L, T, R | 0 | 7.11 Engagement is measured where the provider supports it; 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
 | 8 | Reporting and analytics | 8 / 9 | **88.9%** | L, T | 0 | 8.9 Email engagement figures come from real provider events |
 | 9 | Documents | 7 / 8 | **87.5%** | L, T | 0 | 9.8 Agreements can be signed electronically through a provider |
 | 10 | Workflow automation and approvals | 10 / 10 | **100.0%** | T | 0 | — |
@@ -51,63 +51,63 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**105 / 300 page checks = 35.0%.** Pages passing all 6: 0. Pages passing none: 6.
+**140 / 300 page checks = 46.7%.** Pages passing all 6: 0. Pages passing none: 2.
 
-By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by decision 0.
+By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
 | open | 41 / 50 (82.0%) |
 | action | 21 / 50 (42.0%) |
-| persist | 8 / 50 (16.0%) |
+| persist | 9 / 50 (18.0%) |
 | permission | 20 / 50 (40.0%) |
 | recovery | 1 / 50 (2.0%) |
-| mobile | 14 / 50 (28.0%) |
+| mobile | 48 / 50 (96.0%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
 |---|---|---|---|---|---|---|
-| 1 | `/admin` | Sign-in and first-run setup | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
-| 2 | `/admin/activate` | Staff invitation and password-reset landing | 4 / 6 | 66.7% | L, T | recovery, mobile |
-| 3 | `/admin/dashboard` | Legacy admin dashboard | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
+| 1 | `/admin` | Sign-in and first-run setup | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 2 | `/admin/activate` | Staff invitation and password-reset landing | 5 / 6 | 83.3% | L, T | recovery |
+| 3 | `/admin/dashboard` | Legacy Discovery Portal | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
 | 4 | `/admin/submissions/:id` | Legacy submission detail | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 5 | `/admin/crm/dashboard` | Command Center | 2 / 6 | 33.3% | L | persist, permission, recovery, mobile |
-| 6 | `/admin/crm/leads/:id/dna` | Lead DNA | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
+| 5 | `/admin/crm/dashboard` | Command Center | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 6 | `/admin/crm/leads/:id/dna` | Lead DNA | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 7 | `/admin/crm/leads/:id` | Contact record | 4 / 6 | 66.7% | L, T, R | persist, recovery |
-| 8 | `/admin/crm/leads` | Contacts | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
-| 9 | `/admin/crm/communications` | Communications | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 10 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 11 | `/admin/crm/intelligence/automation-queue` | Automation queue | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 12 | `/admin/crm/inbox` | Inbox | 3 / 6 | 50.0% | L | permission, recovery, mobile |
-| 13 | `/admin/crm/tasks` | All tasks | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 14 | `/admin/crm/calendar` | Calendar | 2 / 6 | 33.3% | L, R | persist, permission, recovery, mobile |
+| 8 | `/admin/crm/leads` | Contacts | 4 / 6 | 66.7% | L, T | persist, recovery |
+| 9 | `/admin/crm/communications` | Communications | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 10 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 11 | `/admin/crm/intelligence/automation-queue` | Automation queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 12 | `/admin/crm/inbox` | Inbox | 4 / 6 | 66.7% | L | permission, recovery |
+| 13 | `/admin/crm/tasks` | All tasks | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 14 | `/admin/crm/calendar` | Calendar | 4 / 6 | 66.7% | L, R | permission, recovery |
 | 15 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 16 | `/admin/crm/transactions` | Transactions | 2 / 6 | 33.3% | L | persist, permission, recovery, mobile |
-| 17 | `/admin/crm/projects` | Projects | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 18 | `/admin/crm/documents` | Documents | 3 / 6 | 50.0% | L | permission, recovery, mobile |
-| 19 | `/admin/crm/support` | Support | 4 / 6 | 66.7% | L, T | recovery, mobile |
-| 20 | `/admin/crm/pipeline` | Pipeline | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 21 | `/admin/crm/reporting` | Reporting | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 22 | `/admin/crm/admin` | Admin hub | 3 / 6 | 50.0% | L | permission, recovery, mobile |
-| 23 | `/admin/crm/workspace` | Sales workspace | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 24 | `/admin/crm/campaigns` | Sequences | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 25 | `/admin/crm/campaign-builder` | Marketing | 3 / 6 | 50.0% | L, T, R | persist, recovery, mobile |
-| 26 | `/admin/crm/campaign-queue` | Sequence queue | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
+| 16 | `/admin/crm/transactions` | Transactions | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 17 | `/admin/crm/projects` | Projects | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 18 | `/admin/crm/documents` | Documents | 4 / 6 | 66.7% | L | permission, recovery |
+| 19 | `/admin/crm/support` | Support | 5 / 6 | 83.3% | L, T | recovery |
+| 20 | `/admin/crm/pipeline` | Pipeline | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 21 | `/admin/crm/reporting` | Reporting | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 22 | `/admin/crm/admin` | Admin hub | 4 / 6 | 66.7% | L | permission, recovery |
+| 23 | `/admin/crm/workspace` | Sales workspace | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 24 | `/admin/crm/campaigns` | Sequences | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 25 | `/admin/crm/campaign-builder` | Marketing | 4 / 6 | 66.7% | L, T, R | persist, recovery |
+| 26 | `/admin/crm/campaign-queue` | Sequence queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 27 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 28 | `/admin/crm/intake-cases` | Intake cases | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 29 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
-| 30 | `/admin/crm/email-templates` | Email templates | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
+| 28 | `/admin/crm/intake-cases` | Intake cases | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 29 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 30 | `/admin/crm/email-templates` | Email templates | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
 | 31 | `/admin/crm/import` | Import contacts | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 32 | `/admin/crm/duplicates` | Duplicate review | 2 / 6 | 33.3% | L, T | persist, permission, recovery, mobile |
+| 32 | `/admin/crm/duplicates` | Duplicate review | 3 / 6 | 50.0% | L, T | persist, permission, recovery |
 | 33 | `/admin/crm/settings` | Settings | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 34 | `/admin/crm/people` | People | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
-| 35 | `/admin/crm/account` | My account | 3 / 6 | 50.0% | L | permission, recovery, mobile |
-| 36 | `/admin/crm/operations` | Operations | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
+| 34 | `/admin/crm/people` | People | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 35 | `/admin/crm/account` | My account | 4 / 6 | 66.7% | L | permission, recovery |
+| 36 | `/admin/crm/operations` | Operations | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
 | 37 | `/admin/crm/my-day` | My Day | 5 / 6 | 83.3% | L | permission |
-| 38 | `/admin/ops/firms/:id` | Receptionist firm detail | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
-| 39 | `/admin/ops/firms` | Receptionist firms | 2 / 6 | 33.3% | L, T | action, persist, recovery, mobile |
-| 40 | `/admin/ops/issues` | Receptionist issues | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
-| 41 | `/admin/ops/usage` | Receptionist usage | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
-| 42 | `/admin/ops/numbers` | Receptionist numbers | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 38 | `/admin/ops/firms/:id` | Receptionist firm detail | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 39 | `/admin/ops/firms` | Receptionist firms | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 40 | `/admin/ops/issues` | Receptionist issues | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
+| 41 | `/admin/ops/usage` | Receptionist usage | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
+| 42 | `/admin/ops/numbers` | Receptionist numbers | 2 / 6 | 33.3% | L, T | open, action, persist, recovery |
 | 43 | `/portal/sign-in` | Portal sign-in | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 44 | `/portal/accept` | Portal invitation landing | 4 / 6 | 66.7% | L, T, R | persist, recovery |
 | 45 | `/portal` | Portal home | 3 / 6 | 50.0% | L, T | action, persist, recovery |
@@ -125,7 +125,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | 2026-09-15 | Owner brief §4: retries and ambiguous outcomes without duplicate delivery | Passed |
 | 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | 2026-09-15 | Owner brief §4: save and resume drafts, and preserve drafts on failures | Built, not proven |
 | 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | 2026-09-15 | Owner brief §4: template editing, branding and personalisation | Passed |
-| 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | 2026-09-15 | Owner brief §4: campaigns, sequences and queues must be understandable | Built, not proven |
+| 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | 2026-09-15 | Owner brief §4: campaigns, sequences and queues must be understandable | Passed |
 | 7.17 | A real AI draft is produced in the campaign editor | 2026-09-15 | Owner brief §2: verify a real draft in the campaign editor | Not passed |
 | 11.10 | Receptionist accounts, receptionist firms and firm diagnostics work with a staff session and enforce permissions | 2026-09-15 | Owner brief §3: the three pages whose data requests reject staff sessions | Passed |
 
@@ -230,7 +230,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | Passed | T | Claim-before-send, same-key retry, simultaneous retry and crash-resume tests, plus a provider 5xx stored as unknown and never retried (matching reminders and support); mutation-checked, green on the committed candidate a3c56b3 |
 | 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | Built, not proven | — | campaignDraft.test.ts (12) and campaignRequests.test.ts (9) prove the logic; the restore prompt has not been used in a browser |
 | 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | Passed | T | Preview and delivery compared byte for byte (subject, HTML, text, stored copy, branding and fallbacks), and template editing tested; green on the committed candidate a3c56b3 |
-| 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | Built, not proven | — | One shared naming module with messagingConcepts.test.ts; not yet seen in a browser |
+| 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | Passed | L, T | messagingConcepts.test.ts. In the browser, each page opens with a heading and a summary of what it is (“One email, sent once, to a list of people”; “Several messages over days”; “Every message a sequence has scheduled”), and the nav reads Marketing / Sequences / Sequence Queue. The Sequences page's leftover “Campaigns” tab and empty states were renamed (03d339e) |
 | 7.17 | A real AI draft is produced in the campaign editor | Not passed | — | The production server's AI integration answered a real request (HTTP 200, 2026-09-15), but no draft has come through the editor: the local server has no AI key and production still runs the old build |
 
 ### 8. Reporting and analytics
@@ -328,7 +328,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 
 | ID | Criterion | Status | Env | Evidence / gap |
 |---|---|---|---|---|
-| 15.1 | Staff pages have no clipped or unreachable content at 375px | Passed | L | 26 pages measured for unreachable elements at a real 375×812 viewport; two defects found and fixed |
+| 15.1 | Staff pages have no clipped or unreachable content at 375px | Passed | L | Every staff route measured at a real 375×812 viewport with the validated clipped-content metric (evening of 2026-09-15). The sweep found two defects the earlier record had missed, both fixed and re-measured: the shared header's action row hid the profile menu (sign out, My account) on every staff page, and the Sequences header hid “New sequence”. Every measurable route now shows 0. The two legacy Discovery Portal pages redirect a staff session, so they could not be measured as themselves |
 | 15.2 | Wide tables scroll inside their own container | Passed | L | Import plan table scrolls in a 342px container |
 | 15.3 | Controls are reachable by touch | Passed | L | Deals edit tapped and the dialog opened on a touch device |
 | 15.4 | Populated Discovery and Settings tables are verified on a phone | Passed | L | Both rendered populated and measured at 375px |
@@ -386,7 +386,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | A signed-in session surviving a reload is tested at the API (crmStaffAuth.test.ts), not recorded in a browser |
 | permission | Passed | T | Wrong passwords refused and sign-in throttled in the database (crmStaffAuth.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | No 375px measurement recorded |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/activate` — Staff invitation and password-reset landing
 
@@ -397,29 +397,29 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Passed | L | The activated account signs in afterwards and keeps a live session |
 | permission | Passed | T | Invitations expire and are consumed atomically; a replayed token answers 404 (crmStaffAuth.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | No 375px measurement recorded |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15: 0 elements clipped without a scrollable ancestor (validated metric) |
 
-### `/admin/dashboard` — Legacy admin dashboard
+### `/admin/dashboard` — Legacy Discovery Portal
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Never opened in a recorded sweep: the 2026-09-15 table listed 47 routes and missed this one |
-| action | Built, not proven | — | Not exercised |
+| open | Not passed | — | Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix, opening it also wiped the session's CSRF token and bounced the person to sign-in |
+| action | Built, not proven | — | Unreachable with a staff session |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Built, not proven | — | Could not be measured as itself: a staff session was redirected to sign-in |
 
 ### `/admin/submissions/:id` — Legacy submission detail
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Never opened in a recorded sweep: missing from the 2026-09-15 table |
-| action | Built, not proven | — | Not exercised |
+| open | Not passed | — | Its data (/api/admin/submissions/:id) is guarded by the retired shared admin credential and answers 401 to a staff session, so it shows nothing; the CRM's Discovery page is the working equivalent |
+| action | Built, not proven | — | Unreachable with a staff session |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Built, not proven | — | Could not be measured as itself: a staff session was redirected to sign-in |
 
 ### `/admin/crm/dashboard` — Command Center
 
@@ -430,7 +430,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Filters and figures after a reload not recorded |
 | permission | Built, not proven | — | Mine/Team scoping not exercised with a restricted user |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15, but that table marks 30 pages clean against 26 measured with the clipped-content metric, so which were measured cannot be told. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15, measured both before and after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/leads/:id/dna` — Lead DNA
 
@@ -441,7 +441,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not reloaded |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/leads/:id` — Contact record
 
@@ -463,7 +463,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not reloaded |
 | permission | Passed | T | Export requires data.export; a user without it is refused (crmContacts.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/communications` — Communications
 
@@ -474,7 +474,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/intelligence/behavioral` — Behavioral intelligence
 
@@ -485,7 +485,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/intelligence/automation-queue` — Automation queue
 
@@ -496,7 +496,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/inbox` — Inbox
 
@@ -507,7 +507,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Passed | L | An unsent draft survived a full reload |
 | permission | Built, not proven | — | Not exercised with a restricted user |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/tasks` — All tasks
 
@@ -518,7 +518,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/calendar` — Calendar
 
@@ -526,10 +526,10 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 |---|---|---|---|
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
 | action | Passed | L, R | On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs |
-| persist | Built, not proven | — | Not recorded after a reload |
+| persist | Passed | L | After a full reload and selecting Sep 17, the card showed the rescheduled 11:00–11:30 time, status cancelled, and “Cancellation sent” for both attendees |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/deals` — Deals
 
@@ -551,7 +551,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/projects` — Projects
 
@@ -562,7 +562,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/documents` — Documents
 
@@ -573,7 +573,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Passed | L | After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/support` — Support
 
@@ -584,7 +584,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Passed | L | The reply sent from this page was read back by the customer's own session in the portal thread |
 | permission | Passed | L, T | The internal note was absent from the customer view; barred by a database CHECK and a route test |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/pipeline` — Pipeline
 
@@ -595,7 +595,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/reporting` — Reporting
 
@@ -606,7 +606,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/admin` — Admin hub
 
@@ -617,7 +617,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Passed | L | After a full reload: 7 contacts belong to a person, 0 unresolved, and 3 decisions recorded |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/workspace` — Sales workspace
 
@@ -628,7 +628,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/campaigns` — Sequences
 
@@ -639,7 +639,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/campaign-builder` — Marketing
 
@@ -650,7 +650,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Autosave not checked across a reload in the browser |
 | permission | Passed | T | Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts) |
 | recovery | Built, not proven | — | Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used, and the page has changed since. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/campaign-queue` — Sequence queue
 
@@ -661,7 +661,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/discovery` — Discovery submissions
 
@@ -683,7 +683,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/receptionist-accounts` — Receptionist accounts
 
@@ -694,7 +694,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/email-templates` — Email templates
 
@@ -705,7 +705,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/import` — Import contacts
 
@@ -727,7 +727,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not reloaded after the merge |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/settings` — Settings
 
@@ -749,7 +749,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Self-escalation, unauthorised role changes and removing the last owner are refused (crmStaffAuth.test.ts) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/account` — My account
 
@@ -760,7 +760,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Passed | L | The Asia/Manila timezone persisted |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Recorded clean on 2026-09-15 without saying which metric was used. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/operations` — Operations
 
@@ -771,7 +771,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | The Automation tab was checked at 375px against a stubbed API only. Re-measure |
+| mobile | Passed | L | Real 375×812 viewport with live data, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/my-day` — My Day
 
@@ -793,7 +793,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/ops/firms` — Receptionist firms
 
@@ -804,7 +804,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/ops/issues` — Receptionist issues
 
@@ -815,7 +815,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session, staff without settings.read, and a mutation without CSRF or the right grant (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/ops/usage` — Receptionist usage
 
@@ -826,7 +826,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/ops/numbers` — Receptionist numbers
 
@@ -837,7 +837,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | persist | Built, not proven | — | Not exercised |
 | permission | Passed | T | Refuses no credential, a forged cookie, a receptionist customer session and staff without settings.read (receptionistOpsAuth.test.ts, green on a3c56b3) |
 | recovery | Built, not proven | — | Not exercised |
-| mobile | Built, not proven | — | Not measured |
+| mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/portal/sign-in` — Portal sign-in
 
