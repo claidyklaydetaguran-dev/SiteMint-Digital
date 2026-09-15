@@ -409,6 +409,8 @@ export async function syncAssistant(id: number): Promise<SynchronizedAssistantRe
 export interface BrowserTestSessionDto {
   provider: string;
   providerAssistantId: string;
+  /** Scoped to this assistant only. Held in memory for the call; never stored. */
+  publicKey: string;
 }
 
 /**

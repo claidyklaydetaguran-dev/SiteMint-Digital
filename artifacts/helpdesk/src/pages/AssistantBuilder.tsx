@@ -161,6 +161,7 @@ const unsavedChangesPrompt: string | null = publishInBuild
 const NO_BROWSER_TEST: UseBrowserVoiceTestResult = {
   state: "idle",
   errorMessage: null,
+  supportReference: null,
   elapsedSeconds: 0,
   clientAvailable: false,
   isActive: false,
@@ -631,7 +632,11 @@ export default function AssistantBuilder() {
               setTestSessionError(BROWSER_TEST_SESSION_ERROR);
               return;
             }
-            browserTest.start({ provider: "vapi", providerAssistantId: session.providerAssistantId });
+            browserTest.start({
+              provider: "vapi",
+              providerAssistantId: session.providerAssistantId,
+              publicKey: session.publicKey,
+            });
           })
           .catch(() => {
             // Never surfaces the response body: it could carry provider text.
@@ -799,6 +804,7 @@ export default function AssistantBuilder() {
               assistantName={draft.setup.assistantName || "Untitled assistant"}
               elapsedSeconds={browserTest.elapsedSeconds}
               errorMessage={browserTest.errorMessage}
+              supportReference={browserTest.supportReference}
               onEnd={browserTest.end}
               onDismiss={browserTest.dismiss}
             />

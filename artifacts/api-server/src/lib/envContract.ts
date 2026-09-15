@@ -41,6 +41,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["CALENDAR_WRITE_ENABLED", "P4", "Writing booked appointments into connected calendars"],
   ["VOICE_SMS_ENABLED", "P5", "Voice-side SMS sending (consent-gated outbox)"],
   ["VOICE_ALERTS_ENABLED", "P7", "Operator email alerts (critical issues)"],
+  ["VOICE_BROWSER_TOKEN_ORIGINS", "AR-001V.3", "Origins a scoped browser token may be used from; falls back to CORS_ALLOWED_ORIGINS"],
   ["VOICE_DIGEST_ENABLED", "P7", "Daily per-firm digest emails"],
   ["STRIPE_BOOT_SYNC_ENABLED", "core", "Stripe webhook registration/backfill at boot"],
   ["CRM_MARKETING_AUTOSEND_ENABLED", "M4", "Scheduled marketing broadcasts starting themselves on the CRM scheduler tick — the only worker that can email customers with nobody pressing Send"],

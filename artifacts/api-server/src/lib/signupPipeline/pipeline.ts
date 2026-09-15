@@ -19,7 +19,20 @@
 // form's non-secret fields, and the CRM record carries name/company/contact
 // data only.
 
-import { db, crmLeads, intakeFirms } from "@workspace/db";
+// Tables come from the schema entry, which builds no client. The DATABASE-
+// BACKED `db` is resolved lazily instead: `@workspace/db` THROWS at import
+// time when DATABASE_URL is unset, so importing it at module scope would make
+// merely importing this file fatal — which is exactly what took this module's
+// own test suite out of the run (it injects its dependencies and provisions no
+// database). Every other api-server module that touches the database resolves
+// it the same way.
+import { crmLeads, intakeFirms } from "@workspace/db/schema";
+
+let workspaceDbModule: Promise<typeof import("@workspace/db")> | null = null;
+function wdb(): Promise<typeof import("@workspace/db")> {
+  workspaceDbModule ??= import("@workspace/db");
+  return workspaceDbModule;
+}
 import {
   voiceSignupJobs,
   type VoiceSignupJob,
@@ -50,7 +63,7 @@ export async function enqueueSignupJobs(
   kinds: VoiceSignupJobKind[],
 ): Promise<void> {
   if (kinds.length === 0) return;
-  await db
+  await (await wdb()).db
     .insert(voiceSignupJobs)
     .values(kinds.map((kind) => ({ firmId, kind, payload })))
     .onConflictDoNothing();
@@ -82,7 +95,7 @@ async function productionDeps(): Promise<SignupJobDeps> {
   const { createAlertTransportFromEnv } = await import("../voiceAlerts/alertTransport.js");
   return {
     findLeadByEmail: async (emailLower) => {
-      const [row] = await db
+      const [row] = await (await wdb()).db
         .select({ id: crmLeads.id, tags: crmLeads.tags, notes: crmLeads.notes })
         .from(crmLeads)
         .where(sql`lower(${crmLeads.email}) = ${emailLower}`)
@@ -90,17 +103,17 @@ async function productionDeps(): Promise<SignupJobDeps> {
       return row;
     },
     insertLead: async (values) => {
-      const [row] = await db.insert(crmLeads).values(values).returning({ id: crmLeads.id });
+      const [row] = await (await wdb()).db.insert(crmLeads).values(values).returning({ id: crmLeads.id });
       return row;
     },
     tagLead: async (leadId, tags, noteLine) => {
-      const [existing] = await db
+      const [existing] = await (await wdb()).db
         .select({ notes: crmLeads.notes })
         .from(crmLeads)
         .where(eq(crmLeads.id, leadId))
         .limit(1);
       const notes = existing?.notes ? `${existing.notes}\n${noteLine}` : noteLine;
-      await db.update(crmLeads).set({ tags, notes, updatedAt: new Date() }).where(eq(crmLeads.id, leadId));
+      await (await wdb()).db.update(crmLeads).set({ tags, notes, updatedAt: new Date() }).where(eq(crmLeads.id, leadId));
     },
     requestVerificationEmail: (firmId) => requestEmailVerification(firmId),
     sendWelcomeEmail: async (to, firmName) => {
@@ -130,7 +143,7 @@ async function productionDeps(): Promise<SignupJobDeps> {
       return result.ok ? { ok: true } : { ok: false, reason: (result as { reason?: string }).reason };
     },
     findFirmEmail: async (firmId) => {
-      const [row] = await db
+      const [row] = await (await wdb()).db
         .select({ email: intakeFirms.email, name: intakeFirms.name })
         .from(intakeFirms)
         .where(eq(intakeFirms.id, firmId))
@@ -201,7 +214,7 @@ export function backoffDelayMs(attempts: number): number {
 }
 
 async function claimDueJobs(now: Date): Promise<VoiceSignupJob[]> {
-  return db.transaction(async (tx) => {
+  return (await wdb()).db.transaction(async (tx) => {
     const leaseDeadline = new Date(now.getTime() - LEASE_MS);
     const due = await tx
       .select({ id: voiceSignupJobs.id })
@@ -233,7 +246,7 @@ async function claimDueJobs(now: Date): Promise<VoiceSignupJob[]> {
 
 async function settleJob(job: VoiceSignupJob, outcome: JobOutcome, now: Date): Promise<void> {
   if (outcome.ok) {
-    await db
+    await (await wdb()).db
       .update(voiceSignupJobs)
       .set({ status: "completed", result: outcome.result, lastError: null, updatedAt: now })
       .where(eq(voiceSignupJobs.id, job.id));
@@ -241,7 +254,7 @@ async function settleJob(job: VoiceSignupJob, outcome: JobOutcome, now: Date): P
   }
   const attempts = job.attempts + 1;
   const exhausted = !outcome.retryable || attempts >= job.maxAttempts;
-  await db
+  await (await wdb()).db
     .update(voiceSignupJobs)
     .set({
       status: exhausted ? "permanently_failed" : "retry_scheduled",
@@ -300,7 +313,7 @@ async function productionReconcileDeps(): Promise<ReconcileDeps> {
   return {
     findAccountsMissingCrmLink: async (limit) => {
       // Receptionist accounts (password_hash set) with no crm_link job row.
-      const rows = await db
+      const rows = await (await wdb()).db
         .select({ id: intakeFirms.id, email: intakeFirms.email, name: intakeFirms.name, industry: intakeFirms.industry })
         .from(intakeFirms)
         .where(

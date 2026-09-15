@@ -1,8 +1,6 @@
 import type { BrowserVoiceClient } from "../types";
 import type { BrowserVoiceClientSource } from "../context";
-import { UnavailableBrowserVoiceClient } from "../UnavailableBrowserVoiceClient";
 import { VapiBrowserVoiceClient } from "./VapiBrowserVoiceClient";
-import { getVapiPublicKey } from "./config";
 import type { VapiSdkConstructor, VapiSdkLoader } from "./sdkTypes";
 
 /**
@@ -25,13 +23,18 @@ const loadVapiSdk: VapiSdkLoader = () =>
  */
 export function createProductionBrowserVoiceClientSource(): BrowserVoiceClientSource {
   return {
+    // AR-001V.3: availability no longer depends on a build-time key. The
+    // credential now arrives per session from the authenticated
+    // browser-test-session endpoint, so the server is the authority on whether
+    // a given assistant can be tested. The client build flag still decides
+    // whether any of this code ships at all.
     get available(): boolean {
-      return getVapiPublicKey() !== null;
+      return true;
     },
     create(): BrowserVoiceClient {
-      const publicKey = getVapiPublicKey();
-      if (!publicKey) return new UnavailableBrowserVoiceClient();
-      return new VapiBrowserVoiceClient(publicKey, loadVapiSdk);
+      // The constructor key is intentionally empty: start() uses the scoped
+      // key from its input and refuses to run without one.
+      return new VapiBrowserVoiceClient("", loadVapiSdk);
     },
   };
 }

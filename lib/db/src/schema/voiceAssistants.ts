@@ -55,6 +55,25 @@ export const voiceAssistants = pgTable("voice_assistants", {
   providerSyncStartedAt:  timestamp("provider_sync_started_at", { withTimezone: true }),
   /** Short static code from PROVIDER_SYNC_ERROR_CODES. Never provider text, payloads, ids, prompts, or caller data. */
   providerSyncError:      text("provider_sync_error"),
+  // ── AR-001V.3: per-assistant browser call credential ─────────────────────
+  // A Vapi *public* token restricted by allowedAssistantIds to THIS assistant
+  // (and to our dashboard origin, with transient assistants disallowed). It is
+  // minted server-side with the private key and handed only to the owning firm,
+  // through the already firm-scoped browser-test-session endpoint.
+  //
+  // Why per-assistant rather than one shared browser key: a shared key lets any
+  // holder start ANY assistant in the org, and neither of the things that might
+  // seem to prevent that actually does. Assistant ids are not secret (the Web
+  // SDK is handed one verbatim), and the origin allowlist is not authentication
+  // — a plain server-side request can set the Origin header to anything, which
+  // was demonstrated against the live provider on 2026-09-11. The provider
+  // refusing a cross-business assistant id (403) is the only control that holds.
+  //
+  // browserTokenValue IS a credential: never return it for another firm, never
+  // log it, never include it in a list response.
+  browserTokenId:       text("browser_token_id"),
+  browserTokenValue:    text("browser_token_value"),
+  browserTokenIssuedAt: timestamp("browser_token_issued_at", { withTimezone: true }),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

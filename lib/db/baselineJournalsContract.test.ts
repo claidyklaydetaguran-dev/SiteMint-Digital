@@ -94,9 +94,10 @@ check(
 // ── 3. Expected pairs derive from the committed folders ──────────────────────
 
 const expectedAll = readAllExpectedMigrations();
-// Raised from eleven by voice migration 0008 (voice_signup_jobs). Derived from
+// Raised from eleven by voice migration 0008 (voice_signup_jobs), then to
+// thirteen by voice 0009 (per-assistant browser token columns). Derived from
 // the committed folders, so update it only alongside a reviewed migration.
-check("the committed folders describe twelve migrations", expectedAll.length === 12, String(expectedAll.length));
+check("the committed folders describe thirteen migrations", expectedAll.length === 13, String(expectedAll.length));
 check(
   "expected migrations are unique by created_at",
   new Set(expectedAll.map((e) => e.createdAt)).size === expectedAll.length,

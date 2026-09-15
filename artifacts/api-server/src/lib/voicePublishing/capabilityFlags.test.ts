@@ -342,7 +342,7 @@ describe("publish and synchronization are independent", () => {
 // ─── Browser-test session boundary ─────────────────────────────────────────
 
 describe("browser-test session metadata", () => {
-  function sessionDeps(row: unknown, spy: { count: number }) {
+  function sessionDeps(row: unknown, spy: { count: number; mints?: number }) {
     return {
       isEnabled: isVoiceBrowserTestEnabled,
       findByIdForFirm: async (firmId: number, id: number) => {
@@ -350,6 +350,14 @@ describe("browser-test session metadata", () => {
         const r = row as { firmId: number; id: number } | null;
         if (!r || r.firmId !== firmId || r.id !== id) return null;
         return row as never;
+      },
+      // AR-001V.3: a scoped browser token is minted only for an assistant that
+      // has none. The counter lets a test prove no provider call happens on the
+      // denied path or when a token already exists.
+      setBrowserToken: async () => row as never,
+      mintBrowserToken: async () => {
+        spy.mints = (spy.mints ?? 0) + 1;
+        return { tokenId: "tok_test", tokenValue: "pk_test_value" };
       },
     };
   }
@@ -426,17 +434,23 @@ describe("browser-test session metadata", () => {
     );
   });
 
-  it("returns exactly two fields and nothing else when everything checks out", async () => {
+  it("returns exactly three fields and nothing else when everything checks out", async () => {
     process.env[VOICE_BROWSER_TEST_ENABLED_ENV_VAR] = "true";
-    const spy = { count: 0 };
+    const spy = { count: 0, mints: 0 };
 
     const result = await getBrowserTestSession(FIRM_ID, ASSISTANT_ID, sessionDeps(publishedRow(), spy));
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(Object.keys(result.session).sort()).toEqual(["provider", "providerAssistantId"]);
+    // AR-001V.3 widened this response by exactly one field: a browser
+    // credential scoped to THIS assistant. The set stays closed — the point of
+    // the assertion is that nothing else ever joins it.
+    expect(Object.keys(result.session).sort()).toEqual(["provider", "providerAssistantId", "publicKey"]);
     expect(result.session.provider).toBe("vapi");
     expect(result.session.providerAssistantId).toBe(PROVIDER_ASSISTANT_ID);
+    expect(result.session.publicKey).toBe("pk_test_value");
+    // The row had no token, so exactly one was minted — never more than one.
+    expect(spy.mints).toBe(1);
 
     // No prompt, no config, no key, no firm id, no database field, no publish
     // metadata, and nothing that could seed a transient assistant.
@@ -444,5 +458,31 @@ describe("browser-test session metadata", () => {
     for (const forbidden of ["Be helpful", "Hello.", "natural-balanced", "firmId", "createdAt", "status", "config", "publish"]) {
       expect(serialized).not.toContain(forbidden);
     }
+  });
+
+  it("mints no token when the assistant already has one", async () => {
+    process.env[VOICE_BROWSER_TEST_ENABLED_ENV_VAR] = "true";
+    const spy = { count: 0, mints: 0 };
+    const row = { ...(publishedRow() as Record<string, unknown>), browserTokenValue: "pk_existing" };
+
+    const result = await getBrowserTestSession(FIRM_ID, ASSISTANT_ID, sessionDeps(row, spy));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.session.publicKey).toBe("pk_existing");
+    // An ordinary repeat browser test must not create provider tokens.
+    expect(spy.mints).toBe(0);
+  });
+
+  it("reports the capability as unavailable rather than falling back to a shared key", async () => {
+    process.env[VOICE_BROWSER_TEST_ENABLED_ENV_VAR] = "true";
+    const spy = { count: 0, mints: 0 };
+    const deps = { ...sessionDeps(publishedRow(), spy), mintBrowserToken: async () => null };
+
+    const result = await getBrowserTestSession(FIRM_ID, ASSISTANT_ID, deps);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("browser_token_unavailable");
   });
 });

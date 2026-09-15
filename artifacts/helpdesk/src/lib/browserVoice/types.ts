@@ -6,6 +6,8 @@
  * provider client landing in Checkpoint F2.
  */
 
+import type { BrowserVoiceErrorCategory } from "./errors";
+
 export type BrowserVoiceTestState =
   | "idle"
   | "preparing"
@@ -26,7 +28,12 @@ export type BrowserVoiceEvent =
   | { type: "call-start" }
   | { type: "call-end" }
   | { type: "permission-denied" }
-  | { type: "error" };
+  // AR-001V.2: `category` is a value from OUR closed enum, chosen by the
+  // provider client from the shape of the provider's failure. It is not
+  // provider text and never becomes provider text — the consumer still looks
+  // the displayed copy up in our own static table. Optional so a client that
+  // cannot classify a failure stays valid.
+  | { type: "error"; category?: BrowserVoiceErrorCategory; providerStatus?: number };
 
 /**
  * Only the opaque provider assistant id crosses this boundary — never
@@ -35,6 +42,14 @@ export type BrowserVoiceEvent =
 export interface BrowserVoiceStartInput {
   provider: "vapi";
   providerAssistantId: string;
+  /**
+   * AR-001V.3: the provider credential for THIS assistant, issued per session
+   * by the authenticated, firm-scoped browser-test-session endpoint. It
+   * replaces the build-time key, which could start any assistant in the
+   * organisation. There is deliberately no fallback to that shared key: if the
+   * server does not issue one, the test does not start.
+   */
+  publicKey: string;
 }
 
 export interface BrowserVoiceClient {

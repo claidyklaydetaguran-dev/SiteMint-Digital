@@ -11,7 +11,14 @@
 import { VoiceProviderError } from "../../errors";
 import { validateAssistantInput, validateProviderAssistantId } from "../../validation";
 import type { VoiceProvider } from "../../VoiceProvider";
-import type { JsonObject, VoiceAssistantDeleteResult, VoiceAssistantInput, VoiceAssistantResult } from "../../types";
+import type {
+  JsonObject,
+  VoiceAssistantDeleteResult,
+  VoiceAssistantInput,
+  VoiceAssistantResult,
+  VoiceBrowserTokenInput,
+  VoiceBrowserTokenResult,
+} from "../../types";
 import { VAPI_PROVIDER_KEY, type VapiProviderConfig } from "./config";
 import { buildVapiArtifactPlan, loadVoiceArtifactPolicyFromEnv } from "./artifactPolicy";
 import { buildVapiAssistantRequestBody, mapVapiAssistantResponse } from "./mapper";
@@ -225,6 +232,49 @@ export class VapiVoiceProvider implements VoiceProvider {
     const body = buildVapiAssistantRequestBody(name, runtimeConfig, this.resolveArtifactPlan());
     const raw = await this.request("POST", "/assistant", body);
     return mapVapiAssistantResponse(raw);
+  }
+
+  /**
+   * AR-001V.3. Creates a PUBLIC token restricted to this assistant only.
+   *
+   * Verified against the live provider on 2026-09-12: a token carrying
+   * `allowedAssistantIds: [A]` is refused with 403 when used to start a
+   * different assistant, and refused again for a transient assistant — with no
+   * call created, so a refusal costs nothing. That provider-side refusal is the
+   * tenant boundary; our own endpoints returning 404 to other firms is a
+   * separate, weaker layer that says nothing about a caller who goes straight
+   * to the provider.
+   */
+  async createBrowserToken(input: VoiceBrowserTokenInput): Promise<VoiceBrowserTokenResult> {
+    const assistantId = validateProviderAssistantId(input.providerAssistantId);
+    const origins = input.allowedOrigins
+      .map((o: string) => (typeof o === "string" ? o.trim() : ""))
+      .filter((o: string) => o.length > 0);
+    if (origins.length === 0) {
+      throw new VoiceProviderError("VALIDATION_FAILED", "A browser token requires at least one allowed origin.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+    const name = typeof input.name === "string" ? input.name.trim().slice(0, 80) : "";
+    const raw = await this.request("POST", "/token", {
+      tag: "public",
+      name: name.length > 0 ? name : "sitemint-browser-token",
+      restrictions: {
+        enabled: true,
+        allowedOrigins: origins,
+        allowedAssistantIds: [assistantId],
+        allowTransientAssistant: false,
+      },
+    });
+    const obj = raw as { id?: unknown; value?: unknown };
+    const tokenId = typeof obj.id === "string" ? obj.id.trim() : "";
+    const tokenValue = typeof obj.value === "string" ? obj.value.trim() : "";
+    if (tokenId.length === 0 || tokenValue.length === 0) {
+      throw new VoiceProviderError("PROVIDER_ERROR", "Vapi returned an unusable browser token.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+    return { tokenId, tokenValue };
   }
 
   async getAssistant(providerAssistantId: string): Promise<VoiceAssistantResult> {

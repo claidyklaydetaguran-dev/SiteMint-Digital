@@ -18,6 +18,7 @@ import {
   loadVoiceArtifactPolicyFromEnv,
   type VoiceArtifactPolicy,
 } from "../voice/providers/vapi/artifactPolicy.js";
+import { computeProviderPayloadHash } from "./providerPayloadHash.js";
 import {
   voiceAssistantRepository,
   STALE_PUBLISHING_THRESHOLD_MS,
@@ -429,6 +430,21 @@ export async function publishAssistant(
   }
 
   // STEP 6 — successful finalization.
+  //
+  // Record the digest of the payload this publish actually sent. The sync
+  // builder is an identical construction (see buildSyncProviderInput), so an
+  // untouched assistant now derives `synchronized` immediately after publish
+  // instead of `local_changes`. It is the digest of what was SENT, not of the
+  // row as it stands at finalize time — so a draft the owner edited while the
+  // publish was in flight still differs from it and is correctly reported as
+  // unpublished rather than silently absorbed.
+  let publishedHash: string | null = null;
+  try {
+    publishedHash = computeProviderPayloadHash(providerInput, deps.loadArtifactPolicy());
+  } catch {
+    publishedHash = null;
+  }
+
   let finalized: VoiceAssistant | null = null;
   try {
     finalized = await deps.repository.finalizePublished(
@@ -437,6 +453,7 @@ export async function publishAssistant(
       publishAttemptId,
       providerResult.provider,
       providerResult.providerAssistantId,
+      publishedHash,
     );
   } catch {
     finalized = null;

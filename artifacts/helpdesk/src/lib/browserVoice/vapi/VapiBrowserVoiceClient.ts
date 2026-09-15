@@ -1,8 +1,104 @@
 import type { BrowserVoiceClient, BrowserVoiceEvent, BrowserVoiceStartInput } from "../types";
-import { safeBrowserVoiceErrorMessage } from "../errors";
+import { safeBrowserVoiceErrorMessage, type BrowserVoiceErrorCategory } from "../errors";
 import type { VapiSdkEventListener, VapiSdkInstance, VapiSdkLoader } from "./sdkTypes";
 
 const PERMISSION_DENIED_ERROR_NAMES = new Set(["NotAllowedError", "PermissionDeniedError"]);
+
+/**
+ * Browser-standard DOMException names for "there is a microphone, but this
+ * browser cannot use it" — a different customer action from a denied
+ * permission prompt, so a different category.
+ */
+const DEVICE_ERROR_NAMES = new Set([
+  "NotFoundError",
+  "NotReadableError",
+  "OverconstrainedError",
+  "TrackStartError",
+]);
+
+function errorName(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const nested = (payload as { error?: { name?: unknown } }).error?.name;
+  if (typeof nested === "string") return nested;
+  const direct = (payload as { name?: unknown }).name;
+  return typeof direct === "string" ? direct : undefined;
+}
+
+/**
+ * Reads an HTTP status from the shapes the SDK actually surfaces when the
+ * provider's API refuses a web call. The provider's REST errors are
+ * `{ message, error, statusCode }`, and the SDK may hand that body over
+ * directly, wrapped in `{ error: … }`, or alongside a fetch `Response`.
+ *
+ * Only the NUMBER is read. The provider's `message` is deliberately never
+ * inspected and never rendered — classification is by status alone, which
+ * keeps the "no substring search over arbitrary error text" rule intact.
+ */
+export function providerStatus(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates: unknown[] = [
+    (payload as { statusCode?: unknown }).statusCode,
+    (payload as { status?: unknown }).status,
+    (payload as { error?: { statusCode?: unknown } }).error?.statusCode,
+    (payload as { error?: { status?: unknown } }).error?.status,
+    (payload as { response?: { status?: unknown } }).response?.status,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "number" && Number.isFinite(c) && c >= 100 && c <= 599) return c;
+  }
+  return null;
+}
+
+/**
+ * Maps one provider failure onto our own closed category enum.
+ *
+ * The authorization rule is deliberately NOT origin-specific. A browser key
+ * carries several independent restrictions — allowed origins, allowed
+ * assistants, whether transient assistants may be used — and the provider
+ * refuses all of them with the same 403. Verified against the live provider
+ * on 2026-09-11: the identical status arrived first as
+ * "doesn't allow origin '<site>'" and then, once the origin was corrected, as
+ * "doesn't allow assistantId '<id>'". The status alone cannot tell those
+ * apart, and the only thing that could is the provider's free-text message,
+ * which this module never inspects and never renders.
+ *
+ * So 401/403 map to one honest category — the request was not authorized by
+ * the provider's current configuration — whose copy names BOTH settings an
+ * administrator should check, and which always carries a support reference.
+ * Guessing "it's the origin" would have been wrong half the time today.
+ */
+export function classifyVapiError(payload: unknown): BrowserVoiceErrorCategory {
+  const name = errorName(payload);
+  if (name && PERMISSION_DENIED_ERROR_NAMES.has(name)) return "permission_denied";
+  if (name && DEVICE_ERROR_NAMES.has(name)) return "microphone_unavailable";
+
+  const status = providerStatus(payload);
+  if (status === 401 || status === 403) return "provider_not_authorized";
+  if (status !== null && status >= 400 && status < 500) return "provider_refused";
+  if (status !== null && status >= 500) return "provider_unavailable";
+
+  return "unexpected_browser_voice_error";
+}
+
+/**
+ * A sanitized one-line diagnostic for the browser console. Deliberately
+ * carries the classification and the HTTP status ONLY — never the provider's
+ * message, never the assistant id, never any part of a key. That is enough to
+ * tell an origin/assistant refusal (403) from an outage (5xx) when a support
+ * reference is quoted back, without putting provider text on screen or in a
+ * log.
+ */
+export function browserVoiceDiagnosticLine(
+  category: BrowserVoiceErrorCategory,
+  payload: unknown,
+  supportReference: string | null,
+): string {
+  const status = providerStatus(payload);
+  const parts = ["[browser-voice] test failed", "category=" + category];
+  if (status !== null) parts.push("providerStatus=" + status);
+  if (supportReference) parts.push("ref=" + supportReference);
+  return parts.join(" ");
+}
 
 /**
  * Reliable-only permission-denied detection: the installed SDK's `error`
@@ -58,7 +154,16 @@ export class VapiBrowserVoiceClient implements BrowserVoiceClient {
 
   private readonly onError: VapiSdkEventListener = (payload) => {
     if (this.destroyed) return;
-    this.emit(isPermissionDeniedError(payload) ? { type: "permission-denied" } : { type: "error" });
+    if (isPermissionDeniedError(payload)) {
+      this.emit({ type: "permission-denied" });
+      return;
+    }
+    const status = providerStatus(payload);
+    this.emit({
+      type: "error",
+      category: classifyVapiError(payload),
+      ...(status === null ? {} : { providerStatus: status }),
+    });
   };
 
   constructor(publicKey: string, loadSdk: VapiSdkLoader) {
@@ -71,6 +176,11 @@ export class VapiBrowserVoiceClient implements BrowserVoiceClient {
     if (input.provider !== "vapi") throw new Error(safeBrowserVoiceErrorMessage("start_failed"));
     const providerAssistantId = input.providerAssistantId.trim();
     if (!providerAssistantId) throw new Error(safeBrowserVoiceErrorMessage("start_failed"));
+    // The per-session scoped credential. Absent means the server did not issue
+    // one, and starting anyway would mean reaching for a broader key — so this
+    // fails closed instead.
+    const sessionKey = typeof input.publicKey === "string" ? input.publicKey.trim() : "";
+    if (!sessionKey) throw new Error(safeBrowserVoiceErrorMessage("integration_unavailable"));
     // Idempotent guard, set synchronously before any async work: a second
     // start while loading/active is a no-op, not an error — this also
     // guarantees rapid repeated confirmation triggers exactly one SDK
@@ -89,7 +199,7 @@ export class VapiBrowserVoiceClient implements BrowserVoiceClient {
     // network/microphone. No retry; destroy() already handled cleanup.
     if (this.destroyed) return;
 
-    const sdk = new SdkCtor(this.publicKey);
+    const sdk = new SdkCtor(sessionKey);
     this.sdk = sdk;
     sdk.on("call-start", this.onCallStart);
     sdk.on("call-end", this.onCallEnd);

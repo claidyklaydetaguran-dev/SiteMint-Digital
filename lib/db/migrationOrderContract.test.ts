@@ -640,6 +640,8 @@ check(
   // Voice 0008 raised it from twenty-nine: voice_signup_jobs.
   // Update this pin ONLY alongside a reviewed migration that changes
   // the inventory.
+  // Voice 0009 adds columns only (per-assistant browser tokens), so it
+  // leaves this count unchanged.
   "the committed migrations create exactly thirty domain tables",
   domainTables.length === 30,
   domainTables.join(","),

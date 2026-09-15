@@ -949,8 +949,16 @@ check(
 
 check(
   "the loader is still injected into the client rather than called to check availability",
-  /new VapiBrowserVoiceClient\(publicKey, loadVapiSdk\)/.test(vapiFactorySrc) &&
-    /get available\(\): boolean \{\s*return getVapiPublicKey\(\) !== null;/.test(vapiFactorySrc),
+  // AR-001V.3: the call credential is now issued per session by the server,
+  // so the factory holds no build-time key and availability no longer
+  // consults one. The property this assertion exists to protect is unchanged
+  // and is now checked directly: availability must stay a cheap,
+  // side-effect-free getter that neither loads the SDK nor builds a client.
+  /new VapiBrowserVoiceClient\("", loadVapiSdk\)/.test(vapiFactorySrc) &&
+    /get available\(\): boolean \{\s*return true;/.test(vapiFactorySrc) &&
+    !/get available\(\): boolean \{[^}]*(loadVapiSdk|import\(|new VapiBrowserVoiceClient)/.test(
+      vapiFactorySrc,
+    ),
 );
 
 check(
