@@ -73,7 +73,7 @@ export const ROUTES = {
   // Issues are, below.
   billing: "/account/billing",
   settings: "/account/settings",
-  /** Who else can sign in — the invite/revoke endpoints have existed since P8. */
+  /** Invited people (invite/list/revoke since P8). Team members cannot sign in yet. */
   team: "/account/team",
   support: "/account/support",
 
