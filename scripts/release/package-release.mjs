@@ -45,6 +45,7 @@ const SHIPPED_ROOTS = [
   "artifacts/helpdesk/vite.config.ts",
   "lib/db/src",
   "lib/db/drizzle",
+  "lib/db/push-packets",
   "lib/db/package.json",
   "pnpm-lock.yaml",
 ];
