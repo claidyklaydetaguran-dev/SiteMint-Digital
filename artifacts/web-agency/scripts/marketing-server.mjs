@@ -51,7 +51,7 @@ const APEX = "https://sitemintdigital.com";
  *
  * `/ai-toolkit` is deliberately absent — it is a public product microsite.
  */
-const PRIVATE_PREFIXES = ["/admin", "/ai-receptionist/dashboard", "/app"];
+const PRIVATE_PREFIXES = ["/admin", "/ai-receptionist/dashboard", "/app", "/portal"];
 const isPrivateSurface = (pathname) =>
   PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
@@ -70,6 +70,10 @@ const PROXY_PREFIXES = [
   "/ai-toolkit",
   "/admin",
   "/app",
+  // The CRM customer portal (/portal/sign-in, /portal/accept, ...) is served
+  // by the same upstream application as /admin. Without this prefix every
+  // portal invitation link lands on the marketing 404.
+  "/portal",
 ];
 
 // Valid-but-not-prerendered SPA prefixes (written by prerender.mjs): these
