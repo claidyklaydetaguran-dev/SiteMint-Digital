@@ -14,6 +14,7 @@ import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import {
   getVoiceMessageForFirm,
   isMessageFollowUpStatus,
+  listVoiceMessagesForCall,
   listVoiceMessagesForFirm,
   setVoiceMessageFollowUpStatus,
   type MessageFollowUpStatus,
@@ -56,11 +57,18 @@ function parseStatusFilter(raw: unknown): MessageFollowUpStatus[] | undefined {
 router.get("/receptionist/voice/messages", requireReceptionistAuth, async (req: Request, res: Response) => {
   try {
     const statuses = parseStatusFilter(req.query["status"]);
-    const messages = await listVoiceMessagesForFirm(req.firmId!, statuses ? { statuses } : {});
+    // A per-call filter, firm-scoped exactly like every other read here: the
+    // repository matches on (firmId, providerCallId), so a call id belonging to
+    // another firm matches nothing rather than leaking a row.
+    const callId = typeof req.query["callId"] === "string" ? req.query["callId"].trim() : "";
+    const messages =
+      callId.length > 0
+        ? await listVoiceMessagesForCall(req.firmId!, callId)
+        : await listVoiceMessagesForFirm(req.firmId!, statuses ? { statuses } : {});
     const counts = { new: 0, in_progress: 0, resolved: 0 };
     // Counts come from the unfiltered set so the tabs do not change as you
     // filter. One extra indexed read, and it keeps the UI honest.
-    const all = statuses ? await listVoiceMessagesForFirm(req.firmId!) : messages;
+    const all = statuses || callId.length > 0 ? await listVoiceMessagesForFirm(req.firmId!) : messages;
     for (const message of all) {
       if (message.followUpStatus === "new") counts.new += 1;
       else if (message.followUpStatus === "in_progress") counts.in_progress += 1;
@@ -148,6 +156,10 @@ router.get("/receptionist/voice/notifications", requireReceptionistAuth, async (
         lastErrorCode: voiceNotifications.lastErrorCode,
         acceptedAt: voiceNotifications.acceptedAt,
         nextAttemptAt: voiceNotifications.nextAttemptAt,
+        // Delivery evidence is separate from acceptance: null means no event
+        // has arrived, which is NOT the same as "not delivered".
+        deliveryStatus: voiceNotifications.deliveryStatus,
+        deliveryEventAt: voiceNotifications.deliveryEventAt,
         createdAt: voiceNotifications.createdAt,
       })
       .from(voiceNotifications)
@@ -168,6 +180,8 @@ router.get("/receptionist/voice/notifications", requireReceptionistAuth, async (
         lastErrorCode: row.lastErrorCode,
         acceptedAt: row.acceptedAt?.toISOString() ?? null,
         nextAttemptAt: row.nextAttemptAt.toISOString(),
+        deliveryStatus: row.deliveryStatus,
+        deliveryEventAt: row.deliveryEventAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
       })),
       count: rows.length,
