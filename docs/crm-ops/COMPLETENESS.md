@@ -13,9 +13,9 @@
 
 ## Table 1 — the 18 core feature areas
 
-**127 / 150 criteria = 84.7% verified.** At the real provider: 3. In production: **0**.
+**129 / 150 criteria = 86.0% verified.** At the real provider: 8. In production: **0**.
 
-By status: Passed 127 · Built, not proven 3 · Not passed 19 · Deferred by decision 1.
+By status: Passed 129 · Built, not proven 3 · Not passed 17 · Deferred by decision 1.
 
 The denominator is 143 baseline criteria plus 7 added from the owner's brief after the baseline was set; each is listed under "Criteria added after the baseline" with its reason.
 
@@ -26,14 +26,14 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 | 3 | Sales pipeline | 7 / 7 | **100.0%** | L, T | 0 | — |
 | 4 | Customer communication | 7 / 9 | **77.8%** | L, T, R | 0 | 4.8 Inbound replies arrive through the real provider; 4.9 Delivery events from the real provider update message state |
 | 5 | Tasks, activities and reminders | 8 / 8 | **100.0%** | L, T | 0 | — |
-| 6 | Support and knowledge base | 7 / 9 | **77.8%** | L, T | 0 | 6.8 A support reply is delivered to a real mailbox; 6.9 A customer's emailed reply lands on the right ticket |
-| 7 | Marketing automation | 12 / 17 | **70.6%** | L, T | 0 | 7.10 A campaign test email is delivered to a real mailbox; 7.11 Engagement is measured where the provider supports it; 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.16 Marketing, Sequences and the Sequence queue each say plainly what they are (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
+| 6 | Support and knowledge base | 8 / 9 | **88.9%** | L, T, R | 0 | 6.9 A customer's emailed reply lands on the right ticket |
+| 7 | Marketing automation | 13 / 17 | **76.5%** | L, T, R | 0 | 7.11 Engagement is measured where the provider supports it; 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.16 Marketing, Sequences and the Sequence queue each say plainly what they are (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
 | 8 | Reporting and analytics | 8 / 9 | **88.9%** | L, T | 0 | 8.9 Email engagement figures come from real provider events |
 | 9 | Documents | 7 / 8 | **87.5%** | L, T | 0 | 9.8 Agreements can be signed electronically through a provider |
 | 10 | Workflow automation and approvals | 10 / 10 | **100.0%** | T | 0 | — |
 | 11 | Users, roles and permissions | 9 / 10 | **90.0%** | L, T | 0 | 11.9 Two-step verification is enrolled on the real owner accounts |
 | 12 | Interaction history | 6 / 6 | **100.0%** | L, T | 0 | — |
-| 13 | Calendar and scheduling | 7 / 8 | **87.5%** | L, T | 0 | 13.8 Two-way sync with external calendars |
+| 13 | Calendar and scheduling | 7 / 8 | **87.5%** | L, T, R | 0 | 13.8 Two-way sync with external calendars |
 | 14 | Integrations | 0 / 5 | **0.0%** | — | 0 | 14.1 An accounting or payments connector; 14.2 Calendar provider sync; 14.3 An e-signature provider; 14.4 Team notifications to a chat tool; 14.5 Outbound webhooks or an API for other systems |
 | 15 | Mobile, offline and push | 6 / 8 | **75.0%** | L, T | 0 | 15.6 Offline editing with a write queue (deferred); 15.7 Push notifications |
 | 16 | Customer portal | 8 / 8 | **100.0%** | L, T, R | 0 | — |
@@ -79,7 +79,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 11 | `/admin/crm/intelligence/automation-queue` | Automation queue | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 12 | `/admin/crm/inbox` | Inbox | 3 / 6 | 50.0% | L | permission, recovery, mobile |
 | 13 | `/admin/crm/tasks` | All tasks | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 14 | `/admin/crm/calendar` | Calendar | 2 / 6 | 33.3% | L | persist, permission, recovery, mobile |
+| 14 | `/admin/crm/calendar` | Calendar | 2 / 6 | 33.3% | L, R | persist, permission, recovery, mobile |
 | 15 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 16 | `/admin/crm/transactions` | Transactions | 2 / 6 | 33.3% | L | persist, permission, recovery, mobile |
 | 17 | `/admin/crm/projects` | Projects | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
@@ -90,7 +90,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 22 | `/admin/crm/admin` | Admin hub | 3 / 6 | 50.0% | L | permission, recovery, mobile |
 | 23 | `/admin/crm/workspace` | Sales workspace | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 24 | `/admin/crm/campaigns` | Sequences | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
-| 25 | `/admin/crm/campaign-builder` | Marketing | 3 / 6 | 50.0% | L, T | persist, recovery, mobile |
+| 25 | `/admin/crm/campaign-builder` | Marketing | 3 / 6 | 50.0% | L, T, R | persist, recovery, mobile |
 | 26 | `/admin/crm/campaign-queue` | Sequence queue | 1 / 6 | 16.7% | L | action, persist, permission, recovery, mobile |
 | 27 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 28 | `/admin/crm/intake-cases` | Intake cases | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
@@ -208,7 +208,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 6.5 | Delivery is labelled honestly | Passed | L, T | Strongest label is 'accepted by the mail provider'; unsent replies read 'Waiting — not sent' |
 | 6.6 | Knowledge-base articles can be written and published | Passed | T | crmSupport.test.ts KB routes |
 | 6.7 | Customers raise and follow requests in the portal | Passed | L, T | crmPortal.test.ts tickets; /portal/support listed SUP-00002 for a real customer session |
-| 6.8 | A support reply is delivered to a real mailbox | Not passed | — | Not yet exercised against the provider |
+| 6.8 | A support reply is delivered to a real mailbox | Passed | L, R | On candidate a3c56b3, a staff reply recorded while the server had no mail key was retried once the key was configured: recovery POST 200, reusing the original idempotency key, shown as Accepted by the mail provider. It arrived in the controlled mailbox at 14:42:43 UTC as “[SUP-00002] [CRM-TEST] Where is my welcome pack?” |
 | 6.9 | A customer's emailed reply lands on the right ticket | Not passed | — | Blocked with 4.8: inbound not live |
 
 ### 7. Marketing automation
@@ -224,7 +224,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 7.7 | AI copy cannot be sent unapproved, and unavailable drafting says so | Passed | L, T | Approval gate tests; local drafting refuses with a plain-language 503 |
 | 7.8 | Pause stops mid-batch; cancel does not claim to un-send | Passed | T | crmMarketing.test.ts pause and cancel |
 | 7.9 | A scheduled campaign starts itself only behind a fail-closed flag | Passed | T | Scheduler flag tests |
-| 7.10 | A campaign test email is delivered to a real mailbox | Not passed | — | Not yet exercised against the provider |
+| 7.10 | A campaign test email is delivered to a real mailbox | Passed | L, R | From a draft duplicated from a designed campaign, “Send a test” to the owner's staff address (test-send 200) arrived at 14:42:53 UTC as “[TEST] A quicker way to book Vega Family Dentistry”. It was marked as a staff-only test and rendered with the chosen contact's merge fields; no customer received it (candidate a3c56b3) |
 | 7.11 | Engagement is measured where the provider supports it | Not passed | — | Opens/clicks need a Resend tracking subdomain and event webhook; reported as untracked, not zero |
 | 7.12 | Audience preview, preflight and the send apply one eligibility rule | Passed | T | One 13-contact fixture gives the same answer, reason for reason, from preview, preflight and the send ledger (crmMarketingDelivery.test.ts, green on the committed candidate a3c56b3) |
 | 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | Passed | T | Claim-before-send, same-key retry, simultaneous retry and crash-resume tests, plus a provider 5xx stored as unknown and never retried (matching reminders and support); mutation-checked, green on the committed candidate a3c56b3 |
@@ -309,9 +309,9 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | 13.2 | A past meeting can be marked held | Passed | L, T | crmM3.test.ts |
 | 13.3 | Appointments export as .ics | Passed | L, T | Shared generator with invitations |
 | 13.4 | Appointment reminders fire | Passed | L, T | Reminder engine |
-| 13.5 | Attendees receive an invitation their calendar can add | Passed | T | crmCalendarInvites.test.ts (24): METHOD:REQUEST with stable UID; not yet delivered by the provider |
-| 13.6 | A material change updates the invitation; a trivial edit mails nobody | Passed | T | SEQUENCE increments; non-material edit proven silent |
-| 13.7 | A cancellation removes it from attendees' calendars | Passed | T | METHOD:CANCEL tests |
+| 13.5 | Attendees receive an invitation their calendar can add | Passed | L, T, R | crmCalendarInvites.test.ts (24). On candidate a3c56b3, an appointment created in the browser mailed both attendees (201, “2 invitations accepted by the mail provider”). The invitation arrived at 14:42:59 UTC with invite.ics (text/calendar) attached, and was stored as METHOD REQUEST with outcome sent |
+| 13.6 | A material change updates the invitation; a trivial edit mails nobody | Passed | L, T, R | crmCalendarInvites.test.ts proves SEQUENCE increments and that a non-material edit mails nobody; the silent case was not repeated live. On candidate a3c56b3, rescheduling in the browser (PATCH 200) stored sequence 1 for both attendees, and “Updated: [CRM-TEST] Invitation provider check” arrived at 14:44:40–41 UTC with the new time and what changed |
+| 13.7 | A cancellation removes it from attendees' calendars | Passed | L, T, R | METHOD:CANCEL tests. On candidate a3c56b3, cancelling in the browser (PATCH 200, after the confirmation naming who is told) stored CANCEL at sequence 2 for both attendees, and “Cancelled: [CRM-TEST] Invitation provider check” arrived at 14:45:33–34 UTC with the calendar file that removes the event. The invitation, update and cancellation share one event at sequences 0, 1 and 2 |
 | 13.8 | Two-way sync with external calendars | Not passed | — | Not built; .ics is an export |
 
 ### 14. Integrations
@@ -525,7 +525,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
-| action | Passed | L | M3 (2026-09-12): create, reschedule, mark held, cancel and .ics export in a browser; not repeated since invitations were added |
+| action | Passed | L, R | On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs |
 | persist | Built, not proven | — | Not recorded after a reload |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
@@ -646,7 +646,7 @@ By status: Passed 105 · Built, not proven 195 · Not passed 0 · Deferred by de
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened with 13 real contacts listed and nobody pre-ticked (2026-09-15) |
-| action | Passed | L | Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient |
+| action | Passed | L, R | Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient. On candidate a3c56b3 a test send rendered for a chosen contact reached the owner's mailbox (test-send 200), marked as a staff-only test |
 | persist | Built, not proven | — | Autosave not checked across a reload in the browser |
 | permission | Passed | T | Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts) |
 | recovery | Built, not proven | — | Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser |

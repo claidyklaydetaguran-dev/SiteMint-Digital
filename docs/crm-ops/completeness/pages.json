@@ -162,7 +162,7 @@
       "title": "Calendar",
       "checks": {
         "open": { "status": "pass", "env": ["L"], "evidence": "Opened populated with a real staff session (2026-09-15)" },
-        "action": { "status": "pass", "env": ["L"], "evidence": "M3 (2026-09-12): create, reschedule, mark held, cancel and .ics export in a browser; not repeated since invitations were added" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not recorded after a reload" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Not exercised" },
@@ -294,7 +294,7 @@
       "title": "Marketing",
       "checks": {
         "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 13 real contacts listed and nobody pre-ticked (2026-09-15)" },
-        "action": { "status": "pass", "env": ["L"], "evidence": "Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient" },
+        "action": { "status": "pass", "env": ["L", "R"], "evidence": "Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient. On candidate a3c56b3 a test send rendered for a chosen contact reached the owner's mailbox (test-send 200), marked as a staff-only test" },
         "persist": { "status": "unverified", "env": [], "evidence": "Autosave not checked across a reload in the browser" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts)" },
         "recovery": { "status": "unverified", "env": [], "evidence": "Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser" },
