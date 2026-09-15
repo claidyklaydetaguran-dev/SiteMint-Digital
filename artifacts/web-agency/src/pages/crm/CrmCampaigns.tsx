@@ -33,6 +33,13 @@ import {
 } from "@/lib/campaignTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
 import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+
+/** "objective", "objective and tone profile", "a, b and c". */
+const listWords = (parts: string[]): string =>
+  parts.length <= 1
+    ? parts[0] ?? ""
+    : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -672,26 +679,51 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
   // Apply a blueprint's strategy metadata. Never overwrites subject/body, and
   // confirms before replacing objective/tone/notes the user already typed.
+  const confirmation = useConfirmDialog();
+
   const applyBlueprint = () => {
     if (!selectedBlueprint) return;
-    const persona = SITEMINT_PERSONAS.find(p => p.id === selectedBlueprint.personaId);
+    const blueprint = selectedBlueprint;
+    const persona = SITEMINT_PERSONAS.find(p => p.id === blueprint.personaId);
     const note = persona
-      ? `Strategy: ${persona.label}\nGoal: ${selectedBlueprint.goal}\nCadence: ${persona.recommendedCadence}`
-      : `Goal: ${selectedBlueprint.goal}`;
-    const hasExisting = objective.trim() || toneProfile.trim() || strategyNote.trim();
-    if (hasExisting && !window.confirm("Apply this blueprint? It will replace the current objective, tone profile, and strategy notes (your subject and body are not changed).")) {
-      return;
-    }
-    setObjective(selectedBlueprint.goal);
-    setToneProfile(selectedBlueprint.toneProfile);
-    setStrategyNote(note);
-    setStopOnReply(selectedBlueprint.stopOnReply);
-    // Pre-fill campaign type only when the blueprint clearly implies a sequence,
-    // and only from the default broadcast (don't override a deliberate choice).
-    if (selectedBlueprint.suggestedSequenceLength > 1 && campaignType === "broadcast") {
-      setCampaignType("nurture");
-    }
-    setIsDirty(true);
+      ? `Strategy: ${persona.label}\nGoal: ${blueprint.goal}\nCadence: ${persona.recommendedCadence}`
+      : `Goal: ${blueprint.goal}`;
+
+    const apply = () => {
+      setObjective(blueprint.goal);
+      setToneProfile(blueprint.toneProfile);
+      setStrategyNote(note);
+      setStopOnReply(blueprint.stopOnReply);
+      // Pre-fill campaign type only when the blueprint clearly implies a sequence,
+      // and only from the default broadcast (don't override a deliberate choice).
+      if (blueprint.suggestedSequenceLength > 1 && campaignType === "broadcast") {
+        setCampaignType("nurture");
+      }
+      setIsDirty(true);
+    };
+
+    // Naming what is actually about to be overwritten, rather than listing all
+    // three fields whether or not anything is in them.
+    const replacing = [
+      objective.trim() ? "objective" : null,
+      toneProfile.trim() ? "tone profile" : null,
+      strategyNote.trim() ? "strategy notes" : null,
+    ].filter((part): part is string => part !== null);
+
+    if (replacing.length === 0) { apply(); return; }
+
+    void confirmation.ask({
+      title: `Replace what you have written with the "${blueprint.label}" blueprint?`,
+      description: `It overwrites the ${listWords(replacing)} you have typed.`,
+      consequences: [
+        "Your subject and body are not changed.",
+        "There is no undo, so copy anything you want to keep first.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Replace with blueprint",
+      cancelLabel: "Keep what I wrote",
+      action: apply,
+    });
   };
 
   // ── Open a saved campaign ──
@@ -2178,6 +2210,8 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       <div className="p-6 max-w-6xl mx-auto space-y-4">
 
         {/* ── Builder top bar ───────────────────────────────────────────────── */}
