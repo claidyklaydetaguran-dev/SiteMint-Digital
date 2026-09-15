@@ -121,6 +121,40 @@ BEGIN
   RAISE NOTICE 'created uq_crm_reminder_deliveries_occurrence as a NULLS NOT DISTINCT constraint';
 END $$;
 
+-- ── Two foreign keys that carry PostgreSQL's default name ──────────────────
+--
+-- Same class of drift, found by the same catalog comparison. M4-deliveries.sql
+-- wrote these two FKs without naming them, so PostgreSQL named them
+-- `<table>_<column>_fkey`, while drizzle names them
+-- `<table>_<column>_<reftable>_<refcolumn>_fk` (truncated to 63 characters).
+-- A database built by push therefore disagrees with one built from the
+-- reviewed file, and push against the latter would try to add its own copy.
+-- Renaming changes nothing about what the constraint does.
+
+DO $$
+DECLARE
+  renames CONSTANT text[][] := ARRAY[
+    ARRAY['crm_reminder_deliveries', 'crm_reminder_deliveries_job_id_fkey',
+          'crm_reminder_deliveries_job_id_crm_scheduled_jobs_id_fk'],
+    ARRAY['crm_delivery_recovery_actions', 'crm_delivery_recovery_actions_delivery_id_fkey',
+          'crm_delivery_recovery_actions_delivery_id_crm_reminder_deliveri']
+  ];
+  entry text[];
+BEGIN
+  FOREACH entry SLICE 1 IN ARRAY renames LOOP
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint
+       WHERE conname = entry[2] AND conrelid = ('public.' || entry[1])::regclass
+    ) AND NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+       WHERE conname = entry[3] AND conrelid = ('public.' || entry[1])::regclass
+    ) THEN
+      EXECUTE format('ALTER TABLE public.%I RENAME CONSTRAINT %I TO %I', entry[1], entry[2], entry[3]);
+      RAISE NOTICE 'renamed %.% to %', entry[1], entry[2], entry[3];
+    END IF;
+  END LOOP;
+END $$;
+
 COMMIT;
 
 -- ── After applying ─────────────────────────────────────────────────────────
