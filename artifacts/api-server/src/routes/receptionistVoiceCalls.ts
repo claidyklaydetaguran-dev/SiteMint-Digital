@@ -85,6 +85,11 @@ function serializeDetail(call: RealCallRecord) {
     analysisAvailability,
     structuredOutcome: analysisAvailability === "available" ? call.structuredOutcome ?? null : null,
     transfer: call.transfer,
+    // The resolved retention policy travels WITH the record the dashboard
+    // already reads, so the page can state what is kept instead of asserting
+    // it — and without the call pages taking on a second request. Never a
+    // credential: this is the policy's name and nothing else.
+    artifactPolicy: readArtifactPolicy(),
   };
 }
 
