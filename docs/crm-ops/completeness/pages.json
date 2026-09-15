@@ -29,7 +29,7 @@
       "route": "/admin/dashboard",
       "title": "Legacy Discovery Portal",
       "checks": {
-        "open": { "status": "fail", "env": [], "evidence": "Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix, opening it also wiped the session's CSRF token and bounced the person to sign-in" },
+        "open": { "status": "fail", "env": [], "evidence": "Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix (c366c75), opening it also wiped the session's CSRF token and bounced the person to sign-in; it now stays open, but shows 0 leads and 0 proposals instead of saying the data could not be loaded — a misleading zero left on this superseded page" },
         "action": { "status": "unverified", "env": [], "evidence": "Unreachable with a staff session" },
         "persist": { "status": "unverified", "env": [], "evidence": "Not exercised" },
         "permission": { "status": "unverified", "env": [], "evidence": "Not exercised" },
@@ -295,9 +295,9 @@
       "checks": {
         "open": { "status": "pass", "env": ["L"], "evidence": "Opened with 13 real contacts listed and nobody pre-ticked (2026-09-15)" },
         "action": { "status": "pass", "env": ["L", "R"], "evidence": "Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient. On candidate a3c56b3 a test send rendered for a chosen contact reached the owner's mailbox (test-send 200), marked as a staff-only test" },
-        "persist": { "status": "unverified", "env": [], "evidence": "Autosave not checked across a reload in the browser" },
+        "persist": { "status": "pass", "env": ["L"], "evidence": "A change restored from the browser's kept copy was saved (PATCH 200) and, after a full reload, the campaign list and the database both held it" },
         "permission": { "status": "pass", "env": ["T"], "evidence": "Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts)" },
-        "recovery": { "status": "unverified", "env": [], "evidence": "Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser" },
+        "recovery": { "status": "pass", "env": ["L"], "evidence": "With the autosave failing like a dropped connection, the page said “Not saved — The server did not answer… Your changes are kept in this browser until they are saved.” After a reload it offered Restore / Discard, and Restore saved the change" },
         "mobile": { "status": "pass", "env": ["L"], "evidence": "Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric)" }
       }
     },

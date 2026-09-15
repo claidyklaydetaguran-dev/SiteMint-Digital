@@ -13,9 +13,9 @@
 
 ## Table 1 — the 18 core feature areas
 
-**130 / 150 criteria = 86.7% verified.** At the real provider: 8. In production: **0**.
+**131 / 150 criteria = 87.3% verified.** At the real provider: 8. In production: **0**.
 
-By status: Passed 130 · Built, not proven 2 · Not passed 17 · Deferred by decision 1.
+By status: Passed 131 · Built, not proven 1 · Not passed 17 · Deferred by decision 1.
 
 The denominator is 143 baseline criteria plus 7 added from the owner's brief after the baseline was set; each is listed under "Criteria added after the baseline" with its reason.
 
@@ -27,7 +27,7 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 | 4 | Customer communication | 7 / 9 | **77.8%** | L, T, R | 0 | 4.8 Inbound replies arrive through the real provider; 4.9 Delivery events from the real provider update message state |
 | 5 | Tasks, activities and reminders | 8 / 8 | **100.0%** | L, T | 0 | — |
 | 6 | Support and knowledge base | 8 / 9 | **88.9%** | L, T, R | 0 | 6.9 A customer's emailed reply lands on the right ticket |
-| 7 | Marketing automation | 14 / 17 | **82.4%** | L, T, R | 0 | 7.11 Engagement is measured where the provider supports it; 7.14 An unsaved draft survives a failed save or a lost connection and can be restored (built, not proven); 7.17 A real AI draft is produced in the campaign editor |
+| 7 | Marketing automation | 15 / 17 | **88.2%** | L, T, R | 0 | 7.11 Engagement is measured where the provider supports it; 7.17 A real AI draft is produced in the campaign editor |
 | 8 | Reporting and analytics | 8 / 9 | **88.9%** | L, T | 0 | 8.9 Email engagement figures come from real provider events |
 | 9 | Documents | 7 / 8 | **87.5%** | L, T | 0 | 9.8 Agreements can be signed electronically through a provider |
 | 10 | Workflow automation and approvals | 10 / 10 | **100.0%** | T | 0 | — |
@@ -51,17 +51,17 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**140 / 300 page checks = 46.7%.** Pages passing all 6: 0. Pages passing none: 2.
+**142 / 300 page checks = 47.3%.** Pages passing all 6: 1. Pages passing none: 2.
 
-By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by decision 0.
+By status: Passed 142 · Built, not proven 156 · Not passed 2 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
 | open | 41 / 50 (82.0%) |
 | action | 21 / 50 (42.0%) |
-| persist | 9 / 50 (18.0%) |
+| persist | 10 / 50 (20.0%) |
 | permission | 20 / 50 (40.0%) |
-| recovery | 1 / 50 (2.0%) |
+| recovery | 2 / 50 (4.0%) |
 | mobile | 48 / 50 (96.0%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
@@ -90,7 +90,7 @@ By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by de
 | 22 | `/admin/crm/admin` | Admin hub | 4 / 6 | 66.7% | L | permission, recovery |
 | 23 | `/admin/crm/workspace` | Sales workspace | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 24 | `/admin/crm/campaigns` | Sequences | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 25 | `/admin/crm/campaign-builder` | Marketing | 4 / 6 | 66.7% | L, T, R | persist, recovery |
+| 25 | `/admin/crm/campaign-builder` | Marketing | 6 / 6 | 100.0% | L, T, R | — |
 | 26 | `/admin/crm/campaign-queue` | Sequence queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 27 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 28 | `/admin/crm/intake-cases` | Intake cases | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
@@ -123,7 +123,7 @@ By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by de
 |---|---|---|---|---|
 | 7.12 | Audience preview, preflight and the send apply one eligibility rule | 2026-09-15 | Owner brief §4: audience preview and sending use the same eligibility rules | Passed |
 | 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | 2026-09-15 | Owner brief §4: retries and ambiguous outcomes without duplicate delivery | Passed |
-| 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | 2026-09-15 | Owner brief §4: save and resume drafts, and preserve drafts on failures | Built, not proven |
+| 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | 2026-09-15 | Owner brief §4: save and resume drafts, and preserve drafts on failures | Passed |
 | 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | 2026-09-15 | Owner brief §4: template editing, branding and personalisation | Passed |
 | 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | 2026-09-15 | Owner brief §4: campaigns, sequences and queues must be understandable | Passed |
 | 7.17 | A real AI draft is produced in the campaign editor | 2026-09-15 | Owner brief §2: verify a real draft in the campaign editor | Not passed |
@@ -228,7 +228,7 @@ By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by de
 | 7.11 | Engagement is measured where the provider supports it | Not passed | — | Opens/clicks need a Resend tracking subdomain and event webhook; reported as untracked, not zero |
 | 7.12 | Audience preview, preflight and the send apply one eligibility rule | Passed | T | One 13-contact fixture gives the same answer, reason for reason, from preview, preflight and the send ledger (crmMarketingDelivery.test.ts, green on the committed candidate a3c56b3) |
 | 7.13 | A retry or an ambiguous provider outcome never delivers a message twice | Passed | T | Claim-before-send, same-key retry, simultaneous retry and crash-resume tests, plus a provider 5xx stored as unknown and never retried (matching reminders and support); mutation-checked, green on the committed candidate a3c56b3 |
-| 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | Built, not proven | — | campaignDraft.test.ts (12) and campaignRequests.test.ts (9) prove the logic; the restore prompt has not been used in a browser |
+| 7.14 | An unsaved draft survives a failed save or a lost connection and can be restored | Passed | L, T | campaignDraft.test.ts (12) and campaignRequests.test.ts (9). In the browser on a test draft, a subject edit whose autosave failed like a dropped connection read “Not saved — The server did not answer… Your changes are kept in this browser until they are saved.”, with no false Saved. After a full reload the campaign offered “This browser kept changes to this campaign that were never saved” with Restore / Discard. Restore saved it (PATCH 200, “Saved”), and a second reload showed the restored subject from the server with no copy left in the browser |
 | 7.15 | Templates are editable, and branding and personalisation render identically in preview and delivery | Passed | T | Preview and delivery compared byte for byte (subject, HTML, text, stored copy, branding and fallbacks), and template editing tested; green on the committed candidate a3c56b3 |
 | 7.16 | Marketing, Sequences and the Sequence queue each say plainly what they are | Passed | L, T | messagingConcepts.test.ts. In the browser, each page opens with a heading and a summary of what it is (“One email, sent once, to a list of people”; “Several messages over days”; “Every message a sequence has scheduled”), and the nav reads Marketing / Sequences / Sequence Queue. The Sequences page's leftover “Campaigns” tab and empty states were renamed (03d339e) |
 | 7.17 | A real AI draft is produced in the campaign editor | Not passed | — | The production server's AI integration answered a real request (HTTP 200, 2026-09-15), but no draft has come through the editor: the local server has no AI key and production still runs the old build |
@@ -403,7 +403,7 @@ By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by de
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Not passed | — | Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix, opening it also wiped the session's CSRF token and bounced the person to sign-in |
+| open | Not passed | — | Linked from the CRM sidebar as “Discovery Portal”, but its data (/api/admin/submissions) is guarded by the retired shared admin credential and answers 401 to a staff session. Before the fix (c366c75), opening it also wiped the session's CSRF token and bounced the person to sign-in; it now stays open, but shows 0 leads and 0 proposals instead of saying the data could not be loaded — a misleading zero left on this superseded page |
 | action | Built, not proven | — | Unreachable with a staff session |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
@@ -647,9 +647,9 @@ By status: Passed 140 · Built, not proven 158 · Not passed 2 · Deferred by de
 |---|---|---|---|
 | open | Passed | L | Opened with 13 real contacts listed and nobody pre-ticked (2026-09-15) |
 | action | Passed | L, R | Audience step on real data: 5 contacts sharing one address → 1 eligible, 4 excluded with a reason naming the recipient. On candidate a3c56b3 a test send rendered for a chosen contact reached the owner's mailbox (test-send 200), marked as a staff-only test |
-| persist | Built, not proven | — | Autosave not checked across a reload in the browser |
+| persist | Passed | L | A change restored from the browser's kept copy was saved (PATCH 200) and, after a full reload, the campaign list and the database both held it |
 | permission | Passed | T | Sending and retry require campaigns.send; a restricted user is refused (crmMarketing.test.ts) |
-| recovery | Built, not proven | — | Draft preservation on a failed save is unit-tested (campaignRequests/campaignDraft tests) but not exercised in the browser |
+| recovery | Passed | L | With the autosave failing like a dropped connection, the page said “Not saved — The server did not answer… Your changes are kept in this browser until they are saved.” After a reload it offered Restore / Discard, and Restore saved the change |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/campaign-queue` — Sequence queue
