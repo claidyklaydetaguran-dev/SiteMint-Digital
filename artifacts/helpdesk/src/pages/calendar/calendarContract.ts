@@ -284,6 +284,11 @@ export const CALENDAR_PICKER = {
   needsPermissionTitle: "One more permission is needed",
   needsPermissionDetail:
     "SiteMint can book into your calendar but hasn't been allowed to see the list of calendars on this account, so it can't offer you a choice. Reconnect to grant that, and your current connection keeps working if you decide not to.",
+  // The button label has to name the ACTION. It previously reused the section
+  // heading, so the only control on this panel read "Where appointments are
+  // saved" — a description of the panel, on a button that sends the customer
+  // to Google.
+  needsPermissionAction: "Reconnect Google Calendar",
   unavailableTitle: "Your calendars couldn't be listed",
   unavailableDetail: "This is usually temporary. The calendar already chosen keeps being used.",
   failedTitle: "That calendar wasn't saved",

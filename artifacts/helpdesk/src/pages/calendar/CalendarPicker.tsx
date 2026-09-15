@@ -66,7 +66,7 @@ export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): Re
         </p>
         {needsPermission && (
           <Button type="button" variant="outline" onClick={onReconnect}>
-            {CALENDAR_PICKER.heading}
+            {CALENDAR_PICKER.needsPermissionAction}
           </Button>
         )}
       </section>

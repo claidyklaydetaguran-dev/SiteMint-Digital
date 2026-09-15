@@ -178,6 +178,31 @@ export async function approveRequestToBooked(
 
 export type CancelSyncOutcome = "disabled" | "skipped" | "no_connection" | "deleted" | "failed";
 
+/**
+ * Which calendar an ALREADY-WRITTEN event lives on.
+ *
+ * Not the connection's current selection. Once a business points new
+ * appointments at a different calendar, every event already written stays
+ * exactly where it was written — `provider_calendar_id` is stamped on the row
+ * at booking time for precisely this reason. Addressing an old event by the
+ * new selection asks Google to delete an id that calendar has never held, and
+ * Google answers 404 — which `deleteEvent` reads as "already gone" and reports
+ * as success. The cancellation would look clean while the appointment stayed
+ * on the customer's old calendar indefinitely.
+ *
+ * A row with no stored calendar predates that column being written and can
+ * only have gone to the selection in force at the time; the connection's
+ * value is the best available answer for it.
+ */
+export function calendarHoldingEvent<T extends { calendarId: string }>(
+  connection: T,
+  storedCalendarId: string | null,
+): T {
+  if (storedCalendarId === null || storedCalendarId.trim() === "") return connection;
+  if (storedCalendarId === connection.calendarId) return connection;
+  return { ...connection, calendarId: storedCalendarId };
+}
+
 /** For a request that left the calendar-worthy world (cancelled/rescheduled/failed/expired): remove its event. */
 export async function removeCalendarEventForRequest(
   request: SchedulingAppointmentRequest,
@@ -188,7 +213,10 @@ export async function removeCalendarEventForRequest(
   const connection = await deps.getActiveConnection(request.firmId);
   if (!connection) return "no_connection";
 
-  const result = await deps.writer.deleteEvent(connection, request.providerEventId);
+  const result = await deps.writer.deleteEvent(
+    calendarHoldingEvent(connection, request.providerCalendarId),
+    request.providerEventId,
+  );
   if (!result.ok) {
     await deps.openIssue({
       firmId: request.firmId,

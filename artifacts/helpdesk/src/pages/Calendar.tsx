@@ -258,6 +258,21 @@ export default function CalendarPage() {
               calendar is the ordinary action and disconnecting is the rare one. */}
           <CalendarPicker onReconnect={handleConnect} />
 
+          {/*
+            The reconnect button lives on THIS panel too, so its failure has to
+            be reported here. Without this the only report of a failed start was
+            rendered on the not-connected panel, which a connected business
+            never sees: the button would send them nowhere and say nothing.
+          */}
+          {connectFailure === "failed" && (
+            <div className="sd-error" role="alert">
+              <div className="sd-error__body">
+                <span className="sd-error__title">{CONNECT.connectFailedTitle}</span>
+                <p className="sd-error__detail">{CONNECT.connectFailedDetail}</p>
+              </div>
+            </div>
+          )}
+
           {disconnectFailed && (
             <div className="sd-error" role="alert">
               <div className="sd-error__body">

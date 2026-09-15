@@ -18,6 +18,7 @@ import { dirname, resolve } from "node:path";
 import {
   approveRequestToBooked,
   removeCalendarEventForRequest,
+  calendarHoldingEvent,
   reconcileCalendarForFirm,
   cancelBookedRequest,
   rescheduleBookedRequest,
@@ -153,6 +154,8 @@ interface Harness {
   deps: CalendarSyncDeps;
   inserts: number;
   deletes: string[];
+  /** Which calendar each delete was addressed to, in the same order. */
+  deleteTargets: string[];
   issues: string[];
   row: SchedulingAppointmentRequest;
 }
@@ -168,6 +171,7 @@ function harness(opts: {
   const state: Harness = {
     inserts: 0,
     deletes: [],
+    deleteTargets: [],
     issues: [],
     row: opts.row ?? request(),
     deps: null as unknown as CalendarSyncDeps,
@@ -186,8 +190,9 @@ function harness(opts: {
       },
       patchEventTimes: async () => ({ ok: true, eventId: "evt" }),
       findEventByRequest: async () => ({ ok: true as const, eventId: null }),
-      deleteEvent: async (_c, id) => {
+      deleteEvent: async (conn, id) => {
         state.deletes.push(id);
+        state.deleteTargets.push(conn.calendarId);
         return opts.deleteResult ?? { ok: true };
       },
     },
@@ -322,6 +327,35 @@ describe("cancellation and removal", () => {
     expect(await removeCalendarEventForRequest(h.row, h.deps)).toBe("deleted");
     expect(await removeCalendarEventForRequest(h.row, h.deps)).toBe("skipped");
     expect(h.deletes).toEqual(["evt-1"]);
+  });
+
+  // The picker made this reachable: a business can now point new appointments
+  // at a different calendar, and everything already booked stays where it was.
+  it("deletes from the calendar the event was WRITTEN to, not the current selection", async () => {
+    const h = harness({
+      row: request({ status: "cancelled", providerEventId: "evt-1", providerCalendarId: "team@example.com" }),
+    });
+    expect(CONNECTION.calendarId).toBe("primary"); // the selection has moved on
+    expect(await removeCalendarEventForRequest(h.row, h.deps)).toBe("deleted");
+    expect(h.deleteTargets).toEqual(["team@example.com"]);
+  });
+
+  it("falls back to the connection's calendar for a row that stored none", async () => {
+    const h = harness({
+      row: request({ status: "cancelled", providerEventId: "evt-1", providerCalendarId: null }),
+    });
+    expect(await removeCalendarEventForRequest(h.row, h.deps)).toBe("deleted");
+    expect(h.deleteTargets).toEqual(["primary"]);
+  });
+
+  it("calendarHoldingEvent prefers the stored reference and never mutates the connection", () => {
+    const conn = { calendarId: "primary", refreshTokenEnc: "x" };
+    expect(calendarHoldingEvent(conn, "other@example.com").calendarId).toBe("other@example.com");
+    expect(calendarHoldingEvent(conn, "other@example.com").refreshTokenEnc).toBe("x");
+    expect(conn.calendarId).toBe("primary");
+    expect(calendarHoldingEvent(conn, null)).toBe(conn);
+    expect(calendarHoldingEvent(conn, "   ")).toBe(conn);
+    expect(calendarHoldingEvent(conn, "primary")).toBe(conn);
   });
 });
 
