@@ -23,8 +23,12 @@
 /** The persisted call facts. Every field is nullable because the ledger's are. */
 export interface PostCallFacts {
   providerCallId: string;
-  /** Our own label for how the call reached us; 'browser_test' must be visible. */
-  source: "browser_test" | "telephone" | "unknown";
+  /**
+   * Our own label for how the call reached us; 'browser_test' must be visible.
+   * 'synthetic_qa' is an event SiteMint itself generated to exercise this
+   * pipeline — never a call anyone made — and is labelled as such.
+   */
+  source: "browser_test" | "telephone" | "synthetic_qa" | "unknown";
   startedAt: Date;
   endedAt: Date | null;
   durationSec: number | null;
@@ -73,6 +77,7 @@ function formatWhen(when: Date, timeZone: string): string {
 const SOURCE_LABEL: Record<PostCallFacts["source"], string> = {
   browser_test: "Browser test call (not a real customer)",
   telephone: "Phone call",
+  synthetic_qa: "SiteMint QA test event (no call took place)",
   unknown: "Call",
 };
 
@@ -89,11 +94,12 @@ export interface ComposePostCallInput {
 export function composePostCallEmail(input: ComposePostCallInput): PostCallComposition {
   const { facts, messages } = input;
   const isTest = facts.source === "browser_test";
+  const isSynthetic = facts.source === "synthetic_qa";
   const primary = messages[0];
   const urgent = messages.some((m) => m.urgency === "urgent");
 
   const subject = [
-    isTest ? "[Test]" : null,
+    isSynthetic ? "[QA]" : isTest ? "[Test]" : null,
     urgent ? "[Urgent]" : null,
     messages.length > 0
       ? `New message from ${primary!.callerName}: ${primary!.topic}`
@@ -104,7 +110,13 @@ export function composePostCallEmail(input: ComposePostCallInput): PostCallCompo
 
   const lines: string[] = [];
 
-  if (isTest) {
+  if (isSynthetic) {
+    lines.push(
+      "THIS IS A SITEMINT QA TEST EVENT. No call took place and no customer is",
+      "waiting. It was generated to check that call emails reach you.",
+      "",
+    );
+  } else if (isTest) {
     lines.push(
       "THIS WAS A BROWSER TEST CALL, not a customer. It is shown here so you can",
       "see exactly what a real call will send you.",
@@ -141,7 +153,10 @@ export function composePostCallEmail(input: ComposePostCallInput): PostCallCompo
       lines.push(`  Email:     ${message.callbackEmail ?? "no email given"}`);
       lines.push(`  Details:   ${message.details}`);
       if (message.emailAckRequested) {
-        lines.push(`  The caller asked us to email them a copy at the address above.`);
+        // Stated as a request, not a promise: no copy is emailed to the caller
+        // automatically, so the business must not read this as already done.
+        lines.push(`  The caller asked for a copy by email. No copy has been sent to them;`);
+        lines.push(`  reply to the address above if you want to confirm their message.`);
       }
       lines.push("");
     }

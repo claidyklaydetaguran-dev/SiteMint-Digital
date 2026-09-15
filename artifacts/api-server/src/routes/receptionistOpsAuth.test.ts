@@ -139,18 +139,24 @@ suite("receptionist-ops routes accept staff sessions (real DB)", () => {
     "/api/admin/voice/numbers",
   ];
 
-  /** The reads whose PREVIOUS guard also accepted the admin_session cookie. (Resolve is the fourth such route.) */
+  /**
+   * The operator VOICE reads: all behind `requireOperator` (lib/operatorGate.ts),
+   * which accepts the persistent admin_session cookie so an operator survives a
+   * restart. Diagnostics joined this list when the release merge put every
+   * operator voice route on that one gate. (Resolve and the subscription writer
+   * are the mutating members.)
+   */
   const cookieEraReads = (): string[] => [
     "/api/admin/voice/issues",
     "/api/admin/voice/usage",
     "/api/admin/voice/numbers",
+    `/api/admin/voice/firms/${firmId}/diagnostics`,
   ];
 
-  /** The reads whose previous guard never accepted that cookie. */
+  /** CRM staff routes behind `requireCrmAuth` alone: the cookie never reached them and still does not. */
   const bearerOnlyEraReads = (): string[] => [
     "/api/admin/receptionist-accounts",
     "/api/crm/receptionist-signup-jobs",
-    `/api/admin/voice/firms/${firmId}/diagnostics`,
   ];
 
   const resolvePath = (issueId: number): string => `/api/admin/voice/issues/${issueId}/resolve`;
@@ -458,12 +464,15 @@ suite("receptionist-ops routes accept staff sessions (real DB)", () => {
     expect(post.status).toBe(200);
     expect((await issue(cookieIssueId)).resolvedAt).not.toBeNull();
 
-    // Not widened: these were bearer-only (or staff-only) before and still are.
+    // Not widened: the CRM staff routes never accepted it and still do not.
     for (const path of bearerOnlyEraReads()) {
       expect((await cookieAdmin.call("GET", path)).status, path).toBe(401);
     }
+    // The subscription writer is an operator voice route, so the shared admin
+    // reaches its handler by cookie exactly as by bearer — the same identity —
+    // and with no plan catalog configured the handler still writes nothing.
     const before = await subscriptionRows();
-    expect((await cookieAdmin.call("PUT", subscriptionPath(), { planCode: "starter" })).status).toBe(401);
+    expect([400, 503]).toContain((await cookieAdmin.call("PUT", subscriptionPath(), { planCode: "starter" })).status);
     expect(await subscriptionRows()).toEqual(before);
   });
 

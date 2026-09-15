@@ -17,13 +17,20 @@ function serializeSummary(call: RealCallRecord) {
   return {
     callId: call.callId,
     source: call.source,
+    /** 'telephone' | 'browser' | 'unknown' — from the provider's call type first. */
+    channel: call.channel,
+    /** A SiteMint QA event, never a real call. */
+    synthetic: call.synthetic,
     state: call.state,
     stateLabel: callStateLabel(call.state),
     isFinal: call.isFinal,
-    callerNumberDisplay: call.callerNumberDisplay,
+    callerNumberDisplay: call.callerNumberKnown ? call.callerNumberDisplay : null,
     startedAt: call.firstEventAt.toISOString(),
     endedAt: call.endedAt?.toISOString() ?? null,
-    durationSec: call.durationSec ?? null,
+    // The provider's own measurement only. The receipt-time estimate measures
+    // how far apart our webhooks arrived — 0 whenever a single event came in —
+    // so it is not shown as a duration. Null reads as "not available".
+    durationSec: call.providerDurationSec ?? null,
     // Only the word, on the list. The evidence behind it belongs on the
     // detail, where there is room to say why.
     transferState: call.transfer.state,

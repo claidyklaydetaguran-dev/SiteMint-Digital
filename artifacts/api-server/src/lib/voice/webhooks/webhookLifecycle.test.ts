@@ -299,6 +299,40 @@ describe("event key + call-state fold", () => {
     expect(record!.callerNumberKnown).toBe(true);
     expect(record!.callerNumberDisplay).not.toBe("Unknown");
   });
+
+  // The provider states the call type itself; that outranks any inference from
+  // which caller details happened to arrive.
+  it("classifies the channel from the provider's own call type first", () => {
+    const web = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report", call: { id: "call-1", assistantId: "asst-1", callType: "webCall" } }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(web!.channel).toBe("browser");
+    const inbound = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report", call: { id: "call-1", assistantId: "asst-1", callType: "inboundPhoneCall" } }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(inbound!.channel).toBe("telephone");
+    expect(inbound!.callerNumberKnown).toBe(false);
+  });
+
+  it("never presumes a browser test when there is no evidence either way", () => {
+    const record = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report", endedReason: "customer-ended-call" }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(record!.channel).toBe("unknown");
+    const withheld = foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report", call: { id: "call-1", assistantId: "asst-1", phoneNumberId: "pn-1" } }), "2026-08-30T11:01:00Z"),
+    ]);
+    expect(withheld!.channel).toBe("telephone");
+  });
+
+  it("marks only the reserved QA namespace as synthetic", () => {
+    expect(foldEventsIntoCallRecord("sitemint-qa-7f3a", [
+      stored(msg({ type: "end-of-call-report", call: { id: "sitemint-qa-7f3a", assistantId: "asst-1" } }), "2026-08-30T11:01:00Z"),
+    ])!.synthetic).toBe(true);
+    expect(foldEventsIntoCallRecord("call-1", [
+      stored(msg({ type: "end-of-call-report" }), "2026-08-30T11:01:00Z"),
+    ])!.synthetic).toBe(false);
+  });
 });
 
 // ── 4. reconciliation ────────────────────────────────────────────────────────
@@ -314,6 +348,9 @@ function callRecord(overrides: Partial<RealCallRecord>): RealCallRecord {
     callerNumberDisplay: "•••• 1234",
     callerNumberKnown: true,
     reachedViaNumber: true,
+    callType: "inboundPhoneCall",
+    channel: "telephone",
+    synthetic: false,
     firstEventAt: new Date("2026-08-30T10:00:00Z"),
     lastEventAt: new Date("2026-08-30T10:00:00Z"),
     endedAt: undefined,
