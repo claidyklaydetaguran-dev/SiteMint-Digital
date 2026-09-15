@@ -16,6 +16,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchCalendarChoices, selectCalendar, isCalendarActionError } from "@/lib/calendarApi";
 import { CALENDAR_PICKER, resolveSelectedCalendarId } from "@/pages/calendar/calendarContract";
 import { Button } from "@/components/ui/button";
+// The picker uses the shared form classes (si-label, si-input). The Calendar
+// page did not load their stylesheet, so on a direct visit the select had no
+// width rule and sized itself to its longest option — ~150px past a 375px
+// screen (measured on staging). Every selector in it is `.si-` scoped.
+import "@/styles/v2-signin.css";
 
 export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): React.ReactElement | null {
   const queryClient = useQueryClient();

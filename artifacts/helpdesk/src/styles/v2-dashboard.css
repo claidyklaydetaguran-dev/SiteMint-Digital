@@ -1002,6 +1002,12 @@
   font-size: var(--sd-text-small);
   color: var(--sd-text-muted);
 }
+/* A figure can hold text, not just a number — the Calendar page shows the
+   connected account's email there. Without these, a long unbroken value kept
+   its column at full width and ran ~200px past a 375px screen (measured on
+   staging). */
+.sd-figure { min-width: 0; }
+.sd-figure__value { max-width: 100%; overflow-wrap: anywhere; }
 
 /* ── Conversation list ─────────────────────────────────────────────────────*/
 

@@ -1100,7 +1100,26 @@
     color: var(--sd-text-muted);
   }
   .sa-row__action { justify-content: flex-start; }
-  .sa-days__name { flex-basis: 100%; }
+  /* Weekly hours at phone width. The row is a GRID, so the old
+     `flex-basis: 100%` on the name never applied: the 8rem name column stayed,
+     and a closed day's 18.5rem label pushed "Set hours" ~73px past a 375px
+     screen (measured on staging). Stack the day name above its controls, let
+     the closed label shrink, and — because the Start/End column headings can no
+     longer line up with stacked rows — show each input's own label instead. */
+  .sa-days__legend { display: none; }
+  .sa-days__row { grid-template-columns: minmax(0, 1fr); gap: var(--sd-space-1); }
+  .sa-days__closed { min-width: 0; }
+  .sa-days__hours .sa-vh {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    font-size: var(--sd-text-micro);
+    color: var(--sd-text-muted);
+  }
   .sa-slots { grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); }
 }
 
