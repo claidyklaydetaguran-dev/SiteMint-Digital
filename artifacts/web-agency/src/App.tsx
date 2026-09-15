@@ -109,6 +109,8 @@ const CrmExecutiveDashboard = lazyRoute(() => import("@/pages/crm/CrmExecutiveDa
 const CrmLeads = lazyRoute(() => import("@/pages/crm/CrmLeads"));
 const CrmLeadDetail = lazyRoute(() => import("@/pages/crm/CrmLeadDetail"));
 const CrmLeadDna = lazyRoute(() => import("@/pages/crm/CrmLeadDna"));
+const CrmCompanies = lazyRoute(() => import("@/pages/crm/CrmCompanies"));
+const CrmCompanyDetail = lazyRoute(() => import("@/pages/crm/CrmCompanyDetail"));
 const CrmPipeline = lazyRoute(() => import("@/pages/crm/CrmPipeline"));
 const CrmTasks = lazyRoute(() => import("@/pages/crm/CrmTasks"));
 const CrmEmailTemplates = lazyRoute(() => import("@/pages/crm/CrmEmailTemplates"));
@@ -195,6 +197,9 @@ function AdminRoutes() {
       <Route path="/admin/crm/leads/:id/dna" component={CrmLeadDna} />
       <Route path="/admin/crm/leads/:id" component={CrmLeadDetail} />
       <Route path="/admin/crm/leads" component={CrmLeads} />
+      {/* The company record before the list, so an id is never read as the list. */}
+      <Route path="/admin/crm/companies/:id" component={CrmCompanyDetail} />
+      <Route path="/admin/crm/companies" component={CrmCompanies} />
       <Route path="/admin/crm/communications" component={CrmCommunications} />
       <Route path="/admin/crm/intelligence/behavioral" component={CrmBehavioralIntelligence} />
       <Route path="/admin/crm/intelligence/automation-queue" component={CrmAutomationQueue} />

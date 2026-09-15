@@ -210,6 +210,20 @@ export const applySuggestions = (groups: ApplyGroupInput[]) =>
   call<{ results: ApplyResult[]; totals: { companiesCreated: number; contactsLinked: number; contactsSkipped: number } }>(
     "/api/crm/companies/suggestions/apply", { method: "POST", body: { groups } });
 
+export interface ContactSearchResult {
+  id: number;
+  name: string;
+  email: string;
+  company: string | null;
+  companyName: string | null;
+  companyId: number | null;
+  status: string;
+}
+
+/** Contacts matching a search, for linking somebody to a company. */
+export const searchContacts = (query: string) =>
+  call<{ leads: ContactSearchResult[] }>(`/api/crm/leads?search=${encodeURIComponent(query)}`);
+
 /** Link or unlink one contact. `null` unlinks. */
 export const setContactCompany = (leadId: number, companyId: number | null) =>
   call<{ lead: { id: number; companyId: number | null } }>(`/api/crm/leads/${leadId}`, {

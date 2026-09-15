@@ -39,6 +39,8 @@ function timeAgo(d: string) {
 
 interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
+  /** M7: the company record this contact is linked to, when somebody has linked it. */
+  companyId?: number | null; companyName?: string | null;
   status: string; priority: string; source: string; serviceInterest?: string;
   assignedTo?: string; nextFollowUpAt?: string | null; lastContactedAt?: string | null;
   /** M6: the staff reference the product reads; `assignedTo` is the name as recorded. */
@@ -214,6 +216,7 @@ export default function CrmLeads() {
         (l.name ?? "").toLowerCase().includes(q) ||
         (l.email ?? "").toLowerCase().includes(q) ||
         (l.company || "").toLowerCase().includes(q) ||
+        (l.companyName || "").toLowerCase().includes(q) ||
         (l.phone || "").includes(q)
       );
     }
@@ -573,7 +576,9 @@ export default function CrmLeads() {
                                 </span>
                               )}
                             </div>
-                            {lead.company && <p className="text-xs text-muted-foreground truncate">{lead.company}</p>}
+                            {(lead.companyName || lead.company) && (
+                              <p className="text-xs text-muted-foreground truncate">{lead.companyName ?? lead.company}</p>
+                            )}
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>
                                 {normalizeLeadStatus(lead.status)}
@@ -613,17 +618,28 @@ export default function CrmLeads() {
                       <tr key={lead.id} className="hover:bg-accent/70 transition-colors group">
                         {/* Name + avatar */}
                         <td className="px-4 py-2.5">
-                          <Link href={`/admin/crm/leads/${lead.id}`}>
-                            <div className="flex items-center gap-2.5 cursor-pointer">
-                              <div className={`w-7 h-7 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
+                          <div className="flex items-center gap-2.5">
+                            <Link href={`/admin/crm/leads/${lead.id}`}>
+                              <div className={`w-7 h-7 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0 cursor-pointer`}>
                                 <span className="text-white text-[10px] font-bold">{initials(lead.name)}</span>
                               </div>
-                              <div className="min-w-0">
-                                <span className="font-medium text-xs text-blue-600 hover:text-blue-800 transition-colors block truncate">{lead.name}</span>
-                                {lead.company && <span className="text-[10px] text-muted-foreground truncate block">{lead.company}</span>}
-                              </div>
+                            </Link>
+                            <div className="min-w-0">
+                              <Link href={`/admin/crm/leads/${lead.id}`}>
+                                <span className="font-medium text-xs text-blue-600 hover:text-blue-800 transition-colors block truncate cursor-pointer">{lead.name}</span>
+                              </Link>
+                              {/* M7: the company RECORD when the contact is linked to one — a separate
+                                  link, never nested inside the contact's own — and the text on file
+                                  when nobody has linked it yet. */}
+                              {lead.companyId && lead.companyName ? (
+                                <Link href={`/admin/crm/companies/${lead.companyId}`}>
+                                  <span className="text-[10px] text-muted-foreground hover:text-foreground underline truncate block cursor-pointer">{lead.companyName}</span>
+                                </Link>
+                              ) : lead.company ? (
+                                <span className="text-[10px] text-muted-foreground truncate block">{lead.company}</span>
+                              ) : null}
                             </div>
-                          </Link>
+                          </div>
                         </td>
                         {/* Health Score */}
                         <td className="px-4 py-2.5">
