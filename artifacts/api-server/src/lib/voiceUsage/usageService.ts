@@ -68,6 +68,38 @@ export interface UsageLedgerDeps {
     channel: "telephone" | "browser" | "unknown" | null;
   }) => Promise<{ inserted: boolean }>;
   sumPeriod: (firmId: number, periodYm: string) => Promise<{ totalSeconds: number; callCount: number }>;
+  /**
+   * Optional on purpose: every fake that already implements this interface
+   * stays valid, and a caller that cannot group by channel reports no
+   * breakdown rather than a fabricated one.
+   */
+  sumPeriodByChannel?: (firmId: number, periodYm: string) => Promise<UsageChannelRow[]>;
+}
+
+/** How a call reached the assistant, as recorded on the ledger row. */
+export type UsageChannel = "telephone" | "browser" | "unknown";
+
+export interface UsageChannelRow {
+  /** Null for rows written before the column existed — never guessed at. */
+  channel: UsageChannel | null;
+  totalSeconds: number;
+  callCount: number;
+}
+
+export interface UsageChannelBucket {
+  totalSeconds: number;
+  callCount: number;
+}
+
+/**
+ * `unreported` holds both the explicit "unknown" channel and the rows that
+ * carry no channel at all. Neither can honestly be called a phone call or a
+ * browser test, so they are counted and named separately instead.
+ */
+export interface UsageChannelBreakdown {
+  telephone: UsageChannelBucket;
+  browser: UsageChannelBucket;
+  unreported: UsageChannelBucket;
 }
 
 async function productionLedgerDeps(): Promise<UsageLedgerDeps> {
@@ -92,6 +124,22 @@ async function productionLedgerDeps(): Promise<UsageLedgerDeps> {
         .from(voiceUsageLedger)
         .where(and(eq(voiceUsageLedger.firmId, firmId), eq(voiceUsageLedger.periodYm, periodYm)));
       return { totalSeconds: row?.totalSeconds ?? 0, callCount: row?.callCount ?? 0 };
+    },
+    sumPeriodByChannel: async (firmId, periodYm) => {
+      const rows = await db
+        .select({
+          channel: voiceUsageLedger.channel,
+          totalSeconds: sql<number>`coalesce(sum(${voiceUsageLedger.durationSec}), 0)::int`,
+          callCount: sql<number>`count(*)::int`,
+        })
+        .from(voiceUsageLedger)
+        .where(and(eq(voiceUsageLedger.firmId, firmId), eq(voiceUsageLedger.periodYm, periodYm)))
+        .groupBy(voiceUsageLedger.channel);
+      return rows.map((r) => ({
+        channel: (r.channel as UsageChannel | null) ?? null,
+        totalSeconds: r.totalSeconds ?? 0,
+        callCount: r.callCount ?? 0,
+      }));
     },
   };
 }
@@ -124,6 +172,64 @@ export async function aggregateUsageForPeriod(
 ): Promise<{ totalSeconds: number; callCount: number }> {
   const resolved = deps ?? (await productionLedgerDeps());
   return resolved.sumPeriod(firmId, periodYm);
+}
+
+/**
+ * The same period, split by how each call reached the assistant. Returns null
+ * — not zeroes — when the ledger source cannot group by channel, so a caller
+ * can tell "no breakdown available" apart from "a period with no calls".
+ */
+export async function aggregateUsageByChannelForPeriod(
+  firmId: number,
+  periodYm: string,
+  deps?: UsageLedgerDeps,
+): Promise<UsageChannelBreakdown | null> {
+  const resolved = deps ?? (await productionLedgerDeps());
+  if (!resolved.sumPeriodByChannel) return null;
+  const rows = await resolved.sumPeriodByChannel(firmId, periodYm);
+  const breakdown: UsageChannelBreakdown = {
+    telephone: { totalSeconds: 0, callCount: 0 },
+    browser: { totalSeconds: 0, callCount: 0 },
+    unreported: { totalSeconds: 0, callCount: 0 },
+  };
+  for (const row of rows) {
+    const bucket =
+      row.channel === "telephone"
+        ? breakdown.telephone
+        : row.channel === "browser"
+          ? breakdown.browser
+          : breakdown.unreported;
+    bucket.totalSeconds += row.totalSeconds;
+    bucket.callCount += row.callCount;
+  }
+  return breakdown;
+}
+
+/** The plan catalog's env var. Its absence is what selects the flat cap below. */
+export const VOICE_PLAN_CATALOG_ENV_VAR = "VOICE_PLAN_CATALOG_JSON";
+
+/**
+ * Included minutes for one firm: the plan-resolved figure when a plan catalog
+ * is configured, and otherwise the flat VOICE_USAGE_INCLUDED_MINUTES value,
+ * behaving exactly as it did before.
+ *
+ * The catalog check comes first deliberately. With no catalog there is nothing
+ * for entitlements to resolve, so this must not reach the database to discover
+ * that — the fallback stays a pure env read on every deployment that has not
+ * configured plans.
+ *
+ * The entitlements import is dynamic because that module imports this one back
+ * for the same fallback; keeping both directions lazy avoids a module cycle.
+ */
+export async function resolveIncludedMinutesForFirmOrEnv(
+  firmId: number,
+  env: Record<string, string | undefined> = process.env,
+): Promise<number | null> {
+  if ((env[VOICE_PLAN_CATALOG_ENV_VAR] ?? "").trim().length === 0) {
+    return loadUsageCapMinutesFromEnv(env);
+  }
+  const { resolveIncludedMinutesForFirm } = await import("../voiceBilling/entitlements.js");
+  return resolveIncludedMinutesForFirm(firmId, { env });
 }
 
 // ── cap evaluation ───────────────────────────────────────────────────────────
@@ -182,7 +288,7 @@ export async function checkAndRecordUsageCap(
   firmId: number,
   deps: Partial<UsageCapDeps> = {},
 ): Promise<CapCheckResult> {
-  const capMinutes = loadUsageCapMinutesFromEnv(deps.env ?? process.env);
+  const capMinutes = await resolveIncludedMinutesForFirmOrEnv(firmId, deps.env ?? process.env);
   if (capMinutes === null) return { checked: false, reason: "no_cap_configured" };
 
   const ledger = deps.ledger ?? (await productionLedgerDeps());
