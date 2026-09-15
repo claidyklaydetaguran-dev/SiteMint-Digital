@@ -38,6 +38,18 @@ import { buildVapiEventKey } from "../lib/voice/webhooks/eventKey.js";
 import { dispatchToolCalls } from "../lib/voice/tools/toolDispatcher.js";
 import { openVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
 import { resolveAssistantForNumber, resolveTransferDestination, scanEmergencyLanguage } from "../lib/voiceNumbers/numberService.js";
+import { isCapabilityExecutable } from "../lib/voice/tools/firmCapabilities.js";
+
+/**
+ * The truthful line for every reason a caller cannot be put through EXCEPT
+ * closing time, which has its own.
+ *
+ * Written once because it is now spoken from two places — the capability gate
+ * and the destination resolver — and two copies would drift into saying
+ * different things about the same situation.
+ */
+const TRANSFER_UNAVAILABLE_LINE =
+  "I'm not able to put you through from here, but I can take a detailed message and someone will get back to you.";
 
 const router = Router();
 
@@ -154,9 +166,30 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
   if (message.type === "transfer-destination-request") {
     try {
       await storeVapiWebhookEvent(firmId, message);
+
+      // V9: EXECUTABLE, not merely published — the same per-call re-check the
+      // dispatcher applies to function tools.
+      //
+      // The provider goes on advertising whatever tool was attached at publish
+      // time. A business whose authorization is withdrawn, or whose last
+      // consented contact is removed, must stop putting callers through
+      // immediately rather than at its next publish. Resolving nothing here is
+      // what makes that true, and it fails closed: an unresolvable capability
+      // state transfers nobody.
+      if (!(await isCapabilityExecutable(firmId, "transfer"))) {
+        req.log.info({ firmId, reason: "capability_not_executable" }, "[voice webhook] transfer refused");
+        res.status(200).json({ error: TRANSFER_UNAVAILABLE_LINE });
+        return;
+      }
+
       const resolution = await resolveTransferDestination(firmId);
       if (resolution.ok) {
         req.log.info({ firmId, callId: message.call.id }, "[voice webhook] transfer destination resolved");
+        // No transferPlan is sent. This repository models no provider transfer
+        // mode, and inventing one here would put provider vocabulary in a route
+        // rather than in the provider module — while changing nothing: the
+        // handover is already the blind one that transferOutcome.ts reports
+        // (connectionKnowable: false), because the assistant leaves the call.
         res.status(200).json({
           destination: {
             type: "number",
@@ -173,7 +206,7 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
         const spoken =
           resolution.reason === "after_hours"
             ? "The office is closed right now, but I can take a detailed message."
-            : "I'm not able to put you through from here, but I can take a detailed message and someone will get back to you.";
+            : TRANSFER_UNAVAILABLE_LINE;
         res.status(200).json({ error: spoken });
       }
     } catch (err) {

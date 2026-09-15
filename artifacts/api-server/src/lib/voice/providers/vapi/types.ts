@@ -84,6 +84,19 @@ const SERVER_KEYS = new Set(["url", "credentialId"]);
 const CREDENTIAL_ID_SHAPE = /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/;
 const TOOL_KEYS = new Set(["type", "function", "server"]);
 const TOOL_FUNCTION_KEYS = new Set(["name", "description", "parameters"]);
+/**
+ * V9: the provider-native transfer tool carries exactly these two keys.
+ *
+ * `destinations` is absent by design, and its absence is enforced rather than
+ * assumed: a destination list here would ship a business's private telephone
+ * numbers into a provider-stored assistant config and route calls without
+ * consulting consent or hours. The destination is resolved per call by our own
+ * webhook instead, which is what `server` is for.
+ */
+const TRANSFER_TOOL_TYPE = "transferCall";
+const TRANSFER_TOOL_KEYS = new Set(["type", "server"]);
+/** At most one: two transfer tools would leave the model choosing between them. */
+const MAX_TRANSFER_TOOLS = 1;
 const MAX_TOOLS = 8;
 const MODEL_KEYS = new Set(["provider", "model"]);
 const VOICE_KEYS = new Set(["provider", "voiceId", "version"]);
@@ -213,26 +226,56 @@ export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeC
       fail(`Vapi runtime config "tools" must contain 1..${MAX_TOOLS} entries.`);
     }
     if (server === undefined) fail('Vapi runtime config "tools" requires "server" to be present.');
-    tools = value.tools.map((tool, index) => {
-      if (!isPlainObject(tool)) fail(`tools[${index}] must be a plain object.`);
-      requireNoUnknownKeys(tool, TOOL_KEYS, `tools[${index}]`);
-      if (tool.type !== "function") fail(`tools[${index}].type must be "function".`);
-      if (!isPlainObject(tool.function)) fail(`tools[${index}].function must be a plain object.`);
-      requireNoUnknownKeys(tool.function, TOOL_FUNCTION_KEYS, `tools[${index}].function`);
-      const name = requireNonEmptyString(tool.function.name, `tools[${index}].function.name`);
-      if (!VAPI_ALLOWED_TOOL_NAMES.has(name)) fail(`tools[${index}].function.name is not in the closed tool catalog.`);
-      requireNonEmptyString(tool.function.description, `tools[${index}].function.description`);
-      if (!isPlainObject(tool.function.parameters)) fail(`tools[${index}].function.parameters must be a plain object.`);
+
+    /**
+     * Validates a tool's own `server` block exactly as the assistant-level one
+     * is validated: https, no userinfo, one well-formed credential id. Shared so
+     * a transfer tool can never reach the provider under looser rules than a
+     * function tool.
+     */
+    const requireToolServer = (tool: Record<string, unknown>, index: number): void => {
       if (!isPlainObject(tool.server)) fail(`tools[${index}].server must be a plain object.`);
       requireNoUnknownKeys(tool.server, SERVER_KEYS, `tools[${index}].server`);
       const toolUrl = requireNonEmptyString(tool.server.url, `tools[${index}].server.url`);
       let parsedToolUrl: URL;
       try { parsedToolUrl = new URL(toolUrl); } catch { fail(`tools[${index}].server.url must be a valid absolute URL.`); }
       if (parsedToolUrl.protocol !== "https:") fail(`tools[${index}].server.url must use https.`);
+      if (parsedToolUrl.username || parsedToolUrl.password) fail(`tools[${index}].server.url must not contain userinfo.`);
       const toolCredentialId = requireNonEmptyString(tool.server.credentialId, `tools[${index}].server.credentialId`);
       if (!CREDENTIAL_ID_SHAPE.test(toolCredentialId)) {
         fail(`tools[${index}].server.credentialId must be a single well-formed provider credential id.`);
       }
+    };
+
+    let transferToolCount = 0;
+
+    tools = value.tools.map((tool, index) => {
+      if (!isPlainObject(tool)) fail(`tools[${index}] must be a plain object.`);
+
+      // V9: the provider-native transfer tool. Two keys and nothing else — in
+      // particular no `destinations`, which would carry a business's telephone
+      // numbers into a provider-stored config and route calls without consulting
+      // consent or hours. Rejected here rather than merely never built, so a
+      // future edit cannot add one quietly.
+      if (tool.type === TRANSFER_TOOL_TYPE) {
+        requireNoUnknownKeys(tool, TRANSFER_TOOL_KEYS, `tools[${index}]`);
+        transferToolCount += 1;
+        if (transferToolCount > MAX_TRANSFER_TOOLS) {
+          fail(`Vapi runtime config "tools" must contain at most ${MAX_TRANSFER_TOOLS} "${TRANSFER_TOOL_TYPE}" tool.`);
+        }
+        requireToolServer(tool, index);
+        return tool as JsonObject;
+      }
+
+      requireNoUnknownKeys(tool, TOOL_KEYS, `tools[${index}]`);
+      if (tool.type !== "function") fail(`tools[${index}].type must be "function" or "${TRANSFER_TOOL_TYPE}".`);
+      if (!isPlainObject(tool.function)) fail(`tools[${index}].function must be a plain object.`);
+      requireNoUnknownKeys(tool.function, TOOL_FUNCTION_KEYS, `tools[${index}].function`);
+      const name = requireNonEmptyString(tool.function.name, `tools[${index}].function.name`);
+      if (!VAPI_ALLOWED_TOOL_NAMES.has(name)) fail(`tools[${index}].function.name is not in the closed tool catalog.`);
+      requireNonEmptyString(tool.function.description, `tools[${index}].function.description`);
+      if (!isPlainObject(tool.function.parameters)) fail(`tools[${index}].function.parameters must be a plain object.`);
+      requireToolServer(tool, index);
       return tool as JsonObject;
     });
   }

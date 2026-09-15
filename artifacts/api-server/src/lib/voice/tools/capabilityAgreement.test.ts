@@ -23,12 +23,13 @@ vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 import {
   describeFirmCapabilities,
   readCapabilityEnvironment,
+  resolveFirmCapabilities,
   resolveFirmToolNames,
   resolveEffectiveCapabilities,
   NO_READINESS,
   type FirmReadiness,
 } from "./firmCapabilities.js";
-import { loadVoiceToolsConfigFromEnv } from "../../voicePublishing/toolsConfig.js";
+import { loadVoiceToolsConfigFromEnv, TRANSFER_TOOL_TYPE } from "../../voicePublishing/toolsConfig.js";
 
 const SERVER = { url: "https://example.test/api/voice/webhooks/vapi", credentialId: "cred_abcdefgh" };
 
@@ -36,6 +37,7 @@ const FULLY_READY: FirmReadiness = {
   bookableAppointmentTypes: 2,
   openWeekdays: 5,
   hasUsableTimezone: true,
+  dialableTransferDestinations: 1,
 };
 
 const BOTH_AUTHORIZED = {
@@ -43,12 +45,28 @@ const BOTH_AUTHORIZED = {
   VOICE_TOOLS_CAPABILITIES: "messages,scheduling",
 };
 
-/** The names the payload actually carries, for a given env + readiness. */
+/** V9: all three, including the provider-native one. */
+const ALL_AUTHORIZED = {
+  VOICE_TOOLS_ATTACH_ENABLED: "true",
+  VOICE_TOOLS_CAPABILITIES: "messages,scheduling,transfer",
+};
+
+/**
+ * What the payload actually carries, for a given env + readiness.
+ *
+ * The transfer tool has no function name — that is the whole point of a
+ * provider-native capability — so it is reported by its type. A helper that
+ * read `.function.name` unconditionally would have thrown on it, which is
+ * exactly the shape of mistake these cases exist to catch.
+ */
 function payloadToolNames(env: Record<string, string | undefined>, readiness: FirmReadiness): string[] {
   const capEnv = readCapabilityEnvironment(true, env);
   const firmToolNames = resolveFirmToolNames(capEnv, readiness);
-  const defs = loadVoiceToolsConfigFromEnv(SERVER, env, firmToolNames) ?? [];
-  return defs.map((d) => String((d.function as Record<string, unknown>).name));
+  const firmCapabilities = resolveFirmCapabilities(capEnv, readiness);
+  const defs = loadVoiceToolsConfigFromEnv(SERVER, env, firmToolNames, firmCapabilities) ?? [];
+  return defs.map((d) =>
+    d.type === TRANSFER_TOOL_TYPE ? TRANSFER_TOOL_TYPE : String((d.function as Record<string, unknown>).name),
+  );
 }
 
 describe("scheduling readiness is more than one appointment type", () => {
@@ -104,6 +122,33 @@ describe("the dashboard and the payload agree", () => {
   });
 });
 
+describe("V9 — the transfer capability agrees at the same four places", () => {
+  it("is reported active exactly when the payload carries the transfer tool", () => {
+    for (const env of [ALL_AUTHORIZED, BOTH_AUTHORIZED]) {
+      for (const readiness of [FULLY_READY, { ...FULLY_READY, dialableTransferDestinations: 0 }]) {
+        const capEnv = readCapabilityEnvironment(true, env);
+        const active = describeFirmCapabilities(capEnv, readiness).some(
+          (r) => r.key === "transfer" && r.state === "active",
+        );
+        expect(payloadToolNames(env, readiness).includes(TRANSFER_TOOL_TYPE)).toBe(active);
+      }
+    }
+  });
+
+  it("a business authorized for transfer alone publishes the transfer tool and nothing else", () => {
+    const carried = payloadToolNames(
+      { VOICE_TOOLS_ATTACH_ENABLED: "true", VOICE_TOOLS_CAPABILITIES: "transfer" },
+      FULLY_READY,
+    );
+    expect(carried).toEqual([TRANSFER_TOOL_TYPE]);
+  });
+
+  it("readiness narrows transfer too, and can never widen it", () => {
+    // Contacts configured, but the operator authorized messages and scheduling only.
+    expect(payloadToolNames(BOTH_AUTHORIZED, FULLY_READY)).not.toContain(TRANSFER_TOOL_TYPE);
+  });
+});
+
 describe("the payload and the synchronization comparison agree", () => {
   it("both build from the same resolved list, so the digests match", () => {
     // The comparison calls the same loader with the same firm list. If these
@@ -155,6 +200,28 @@ describe("readiness that lapses after publication", () => {
 
     // And message-taking is untouched by a scheduling lapse.
     expect(now.toolNames).toContain("save_message");
+  });
+
+  it("V9: a provider-native capability lapses the same way a tool-backed one does", async () => {
+    const withContact = await resolveEffectiveCapabilities(1, {
+      isToolsAttachable: async () => true,
+      env: ALL_AUTHORIZED,
+      loadReadiness: async () => FULLY_READY,
+    });
+    expect(withContact.activeCapabilities).toContain("transfer");
+    // It contributes no tool NAME — which is exactly why the payload builder is
+    // given the capability list as well.
+    expect(withContact.toolNames).not.toContain("transfer");
+
+    const withoutContact = await resolveEffectiveCapabilities(1, {
+      isToolsAttachable: async () => true,
+      env: ALL_AUTHORIZED,
+      loadReadiness: async () => ({ ...FULLY_READY, dialableTransferDestinations: 0 }),
+    });
+    expect(withoutContact.activeCapabilities).not.toContain("transfer");
+    // And a transfer lapse leaves the other two untouched.
+    expect(withoutContact.toolNames).toContain("save_message");
+    expect(withoutContact.toolNames).toContain("book_appointment");
   });
 
   it("authorizes nothing when the capability state cannot be resolved", async () => {

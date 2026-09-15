@@ -104,7 +104,14 @@ export interface AssistantCapability {
   state: CapabilityState;
   detail: string;
   /** Names what stands in the way, so the screen can link to the fix. */
-  blockedBy: "platform_disabled" | "not_authorized" | "needs_appointment_type" | null;
+  blockedBy:
+    | "platform_disabled"
+    | "not_authorized"
+    | "needs_appointment_type"
+    | "needs_opening_hours"
+    | "needs_timezone"
+    | "needs_transfer_contact"
+    | null;
 }
 
 export interface AssistantCapabilityList {
@@ -146,6 +153,14 @@ export interface TransferContact {
 }
 
 export interface TransferCapability {
+  /**
+   * Whether this business's assistant may put callers through AT ALL — the
+   * server's own capability verdict, not a guess from "a number is assigned".
+   * A workspace SiteMint has not switched transfers on for is blocked however
+   * many contacts it has configured, and the screen has to say so.
+   */
+  state: CapabilityState;
+  blockedBy: string | null;
   telephoneTransferAvailable: boolean;
   browserTransferAvailable: boolean;
   explanation: string;

@@ -21,6 +21,7 @@ import { loadVoiceServerConfigFromEnv } from "../voicePublishing/serverConfig.js
 import { loadVoiceToolsConfigFromEnv } from "../voicePublishing/toolsConfig.js";
 import { loadVoiceCallPolicyFromEnv } from "../voicePublishing/callPolicyConfig.js";
 import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
+import type { VoiceToolCapability } from "../voice/tools/toolCapabilities.js";
 import { computeProviderPayloadHash } from "../voicePublishing/providerPayloadHash.js";
 import { buildSyncProviderInput } from "../voicePublishing/syncService.js";
 import { STALE_PROVIDER_SYNC_THRESHOLD_MS } from "./repository.js";
@@ -74,6 +75,18 @@ export interface ProviderSyncStateDependencies {
    * pure unit tests want.
    */
   firmToolNames?: readonly VoiceToolName[] | undefined;
+  /**
+   * V9: the business's effective CAPABILITIES, from the same shared resolution
+   * and the same request.
+   *
+   * Threaded for exactly the reason `firmToolNames` is, and it is not
+   * redundant: the transfer capability is provider-native, so it appears in no
+   * tool-name list. A comparison given only the names would rebuild a payload
+   * WITHOUT the transfer tool while publish sent one WITH it — the digests
+   * would never match and the assistant would read "changes not published"
+   * forever, which is the V8 defect returning through a new door.
+   */
+  firmCapabilities?: readonly VoiceToolCapability[] | undefined;
   /** Injected so stale-versus-fresh is deterministic under test, never wall-clock-dependent. */
   clock: Clock;
 }
@@ -108,7 +121,7 @@ function buildComparisonInput(row: VoiceAssistant, deps: ProviderSyncStateDepend
     row,
     deps.loadCatalog(),
     serverConfig,
-    deps.loadToolsConfig(serverConfig, process.env, deps.firmToolNames),
+    deps.loadToolsConfig(serverConfig, process.env, deps.firmToolNames, deps.firmCapabilities),
     deps.loadCallPolicy(),
   );
 }
