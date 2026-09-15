@@ -3,6 +3,8 @@ import { CrmLayout } from "./CrmLayout";
 import { Plus, X, Trash2, Edit2, Check, DollarSign, Calendar, User, CreditCard, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/adminFetch";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 const TXN_METHODS = [
   { value: "manual_cash", label: "Cash" },
@@ -303,12 +305,29 @@ export default function CrmDealsPage() {
     }
   };
 
-  const deleteDeal = async (id: number) => {
-    if (!confirm("Delete this deal?")) return;
-    await adminFetch(`/api/crm/deals/${id}`, {
-      method: "DELETE",
+  const confirmation = useConfirmDialog();
+
+  const deleteDeal = (id: number) => {
+    const deal = deals.find(d => d.id === id);
+    if (!deal) return;
+    void confirmation.ask({
+      title: `Delete the deal "${deal.name}"?`,
+      description: `It comes off the board and out of every pipeline total, including the ${fmt(deal.value)} it carries. This cannot be undone.`,
+      consequences: [
+        "Payments, quotes and invoices recorded against it are not deleted.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete deal",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep deal",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/deals/${id}`, { method: "DELETE" });
+        // The old path removed the card whatever the server answered, so a
+        // refused delete looked exactly like a successful one until a reload.
+        if (!res.ok) throw new Error(await refusalMessage(res, "That deal could not be deleted."));
+        setDeals(d => d.filter(x => x.id !== id));
+      },
     });
-    setDeals(d => d.filter(x => x.id !== id));
   };
 
   const handleDrop = async (targetStage: Stage) => {
@@ -329,6 +348,7 @@ export default function CrmDealsPage() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
       <div className="flex flex-col h-[calc(100vh-48px)]">
         {/* Header */}
         <div className="bg-white border-b border-border px-6 py-3.5 flex items-center gap-3 shrink-0">

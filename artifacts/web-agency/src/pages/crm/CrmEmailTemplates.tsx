@@ -3,6 +3,8 @@ import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2, Trash2, Mail, X } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 interface Template { id:number; name:string; type:string; subject:string; body:string; }
 
@@ -25,6 +27,7 @@ export default function CrmEmailTemplates() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const confirmation = useConfirmDialog();
 
   const load = useCallback(async () => {
     const r = await adminFetch("/api/crm/email-templates");
@@ -56,10 +59,24 @@ export default function CrmEmailTemplates() {
     setSaving(false); setShowForm(false); load();
   };
 
-  const deleteTemplate = async (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    await adminFetch(`/api/crm/email-templates/${id}`, { method: "DELETE" });
-    load();
+  const deleteTemplate = (template: Template) => {
+    void confirmation.ask({
+      title: `Delete the template "${template.name}"?`,
+      description: "It is removed for everyone, and this cannot be undone.",
+      consequences: [
+        "It disappears from this list, and from the template picker used when composing an email.",
+        "Emails already sent using it are not affected.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete template",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep template",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/email-templates/${template.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That template could not be deleted."));
+        await load();
+      },
+    });
   };
 
   const seedDefaults = async () => {
@@ -120,7 +137,7 @@ export default function CrmEmailTemplates() {
                     <button onClick={() => openEdit(t)} className="p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => deleteTemplate(t.id)} className="p-1.5 text-muted-foreground/60 hover:text-red-500 transition-colors rounded">
+                    <button onClick={() => deleteTemplate(t)} aria-label={`Delete ${t.name}`} className="p-1.5 text-muted-foreground/60 hover:text-red-500 transition-colors rounded">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -172,6 +189,8 @@ export default function CrmEmailTemplates() {
           </div>
         </div>
       )}
+
+      {confirmation.element}
     </CrmLayout>
   );
 }

@@ -4,6 +4,8 @@ import { Plus, X, Trash2, Edit2, Check, Calendar, User, ClipboardList, ExternalL
 import { Button } from "@/components/ui/button";
 import { PROJECT_STAGES, PROJECT_STAGE_STYLES, PROJECT_TYPES, type ProjectStage } from "@/lib/crmTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { useConfirmDialog, type Confirmation } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 function fmt(n: number | string | null | undefined) {
   if (n == null || n === "") return null;
@@ -129,6 +131,7 @@ export default function CrmProjectsPage() {
   const [dragOverStage, setDragOverStage] = useState<ProjectStage | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const savingRef = useRef(false);
+  const confirmation = useConfirmDialog();
 
   const [loadError, setLoadError] = useState("");
 
@@ -417,14 +420,24 @@ export default function CrmProjectsPage() {
       )}
 
       {detailId !== null && (
-        <ProjectDetailDrawer projectId={detailId} onClose={() => setDetailId(null)} onChanged={load} />
+        <ProjectDetailDrawer
+          projectId={detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={load}
+          askConfirm={confirmation.ask}
+        />
       )}
+
+      {/* Outside the drawer on purpose: it outlives the drawer that opens it,
+          so the dialog can close cleanly after deleting the project. */}
+      {confirmation.element}
     </CrmLayout>
   );
 }
 
-function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
+function ProjectDetailDrawer({ projectId, onClose, onChanged, askConfirm }: {
   projectId: number; onClose: () => void; onChanged: () => void;
+  askConfirm: Confirmation["ask"];
 }) {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -489,10 +502,26 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
   };
 
   const deleteProject = async () => {
-    if (!confirm("Delete this project and its tasks?")) return;
-    await adminFetch(`/api/crm/projects/${projectId}`, { method: "DELETE" });
-    onChanged();
-    onClose();
+    const taskCount = tasks.length;
+    const deleted = await askConfirm({
+      title: `Delete the project "${project?.name ?? "this project"}"?`,
+      description: "This cannot be undone.",
+      consequences: [
+        taskCount === 1 ? "Its 1 task is deleted with it." : `Its ${taskCount} tasks are deleted with it.`,
+        "Its launch checklist, notes and maintenance plan go with it.",
+        "Files and support tickets linked to it are kept.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete project",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep project",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/projects/${projectId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That project could not be deleted."));
+        onChanged();
+      },
+    });
+    if (deleted) onClose();
   };
 
   const col = project ? (PROJECT_STAGE_STYLES[project.stage as ProjectStage] || PROJECT_STAGE_STYLES["New Lead"]) : PROJECT_STAGE_STYLES["New Lead"];
