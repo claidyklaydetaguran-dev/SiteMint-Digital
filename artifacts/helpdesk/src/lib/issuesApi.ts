@@ -14,6 +14,12 @@ export interface VoiceIssue {
   code: string;
   message: string;
   occurrences: number;
+  /**
+   * Whether the resolve route accepts this issue from a customer. Operator-level
+   * issues (billing suspension, usage pause, platform faults) answer 403. The
+   * server decides; a missing value is treated as "no".
+   */
+  customerResolvable?: boolean;
   createdAt: string;
   updatedAt: string;
 }

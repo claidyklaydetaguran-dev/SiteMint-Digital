@@ -33,6 +33,49 @@ export const VOICE_ISSUE_CODES = [
 ] as const;
 export type VoiceIssueCode = (typeof VOICE_ISSUE_CODES)[number];
 
+/**
+ * The issues a customer may mark resolved from the dashboard — the ones whose
+ * cause is theirs to fix or acknowledge:
+ *
+ *   - calendar_revoked / calendar_sync_failed — reconnect or reconcile their
+ *     own calendar;
+ *   - emergency_language_detected — review the call; acknowledging it is the
+ *     business's decision.
+ *
+ * Everything else is SiteMint's to handle, and a customer "resolving" it only
+ * hides it from the one list an operator shares with them. That includes
+ * `billing_suspended` and `usage_pause_requested`, which request an OWNER
+ * action on the account, and the webhook, call-reconciliation and tool codes,
+ * whose cause is on the provider or platform side. Those are resolved through
+ * the operator route (routes/adminVoiceIssues.ts), which this list does not
+ * touch.
+ *
+ * An explicit allowlist, not a denylist: a code added to VOICE_ISSUE_CODES is
+ * operator-only until someone decides otherwise here.
+ */
+export const CUSTOMER_RESOLVABLE_ISSUE_CODES = [
+  "calendar_revoked",
+  "calendar_sync_failed",
+  "emergency_language_detected",
+] as const satisfies readonly VoiceIssueCode[];
+
+const CUSTOMER_RESOLVABLE = new Set<string>(CUSTOMER_RESOLVABLE_ISSUE_CODES);
+
+export function isCustomerResolvableIssueCode(code: string): boolean {
+  return CUSTOMER_RESOLVABLE.has(code);
+}
+
+export const OPERATOR_ONLY_ISSUE_MESSAGE =
+  "SiteMint resolves this issue for you. Contact support if it needs your attention.";
+
+export type CustomerResolveDecision = "not_found" | "operator_only" | "allowed";
+
+/** Pure: what a customer's resolve request may do with the (firm-scoped, unresolved) issue it found. */
+export function customerResolveDecision(issue: { code: string } | undefined): CustomerResolveDecision {
+  if (!issue) return "not_found";
+  return isCustomerResolvableIssueCode(issue.code) ? "allowed" : "operator_only";
+}
+
 export type VoiceIssueLevel = "info" | "warning" | "error" | "critical";
 
 export interface OpenVoiceIssueInput {
@@ -142,6 +185,16 @@ export async function resolveVoiceIssue(
     .where(and(eq(voiceIssues.id, issueId), eq(voiceIssues.firmId, firmId), isNull(voiceIssues.resolvedAt)))
     .returning();
   return updated;
+}
+
+/** One unresolved issue, only if it belongs to this firm. Another firm's issue is indistinguishable from none. */
+export async function findOpenVoiceIssue(firmId: number, issueId: number): Promise<VoiceIssue | undefined> {
+  const [row] = await db
+    .select()
+    .from(voiceIssues)
+    .where(and(eq(voiceIssues.id, issueId), eq(voiceIssues.firmId, firmId), isNull(voiceIssues.resolvedAt)))
+    .limit(1);
+  return row;
 }
 
 /** Unresolved issues for one firm, newest first. */

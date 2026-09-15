@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
-import { COPY, PAGE, levelLabel } from "@/pages/issues/issuesContract";
+import { COPY, PAGE, canResolve, levelLabel } from "@/pages/issues/issuesContract";
 import "@/styles/v2-dashboard.css";
 
 export default function Issues() {
@@ -100,23 +100,27 @@ export default function Issues() {
                     <p className="mt-1 text-xs text-destructive">{COPY.resolveFailedTitle} — {COPY.resolveFailedDetail}</p>
                   )}
                 </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" size="sm" variant="outline" disabled={pendingId === issue.id}>
-                      {pendingId === issue.id ? COPY.resolvePendingLabel : COPY.resolveLabel}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{COPY.resolveConfirmTitle}</AlertDialogTitle>
-                      <AlertDialogDescription>{COPY.resolveConfirmDetail}</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>{COPY.resolveConfirmDismiss}</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleResolve(issue.id)}>{COPY.resolveConfirmAction}</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {canResolve(issue) ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" size="sm" variant="outline" disabled={pendingId === issue.id}>
+                        {pendingId === issue.id ? COPY.resolvePendingLabel : COPY.resolveLabel}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{COPY.resolveConfirmTitle}</AlertDialogTitle>
+                        <AlertDialogDescription>{COPY.resolveConfirmDetail}</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{COPY.resolveConfirmDismiss}</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleResolve(issue.id)}>{COPY.resolveConfirmAction}</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{COPY.operatorOnlyNote}</p>
+                )}
               </div>
             </li>
           ))}

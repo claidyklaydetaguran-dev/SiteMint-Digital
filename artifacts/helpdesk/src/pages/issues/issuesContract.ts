@@ -3,9 +3,14 @@
  *
  * Reads `GET /receptionist/voice/issues`, resolves one with
  * `POST /receptionist/voice/issues/:id/resolve`.
+ *
+ * Only some issues are the customer's to resolve. The server keeps the
+ * allowlist (CUSTOMER_RESOLVABLE_ISSUE_CODES in voiceIssueService.ts), answers
+ * 403 for the rest, and marks each listed issue with `customerResolvable` —
+ * this page reads that flag rather than keeping a second copy of the list.
  */
 
-import type { IssueLevel } from "@/lib/issuesApi";
+import type { IssueLevel, VoiceIssue } from "@/lib/issuesApi";
 
 export const PAGE = {
   eyebrow: "OBSERVE",
@@ -36,7 +41,14 @@ export const COPY = {
   resolvedAnnouncement: "Issue resolved.",
   resolveFailedTitle: "This issue wasn't resolved",
   resolveFailedDetail: "Nothing changed. Try again.",
+
+  operatorOnlyNote: "SiteMint resolves this one for you.",
 } as const;
+
+/** Show the Resolve action only when the server said it will accept it. */
+export function canResolve(issue: Pick<VoiceIssue, "customerResolvable">): boolean {
+  return issue.customerResolvable === true;
+}
 
 const LEVEL_LABEL: Record<IssueLevel, string> = {
   info: "Info",
