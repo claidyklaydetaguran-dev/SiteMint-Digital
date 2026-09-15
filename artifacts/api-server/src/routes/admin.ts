@@ -15,20 +15,31 @@ import {
 } from "../lib/admin-session.js";
 import { verifyAdminPassword } from "../lib/adminPassword.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
+import { requireOperator } from "../lib/operatorGate.js";
 
 const router: IRouter = Router();
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 //
-// V5 O-1: `requireAdmin` now comes from lib/admin-session.ts and accepts
-// EITHER the existing in-memory bearer token OR a valid `admin_session`
-// cookie — every route below that used the old bearer-only local copy keeps
-// working unchanged for bearer callers (same validateToken check, first),
-// and additionally accepts the cookie. Every OTHER admin route file in this
-// codebase (crm.ts, receptionistAdmin.ts, adminVoiceDiagnostics.ts, ...)
-// still defines its own local, bearer-only requireAdmin — migrating those is
-// out of scope here; this file is the one the O-1 brief names directly
-// because POST /admin/login lives here.
+// Two gates, for two kinds of route.
+//
+// `requireAdmin` (lib/admin-session.ts) is the shared-password admin's own
+// session — the in-memory bearer or the `admin_session` cookie — and guards
+// only `/admin/logout`, which ends exactly that session. `/admin/login` issues
+// it and `/admin/me` reports it.
+//
+// Every data route — the Discovery Portal's submissions and the form inbox — is
+// behind `requireOperator(permission)` (lib/operatorGate.ts). A person signed in
+// with their own `crm_staff_session` is judged as themselves: the CSRF check on
+// writes, the MFA challenge and the named permission, with no fallback. The
+// legacy shared admin, bearer or cookie, still passes while
+// CRM_LEGACY_BEARER_ENABLED is not "false". These routes used to accept only the
+// legacy credential, so a staff session was refused 401 and the portal showed
+// zeros instead of the submissions it could not load.
+//
+//   leads.read   the submissions list, one submission, the form inbox
+//   leads.write  status and notes, proposal and SOW generation, form triage
+//   data.export  the CSV export — bulk egress, owner and technical admin only
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
@@ -100,7 +111,7 @@ router.get("/admin/me", async (req: Request, res: Response) => {
 
 // ── Submissions list ──────────────────────────────────────────────────────────
 
-router.get("/admin/submissions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/submissions", requireOperator("leads.read"), async (req: Request, res: Response) => {
   try {
     const rows = await db
       .select({
@@ -138,7 +149,7 @@ router.get("/admin/submissions", requireAdmin, async (req: Request, res: Respons
 // Registered before /admin/submissions/:id — Express matches top-to-bottom, so
 // behind :id this path resolved to id="export" and 400'd (unreachable route).
 
-router.get("/admin/submissions/export/csv", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/submissions/export/csv", requireOperator("data.export"), async (req: Request, res: Response) => {
   try {
     const rows = await db
       .select()
@@ -175,7 +186,7 @@ router.get("/admin/submissions/export/csv", requireAdmin, async (req: Request, r
 
 // ── Single submission ─────────────────────────────────────────────────────────
 
-router.get("/admin/submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/submissions/:id", requireOperator("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -195,7 +206,7 @@ router.get("/admin/submissions/:id", requireAdmin, async (req: Request, res: Res
 
 // ── Update submission ─────────────────────────────────────────────────────────
 
-router.patch("/admin/submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/admin/submissions/:id", requireOperator("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -221,7 +232,7 @@ router.patch("/admin/submissions/:id", requireAdmin, async (req: Request, res: R
 
 // ── Generate proposal ─────────────────────────────────────────────────────────
 
-router.post("/admin/submissions/:id/proposal", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/submissions/:id/proposal", requireOperator("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -250,7 +261,7 @@ router.post("/admin/submissions/:id/proposal", requireAdmin, async (req: Request
 
 // ── Generate SOW ──────────────────────────────────────────────────────────────
 
-router.post("/admin/submissions/:id/sow", requireAdmin, async (req: Request, res: Response) => {
+router.post("/admin/submissions/:id/sow", requireOperator("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -279,7 +290,7 @@ router.post("/admin/submissions/:id/sow", requireAdmin, async (req: Request, res
 
 // ── All form submissions (cross-form) ─────────────────────────────────────────
 
-router.get("/admin/form-submissions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/admin/form-submissions", requireOperator("leads.read"), async (req: Request, res: Response) => {
   try {
     const rows = await db
       .select()
@@ -292,7 +303,7 @@ router.get("/admin/form-submissions", requireAdmin, async (req: Request, res: Re
   }
 });
 
-router.patch("/admin/form-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/admin/form-submissions/:id", requireOperator("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
