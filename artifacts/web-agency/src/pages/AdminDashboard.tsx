@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users, TrendingUp, FileText, Star, LogOut, ExternalLink,
   Search, RefreshCw, ChevronRight, LayoutDashboard, ArrowRight,
-  Zap, Trophy, CheckCircle2, Loader2,
+  Zap, Trophy, CheckCircle2, Loader2, AlertTriangle, RotateCw,
 } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import { adminFetch, adminLogout } from "@/lib/adminFetch";
+import { type Load, readAdminResource, responseFailureReason, failureReason } from "@/lib/adminLoad";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 
 interface Submission {
@@ -30,10 +32,6 @@ interface Submission {
 const BUDGET_LABELS: Record<string, string> = {
   "under1k": "< $1K", "1k-2.5k": "$1K–$2.5K", "2.5k-5k": "$2.5K–$5K",
   "5k-10k": "$5K–$10K", "10k-plus": "$10K+",
-};
-const TIMELINE_LABELS: Record<string, string> = {
-  "asap": "ASAP", "30-days": "30 Days", "60-days": "60 Days",
-  "90-days": "90 Days", "flexible": "Flexible",
 };
 const SERVICE_LABELS: Record<string, string> = {
   "new-website": "New Website", "redesign": "Redesign", "web-app": "Web App",
@@ -69,64 +67,97 @@ interface CrmStats {
   won: number;
 }
 
-interface CrmImportResult {
-  imported: boolean;
-  existing: boolean;
-  leadId: number;
+/** Which submissions already have a CRM contact, by submission id and by email. */
+interface CrmLinks {
+  bySubmission: Record<number, number>;
+  byEmail: Record<string, number>;
+}
+
+interface Toast {
   message: string;
+  tone: "success" | "error";
+}
+
+function pickSubmissions(body: unknown): Submission[] | undefined {
+  const list = body && typeof body === "object" ? (body as { submissions?: unknown }).submissions : undefined;
+  return Array.isArray(list) ? list as Submission[] : undefined;
+}
+
+function pickStats(body: unknown): CrmStats | undefined {
+  const stats = body && typeof body === "object" ? (body as { stats?: unknown }).stats : undefined;
+  return stats && typeof stats === "object" ? stats as CrmStats : undefined;
+}
+
+function pickLinks(body: unknown): CrmLinks | undefined {
+  const leads = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  if (!Array.isArray(leads)) return undefined;
+  const bySubmission: Record<number, number> = {};
+  const byEmail: Record<string, number> = {};
+  for (const lead of leads as { id: number; email?: string | null; discoverySubmissionId?: number | null }[]) {
+    if (lead.discoverySubmissionId) bySubmission[lead.discoverySubmissionId] = lead.id;
+    if (typeof lead.email === "string" && lead.email) byEmail[lead.email.toLowerCase()] = lead.id;
+  }
+  return { bySubmission, byEmail };
+}
+
+/** A figure, or a dash that says why there is no figure. Never a zero standing in for "unknown". */
+function Figure({ value, loading, className }: { value: number | null | undefined; loading: boolean; className: string }) {
+  if (typeof value === "number") return <p className={className}>{value}</p>;
+  return (
+    <p className={className}>
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">{loading ? "Loading" : "Not available"}</span>
+    </p>
+  );
 }
 
 function AdminDashboardInner() {
   const [, navigate] = useLocation();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [submissions, setSubmissions] = useState<Load<Submission[]>>({ status: "loading" });
+  const [crmStats, setCrmStats] = useState<Load<CrmStats>>({ status: "loading" });
+  const [crmLinks, setCrmLinks] = useState<Load<CrmLinks>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [error, setError] = useState("");
-  const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
-  const [crmSubMap, setCrmSubMap] = useState<Record<number, number>>({});
-  const [crmEmailMap, setCrmEmailMap] = useState<Record<string, number>>({});
+  /** Submissions sent to the CRM from this page, known even if the CRM lookup failed. */
+  const [sentNow, setSentNow] = useState<Record<number, number>>({});
   const [importingId, setImportingId] = useState<number | null>(null);
-  const [importToast, setImportToast] = useState("");
+  const [toast, setToast] = useState<Toast | null>(null);
+  const toastTimer = useRef<number | null>(null);
+  const alive = useRef(true);
 
-  const showImportToast = (msg: string) => {
-    setImportToast(msg);
-    setTimeout(() => setImportToast(""), 4000);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  const showToast = (message: string, tone: Toast["tone"]) => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    setToast({ message, tone });
+    toastTimer.current = window.setTimeout(() => setToast(null), tone === "error" ? 8000 : 4000);
   };
 
+  // Every part keeps what it last showed until its new answer arrives, so a
+  // retry never flashes the page back to empty — and a part that failed stays
+  // a stated failure, not a zero.
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [res, statsRes, leadsRes] = await Promise.all([
-        adminFetch("/api/admin/submissions"),
-        adminFetch("/api/crm/stats"),
-        adminFetch("/api/crm/leads"),
-      ]);
-      if (res.status === 401) return;
-      if (!res.ok) throw new Error("Failed to load");
-      const data = await res.json() as { submissions: Submission[] };
-      setSubmissions(data.submissions);
-      if (statsRes.ok) {
-        const sd = await statsRes.json() as { stats: CrmStats };
-        setCrmStats(sd.stats);
-      }
-      if (leadsRes.ok) {
-        const ld = await leadsRes.json() as { leads: { id: number; email: string; discoverySubmissionId: number | null }[] };
-        const subMap: Record<number, number> = {};
-        const emailMap: Record<string, number> = {};
-        ld.leads.forEach(l => {
-          if (l.discoverySubmissionId) subMap[l.discoverySubmissionId] = l.id;
-          emailMap[l.email.toLowerCase()] = l.id;
-        });
-        setCrmSubMap(subMap);
-        setCrmEmailMap(emailMap);
-      }
-    } catch {
-      setError("Failed to load submissions.");
-    } finally {
-      setLoading(false);
-    }
+    setReloading(true);
+    const [nextSubmissions, nextStats, nextLinks] = await Promise.all([
+      readAdminResource("/api/admin/submissions", pickSubmissions),
+      readAdminResource("/api/crm/stats", pickStats),
+      readAdminResource("/api/crm/leads", pickLinks),
+    ]);
+    if (!alive.current) return;
+    setSubmissions(nextSubmissions);
+    setCrmStats(nextStats);
+    setCrmLinks(nextLinks);
+    setReloading(false);
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   const sendToCrm = async (submissionId: number) => {
     setImportingId(submissionId);
@@ -134,25 +165,32 @@ function AdminDashboardInner() {
       const res = await adminFetch(`/api/crm/import-discovery/${submissionId}`, {
         method: "POST",
       });
-      const data = await res.json() as CrmImportResult;
-      if (res.ok) {
-        setCrmSubMap(prev => ({ ...prev, [submissionId]: data.leadId }));
-        showImportToast(data.existing ? "Already in CRM — navigating to lead." : data.message);
-      } else {
-        showImportToast("Failed to send to CRM. Please try again.");
+      if (!res.ok) {
+        showToast(`Not sent to the CRM. ${await responseFailureReason(res)}`, "error");
+        return;
       }
+      const data = await res.json().catch(() => null) as { existing?: boolean; leadId?: unknown; message?: unknown } | null;
+      if (typeof data?.leadId === "number") {
+        const leadId = data.leadId;
+        setSentNow(prev => ({ ...prev, [submissionId]: leadId }));
+      }
+      showToast(
+        data?.existing ? "Already in the CRM." : typeof data?.message === "string" ? data.message : "Sent to the CRM.",
+        "success",
+      );
     } catch {
-      showImportToast("Connection error. Please try again.");
+      showToast(`Not sent to the CRM. ${failureReason(null)}`, "error");
     } finally {
       setImportingId(null);
     }
   };
 
-  useEffect(() => { load(); }, [load]);
-
   const logout = async () => { await adminLogout(); navigate("/admin"); };
 
-  const filtered = submissions.filter(s => {
+  const list = submissions.status === "ready" ? submissions.data : null;
+  const loadingSubmissions = submissions.status === "loading";
+
+  const filtered = (list ?? []).filter(s => {
     const matchSearch = !search ||
       s.contactName.toLowerCase().includes(search.toLowerCase()) ||
       s.companyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -161,22 +199,36 @@ function AdminDashboardInner() {
     return matchSearch && matchStatus;
   });
 
-  const hotLeads = submissions.filter(s => s.leadScore >= 8).length;
-  const proposals = submissions.filter(s => s.hasProposal).length;
-  const thisWeek = submissions.filter(s => {
-    const d = new Date(s.createdAt);
-    const now = new Date();
-    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+  // Counts exist only when the list they count actually loaded.
+  const hotLeads = list ? list.filter(s => s.leadScore >= 8).length : null;
+  const proposals = list ? list.filter(s => s.hasProposal).length : null;
+  const thisWeek = list ? list.filter(s => {
+    const diff = (Date.now() - new Date(s.createdAt).getTime()) / (1000 * 60 * 60 * 24);
     return diff <= 7;
-  }).length;
+  }).length : null;
+
+  const failures: { what: string; reason: string }[] = [];
+  if (submissions.status === "error") failures.push({ what: "Discovery submissions", reason: submissions.reason });
+  if (crmStats.status === "error") failures.push({ what: "CRM status", reason: crmStats.reason });
+  if (crmLinks.status === "error") failures.push({ what: "Which submissions are already in the CRM", reason: crmLinks.reason });
 
   return (
     <>
-      {importToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> {importToast}
-        </div>
-      )}
+      {/* Always mounted, so a message is announced when it appears. */}
+      <div aria-live="polite" role="status">
+        {toast && (
+          <div
+            className={`fixed bottom-6 left-6 right-6 sm:left-auto z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2 ${
+              toast.tone === "error" ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"
+            }`}
+          >
+            {toast.tone === "error"
+              ? <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              : <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />}
+            <span className="min-w-0">{toast.message}</span>
+          </div>
+        )}
+      </div>
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
       <header className="bg-foreground text-background px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
@@ -192,8 +244,11 @@ function AdminDashboardInner() {
               <ArrowRight className="w-3.5 h-3.5 opacity-70" />
             </Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={load} className="text-background/70 hover:text-background hover:bg-white/10 gap-1">
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          <Button
+            variant="ghost" size="sm" onClick={() => { void load(); }} disabled={reloading}
+            className="text-background/70 hover:text-background hover:bg-white/10 gap-1"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${reloading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <Button variant="ghost" size="sm" onClick={logout} className="text-background/70 hover:text-background hover:bg-white/10 gap-1">
             <LogOut className="w-3.5 h-3.5" /> Logout
@@ -202,10 +257,40 @@ function AdminDashboardInner() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {failures.length > 0 && (
+          <div role="alert" className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-foreground">
+                  {failures.length === 1 ? `${failures[0].what} could not be loaded.` : "Parts of this page could not be loaded."}
+                </p>
+                {failures.length === 1 ? (
+                  <p className="mt-1 break-words text-sm text-muted-foreground">{failures[0].reason}</p>
+                ) : (
+                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                    {failures.map(f => (
+                      <li key={f.what} className="break-words">
+                        <span className="font-medium text-foreground">{f.what}:</span> {f.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => { void load(); }} disabled={reloading}>
+                  {reloading
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                    : <RotateCw className="w-3.5 h-3.5" aria-hidden="true" />}
+                  {reloading ? "Trying again…" : "Try again"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" aria-busy={loadingSubmissions}>
           {[
-            { label: "Total Leads", value: submissions.length, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Total Leads", value: list ? list.length : null, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
             { label: "Hot Leads", value: hotLeads, icon: TrendingUp, color: "text-green-600", bg: "bg-green-50" },
             { label: "Proposals Generated", value: proposals, icon: FileText, color: "text-indigo-600", bg: "bg-indigo-50" },
             { label: "New This Week", value: thisWeek, icon: Star, color: "text-orange-600", bg: "bg-orange-50" },
@@ -214,7 +299,7 @@ function AdminDashboardInner() {
               <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center mb-3`}>
                 <Icon className={`w-5 h-5 ${color}`} />
               </div>
-              <p className="text-2xl font-bold text-foreground">{value}</p>
+              <Figure value={value} loading={loadingSubmissions} className="text-2xl font-bold text-foreground" />
               <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
             </div>
           ))}
@@ -246,24 +331,35 @@ function AdminDashboardInner() {
               </Link>
             </div>
 
-            {crmStats && (
-              <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Active Leads", value: crmStats.total, icon: Users, color: "text-blue-400" },
-                  { label: "New This Week", value: crmStats.newLeads, icon: Zap, color: "text-yellow-400" },
-                  { label: "Hot Leads", value: crmStats.hotLeads, icon: TrendingUp, color: "text-orange-400" },
-                  { label: "Won", value: crmStats.won, icon: Trophy, color: "text-emerald-400" },
-                ].map(({ label, value, icon: Icon, color }) => (
-                  <div key={label} className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 shrink-0 ${color}`} />
-                    <div>
-                      <p className="text-lg font-bold text-white leading-none">{value}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">{label}</p>
+            <div className="mt-4 pt-4 border-t border-white/10">
+              {crmStats.status === "ready" ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "Active Leads", value: crmStats.data.total, icon: Users, color: "text-blue-400" },
+                    { label: "New This Week", value: crmStats.data.newLeads, icon: Zap, color: "text-yellow-400" },
+                    { label: "Hot Leads", value: crmStats.data.hotLeads, icon: TrendingUp, color: "text-orange-400" },
+                    { label: "Won", value: crmStats.data.won, icon: Trophy, color: "text-emerald-400" },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <div key={label} className="flex items-center gap-2.5">
+                      <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                      <div>
+                        <Figure value={value} loading={false} className="text-lg font-bold text-white leading-none" />
+                        <p className="text-[11px] text-gray-400 mt-0.5">{label}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : crmStats.status === "loading" ? (
+                <p className="flex items-center gap-2 text-sm text-gray-400" role="status">
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading CRM status…
+                </p>
+              ) : (
+                <p className="flex items-start gap-2 text-sm text-amber-200">
+                  <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 break-words">CRM status unavailable — {crmStats.reason}</span>
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -279,12 +375,14 @@ function AdminDashboardInner() {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Search leads..."
+                  aria-label="Search submissions"
                   className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 w-48"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
+                aria-label="Filter by status"
                 className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -292,13 +390,19 @@ function AdminDashboardInner() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="py-16 text-center text-muted-foreground">Loading submissions...</div>
-          ) : error ? (
-            <div className="py-16 text-center text-red-500">{error}</div>
+          {submissions.status === "loading" ? (
+            <div className="px-6 py-6 space-y-3" role="status" aria-live="polite">
+              <p className="text-sm text-muted-foreground">Loading submissions…</p>
+              {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-9 w-full" />)}
+            </div>
+          ) : submissions.status === "error" ? (
+            <div className="py-16 px-6 text-center">
+              <p className="font-medium text-foreground">Submissions could not be loaded, so none are listed here.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Use Try again at the top of the page.</p>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="py-16 text-center text-muted-foreground">
-              {submissions.length === 0 ? "No submissions yet. Share your discovery form!" : "No results match your filters."}
+              {submissions.data.length === 0 ? "No submissions yet. Share your discovery form!" : "No results match your filters."}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -329,7 +433,9 @@ function AdminDashboardInner() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {(() => {
-                          const leadId = crmSubMap[s.id] ?? crmEmailMap[s.email.toLowerCase()];
+                          const leadId = sentNow[s.id] ?? (crmLinks.status === "ready"
+                            ? crmLinks.data.bySubmission[s.id] ?? crmLinks.data.byEmail[s.email.toLowerCase()]
+                            : undefined);
                           if (leadId) {
                             return (
                               <Link href={`/admin/crm/leads/${leadId}`}>
@@ -346,12 +452,21 @@ function AdminDashboardInner() {
                               </Button>
                             );
                           }
+                          // Without the CRM lookup there is no telling whether this
+                          // submission is already a contact, so the page does not
+                          // offer to create one as if it knew.
+                          if (crmLinks.status === "loading") {
+                            return <span className="text-xs text-muted-foreground">Checking…</span>;
+                          }
+                          if (crmLinks.status === "error") {
+                            return <span className="text-xs text-muted-foreground">CRM status unavailable</span>;
+                          }
                           return (
                             <Button
                               size="sm"
                               variant="outline"
                               className="gap-1 text-xs h-7 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                              onClick={() => sendToCrm(s.id)}
+                              onClick={() => { void sendToCrm(s.id); }}
                             >
                               Send to CRM
                             </Button>

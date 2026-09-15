@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Lock, ShieldCheck, UserPlus } from "lucide-react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
-import { adminFetch, clearAdminToken, setCsrfToken } from "@/lib/adminFetch";
+import { StaffSignInFields, useStaffSignIn } from "@/components/crm/StaffSignInForm";
+import { staffAccountCount } from "@/lib/staffSignIn";
 
 // M1: sign-in is per person. Three states, decided by the server rather than
 // by a guess:
@@ -13,91 +12,29 @@ import { adminFetch, clearAdminToken, setCsrfToken } from "@/lib/adminFetch";
 //              using the server's own ADMIN_PASSWORD secret.
 //   "signin" — email + password.
 //   "mfa"    — the password was accepted and a second factor is required.
-type Stage = "loading" | "setup" | "signin" | "mfa";
+//
+// The fields and the calls behind them are shared with the session-ended dialog
+// (components/crm/StaffSignInForm.tsx, lib/staffSignIn.ts), so both sign a
+// person in the same way.
 
 export default function AdminLogin() {
   const [, navigate] = useLocation();
-  const [stage, setStage] = useState<Stage>("loading");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await adminFetch("/api/crm/staff/bootstrap-state");
-        if (cancelled) return;
-        if (!r.ok) { setStage("signin"); return; }
-        const d = await r.json() as { staffCount?: number };
-        setStage(d.staffCount === 0 ? "setup" : "signin");
-      } catch {
-        if (!cancelled) setStage("signin");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   function goToWorkspace() {
     const redirect = new URLSearchParams(window.location.search).get("redirect");
     navigate(redirect && redirect.startsWith("/admin") ? redirect : "/admin/crm/dashboard");
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      if (stage === "setup") {
-        const r = await adminFetch("/api/crm/staff/bootstrap", {
-          method: "POST",
-          body: JSON.stringify({ adminPassword, email, displayName, password }),
-        });
-        const d = await r.json().catch(() => ({})) as { error?: string };
-        if (!r.ok) { setError(d.error ?? "Could not create the first account."); return; }
-        // Created, but not signed in — sign in with the credentials just set.
-        setStage("signin");
-        setAdminPassword("");
-        setDisplayName("");
-        return;
-      }
+  const form = useStaffSignIn({ initialStage: "loading", onSignedIn: () => goToWorkspace() });
+  const { stage, setStage } = form;
 
-      if (stage === "mfa") {
-        const r = await adminFetch("/api/crm/staff/login/mfa", {
-          method: "POST",
-          body: JSON.stringify({ code }),
-        });
-        const d = await r.json().catch(() => ({})) as { error?: string };
-        if (!r.ok) { setError(d.error ?? "That code is not valid."); return; }
-        goToWorkspace();
-        return;
-      }
-
-      const r = await adminFetch("/api/crm/staff/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-      const d = await r.json().catch(() => ({})) as {
-        error?: string; csrfToken?: string; mfaRequired?: boolean;
-      };
-      if (!r.ok) { setError(d.error ?? "That email address and password do not match."); return; }
-      if (d.csrfToken) setCsrfToken(d.csrfToken);
-      // The legacy bearer token is no longer issued to staff sign-ins; the
-      // session cookie is the credential. Drop any stale token so requests are
-      // attributed to this person rather than the old shared admin.
-      clearAdminToken();
-      if (d.mfaRequired) { setStage("mfa"); setPassword(""); return; }
-      goToWorkspace();
-    } catch {
-      setError("Connection error. Make sure the server is running.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    void staffAccountCount().then((count) => {
+      if (!cancelled) setStage(count === 0 ? "setup" : "signin");
+    });
+    return () => { cancelled = true; };
+  }, [setStage]);
 
   const heading = stage === "setup" ? "Create the first account"
     : stage === "mfa" ? "Two-step verification"
@@ -130,67 +67,11 @@ export default function AdminLogin() {
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <form onSubmit={submit} className="space-y-5">
-              {stage === "setup" && (
-                <>
-                  <p className="text-xs text-muted-foreground leading-relaxed bg-muted rounded-lg p-3">
-                    This creates the owner account for SiteMint. It works once, and
-                    needs the server's <code className="font-mono">ADMIN_PASSWORD</code>.
-                    Everyone else is invited from Settings afterwards.
-                  </p>
-                  <div>
-                    <Label className="text-sm font-semibold mb-1.5 block">Server admin password</Label>
-                    <Input type="password" value={adminPassword} autoComplete="off"
-                      onChange={e => setAdminPassword(e.target.value)} className="h-11" />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-semibold mb-1.5 block">Your name</Label>
-                    <Input value={displayName} onChange={e => setDisplayName(e.target.value)}
-                      placeholder="e.g. Shasta Green" className="h-11" />
-                  </div>
-                </>
-              )}
+            <form onSubmit={(event) => { void form.submit(event); }} className="space-y-5">
+              <StaffSignInFields form={form} idPrefix="admin-login" autoFocus />
 
-              {stage !== "mfa" && (
-                <>
-                  <div>
-                    <Label className="text-sm font-semibold mb-1.5 block">Email</Label>
-                    <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                      placeholder="you@sitemintdigital.com" className="h-11"
-                      autoComplete="username" autoFocus={stage === "signin"} />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-semibold mb-1.5 block">
-                      {stage === "setup" ? "Choose a password" : "Password"}
-                    </Label>
-                    <Input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                      placeholder={stage === "setup" ? "At least 12 characters" : "Your password"}
-                      className="h-11"
-                      autoComplete={stage === "setup" ? "new-password" : "current-password"} />
-                  </div>
-                </>
-              )}
-
-              {stage === "mfa" && (
-                <div>
-                  <Label className="text-sm font-semibold mb-1.5 block">6-digit code</Label>
-                  <Input value={code} onChange={e => setCode(e.target.value)}
-                    placeholder="000000" inputMode="numeric" autoComplete="one-time-code"
-                    className="h-12 tracking-[0.4em] text-center font-mono text-lg" autoFocus />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Lost your phone? Enter one of your recovery codes instead.
-                  </p>
-                </div>
-              )}
-
-              {error && (
-                <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
-                  {error}
-                </p>
-              )}
-
-              <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
-                {loading ? "Working…"
+              <Button type="submit" className="w-full h-12 text-base" disabled={form.busy}>
+                {form.busy ? "Working…"
                   : stage === "setup" ? "Create owner account"
                   : stage === "mfa" ? "Verify"
                   : "Sign In"}

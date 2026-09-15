@@ -38,6 +38,13 @@ import {
 } from "@workspace/db";
 import { generateToken, hashToken } from "./staffCredentials.js";
 import { deriveClientIp } from "./staffAuth.js";
+// The refusal wording and the re-issue checks are shared with the staff gate.
+// That module holds no session state, reads no cookie and touches no table, so
+// the separation above is unchanged: the portal still resolves only its own
+// cookie and rotates only its own session row.
+import {
+  createReissueLimiter, refuseCrossSiteReissue, refuseInvalidCsrfToken, refuseTooManyReissues,
+} from "./csrfRecovery.js";
 
 // ── Cookie, header and clocks ───────────────────────────────────────────────
 
@@ -311,10 +318,69 @@ export function requirePortalAuth() {
       return;
     }
     if (portalCsrfRejected(req, resolved)) {
-      res.status(403).json({ error: "Request could not be verified. Refresh the page and try again." });
+      refuseInvalidCsrfToken(res);
       return;
     }
     req.portalAuth = resolved;
+    next();
+  };
+}
+
+// ── Security-token re-issue ─────────────────────────────────────────────────
+//
+// The portal keeps its CSRF token in `sessionStorage`, which is per tab. A
+// customer who opens the portal in a new tab — following an emailed link while
+// still signed in, say — has a valid session cookie and no token, so every write
+// was refused, and the refusal told them to refresh, which cannot put a token
+// into that tab. `POST /api/portal/session/csrf` gives the live session a fresh
+// one. lib/csrfRecovery.ts explains what stands in for the CSRF check there.
+
+/**
+ * Rotates the CSRF token of ONE live portal session and returns the new raw
+ * value, or undefined when the session is gone. Stored exactly as sign-in stores
+ * it — only the hash, on the session row — and the previous token stops working
+ * at once.
+ */
+export async function reissuePortalCsrfToken(sessionId: number): Promise<string | undefined> {
+  const csrfToken = generateToken();
+  const rows = await db.update(crmPortalSessions)
+    .set({ csrfHash: hashToken(csrfToken) })
+    .where(and(eq(crmPortalSessions.id, sessionId), isNull(crmPortalSessions.revokedAt)))
+    .returning({ id: crmPortalSessions.id });
+  return rows.length > 0 ? csrfToken : undefined;
+}
+
+export interface PortalCsrfReissueContext {
+  sessionId: number;
+}
+
+const portalCsrfReissueLimiter = createReissueLimiter();
+
+/**
+ * The gate for `POST /api/portal/session/csrf`, and deliberately not
+ * `requirePortalAuth()`, which demands the very token the caller has lost.
+ *
+ * It requires a request from our own pages, then a LIVE portal session resolved
+ * from the portal cookie by the same resolution every portal route uses. It sets
+ * nothing on the request that a scoped read could mistake for authorisation:
+ * the only thing the handler learns is which session row to rotate.
+ */
+export function requirePortalSessionForCsrfReissue() {
+  return async function portalCsrfReissueGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    if (refuseCrossSiteReissue(req, res)) return;
+    const resolved = await resolvePortalSession(req);
+    if (!resolved) {
+      res.status(401).json({ error: "Sign in to see your account." });
+      return;
+    }
+    const key = `portal-session:${resolved.sessionId}`;
+    if (portalCsrfReissueLimiter.isOverLimit(key)) {
+      refuseTooManyReissues(res);
+      return;
+    }
+    portalCsrfReissueLimiter.record(key);
+    const context: PortalCsrfReissueContext = { sessionId: resolved.sessionId };
+    res.locals["portalCsrfReissue"] = context;
     next();
   };
 }

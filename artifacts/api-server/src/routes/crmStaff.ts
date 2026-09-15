@@ -33,7 +33,9 @@ import {
   createStaffSession, revokeStaffSessionByToken, revokeStaffSessionById,
   revokeAllStaffSessions, recordStaffAudit, deriveClientIp,
   recordLoginAttempt, isThrottled, clearLoginAttempts, pruneLoginAttempts,
+  requireStaffSessionForCsrfReissue, reissueStaffCsrfToken, type StaffCsrfReissueContext,
 } from "../lib/staffAuth.js";
+import { sendReissuedToken } from "../lib/csrfRecovery.js";
 
 const router: IRouter = Router();
 
@@ -341,6 +343,38 @@ router.post("/crm/staff/logout", requireStaff(), async (req: Request, res: Respo
     action: "staff.logout", ip: deriveClientIp(req),
   });
   res.json({ ok: true });
+});
+
+// ── A fresh security token for a live session ───────────────────────────────
+//
+// Sign-in hands the browser its CSRF token once and keeps only the hash, so a
+// browser that loses the token could never write again until the person signed
+// out and in. This rotates the token for the session the cookie names and
+// returns it; the CRM client asks for it once when a write is refused for its
+// token, then retries that write once.
+//
+// It cannot require the token it replaces. `requireStaffSessionForCsrfReissue`
+// stands in — a request from our own pages, a live session, a per-session limit
+// — and lib/staffAuth.ts records why not requiring completed MFA is not a bypass.
+router.post("/crm/staff/session/csrf", requireStaffSessionForCsrfReissue(), async (req: Request, res: Response) => {
+  const session = res.locals["staffCsrfReissue"] as StaffCsrfReissueContext;
+  let csrfToken: string | undefined;
+  try {
+    csrfToken = await reissueStaffCsrfToken(session.sessionId);
+  } catch {
+    res.status(503).json({ error: "A new security token could not be issued. Try again shortly." });
+    return;
+  }
+  if (!csrfToken) {
+    // Revoked between the gate and the write.
+    res.status(401).json({ error: "Not signed in." });
+    return;
+  }
+  await recordStaffAudit({
+    actorStaffId: session.staffId, actorLabel: session.email,
+    action: "staff.csrf.reissued", target: `session:${session.sessionId}`, ip: deriveClientIp(req),
+  });
+  sendReissuedToken(res, csrfToken);
 });
 
 // ── The signed-in person ────────────────────────────────────────────────────

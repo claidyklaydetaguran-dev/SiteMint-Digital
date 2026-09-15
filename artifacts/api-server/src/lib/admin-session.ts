@@ -163,12 +163,17 @@ export async function resolveAdminAuthMode(req: Request): Promise<"bearer" | "co
 }
 
 /**
- * Shared admin gate for NEW routes: accepts EITHER the existing in-memory
- * bearer token OR a valid `admin_session` cookie. Existing admin route
- * files each define their OWN local, bearer-only `requireAdmin` — those are
- * intentionally left as-is (keeping the bearer path "working unchanged" per
- * the O-1 brief); new admin surfaces should import this one instead so both
- * modes work uniformly from day one.
+ * The shared-password admin's own gate: accepts EITHER the in-memory bearer
+ * token OR a valid `admin_session` cookie, and nothing else. A person signed in
+ * with their own `crm_staff_session` does NOT pass here.
+ *
+ * That makes it right only for a route about the legacy session itself
+ * (`POST /api/admin/logout` in routes/admin.ts). A route serving data an
+ * operator works with belongs behind `requireOperator(permission)` in
+ * lib/operatorGate.ts, which judges a signed-in staff member by their own
+ * permissions and falls back to this admin while CRM_LEGACY_BEARER_ENABLED
+ * allows it. The Discovery Portal's submission routes used this gate, refused
+ * every staff session with 401, and moved to `requireOperator` for that reason.
  */
 export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   const mode = await resolveAdminAuthMode(req);
