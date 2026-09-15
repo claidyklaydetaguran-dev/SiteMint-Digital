@@ -1634,6 +1634,31 @@ router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
       return;
     }
 
+    // Delivery evidence for a receptionist post-call email lands on its
+    // notification row, matched by the message id Resend returned when it
+    // accepted the send. Checked first because `email.delivered` is not a
+    // campaign event and would otherwise be dropped as unknown below. A bounce
+    // or complaint still continues into the suppression step, so a dead
+    // business inbox is suppressed exactly as a CRM recipient's would be.
+    {
+      const voiceData = (payload.data as Record<string, unknown> | undefined) ?? {};
+      const voiceEmailId = typeof voiceData.email_id === "string" ? voiceData.email_id : null;
+      const voiceType = typeof payload.type === "string" ? payload.type : "";
+      if (voiceEmailId) {
+        const { recordVoiceNotificationDeliveryEvent } = await import("../lib/voiceNotifications/deliveryEvents.js");
+        const occurred = typeof voiceData.created_at === "string" && Number.isFinite(Date.parse(voiceData.created_at))
+          ? new Date(voiceData.created_at)
+          : new Date();
+        const voiceOutcome = await recordVoiceNotificationDeliveryEvent(voiceType, voiceEmailId, occurred);
+        if (voiceOutcome === "recorded" || voiceOutcome === "unchanged") {
+          if (voiceType !== "email.bounced" && voiceType !== "email.complained") {
+            res.json({ ok: true, voiceNotification: voiceOutcome });
+            return;
+          }
+        }
+      }
+    }
+
     // Map Resend event type → internal event_type
     const RESEND_EVENT_MAP: Record<string, string> = {
       "email.opened":          "opened",

@@ -29,6 +29,12 @@ export interface VapiCallRef {
   phoneNumberId?: string;
   /** Present on some payload shapes; we only ever display a masked form. */
   customerNumber?: string;
+  /**
+   * The provider's own statement of how the call was placed: "webCall",
+   * "inboundPhoneCall" or "outboundPhoneCall". Kept verbatim when it is any
+   * non-empty string so an unfamiliar value reads as unknown, not as a guess.
+   */
+  callType?: string;
 }
 
 export interface ParsedVapiMessage {
@@ -107,6 +113,7 @@ export function parseVapiServerMessage(body: unknown): ParseVapiServerMessageRes
   if (isPlainObject(call.customer) && isNonEmptyString(call.customer.number)) {
     callRef.customerNumber = call.customer.number;
   }
+  if (isNonEmptyString(call.type)) callRef.callType = call.type.trim().slice(0, 40);
 
   const parsed: ParsedVapiMessage = { type: type as VapiServerMessageType, call: callRef };
   if (isNonEmptyString(message.status)) parsed.status = message.status as VapiCallStatus;

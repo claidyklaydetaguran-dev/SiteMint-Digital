@@ -111,15 +111,51 @@ export const voiceNotifications = pgTable("voice_notifications", {
   nextAttemptAt:     timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
   leaseExpiresAt:    timestamp("lease_expires_at", { withTimezone: true }),
   acceptedAt:        timestamp("accepted_at", { withTimezone: true }),
+  /**
+   * When a request carrying this row's idempotency key first left for the
+   * provider. The provider keeps a key for 24 hours, so this — not created_at —
+   * is what decides whether a retry is still protected against a duplicate.
+   * Null until a send was actually attempted (a configuration hold sends
+   * nothing and does not start the clock).
+   */
+  firstAttemptAt:    timestamp("first_attempt_at", { withTimezone: true }),
+  /**
+   * When an attempt first ended without a knowable outcome — a timeout, a
+   * dropped connection, a provider 5xx, or a worker that died mid-send. From
+   * then on the provider may already hold the message, so a retry is safe only
+   * inside the key window measured from `first_attempt_at`.
+   */
+  outcomeUncertainAt: timestamp("outcome_uncertain_at", { withTimezone: true }),
+  /**
+   * Delivery evidence, separate from acceptance: what the provider's signed
+   * delivery events later said about the accepted message. Null means no event
+   * has arrived, which is not the same as "not delivered".
+   */
+  deliveryStatus:    text("delivery_status"),
+  deliveryEventAt:   timestamp("delivery_event_at", { withTimezone: true }),
   createdAt:         timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:         timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("uq_voice_notifications_firm_dedupe").on(table.firmId, table.dedupeKey),
   index("ix_voice_notifications_due").on(table.state, table.nextAttemptAt),
   index("ix_voice_notifications_firm_created").on(table.firmId, table.createdAt),
+  index("ix_voice_notifications_provider_message").on(table.providerMessageId),
+  // 'unconfirmed': a send may or may not have reached the provider, and the
+  // provider can no longer be relied on to deduplicate a retry (its key window
+  // has passed, or it reported the key was used for different content). It is
+  // terminal and needs a person — retrying could email the business twice.
   check(
     "ck_voice_notifications_state",
-    sql`${table.state} IN ('queued', 'sending', 'accepted', 'failed', 'abandoned')`,
+    sql`${table.state} IN ('queued', 'sending', 'accepted', 'failed', 'abandoned', 'unconfirmed')`,
+  ),
+  check(
+    "ck_voice_notifications_delivery_status",
+    sql`${table.deliveryStatus} IS NULL OR ${table.deliveryStatus} IN ('delivered', 'delivery_delayed', 'bounced', 'complained', 'failed')`,
+  ),
+  // Delivery evidence can only describe a message the provider accepted.
+  check(
+    "ck_voice_notifications_delivery_only_when_accepted",
+    sql`${table.deliveryStatus} IS NULL OR ${table.state} = 'accepted'`,
   ),
   check(
     "ck_voice_notifications_kind",

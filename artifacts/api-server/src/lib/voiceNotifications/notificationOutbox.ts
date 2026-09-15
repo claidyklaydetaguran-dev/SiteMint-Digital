@@ -30,7 +30,7 @@
 // than merely handled.
 
 import { and, eq, inArray, lte, or, isNull } from "drizzle-orm";
-import type { AlertTransport } from "../voiceAlerts/alertTransport.js";
+import { ALERT_SEND_TIMEOUT_MS, type AlertTransport } from "../voiceAlerts/alertTransport.js";
 import type { RealCallRecord } from "../voice/webhooks/callStateModel.js";
 import {
   composePostCallEmail,
@@ -41,15 +41,179 @@ import { resolveVerifiedBusinessRecipient } from "./recipient.js";
 
 /** Give a late tool-call redelivery time to land before the first send. */
 export const POST_CALL_GRACE_MS = 20_000;
-export const NOTIFICATION_LEASE_MS = 120_000;
 export const NOTIFICATION_MAX_ATTEMPTS = 6;
 const BASE_BACKOFF_MS = 30_000;
 const MAX_BACKOFF_MS = 30 * 60_000;
-const CLAIM_BATCH = 10;
+export const NOTIFICATION_CLAIM_BATCH = 5;
 const WORKER_TICK_MS = 15_000;
+
+/**
+ * How long one claim owns its rows. It must outlast the worst case of the whole
+ * batch — every send in it running to the transport timeout — or a second
+ * worker reclaims rows the first is still sending. It used to be 120 s against
+ * a batch of ten 20 s sends, so a slow provider let the lease lapse mid-batch.
+ */
+export const NOTIFICATION_LEASE_MS = NOTIFICATION_CLAIM_BATCH * ALERT_SEND_TIMEOUT_MS + 60_000;
+
+/**
+ * The provider keeps an idempotency key for 24 hours from the first request
+ * that used it. A row whose earlier attempt may have been accepted is resent
+ * only while the key is certainly still held; the hour of margin covers clock
+ * skew and a slow final attempt.
+ */
+export const NOTIFICATION_KEY_WINDOW_MS = 23 * 60 * 60_000;
 
 export function notificationBackoffMs(attempts: number): number {
   return Math.min(BASE_BACKOFF_MS * 2 ** Math.max(0, attempts - 1), MAX_BACKOFF_MS);
+}
+
+/**
+ * Whether a send result leaves it unknown if the provider accepted the message.
+ * A timeout or dropped connection may have reached the provider, a 5xx may have
+ * been processed, a lapsed lease means a worker stopped mid-send, and "in
+ * progress" means the first request with this key has not finished. A 4xx, or a
+ * hold that sent nothing, is a definite "not sent".
+ */
+export function outcomeIsUncertain(reason: string): boolean {
+  return (
+    reason === "transport_timeout" ||
+    reason === "transport_error" ||
+    reason === "transport_threw" ||
+    reason === "lease_expired" ||
+    reason === "provider_idempotency_in_progress" ||
+    /^provider_status_5\d\d$/.test(reason)
+  );
+}
+
+/** Results that sent nothing at all, so they neither start the key clock nor use an attempt. */
+function isHold(reason: string): boolean {
+  return reason === "alerts_disabled" || reason === "suppression_check_failed";
+}
+
+/** What a row remembers about the sends already tried for it. */
+export interface AttemptHistory {
+  attempts: number;
+  firstAttemptAt: Date | null;
+  outcomeUncertainAt: Date | null;
+}
+
+/**
+ * True when sending again could email the business twice: an earlier attempt
+ * may have been accepted, and the provider's key window — which began with the
+ * first request — may have closed. Such a row is marked 'unconfirmed' for a
+ * person to check instead of being sent again.
+ */
+export function resendWouldBeUnprotected(history: AttemptHistory, now: Date): boolean {
+  return (
+    history.outcomeUncertainAt !== null &&
+    history.firstAttemptAt !== null &&
+    now.getTime() - history.firstAttemptAt.getTime() >= NOTIFICATION_KEY_WINDOW_MS
+  );
+}
+
+export type NotificationSendResult = { ok: true; providerMessageId?: string } | { ok: false; reason: string };
+
+export interface Settlement extends AttemptHistory {
+  state: "accepted" | "failed" | "abandoned" | "unconfirmed";
+  providerMessageId: string | null;
+  lastErrorCode: string | null;
+  /** Null leaves the stored value alone (terminal states are never picked up again). */
+  nextAttemptAt: Date | null;
+}
+
+/** A terminal decision made without sending. */
+export function settleWithoutSending(
+  history: AttemptHistory,
+  code: string,
+): Settlement {
+  return {
+    ...history,
+    // Anything that might already have been sent is 'unconfirmed', never
+    // 'abandoned' — abandoned claims nothing went out.
+    state: history.outcomeUncertainAt !== null ? "unconfirmed" : "abandoned",
+    providerMessageId: null,
+    lastErrorCode: code,
+    nextAttemptAt: null,
+  };
+}
+
+/**
+ * What one attempt's result does to its row. Pure, so every branch is tested
+ * directly; the worker applies it only while its claim is still held.
+ */
+export function planSettlement(
+  history: AttemptHistory,
+  result: NotificationSendResult,
+  attemptedAt: Date,
+  now: Date,
+): Settlement {
+  if (result.ok) {
+    return {
+      state: "accepted",
+      attempts: history.attempts + 1,
+      firstAttemptAt: history.firstAttemptAt ?? attemptedAt,
+      outcomeUncertainAt: history.outcomeUncertainAt,
+      providerMessageId: result.providerMessageId ?? null,
+      lastErrorCode: null,
+      nextAttemptAt: null,
+    };
+  }
+  // Already one of our own short codes; bounded defensively regardless.
+  const reason = result.reason.slice(0, 60);
+  if (isHold(reason)) {
+    // Nothing left this process, so the attempt count and the key clock stay
+    // as they were — turning email on later delivers the backlog instead of
+    // discarding it.
+    return {
+      ...history,
+      state: "failed",
+      providerMessageId: null,
+      lastErrorCode: reason,
+      nextAttemptAt: new Date(now.getTime() + MAX_BACKOFF_MS),
+    };
+  }
+  const next: AttemptHistory = {
+    attempts: history.attempts + 1,
+    firstAttemptAt: history.firstAttemptAt ?? attemptedAt,
+    outcomeUncertainAt: history.outcomeUncertainAt ?? (outcomeIsUncertain(reason) ? attemptedAt : null),
+  };
+  if (reason === "provider_idempotency_conflict") {
+    // The provider already processed this key with other content: something
+    // went out under it. Never resend automatically.
+    return {
+      ...next,
+      outcomeUncertainAt: next.outcomeUncertainAt ?? attemptedAt,
+      state: "unconfirmed",
+      providerMessageId: null,
+      lastErrorCode: reason,
+      nextAttemptAt: null,
+    };
+  }
+  if (next.attempts >= NOTIFICATION_MAX_ATTEMPTS) return settleWithoutSending(next, reason);
+  return {
+    ...next,
+    state: "failed",
+    providerMessageId: null,
+    lastErrorCode: reason,
+    nextAttemptAt: new Date(now.getTime() + notificationBackoffMs(next.attempts)),
+  };
+}
+
+/**
+ * A row found still 'sending' after its lease ran out: the worker that claimed
+ * it stopped mid-send. That attempt counts, and its outcome is unknown from the
+ * moment it was claimed (the lease end minus its length — earlier than the real
+ * request, which is the safe direction for the key window).
+ */
+export function planReclaim(history: AttemptHistory, lapsedLeaseExpiresAt: Date | null, now: Date): AttemptHistory {
+  const claimedAt = lapsedLeaseExpiresAt
+    ? new Date(lapsedLeaseExpiresAt.getTime() - NOTIFICATION_LEASE_MS)
+    : now;
+  return {
+    attempts: history.attempts + 1,
+    firstAttemptAt: history.firstAttemptAt ?? claimedAt,
+    outcomeUncertainAt: history.outcomeUncertainAt ?? claimedAt,
+  };
 }
 
 export function postCallDedupeKey(providerCallId: string): string {
@@ -70,9 +234,12 @@ export function callerAckDedupeKey(messageId: number): string {
  * dedupe key stops a second ROW; only this stops a second SEND. It is safe
  * because a row's subject and body can change only while it is still 'queued'
  * (refreshQueuedNotification), i.e. before any send was attempted — so a retry
- * always repeats the exact payload the key was first used with. Every retry
- * falls well inside the provider's 24-hour key window: six attempts with a
- * 30-minute backoff ceiling.
+ * always repeats the exact payload the key was first used with.
+ *
+ * The key only protects a retry for 24 hours. Six attempts with a 30-minute
+ * backoff ceiling finish well inside that, but a row can also sit on a
+ * configuration hold (email switched off) for days after an uncertain attempt;
+ * `resendWouldBeUnprotected` is what stops that row being sent again blind.
  */
 export function notificationIdempotencyKey(notificationId: number): string {
   return `voice-notification/${notificationId}`;
@@ -195,17 +362,27 @@ export function dashboardCallUrl(providerCallId: string, env: Record<string, str
  * banner — exactly the mistake the composer's label exists to prevent. Found
  * by exercising the staging deployment with a labelled test event.
  *
- * - A call reached us by telephone when any event carried a phone-number id or
- *   a customer number. A withheld caller ID is still a telephone call.
+ * - The label follows the call's channel (`deriveCallChannel`): the provider's
+ *   own call type first, then a phone-number id or customer number. A withheld
+ *   caller ID is still a telephone call, and a call with no evidence either way
+ *   is 'unknown' — never presumed to be a test.
+ * - A SiteMint QA event is labelled as one and never as a call.
  * - The caller's number is shown only when one was actually received; the
  *   placeholder never reaches the email as if it were data.
  * - Duration prefers the provider's own measurement over the receipt-time
  *   approximation, which reads 0s whenever only one event arrived.
  */
 export function callFactsFromRecord(call: RealCallRecord): PostCallFacts {
+  const source: PostCallFacts["source"] = call.synthetic
+    ? "synthetic_qa"
+    : call.channel === "browser"
+      ? "browser_test"
+      : call.channel === "telephone"
+        ? "telephone"
+        : "unknown";
   return {
     providerCallId: call.callId,
-    source: call.reachedViaNumber ? "telephone" : "browser_test",
+    source,
     startedAt: call.firstEventAt,
     endedAt: call.endedAt ?? null,
     durationSec: call.providerDurationSec ?? call.durationSec ?? null,
@@ -358,29 +535,53 @@ export async function refreshQueuedPostCallNotification(
 export interface NotificationWorkerDeps {
   transport: AlertTransport;
   now: () => Date;
+  /** True for an address a hard bounce or complaint has suppressed. */
+  isSuppressed?: (address: string) => Promise<boolean>;
   logger?: (event: string, meta: Record<string, unknown>) => void;
 }
 
 async function productionWorkerDeps(): Promise<NotificationWorkerDeps> {
   const { createAlertTransportFromEnv } = await import("../voiceAlerts/alertTransport.js");
-  return { transport: createAlertTransportFromEnv(), now: () => new Date() };
+  const { isSuppressed } = await import("../inboundEmail.js");
+  return {
+    transport: createAlertTransportFromEnv(),
+    now: () => new Date(),
+    isSuppressed: async (address) => (await isSuppressed(address)).suppressed,
+  };
 }
 
-interface ClaimedNotification {
+interface ClaimedNotification extends AttemptHistory {
   id: number;
   firmId: number;
   recipient: string;
   subject: string;
   body: string;
-  attempts: number;
+  /** The claim token: a settlement lands only while the row still carries it. */
+  leaseExpiresAt: Date;
 }
 
+/**
+ * Claims up to a batch of due rows for this worker.
+ *
+ * The row lock is held only for this short transaction. What protects a send
+ * that is still running is the LEASE: `lease_expires_at` is set to a real
+ * expiry that outlasts the batch, a row is reclaimed only once that time has
+ * passed, and every settlement is conditional on the lease value this claim
+ * wrote. (The previous version stored the claim time as the "expiry" and
+ * reclaimed 120 s later, while a batch could run for 200 s.)
+ */
 async function claimDueNotifications(now: Date): Promise<ClaimedNotification[]> {
   const { db, voiceNotifications } = await wdb();
   return db.transaction(async (tx) => {
-    const leaseDeadline = new Date(now.getTime() - NOTIFICATION_LEASE_MS);
     const due = await tx
-      .select({ id: voiceNotifications.id })
+      .select({
+        id: voiceNotifications.id,
+        state: voiceNotifications.state,
+        attempts: voiceNotifications.attempts,
+        firstAttemptAt: voiceNotifications.firstAttemptAt,
+        outcomeUncertainAt: voiceNotifications.outcomeUncertainAt,
+        leaseExpiresAt: voiceNotifications.leaseExpiresAt,
+      })
       .from(voiceNotifications)
       .where(
         or(
@@ -388,124 +589,153 @@ async function claimDueNotifications(now: Date): Promise<ClaimedNotification[]> 
             inArray(voiceNotifications.state, ["queued", "failed"]),
             lte(voiceNotifications.nextAttemptAt, now),
           ),
-          // Crash recovery: a lease that expired while 'sending'. SKIP LOCKED
-          // leaves a still-running worker's row alone, so only a genuinely
-          // abandoned attempt is reclaimed.
+          // A lease that has genuinely run out while 'sending': that worker
+          // stopped mid-send.
           and(
             eq(voiceNotifications.state, "sending"),
-            or(
-              isNull(voiceNotifications.leaseExpiresAt),
-              lte(voiceNotifications.leaseExpiresAt, leaseDeadline),
-            ),
+            or(isNull(voiceNotifications.leaseExpiresAt), lte(voiceNotifications.leaseExpiresAt, now)),
           ),
         ),
       )
       .orderBy(voiceNotifications.id)
-      .limit(CLAIM_BATCH)
+      .limit(NOTIFICATION_CLAIM_BATCH)
       .for("update", { skipLocked: true });
     if (due.length === 0) return [];
-    const claimed = await tx
-      .update(voiceNotifications)
-      .set({ state: "sending", leaseExpiresAt: now, updatedAt: now })
-      .where(
-        inArray(
-          voiceNotifications.id,
-          due.map((row) => row.id),
-        ),
-      )
-      .returning({
-        id: voiceNotifications.id,
-        firmId: voiceNotifications.firmId,
-        recipient: voiceNotifications.recipient,
-        subject: voiceNotifications.subject,
-        body: voiceNotifications.body,
-        attempts: voiceNotifications.attempts,
-      });
+
+    const lease = new Date(now.getTime() + NOTIFICATION_LEASE_MS);
+    const claimed: ClaimedNotification[] = [];
+    for (const row of due) {
+      const reclaimed = row.state === "sending";
+      const history: AttemptHistory = reclaimed
+        ? planReclaim(row, row.leaseExpiresAt, now)
+        : { attempts: row.attempts, firstAttemptAt: row.firstAttemptAt, outcomeUncertainAt: row.outcomeUncertainAt };
+      const [updated] = await tx
+        .update(voiceNotifications)
+        .set({
+          state: "sending",
+          leaseExpiresAt: lease,
+          attempts: history.attempts,
+          firstAttemptAt: history.firstAttemptAt,
+          outcomeUncertainAt: history.outcomeUncertainAt,
+          ...(reclaimed ? { lastErrorCode: "lease_expired" } : {}),
+          updatedAt: now,
+        })
+        .where(eq(voiceNotifications.id, row.id))
+        .returning({
+          id: voiceNotifications.id,
+          firmId: voiceNotifications.firmId,
+          recipient: voiceNotifications.recipient,
+          subject: voiceNotifications.subject,
+          body: voiceNotifications.body,
+        });
+      if (updated) claimed.push({ ...updated, ...history, leaseExpiresAt: lease });
+    }
     return claimed;
   });
 }
 
-async function settleNotification(
-  row: ClaimedNotification,
-  result: { ok: true; providerMessageId?: string } | { ok: false; reason: string },
-  now: Date,
-): Promise<void> {
+/** Applies a settlement if, and only if, this worker still holds the claim. */
+async function applySettlement(row: ClaimedNotification, settlement: Settlement, now: Date): Promise<boolean> {
   const { db, voiceNotifications } = await wdb();
-  const attempts = row.attempts + 1;
-
-  if (result.ok) {
-    await db
-      .update(voiceNotifications)
-      .set({
-        state: "accepted",
-        acceptedAt: now,
-        providerMessageId: result.providerMessageId ?? null,
-        attempts,
-        lastErrorCode: null,
-        leaseExpiresAt: null,
-        updatedAt: now,
-      })
-      .where(eq(voiceNotifications.id, row.id));
-    return;
-  }
-
-  // 'alerts_disabled' is a configuration state, not a transport failure: keep
-  // retrying rather than burning attempts, so turning email on later delivers
-  // the backlog instead of discarding it.
-  const configurationHold = result.reason === "alerts_disabled";
-  const exhausted = !configurationHold && attempts >= NOTIFICATION_MAX_ATTEMPTS;
-  await db
+  const updated = await db
     .update(voiceNotifications)
     .set({
-      state: exhausted ? "abandoned" : "failed",
-      attempts: configurationHold ? row.attempts : attempts,
-      // Already one of our own short codes; bounded defensively regardless.
-      lastErrorCode: result.reason.slice(0, 60),
-      nextAttemptAt: new Date(
-        now.getTime() + (configurationHold ? MAX_BACKOFF_MS : notificationBackoffMs(attempts)),
-      ),
+      state: settlement.state,
+      attempts: settlement.attempts,
+      firstAttemptAt: settlement.firstAttemptAt,
+      outcomeUncertainAt: settlement.outcomeUncertainAt,
+      providerMessageId: settlement.providerMessageId,
+      acceptedAt: settlement.state === "accepted" ? now : null,
+      lastErrorCode: settlement.lastErrorCode,
+      ...(settlement.nextAttemptAt ? { nextAttemptAt: settlement.nextAttemptAt } : {}),
       leaseExpiresAt: null,
       updatedAt: now,
     })
-    .where(eq(voiceNotifications.id, row.id));
+    .where(
+      and(
+        eq(voiceNotifications.id, row.id),
+        eq(voiceNotifications.state, "sending"),
+        eq(voiceNotifications.leaseExpiresAt, row.leaseExpiresAt),
+      ),
+    )
+    .returning({ id: voiceNotifications.id });
+  return updated.length > 0;
 }
 
 export interface NotificationRunSummary {
   claimed: number;
   accepted: number;
   failed: number;
+  /** Terminal without a receipt: abandoned (nothing sent) or unconfirmed (may have been). */
+  stopped: number;
+  /** Rows this worker no longer owned when it came to send or settle them. */
+  lostLease: number;
 }
 
 export async function processDueNotifications(
   deps?: NotificationWorkerDeps,
 ): Promise<NotificationRunSummary> {
   const resolved = deps ?? (await productionWorkerDeps());
-  const now = resolved.now();
-  const rows = await claimDueNotifications(now);
-  let accepted = 0;
-  let failed = 0;
+  const rows = await claimDueNotifications(resolved.now());
+  const summary: NotificationRunSummary = { claimed: rows.length, accepted: 0, failed: 0, stopped: 0, lostLease: 0 };
 
   for (const row of rows) {
-    let result: { ok: true; providerMessageId?: string } | { ok: false; reason: string };
-    try {
-      result = await resolved.transport.send({
-        to: row.recipient,
-        subject: row.subject,
-        text: row.body,
-        idempotencyKey: notificationIdempotencyKey(row.id),
-      });
-    } catch {
-      result = { ok: false, reason: "transport_threw" };
+    const now = resolved.now();
+    // A claim that has already lapsed may belong to another worker by now.
+    if (now.getTime() >= row.leaseExpiresAt.getTime()) {
+      summary.lostLease += 1;
+      continue;
     }
-    await settleNotification(row, result, resolved.now());
-    if (result.ok) accepted += 1;
-    else failed += 1;
+
+    let settlement: Settlement;
+    if (resendWouldBeUnprotected(row, now)) {
+      settlement = settleWithoutSending(row, "outcome_unknown_key_expired");
+    } else if (row.attempts >= NOTIFICATION_MAX_ATTEMPTS) {
+      // Only reachable when a reclaim used up the last attempt.
+      settlement = settleWithoutSending(row, "lease_expired");
+    } else {
+      let suppressed = false;
+      let suppressionUnknown = false;
+      try {
+        suppressed = resolved.isSuppressed ? await resolved.isSuppressed(row.recipient) : false;
+      } catch {
+        suppressionUnknown = true;
+      }
+      if (suppressionUnknown) {
+        settlement = planSettlement(row, { ok: false, reason: "suppression_check_failed" }, now, now);
+      } else if (suppressed) {
+        settlement = settleWithoutSending(row, "recipient_suppressed");
+      } else {
+        let result: NotificationSendResult;
+        try {
+          result = await resolved.transport.send({
+            to: row.recipient,
+            subject: row.subject,
+            text: row.body,
+            idempotencyKey: notificationIdempotencyKey(row.id),
+          });
+        } catch {
+          result = { ok: false, reason: "transport_threw" };
+        }
+        settlement = planSettlement(row, result, now, resolved.now());
+      }
+    }
+
+    const applied = await applySettlement(row, settlement, resolved.now());
+    if (!applied) {
+      summary.lostLease += 1;
+      resolved.logger?.("voice_notification_settle_lost_lease", { notificationId: row.id, state: settlement.state });
+      continue;
+    }
+    if (settlement.state === "accepted") summary.accepted += 1;
+    else if (settlement.state === "failed") summary.failed += 1;
+    else summary.stopped += 1;
   }
 
   if (rows.length > 0) {
-    resolved.logger?.("voice_notifications_processed", { claimed: rows.length, accepted, failed });
+    resolved.logger?.("voice_notifications_processed", { ...summary });
   }
-  return { claimed: rows.length, accepted, failed };
+  return summary;
 }
 
 let workerStarted = false;

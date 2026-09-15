@@ -51,6 +51,15 @@ export const voiceUsageLedger = pgTable("voice_usage_ledger", {
   source:      text("source").notNull(),
   /** Billing period the call lands in, e.g. '2026-08'. */
   periodYm:    text("period_ym").notNull(),
+  /**
+   * How the call reached the assistant, from the provider's own call type:
+   * 'telephone' or 'browser'. A browser test is a real provider call that
+   * costs real minutes, so it is metered like any other — this column is what
+   * lets usage show it separately rather than hide it. Null on rows written
+   * before the channel was recorded, and 'unknown' when the provider did not
+   * say.
+   */
+  channel:     text("channel"),
   createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   /** Present to satisfy the blanket voice-table rule; ledger rows are never updated. */
   updatedAt:   timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -60,6 +69,7 @@ export const voiceUsageLedger = pgTable("voice_usage_ledger", {
   check("ck_voice_usage_ledger_duration", sql`${table.durationSec} >= 0 AND ${table.durationSec} <= 86400`),
   check("ck_voice_usage_ledger_source", sql`${table.source} IN ('end_of_call_report', 'reconciliation')`),
   check("ck_voice_usage_ledger_period_shape", sql`${table.periodYm} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+  check("ck_voice_usage_ledger_channel", sql`${table.channel} IS NULL OR ${table.channel} IN ('telephone', 'browser', 'unknown')`),
 ]);
 
 export type VoiceUsageLedgerRow = typeof voiceUsageLedger.$inferSelect;

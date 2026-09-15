@@ -49,6 +49,8 @@ export interface RecordUsageInput {
   source: UsageSource;
   /** When the call ended — determines the billing period. */
   endedAt: Date;
+  /** How the call reached the assistant; omitted by sources that cannot tell. */
+  channel?: "telephone" | "browser" | "unknown";
 }
 
 export type RecordUsageResult =
@@ -63,6 +65,7 @@ export interface UsageLedgerDeps {
     durationSec: number;
     source: UsageSource;
     periodYm: string;
+    channel: "telephone" | "browser" | "unknown" | null;
   }) => Promise<{ inserted: boolean }>;
   sumPeriod: (firmId: number, periodYm: string) => Promise<{ totalSeconds: number; callCount: number }>;
 }
@@ -109,6 +112,7 @@ export async function recordCallUsage(
     durationSec: Math.round(input.durationSec),
     source: input.source,
     periodYm: computePeriodYm(input.endedAt),
+    channel: input.channel ?? null,
   });
   return inserted ? { recorded: true } : { recorded: false, reason: "duplicate" };
 }

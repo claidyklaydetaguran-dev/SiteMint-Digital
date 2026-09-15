@@ -97,6 +97,35 @@ export function maskCallerNumber(number: string | undefined): string {
   return `•••• ${digits.slice(-4)}`;
 }
 
+/** How a call reached the assistant. */
+export type CallChannel = "telephone" | "browser" | "unknown";
+
+/**
+ * Classifies a call from the strongest evidence held. The provider's own call
+ * type decides first. Without one, a phone-number id or a customer number means
+ * the call arrived by telephone. With neither, the answer is 'unknown': a call
+ * is never labelled a browser test merely because caller details are missing,
+ * because a telephone caller who withholds their number looks exactly like that.
+ */
+export function deriveCallChannel(callType: string | undefined, reachedViaNumber: boolean): CallChannel {
+  if (callType === "webCall") return "browser";
+  if (callType === "inboundPhoneCall" || callType === "outboundPhoneCall") return "telephone";
+  return reachedViaNumber ? "telephone" : "unknown";
+}
+
+/**
+ * Call ids in this namespace are events SiteMint generates to exercise its own
+ * pipeline. The provider issues UUIDs, and webhook events must carry our
+ * signature, so no caller or customer can produce one: the marker is trustworthy
+ * precisely because only we can send it. Synthetic events are labelled as such
+ * everywhere and are never metered as usage.
+ */
+export const SYNTHETIC_QA_CALL_ID_PREFIX = "sitemint-qa-";
+
+export function isSyntheticQaCallId(callId: string): boolean {
+  return callId.startsWith(SYNTHETIC_QA_CALL_ID_PREFIX);
+}
+
 export interface StoredVapiEvent {
   type: ParsedVapiMessage["type"];
   message: ParsedVapiMessage;
@@ -122,6 +151,12 @@ export interface RealCallRecord {
    * withheld caller ID still arrives on a phone number, so it stays true.
    */
   reachedViaNumber: boolean;
+  /** The provider's call type ("webCall", "inboundPhoneCall", …) when any event carried one. */
+  callType: string | undefined;
+  /** See `deriveCallChannel`. */
+  channel: CallChannel;
+  /** A SiteMint-generated QA event, never a real call. See `isSyntheticQaCallId`. */
+  synthetic: boolean;
   firstEventAt: Date;
   lastEventAt: Date;
   endedAt: Date | undefined;
@@ -175,6 +210,7 @@ export function foldEventsIntoCallRecord(
   let callerNumberDisplay = "Unknown";
   let callerNumberKnown = false;
   let reachedViaNumber = false;
+  let callType: string | undefined;
   let state: InternalCallState = "queued";
   let isFinal = false;
   let endedReason: string | undefined;
@@ -198,6 +234,7 @@ export function foldEventsIntoCallRecord(
       reachedViaNumber = true;
     }
     if (message.call.phoneNumberId) reachedViaNumber = true;
+    if (message.call.callType) callType = message.call.callType;
     lastEventAt = event.createdAt;
 
     if (message.type === "status-update" && message.status) {
@@ -275,6 +312,9 @@ export function foldEventsIntoCallRecord(
     callerNumberDisplay,
     callerNumberKnown,
     reachedViaNumber,
+    callType,
+    channel: deriveCallChannel(callType, reachedViaNumber),
+    synthetic: isSyntheticQaCallId(callId),
     firstEventAt,
     lastEventAt,
     endedAt,

@@ -171,9 +171,9 @@ describe("post-call email composition", () => {
       messages: [message({ callbackEmail: "dana@example.test", emailAckRequested: false })],
     }).body;
 
-    expect(asked).toContain("asked us to email them a copy");
+    expect(asked).toContain("asked for a copy by email");
     // An address on file is not a request to be emailed.
-    expect(notAsked).not.toContain("asked us to email them a copy");
+    expect(notAsked).not.toContain("asked for a copy by email");
   });
 });
 
@@ -309,6 +309,9 @@ function record(overrides: Partial<RealCallRecord> = {}): RealCallRecord {
     callerNumberDisplay: "Unknown",
     callerNumberKnown: false,
     reachedViaNumber: false,
+    callType: "webCall",
+    channel: "browser",
+    synthetic: false,
     firstEventAt: STARTED,
     lastEventAt: STARTED,
     endedAt: STARTED,
@@ -338,14 +341,39 @@ describe("call facts for the email come from what was actually received", () => 
   });
 
   it("keeps a withheld caller ID a telephone call, without inventing a number", () => {
-    const facts = callFactsFromRecord(record({ reachedViaNumber: true }));
+    const facts = callFactsFromRecord(record({ callType: undefined, reachedViaNumber: true, channel: "telephone" }));
     expect(facts.source).toBe("telephone");
     expect(facts.callerNumberDisplay).toBeNull();
+    const email = composePostCallEmail({ ...BASE, facts, messages: [] });
+    expect(email.subject.startsWith("[Test]")).toBe(false);
+  });
+
+  it("does not call a call with no channel evidence a test", () => {
+    const facts = callFactsFromRecord(record({ callType: undefined, channel: "unknown" }));
+    expect(facts.source).toBe("unknown");
+    const email = composePostCallEmail({ ...BASE, facts, messages: [] });
+    expect(email.subject).not.toContain("[Test]");
+    expect(email.body).not.toContain("BROWSER TEST");
+  });
+
+  it("labels a SiteMint QA event as one, never as a call or a customer", () => {
+    const facts = callFactsFromRecord(record({ callId: "sitemint-qa-1", synthetic: true, channel: "unknown" }));
+    expect(facts.source).toBe("synthetic_qa");
+    const email = composePostCallEmail({ ...BASE, facts, messages: [message()] });
+    expect(email.subject.startsWith("[QA]")).toBe(true);
+    expect(email.body).toContain("QA TEST EVENT");
+    expect(email.body).not.toContain("Phone call");
   });
 
   it("shows the caller only when a number was received", () => {
-    const facts = callFactsFromRecord(record({ reachedViaNumber: true, callerNumberKnown: true, callerNumberDisplay: "•••• 2030" }));
+    const facts = callFactsFromRecord(record({ reachedViaNumber: true, channel: "telephone", callerNumberKnown: true, callerNumberDisplay: "•••• 2030" }));
     expect(facts.callerNumberDisplay).toBe("•••• 2030");
+  });
+
+  it("states a caller's request for a copy as a request, not as a copy already sent", () => {
+    const email = composePostCallEmail({ ...BASE, facts: facts(), messages: [message({ emailAckRequested: true, callbackEmail: "dana@example.test" })] });
+    expect(email.body).toContain("No copy has been sent to them");
+    expect(email.body).not.toMatch(/we (will )?email(ed)? them/i);
   });
 
   it("reports the provider's duration, not the 0s receipt-time approximation", () => {
@@ -382,10 +410,13 @@ describe("a retried send cannot email the business twice", () => {
     expect("Idempotency-Key" in headers[1]!).toBe(false);
   });
 
-  it("treats 'key already used' as the earlier send having gone through — never a failure to retry", async () => {
+  // A repeat with the SAME content returns the original response; this 409 means
+  // the key was used for DIFFERENT content. Something went out, but not this
+  // message, so it is neither a receipt nor something to resend.
+  it("reports 'key used for other content' as a conflict, never as an accepted receipt", async () => {
     const fetchImpl: FetchLike = async () => ({ ok: false, status: 409, json: async () => ({ name: "invalid_idempotent_request", message: "…" }) });
     const result = await createResendAlertTransport(config, fetchImpl).send({ subject: "s", text: "t", idempotencyKey: "voice-notification/7" });
-    expect(result.ok).toBe(true);
+    expect(result).toEqual({ ok: false, reason: "provider_idempotency_conflict" });
   });
 
   it("reports a still-running keyed request as retryable, not as a delivery", async () => {

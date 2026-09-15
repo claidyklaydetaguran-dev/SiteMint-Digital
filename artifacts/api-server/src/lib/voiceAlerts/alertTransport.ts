@@ -70,6 +70,14 @@ export interface AlertMessage {
 export const IDEMPOTENCY_KEY_MAX = 256;
 
 /**
+ * How long one send may take before it is cut off. Exported because the
+ * notification outbox sizes its claim lease from it: a lease shorter than a
+ * batch of sends that each run to this limit lets a second worker reclaim rows
+ * the first is still sending.
+ */
+export const ALERT_SEND_TIMEOUT_MS = 20_000;
+
+/**
  * `ok` means the provider ACCEPTED the message, which is the strongest thing we
  * can observe — inbox delivery is not visible to us and nothing here claims it.
  * `providerMessageId` is the provider's own receipt when it returns one; absent
@@ -124,7 +132,7 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
           // Long enough that a slow-but-working provider is not cut off. A cut-off
           // send may still have been delivered — which is why a keyed retry, not
           // a shorter timeout, is what prevents the duplicate.
-          signal: AbortSignal.timeout(20_000),
+          signal: AbortSignal.timeout(ALERT_SEND_TIMEOUT_MS),
         });
         if (response.ok) {
           // The provider's receipt id, when it gives one. Read defensively: a
@@ -150,10 +158,13 @@ export function createResendAlertTransport(config: VoiceAlertConfig, fetchImpl?:
           } catch {
             name = undefined;
           }
-          // This key already produced a processed send. Our payload for a key
-          // never changes once a send has been attempted, so this can only mean
-          // the earlier attempt went through: treat it as accepted, never resend.
-          if (name === "invalid_idempotent_request") return { ok: true };
+          // The provider already processed a request with this key but DIFFERENT
+          // content. (A repeat of the same content returns the original response,
+          // not this.) So something was sent under this key, and it was not
+          // exactly this message — reporting that as "accepted" would record a
+          // receipt we do not have. It is its own result: never resent
+          // automatically, and surfaced for a person to check.
+          if (name === "invalid_idempotent_request") return { ok: false, reason: "provider_idempotency_conflict" };
           // The first request with this key is still being processed. Safe to
           // retry later; nothing is sent twice.
           if (name === "concurrent_idempotent_requests") return { ok: false, reason: "provider_idempotency_in_progress" };
