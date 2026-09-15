@@ -29,9 +29,10 @@ import {
 } from "../voiceAssistants/repository.js";
 import { isVoiceSyncEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
-import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
+import { loadVoiceToolsConfigFromEnv, withTransferInstruction } from "./toolsConfig.js";
 import { resolveEffectiveCapabilities } from "../voice/tools/firmCapabilities.js";
 import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
+import type { VoiceToolCapability } from "../voice/tools/toolCapabilities.js";
 import { loadVoiceCallPolicyFromEnv, type VoiceCallPolicy } from "./callPolicyConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
@@ -103,9 +104,15 @@ export interface SyncServiceDependencies {
     serverConfig: VoiceServerConfig | null,
     env?: Record<string, string | undefined>,
     firmToolNames?: readonly VoiceToolName[],
+    firmCapabilities?: readonly VoiceToolCapability[],
   ) => JsonObject[] | null;
-  /** Resolves what this business may carry. Defaults to the shared resolution. */
-  resolveCapabilities?: (firmId: number) => Promise<{ toolNames: VoiceToolName[] }>;
+  /**
+   * Resolves what this business may carry. Defaults to the shared resolution.
+   * Both halves are required — see the identical note in publishService.ts.
+   */
+  resolveCapabilities?: (
+    firmId: number,
+  ) => Promise<{ toolNames: VoiceToolName[]; activeCapabilities: readonly VoiceToolCapability[] }>;
   /** P6: optional call-behavior policy; null (default) sends nothing. */
   loadCallPolicy?: () => VoiceCallPolicy | null;
   createProvider: () => VoiceProvider;
@@ -214,7 +221,10 @@ export function buildSyncProviderInput(
       },
       firstMessageMode: mapFirstMessageMode(extracted.firstMessageMode),
       ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
-      systemInstructions: extracted.systemInstructions,
+      // Identical to publishService.buildProviderInput, deliberately: if the
+      // transfer instruction were appended on only one of the two paths, a
+      // freshly published assistant would read as out of sync forever.
+      systemInstructions: withTransferInstruction(extracted.systemInstructions, toolsConfig),
       ...(serverConfig !== null ? { server: { url: serverConfig.url, credentialId: serverConfig.credentialId } } : {}),
       ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
       ...(callPolicy !== null ? { callPolicy: callPolicy as unknown as JsonObject } : {}),
@@ -366,6 +376,7 @@ export async function synchronizePublishedAssistant(
       serverConfig,
       process.env,
       effective.toolNames,
+      effective.activeCapabilities,
     );
   } catch {
     return failure("sync_disabled");

@@ -26,9 +26,10 @@ import {
 } from "../voiceAssistants/repository.js";
 import { isVoicePublishEnabled } from "./featureFlags.js";
 import { loadVoiceServerConfigFromEnv, type VoiceServerConfig } from "./serverConfig.js";
-import { loadVoiceToolsConfigFromEnv } from "./toolsConfig.js";
+import { loadVoiceToolsConfigFromEnv, withTransferInstruction } from "./toolsConfig.js";
 import { resolveEffectiveCapabilities } from "../voice/tools/firmCapabilities.js";
 import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
+import type { VoiceToolCapability } from "../voice/tools/toolCapabilities.js";
 import { loadVoiceCallPolicyFromEnv, type VoiceCallPolicy } from "./callPolicyConfig.js";
 import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
@@ -100,9 +101,18 @@ export interface PublishServiceDependencies {
     serverConfig: VoiceServerConfig | null,
     env?: Record<string, string | undefined>,
     firmToolNames?: readonly VoiceToolName[],
+    firmCapabilities?: readonly VoiceToolCapability[],
   ) => JsonObject[] | null;
-  /** Resolves what this business may carry. Defaults to the shared resolution. */
-  resolveCapabilities?: (firmId: number) => Promise<{ toolNames: VoiceToolName[] }>;
+  /**
+   * Resolves what this business may carry. Defaults to the shared resolution.
+   *
+   * Both halves are required: a provider-native capability (transfer) has no
+   * tool name, so a dependency that returned names alone would silently publish
+   * an assistant without it.
+   */
+  resolveCapabilities?: (
+    firmId: number,
+  ) => Promise<{ toolNames: VoiceToolName[]; activeCapabilities: readonly VoiceToolCapability[] }>;
   /** P6: optional call-behavior policy; null (default) sends nothing. */
   loadCallPolicy?: () => VoiceCallPolicy | null;
   /** Explicit, lazy production-provider construction. No network request occurs during construction. */
@@ -337,7 +347,10 @@ function buildProviderInput(
     },
     firstMessageMode: mapFirstMessageMode(extracted.firstMessageMode),
     ...(extracted.firstMessage !== undefined ? { firstMessage: extracted.firstMessage } : {}),
-    systemInstructions: extracted.systemInstructions,
+    // The transfer tool comes with one fixed, server-owned operating rule, and
+    // it is derived from the payload itself so publish, sync and the digest
+    // comparison append it identically or not at all.
+    systemInstructions: withTransferInstruction(extracted.systemInstructions, toolsConfig),
     ...(serverConfig !== null ? { server: { url: serverConfig.url, credentialId: serverConfig.credentialId } } : {}),
     ...(toolsConfig !== null ? { tools: toolsConfig } : {}),
     ...(callPolicy !== null ? { callPolicy: callPolicy as unknown as JsonObject } : {}),
@@ -405,6 +418,7 @@ export async function publishAssistant(
       serverConfig,
       process.env,
       effective.toolNames,
+      effective.activeCapabilities,
     );
   } catch {
     return failure("publish_disabled");
