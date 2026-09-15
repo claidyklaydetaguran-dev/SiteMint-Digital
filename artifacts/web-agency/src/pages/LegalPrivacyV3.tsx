@@ -57,6 +57,55 @@ export default function LegalPrivacyV3() {
               transcripts are not retained.
             </p>
 
+            {/*
+              Google Calendar disclosure. Required for Google OAuth verification of
+              the three calendar scopes, and written from what the product does:
+              lib/calendar/googleOAuth.ts (scopes), tokenCrypto.ts (AES-256-GCM at
+              rest), calendarConnectionsRepository.ts (tokens cleared on disconnect
+              or revocation). Wording pending owner/legal approval like the rest of
+              this page.
+            */}
+            <h2>Google Calendar</h2>
+            <p>
+              A business using the SiteMint AI Receptionist can choose to connect
+              a Google Calendar. When it does, SiteMint uses Google&apos;s
+              permission to do three things, and nothing more:
+            </p>
+            <ul>
+              <li>
+                read the list of the account&apos;s calendars, so the business can
+                choose which one receives appointments;
+              </li>
+              <li>
+                read busy and free times on the chosen calendar, so the
+                receptionist never offers a time that is already taken — the
+                titles, descriptions and guests of other events are not read;
+              </li>
+              <li>
+                create, move and remove only the appointment events SiteMint
+                itself added for that business.
+              </li>
+            </ul>
+            <p>
+              We store the access tokens Google issues, encrypted, together with
+              the chosen calendar and the identifiers of the events we created.
+              Disconnecting the calendar in the dashboard deletes the stored
+              tokens, and access can also be removed at any time from the Google
+              Account permissions page. Information received from Google is used
+              only to provide these scheduling features to the business that
+              connected it. It is not sold, not used for advertising, not used to
+              train AI models, and not shared except with the service providers
+              needed to run the feature or where the law requires it.
+            </p>
+            <p>
+              SiteMint&apos;s use and transfer of information received from Google
+              APIs adheres to the{" "}
+              <a href="https://developers.google.com/terms/api-services-user-data-policy">
+                Google API Services User Data Policy
+              </a>
+              , including the Limited Use requirements.
+            </p>
+
             <h2>Consent and opt-out</h2>
             <p>
               Messaging through our systems honors opt-out requests
