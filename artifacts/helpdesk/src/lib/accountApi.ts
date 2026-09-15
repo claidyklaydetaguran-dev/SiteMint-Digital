@@ -14,9 +14,10 @@
  * server that has not yet added a key degrades to "not set" rather than to
  * an error.
  *
- * The password-reset and password-change endpoints are the shapes specified
- * in the task brief; `changePassword` treats a 404 as "not available yet"
- * because that route may not exist until the backend owner ships it.
+ * The password-change endpoint exists (routes/receptionistAccount.ts): it
+ * requires the current password and signs out every other session. A 404 is
+ * still read as "not available yet", so a server older than this client says
+ * so honestly instead of reporting a password error.
  */
 
 import { apiFetch } from "@/lib/api";
@@ -260,10 +261,11 @@ export type ChangePasswordResult =
   | { ok: false; reason: "unavailable" | "invalid" | "network"; message: string };
 
 /**
- * `PASSWORD_CHANGE_ENDPOINT` may not exist yet (the brief flags it as
- * possibly unbuilt). A 404 is read as "not available yet", never as a
- * password error — those are different facts and the page must not conflate
- * them.
+ * `POST PASSWORD_CHANGE_ENDPOINT` — `{ currentPassword, newPassword }` →
+ * 200 `{ ok: true }`; 401 wrong current password; 400 weak new password; 429.
+ * A 404 (a server without the route) is read as "not available yet", never
+ * as a password error — those are different facts and the page must not
+ * conflate them.
  */
 export async function changePassword(
   currentPassword: string,

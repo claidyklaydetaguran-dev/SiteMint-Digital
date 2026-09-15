@@ -6,7 +6,7 @@
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
-import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
+import { COOKIE_NAME, requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import {
   completePasswordReset,
   confirmEmailVerification,
@@ -14,6 +14,7 @@ import {
   requestPasswordReset,
 } from "../lib/accountSecurity/accountTokens.js";
 import { changeAccountEmail, productionEmailChangeDeps } from "../lib/accountSecurity/emailChange.js";
+import { changeAccountPassword, productionPasswordChangeDeps } from "../lib/accountSecurity/passwordChange.js";
 import { applyProfilePatch, readBusinessProfile, validateProfilePatch } from "../lib/accountProfile/profileService.js";
 import { resolveVerifiedBusinessRecipient } from "../lib/voiceNotifications/recipient.js";
 import { acceptInvitation, inviteMember, listFirmMembers, revokeMemberById } from "../lib/voiceAccounts/membership.js";
@@ -97,6 +98,46 @@ router.post("/receptionist/account/password-reset/complete", async (req: Request
     res.status(500).json({ error: "Internal error" });
   }
 });
+
+// ── POST /api/receptionist/account/password/change ───────────────────────────
+//
+// The Settings form has always posted here; the route did not exist, so it
+// answered 404 and the page said "not available yet".
+//
+// Session-gated AND password-gated (a borrowed session must not be able to lock
+// the owner out), and rate limited on top because it is a password-guessing
+// surface. The policy and the hash are the reset path's own — see
+// lib/accountSecurity/passwordChange.ts. Every other session is signed out; the
+// one making the change is kept, identified by its cookie.
+
+router.post("/receptionist/account/password/change", requireReceptionistAuth, async (req: Request, res: Response) => {
+  if (limited(req, res, "pw-change")) return;
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  try {
+    const deps = await productionPasswordChangeDeps();
+    const result = await changeAccountPassword(
+      req.firmId!,
+      { currentPassword: body.currentPassword, newPassword: body.newPassword },
+      req.cookies?.[COOKIE_NAME] as string | undefined,
+      deps,
+    );
+    if (!result.ok) {
+      res
+        .status(result.reason === "weak_password" ? 400 : 401)
+        .json({ error: PASSWORD_CHANGE_MESSAGES[result.reason], reason: result.reason });
+      return;
+    }
+    res.json({ ok: true, otherSessionsSignedOut: result.otherSessionsSignedOut });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] password change failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+const PASSWORD_CHANGE_MESSAGES: Record<string, string> = {
+  wrong_password: "That current password is not correct.",
+  weak_password: "New password must be at least 8 characters.",
+};
 
 // ── GET /api/receptionist/account/email-status ───────────────────────────────
 //
