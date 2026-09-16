@@ -51,9 +51,9 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**154 / 312 page checks = 49.4%.** Pages passing all 6: 1. Pages passing none: 2.
+**169 / 312 page checks = 54.2%.** Pages passing all 6: 1. Pages passing none: 2.
 
-By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by decision 0.
+By status: Passed 169 · Built, not proven 141 · Not passed 2 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
@@ -61,7 +61,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | 22 / 52 (42.3%) |
 | persist | 10 / 52 (19.2%) |
 | permission | 22 / 52 (42.3%) |
-| recovery | 8 / 52 (15.4%) |
+| recovery | 23 / 52 (44.2%) |
 | mobile | 49 / 52 (94.2%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
@@ -70,37 +70,37 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | 2 | `/admin/activate` | Staff invitation and password-reset landing | 5 / 6 | 83.3% | L, T | recovery |
 | 3 | `/admin/dashboard` | Legacy Discovery Portal | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
 | 4 | `/admin/submissions/:id` | Legacy submission detail | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 5 | `/admin/crm/dashboard` | Command Center | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 5 | `/admin/crm/dashboard` | Command Center | 4 / 6 | 66.7% | L | persist, permission |
 | 6 | `/admin/crm/leads/:id/dna` | Lead DNA | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 7 | `/admin/crm/leads/:id` | Contact record | 4 / 6 | 66.7% | L, T, R | persist, recovery |
 | 8 | `/admin/crm/leads` | Contacts | 5 / 6 | 83.3% | L, T | persist |
 | 9 | `/admin/crm/companies` | Companies | 4 / 6 | 66.7% | L, T | action, persist |
 | 10 | `/admin/crm/companies/:id` | Company record | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
-| 11 | `/admin/crm/communications` | Communications | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 11 | `/admin/crm/communications` | Communications | 3 / 6 | 50.0% | L | action, persist, permission |
 | 12 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
 | 13 | `/admin/crm/intelligence/automation-queue` | Automation queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 14 | `/admin/crm/inbox` | Inbox | 4 / 6 | 66.7% | L | permission, recovery |
-| 15 | `/admin/crm/tasks` | All tasks | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 16 | `/admin/crm/calendar` | Calendar | 4 / 6 | 66.7% | L, R | permission, recovery |
+| 14 | `/admin/crm/inbox` | Inbox | 5 / 6 | 83.3% | L | permission |
+| 15 | `/admin/crm/tasks` | All tasks | 4 / 6 | 66.7% | L | persist, permission |
+| 16 | `/admin/crm/calendar` | Calendar | 5 / 6 | 83.3% | L, R | permission |
 | 17 | `/admin/crm/deals` | Deals | 3 / 6 | 50.0% | L | action, persist, permission |
-| 18 | `/admin/crm/transactions` | Transactions | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 18 | `/admin/crm/transactions` | Transactions | 4 / 6 | 66.7% | L | persist, permission |
 | 19 | `/admin/crm/projects` | Projects | 3 / 6 | 50.0% | L | action, persist, permission |
 | 20 | `/admin/crm/documents` | Documents | 5 / 6 | 83.3% | L | permission |
 | 21 | `/admin/crm/support` | Support | 5 / 6 | 83.3% | L, T | recovery |
-| 22 | `/admin/crm/pipeline` | Pipeline | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 23 | `/admin/crm/reporting` | Reporting | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 22 | `/admin/crm/pipeline` | Pipeline | 3 / 6 | 50.0% | L | action, persist, permission |
+| 23 | `/admin/crm/reporting` | Reporting | 3 / 6 | 50.0% | L | action, persist, permission |
 | 24 | `/admin/crm/admin` | Admin hub | 4 / 6 | 66.7% | L | permission, recovery |
 | 25 | `/admin/crm/workspace` | Sales workspace | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 26 | `/admin/crm/campaigns` | Sequences | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 26 | `/admin/crm/campaigns` | Sequences | 3 / 6 | 50.0% | L | action, persist, permission |
 | 27 | `/admin/crm/campaign-builder` | Marketing | 6 / 6 | 100.0% | L, T, R | — |
-| 28 | `/admin/crm/campaign-queue` | Sequence queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 29 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 28 | `/admin/crm/campaign-queue` | Sequence queue | 3 / 6 | 50.0% | L | action, persist, permission |
+| 29 | `/admin/crm/discovery` | Discovery submissions | 3 / 6 | 50.0% | L | action, persist, permission |
 | 30 | `/admin/crm/intake-cases` | Intake cases | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
 | 31 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 32 | `/admin/crm/email-templates` | Email templates | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 33 | `/admin/crm/import` | Import contacts | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 34 | `/admin/crm/duplicates` | Duplicate review | 3 / 6 | 50.0% | L, T | persist, permission, recovery |
-| 35 | `/admin/crm/settings` | Settings | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 32 | `/admin/crm/email-templates` | Email templates | 2 / 6 | 33.3% | L | open, action, persist, permission |
+| 33 | `/admin/crm/import` | Import contacts | 4 / 6 | 66.7% | L | persist, permission |
+| 34 | `/admin/crm/duplicates` | Duplicate review | 4 / 6 | 66.7% | L, T | persist, permission |
+| 35 | `/admin/crm/settings` | Settings | 3 / 6 | 50.0% | L | action, persist, permission |
 | 36 | `/admin/crm/people` | People | 3 / 6 | 50.0% | L, T | action, persist, recovery |
 | 37 | `/admin/crm/account` | My account | 4 / 6 | 66.7% | L | permission, recovery |
 | 38 | `/admin/crm/operations` | Operations | 3 / 6 | 50.0% | L | action, persist, permission |
@@ -431,7 +431,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L | Money panel cross-checked against the forecast and transactions: $16,000 across 4 transactions agreed |
 | persist | Built, not proven | — | Filters and figures after a reload not recorded |
 | permission | Built, not proven | — | Mine/Team scoping not exercised with a restricted user |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered the server's own error text ("simulated outage") with a Retry control. Every number remaining on screen is a date-range control (7/30/90/365 days), not a figure: no counts invented. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15, measured both before and after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/leads/:id/dna` — Lead DNA
@@ -497,7 +497,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no conversation counts shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/intelligence/behavioral` — Behavioral intelligence
@@ -530,7 +530,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L | Read, assign and resolve each changed only their own fact |
 | persist | Passed | L | An unsent draft survived a full reload |
 | permission | Built, not proven | — | Not exercised with a restricted user |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no message counts shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/tasks` — All tasks
@@ -541,7 +541,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L | Performed in a browser on 2026-09-16: the tab controls were operated and each bucket read back. Header figure and the tabs agree — 22 active, 22 reachable across five tabs (No date 20, Future 2) — where before the fix 22 were counted and 2 reachable. |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "Couldn't load tasks. Check your connection and try again." with Retry. No task figure shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/calendar` — Calendar
@@ -552,7 +552,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L, R | On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs |
 | persist | Passed | L | After a full reload and selecting Sep 17, the card showed the rescheduled 11:00–11:30 time, status cancelled, and “Cancellation sent” for both attendees |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no events or counts fabricated. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/deals` — Deals
@@ -574,7 +574,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L | Total $16,000 and the count matched the list |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no payment totals shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/projects` — Projects
@@ -618,7 +618,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "Couldn't load the pipeline. Check your connection and try again." with a Retry control. No stage counts invented. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/reporting` — Reporting
@@ -629,7 +629,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Drill-down not exercised in the browser (proven by crmReports.test.ts only) |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered the server's own error text with Retry. Remaining numbers are range controls (7/30/90 days, 12 months); no figure, denominator or row count shown while the reads were failing. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/admin` — Admin hub
@@ -662,7 +662,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no sequence counts shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/campaign-builder` — Marketing
@@ -684,7 +684,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no queued-message count shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/discovery` — Discovery submissions
@@ -695,7 +695,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "— Not available submissions" rather than a zero. |
 | mobile | Passed | L | Rendered populated and measured at 375px after the 10-column table fix |
 
 ### `/admin/crm/intake-cases` — Intake cases
@@ -728,7 +728,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "— Not available templates" rather than a zero. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/import` — Import contacts
@@ -739,7 +739,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L | Upload → preview (2 to create, 2 errors with reasons, 1 ignored column) → mapping → commit: 2 created, 2 failed |
 | persist | Built, not proven | — | The created contacts were not checked after a reload |
 | permission | Built, not proven | — | Not exercised with a restricted user |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. No display fetch to fail — the page is a file-upload form; it rendered its instructions intact under total outage and invented nothing. The only number shown is its own 5,000-row limit copy. |
 | mobile | Passed | L | At 375px the plan table scrolls inside its own 342px container |
 
 ### `/admin/crm/duplicates` — Duplicate review
@@ -750,7 +750,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Passed | L, T | A merge kept history from both sides and deleted nothing |
 | persist | Built, not proven | — | Not reloaded after the merge |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no duplicate count shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/settings` — Settings
@@ -761,7 +761,7 @@ By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "Parts of this page could not be loaded"; no health score computed from refused reads. |
 | mobile | Passed | L | One unbreakable Twilio SID was clipped at 375px; re-measured after the fix with the clipped-content metric: 0 |
 
 ### `/admin/crm/people` — People
