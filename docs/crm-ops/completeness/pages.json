@@ -187,9 +187,11 @@
           "evidence": "Filters and figures after a reload not recorded"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Mine/Team scoping not exercised with a restricted user"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/stats and the refusal NAMES the permission (\"leads.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -443,9 +445,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/conversations and the refusal NAMES the permission (\"communications.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -523,9 +527,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/automation/failures and the refusal NAMES the permission (\"settings.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "unverified",
@@ -567,9 +573,11 @@
           "evidence": "An unsent draft survived a full reload"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised with a restricted user"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/inbox/conversations and /api/crm/inbox/summary and the refusal NAMES the permission (\"communications.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -611,9 +619,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/tasks and the refusal NAMES the permission (\"tasks.read.team\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -700,9 +710,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/deals and the refusal NAMES the permission (\"deals.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -744,9 +756,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/transactions and the refusal NAMES the permission (\"deals.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -832,9 +846,11 @@
           "evidence": "After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/documents (the gate runs before the handler, which itself asks for a parent record) and the refusal NAMES the permission (\"documents.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -921,9 +937,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/pipeline and the refusal NAMES the permission (\"leads.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -963,9 +981,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/reports/summary and the refusal NAMES the permission (\"reports.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -1089,9 +1109,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/campaigns and the refusal NAMES the permission (\"campaigns.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -1342,9 +1364,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/email-templates and the refusal NAMES the permission (\"communications.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -1431,9 +1455,11 @@
           "evidence": "Not reloaded after the merge"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/contacts/duplicates and the refusal NAMES the permission (\"leads.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -1473,9 +1499,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/settings/status and the refusal NAMES the permission (\"settings.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
@@ -1601,9 +1629,11 @@
           "evidence": "Not exercised"
         },
         "permission": {
-          "status": "unverified",
-          "env": [],
-          "evidence": "Not exercised"
+          "status": "pass",
+          "env": [
+            "T"
+          ],
+          "evidence": "Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/operations/jobs and the refusal NAMES the permission (\"settings.read\"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it."
         },
         "recovery": {
           "status": "pass",
