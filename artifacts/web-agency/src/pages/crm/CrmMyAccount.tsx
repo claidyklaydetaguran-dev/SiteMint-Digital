@@ -4,6 +4,8 @@ import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Monitor, KeyRound, Check, Copy, AlertCircle } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { LoadFailure } from "@/components/crm/LoadState";
 
 // M1: the signed-in person's own account — name, password, second factor, and
 // the list of devices holding a live session, each individually revocable.
@@ -32,6 +34,27 @@ interface SessionRow {
   userAgent: string | null;
 }
 
+/** The devices holding a live session, and which one is this browser. */
+interface SessionList {
+  sessions: SessionRow[];
+  currentSessionId: number | null;
+}
+
+function pickMe(body: unknown): Me | undefined {
+  const staff = body && typeof body === "object" ? (body as { staff?: unknown }).staff : undefined;
+  return staff && typeof staff === "object" ? staff as Me : undefined;
+}
+
+function pickSessions(body: unknown): SessionList | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const { sessions, currentSessionId } = body as { sessions?: unknown; currentSessionId?: unknown };
+  if (!Array.isArray(sessions)) return undefined;
+  return {
+    sessions: sessions as SessionRow[],
+    currentSessionId: typeof currentSessionId === "number" ? currentSessionId : null,
+  };
+}
+
 function shortDevice(ua: string | null): string {
   if (!ua) return "Unknown device";
   const browser = /Edg\//.test(ua) ? "Edge"
@@ -48,10 +71,13 @@ function shortDevice(ua: string | null): string {
 
 export default function CrmMyAccount() {
   const [, navigate] = useLocation();
-  const [me, setMe] = useState<Me | null>(null);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  // This is a security surface: "No other devices." is a claim that nobody
+  // else is signed in as you. It used to be rendered whenever the session read
+  // failed, because the answer was taken only `if (sessRes.ok)` and there was
+  // no else — and the page had no retry at all.
+  const [meLoad, setMeLoad] = useState<Load<Me>>({ status: "loading" });
+  const [sessionsLoad, setSessionsLoad] = useState<Load<SessionList>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -67,34 +93,38 @@ export default function CrmMyAccount() {
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setReloading(true);
     setError("");
-    try {
-      const [meRes, sessRes] = await Promise.all([
-        adminFetch("/api/crm/staff/me"),
-        adminFetch("/api/crm/staff/me/sessions"),
-      ]);
-      if (!meRes.ok) {
-        setError("You are signed in with the legacy shared admin password, which has no personal account.");
-        return;
-      }
-      const m = ((await meRes.json()) as { staff: Me }).staff;
-      setMe(m);
-      setDisplayName(m.displayName);
-      setTimezone(m.timezone ?? "");
-      if (sessRes.ok) {
-        const d = await sessRes.json() as { sessions: SessionRow[]; currentSessionId: number };
-        setSessions(d.sessions);
-        setCurrentSessionId(d.currentSessionId);
-      }
-    } catch {
-      setError("Couldn't load your account. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
+    const [nextMe, nextSessions] = await Promise.all([
+      readAdminResource("/api/crm/staff/me", pickMe),
+      readAdminResource("/api/crm/staff/me/sessions", pickSessions),
+    ]);
+    setMeLoad(nextMe);
+    setSessionsLoad(nextSessions);
+    setReloading(false);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const me = meLoad.status === "ready" ? meLoad.data : null;
+  const sessionList = sessionsLoad.status === "ready" ? sessionsLoad.data : null;
+
+  // Seed the editable fields from whatever actually arrived.
+  useEffect(() => {
+    if (!me) return;
+    setDisplayName(me.displayName);
+    setTimezone(me.timezone ?? "");
+  }, [me]);
+
+  /**
+   * Only a refusal means "this credential has no personal account".
+   *
+   * The old code showed that sentence for ANY non-ok answer, so a 500 or an
+   * unreachable server told a signed-in person they were using the legacy
+   * shared admin password — a diagnosis nobody had made.
+   */
+  const legacyAdmin = meLoad.status === "error"
+    && (meLoad.httpStatus === 401 || meLoad.httpStatus === 403);
 
   async function saveName() {
     const r = await adminFetch("/api/crm/staff/me", {
@@ -154,9 +184,18 @@ export default function CrmMyAccount() {
     navigate("/admin?reason=mfa-disabled");
   }
 
+  // A revoke that failed used to do nothing at all, silently — leaving the
+  // device listed and the person believing they had signed it out.
   async function revoke(id: number) {
-    const r = await adminFetch(`/api/crm/staff/me/sessions/${id}`, { method: "DELETE" });
-    if (r.ok) void load();
+    setError(""); setNotice("");
+    try {
+      const r = await adminFetch(`/api/crm/staff/me/sessions/${id}`, { method: "DELETE" });
+      if (!r.ok) { setError(`That device was not signed out. ${await responseFailureReason(r)}`); return; }
+      setNotice("That device was signed out.");
+      void load();
+    } catch {
+      setError(`That device was not signed out. ${failureReason(null)}`);
+    }
   }
 
   return (
@@ -177,11 +216,30 @@ export default function CrmMyAccount() {
         )}
         {notice && <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">{notice}</p>}
 
-        {loading ? (
-          <div className="space-y-3">
+        {meLoad.status === "loading" ? (
+          <div className="space-y-3" role="status" aria-live="polite">
+            <span className="sr-only">Loading your account…</span>
             {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />)}
           </div>
-        ) : me && (
+        ) : me === null ? (
+          legacyAdmin ? (
+            <div role="alert" className="rounded-xl border border-border bg-muted p-4">
+              <p className="text-sm text-foreground">
+                You are signed in with the legacy shared admin password, which has no personal account.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground break-words">
+                Sign in with your own staff account to manage your name, password, two-step verification and devices.
+              </p>
+            </div>
+          ) : (
+            <LoadFailure
+              what="Your account"
+              reason={meLoad.status === "error" ? meLoad.reason : ""}
+              onRetry={() => { void load(); }}
+              retrying={reloading}
+            />
+          )
+        ) : (
           <>
             {/* Profile */}
             <section className="rounded-xl border border-border bg-white p-4">
@@ -334,13 +392,33 @@ export default function CrmMyAccount() {
               <p className="text-xs text-muted-foreground mb-3">
                 Revoking one signs that device out immediately.
               </p>
+              {/*
+                Never "No other devices." for a read that failed — on this
+                panel that sentence is a security assurance nobody checked.
+              */}
+              {sessionsLoad.status === "error" && (
+                <LoadFailure
+                  what="Your signed-in devices"
+                  reason={sessionsLoad.reason}
+                  variant="inline"
+                  onRetry={() => { void load(); }}
+                  retrying={reloading}
+                >
+                  <p className="mt-1 text-xs text-muted-foreground break-words">
+                    This does not mean no other device is signed in — it means the list could not be read.
+                  </p>
+                </LoadFailure>
+              )}
+              {sessionsLoad.status === "loading" && (
+                <p className="text-xs text-muted-foreground py-2">Loading your devices…</p>
+              )}
               <div className="divide-y divide-border/60">
-                {sessions.map(s => (
+                {(sessionList?.sessions ?? []).map(s => (
                   <div key={s.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0">
                       <p className="text-sm text-foreground">
                         {shortDevice(s.userAgent)}
-                        {s.id === currentSessionId && (
+                        {s.id === sessionList?.currentSessionId && (
                           <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-accent text-teal-700">
                             this device
                           </span>
@@ -350,7 +428,7 @@ export default function CrmMyAccount() {
                         {s.ip ?? "unknown address"} · last active {new Date(s.lastSeenAt).toLocaleString()}
                       </p>
                     </div>
-                    {s.id !== currentSessionId && (
+                    {s.id !== sessionList?.currentSessionId && (
                       <button className="text-xs text-primary hover:underline shrink-0"
                         onClick={() => void revoke(s.id)}>
                         Revoke
@@ -358,7 +436,7 @@ export default function CrmMyAccount() {
                     )}
                   </div>
                 ))}
-                {sessions.length === 0 && (
+                {sessionList !== null && sessionList.sessions.length === 0 && (
                   <p className="text-xs text-muted-foreground py-2">No other devices.</p>
                 )}
               </div>

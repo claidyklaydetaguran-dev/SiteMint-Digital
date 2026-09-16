@@ -65,6 +65,24 @@ const renderedFiles = allFiles.filter(f => f.endsWith(".tsx"));
 const rel = (file: string) => path.relative(repoRoot, file).replace(/\\/g, "/");
 const sourceOf = (file: string) => readFileSync(file, "utf8");
 
+/**
+ * The code, without the prose.
+ *
+ * Every check here looks for an idiom, and a comment that QUOTES an idiom is
+ * not that idiom — several of these files now carry a note explaining the
+ * swallow they used to have, and matching those would punish a file for
+ * documenting its own fix. Block comments go first (that is where the
+ * explanations live), then whole-line `//` comments; a `//` in the middle of a
+ * line is left alone so URLs inside strings survive.
+ */
+function codeOf(file: string): string {
+  return sourceOf(file)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter(line => !/^\s*\/\//.test(line))
+    .join("\n");
+}
+
 /** Reads that put data on screen. A file doing any of these owns this rule. */
 const READS_THE_API = /\b(adminFetch|adminGet|adminJson|readAdminResource|portalFetch)\s*\(/;
 
@@ -129,7 +147,7 @@ const OWN_HONEST_STATE_ALLOWLIST: ReadonlyArray<{ file: string; reason: string }
   },
   {
     file: "artifacts/web-agency/src/pages/crm/CrmSupport.tsx",
-    reason: "A failed first load is a full-page stated failure with Retry; a failed reload keeps the rows it last had rather than emptying the queue.",
+    reason: "A failed first load is a full-page stated failure with Retry, and a failed reload keeps the rows it last had rather than emptying the queue. Its knowledge-base read used to be swallowed and is now stated too.",
   },
   {
     file: "artifacts/web-agency/src/pages/crm/CrmReporting.tsx",
@@ -156,10 +174,6 @@ const OWN_HONEST_STATE_ALLOWLIST: ReadonlyArray<{ file: string; reason: string }
     reason: "Renders no figure at all when its status probe fails — the chip simply does not appear, so nothing is claimed either way.",
   },
   {
-    file: "artifacts/web-agency/src/pages/crm/CrmDuplicates.tsx",
-    reason: "Its scan stays null on failure, so both the duplicate counts and the 'nothing to merge' state are hidden behind the stated error and its Rescan.",
-  },
-  {
     file: "artifacts/web-agency/src/components/crm/SegmentBuilder.tsx",
     reason: "The live audience count is set to null, never 0, and the panel says 'Count unavailable' with the reason and a Recount.",
   },
@@ -177,6 +191,20 @@ const OWN_HONEST_STATE_ALLOWLIST: ReadonlyArray<{ file: string; reason: string }
   },
 ];
 
+/**
+ * Swallowed failures that are genuinely not loads.
+ *
+ * The bar is high: the call must put nothing on screen and make no claim, so
+ * that discarding its failure cannot mislead anybody. A read belongs here
+ * never — keep it as a `Load` and state it.
+ */
+const SWALLOW_ALLOWLIST: ReadonlyArray<{ file: string; reason: string }> = [
+  {
+    file: "artifacts/web-agency/src/components/crm/ConversationInbox.tsx",
+    reason: "A draft autosave WRITE, not a load. `setDraftSavedAt` is set only on success, so a save that failed never renders as 'saved' — the page claims nothing either way.",
+  },
+];
+
 const allowlisted = new Map<string, string>([
   ...NO_LIST_ALLOWLIST.map(e => [e.file, e.reason] as const),
   ...OWN_HONEST_STATE_ALLOWLIST.map(e => [e.file, e.reason] as const),
@@ -190,9 +218,9 @@ describe("a failed load is never rendered as data", () => {
   it("gives every API-reading surface an honest three-state loader", () => {
     const offenders = renderedFiles
       .filter(file => {
-        const source = sourceOf(file);
-        return READS_THE_API.test(source)
-          && !carriesHonestLoader(source)
+        const code = codeOf(file);
+        return READS_THE_API.test(code)
+          && !carriesHonestLoader(code)
           && !allowlisted.has(rel(file));
       })
       .map(rel);
@@ -227,7 +255,8 @@ describe("a failed load is never rendered as data", () => {
     const notALoad = /clipboard|\.play\(/;
 
     const offenders = allFiles
-      .filter(file => sourceOf(file)
+      .filter(file => !SWALLOW_ALLOWLIST.some(e => e.file === rel(file)))
+      .filter(file => codeOf(file)
         .split("\n")
         .some(line => swallowed.test(line) && !notALoad.test(line)))
       .map(rel);
@@ -254,7 +283,7 @@ describe("a failed load is never rendered as data", () => {
       ).toBeTruthy();
 
       expect(
-        READS_THE_API.test(sourceOf(match!)),
+        READS_THE_API.test(codeOf(match!)),
         `${entry.file} no longer reads from the API, so its allowlist entry is dead — remove it.`,
       ).toBe(true);
 
@@ -269,7 +298,7 @@ describe("a failed load is never rendered as data", () => {
     const redundant = OWN_HONEST_STATE_ALLOWLIST
       .filter(entry => {
         const match = renderedFiles.find(f => rel(f) === entry.file);
-        return match && carriesHonestLoader(sourceOf(match));
+        return match && carriesHonestLoader(codeOf(match));
       })
       .map(e => e.file);
 

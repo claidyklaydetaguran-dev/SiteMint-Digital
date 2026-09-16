@@ -32,6 +32,8 @@ import {
   getCampaignStrategyHints,
 } from "@/lib/campaignTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
 import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -393,6 +395,16 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [templates, setTemplates]   = useState<EmailTemplate[]>([]);
   const [campaigns, setCampaigns]   = useState<Campaign[]>([]);
   const [loading, setLoading]       = useState(true);
+  /*
+    Whether the sequence list actually arrived.
+
+    The three boot requests used to end in `.catch(() => {})`, so any failure
+    left `campaigns` empty and the page reported "Sequences (0)" over "No
+    sequences yet" — and offered to create the first one — with no failure
+    anywhere on screen. That is the exact defect this sweep exists to remove.
+  */
+  const [listLoad, setListLoad]     = useState<Load<null>>({ status: "loading" });
+  const [reloading, setReloading]   = useState(false);
 
   // ── View ──
   const [view, setView] = useState<"history" | "builder" | "execution" | "analytics" | "sequence" | "queue">(urlView ?? initialView);
@@ -477,25 +489,51 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [resendingId, setResendingId]             = useState<number | null>(null);
 
   // ── Load initial data ──
-  useEffect(() => {
-    Promise.all([
-      adminFetch("/api/crm/leads").then(r => r.json()),
-      adminFetch("/api/crm/email-templates").then(r => r.json()),
-      adminFetch("/api/crm/campaigns").then(r => r.json()),
-    ])
-      .then(([ld, td, cd]) => {
-        setAllLeads((ld.leads ?? []).slice().sort((a: Lead, b: Lead) => a.name.localeCompare(b.name)));
-        setTemplates(td.templates ?? []);
-        setCampaigns(cd.campaigns ?? []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const loadAll = useCallback(async () => {
+    setReloading(true);
+    const [ld, td, cd] = await Promise.all([
+      readAdminResource("/api/crm/leads", (b) => {
+        const l = b && typeof b === "object" ? (b as { leads?: unknown }).leads : undefined;
+        return Array.isArray(l) ? l as Lead[] : undefined;
+      }),
+      readAdminResource("/api/crm/email-templates", (b) => {
+        const t = b && typeof b === "object" ? (b as { templates?: unknown }).templates : undefined;
+        return Array.isArray(t) ? t as EmailTemplate[] : undefined;
+      }),
+      readAdminResource("/api/crm/campaigns", (b) => {
+        const c = b && typeof b === "object" ? (b as { campaigns?: unknown }).campaigns : undefined;
+        return Array.isArray(c) ? c as Campaign[] : undefined;
+      }),
+    ]);
+    if (ld.status === "ready") setAllLeads(ld.data.slice().sort((a, b) => a.name.localeCompare(b.name)));
+    if (td.status === "ready") setTemplates(td.data);
+    // The sequence list is what this screen is about, so its answer is the one
+    // the page reports. A failure here must never read as "you have none".
+    if (cd.status === "ready") {
+      setCampaigns(cd.data);
+      setListLoad({ status: "ready", data: null });
+    } else {
+      setListLoad(cd);
+    }
+    setLoading(false);
+    setReloading(false);
   }, []);
 
+  useEffect(() => { void loadAll(); }, [loadAll]);
+
   const refreshCampaigns = useCallback(async () => {
-    const r = await adminFetch("/api/crm/campaigns");
-    const d = await r.json();
-    setCampaigns(d.campaigns ?? []);
+    const next = await readAdminResource("/api/crm/campaigns", (b) => {
+      const c = b && typeof b === "object" ? (b as { campaigns?: unknown }).campaigns : undefined;
+      return Array.isArray(c) ? c as Campaign[] : undefined;
+    });
+    // A refresh that failed keeps the rows it last had rather than emptying
+    // the list behind the operator's back, and states that it failed.
+    if (next.status === "ready") {
+      setCampaigns(next.data);
+      setListLoad({ status: "ready", data: null });
+    } else {
+      setListLoad(next);
+    }
   }, []);
 
   // ── Auto-load analytics for all campaigns when Email Activity tab opens ──
@@ -1934,7 +1972,13 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab === "campaigns" ? `Sequences (${campaigns.length})` : "Email Activity"}
+                {/* The count exists only when the list behind it arrived. */}
+                {tab === "campaigns"
+                  ? <>Sequences (<Figure
+                      value={listLoad.status === "ready" ? campaigns.length : null}
+                      loading={listLoad.status === "loading"}
+                    />)</>
+                  : "Email Activity"}
               </button>
             ))}
           </div>
@@ -1986,7 +2030,24 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
 
               {/* Campaign cards */}
               <div className="p-6 space-y-3">
-                {filteredCampaigns.length === 0 ? (
+                {listLoad.status === "error" ? (
+                  /*
+                    Deliberately not the "No sequences yet" panel below: the
+                    person has to be able to tell an empty account from an
+                    unanswered request, and must not be invited to create a
+                    "first" sequence over sequences that may already exist.
+                  */
+                  <LoadFailure
+                    what="Sequences"
+                    reason={listLoad.reason}
+                    onRetry={() => { void loadAll(); }}
+                    retrying={reloading}
+                  >
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      No sequence count is shown while this is unavailable — there may well be sequences here.
+                    </p>
+                  </LoadFailure>
+                ) : filteredCampaigns.length === 0 ? (
                   <div className="bg-white border border-border rounded-xl shadow-sm py-16 text-center">
                     <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
                     <p className="text-sm font-medium text-foreground mb-1">

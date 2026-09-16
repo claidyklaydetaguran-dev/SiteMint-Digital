@@ -1775,12 +1775,31 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
 
         {/* ── AI Copilot Tab ──────────────────────────────────────────────────── */}
         {activeTab === "copilot" && (
-          <CrmCopilot
-            campaignId={campaignId}
-            campaignName={campaignName}
-            existingSteps={steps}
-            onBuildSequence={handleCopilotBuildSequence}
-          />
+          steps === null ? (
+            /*
+              Not `steps ?? []`: the copilot reads the existing steps to decide
+              what to add, so handing it an empty array for a read that failed
+              would have it plan a sequence from scratch over one that already
+              has steps in it.
+            */
+            <LoadFailure
+              what="This sequence's steps"
+              reason={detailLoad.status === "error" ? detailLoad.reason : ""}
+              onRetry={() => { void load(); }}
+              retrying={reloading}
+            >
+              <p className="mt-2 text-sm text-muted-foreground">
+                The copilot is not offered while the current steps are unknown — it would plan as though the sequence were empty.
+              </p>
+            </LoadFailure>
+          ) : (
+            <CrmCopilot
+              campaignId={campaignId}
+              campaignName={campaignName}
+              existingSteps={steps}
+              onBuildSequence={handleCopilotBuildSequence}
+            />
+          )
         )}
 
         {/* ── Enrolled Recipients Tab ─────────────────────────────────────────── */}
