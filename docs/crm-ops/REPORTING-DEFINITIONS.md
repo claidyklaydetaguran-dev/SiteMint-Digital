@@ -148,10 +148,10 @@ out in `crmReports.ts`.
 
 | Key | Unit | Definition | Source and filter | Denominator | Limitations |
 |---|---|---|---|---|---|
-| `campaignEmailsSent` | count | Campaign recipients the provider accepted, sent in the window. | `crm_campaign_recipients WHERE status = 'sent' AND sent_at` in window | none | "Sent" means the provider accepted it. It is not delivery, and certainly not readership. |
-| `campaignSendFailures` | count | Campaign recipients at status `failed`, created in the window. | `crm_campaign_recipients WHERE status = 'failed' AND created_at` in window | none | Includes bounces the webhook marked failed. |
-| `campaignEmailsOpened` | count | Provider `opened` webhook events in the window. | `crm_campaign_events WHERE event_type = 'opened' AND occurred_at` in window | Campaign emails sent in the window | **Conditionally unavailable** — see section 5. An open is a tracking pixel loading; it is an imperfect signal and not proof anybody read anything. |
-| `campaignEmailsClicked` | count | Provider `clicked` webhook events in the window. | `crm_campaign_events WHERE event_type = 'clicked' AND occurred_at` in window | Campaign emails sent in the window | **Conditionally unavailable** — see section 5. |
+| `campaignEmailsSent` | count | Campaign emails the provider accepted, sent in the window — across the marketing campaigns and both legacy ledgers. | `crm_marketing_recipients`, `crm_campaign_recipients` and `crm_campaign_scheduled_messages`, each `WHERE status = 'sent' AND sent_at` in window | none | Spans all three ledgers deliberately: it is the denominator of the open and click rates, so it must be drawn from the same population as its numerator. "Sent" means the provider accepted it. It is not delivery, and certainly not readership. |
+| `campaignSendFailures` | count | Campaign recipients at status `failed`, created in the window. | `crm_campaign_recipients WHERE status = 'failed' AND created_at` in window | none | The LEGACY ledger only. A marketing campaign's failures are split by what is actually known about each — refused, never handed over, or unconfirmed — on that campaign's own results screen; folding those three into one number here would lose the distinction that decides whether a message may safely be sent again. |
+| `campaignEmailsOpened` | count | Campaign emails whose **first** recorded open falls in the window, counted once per message. | `crm_email_provider_events WHERE event_type = 'email.opened'`, matched to a campaign email by the provider's message id or by the `crm_ref` tag the send carried | Campaign emails sent in the window | **Conditionally unavailable** — see section 5. Once per message, not once per event: one recipient opening four times is one person who opened it, and counting four produces rates above 100%. An open is a tracking image loading — privacy proxies and security scanners load it — so it is never proof anybody read anything. |
+| `campaignEmailsClicked` | count | Campaign emails whose **first** recorded click falls in the window, counted once per message. | `crm_email_provider_events WHERE event_type = 'email.clicked'`, matched the same way | Campaign emails sent in the window | **Conditionally unavailable** — see section 5. Security scanners follow links to check them, so a click is not always a person. |
 | `campaignOpenRate` | percent | Opens as a share of sends. | numerator `campaignEmailsOpened`; denominator `campaignEmailsSent` | Campaign emails sent in the window | Unavailable whenever its numerator is. |
 | `campaignClickRate` | percent | Clicks as a share of sends. | numerator `campaignEmailsClicked`; denominator `campaignEmailsSent` | Campaign emails sent in the window | Unavailable whenever its numerator is. |
 | `campaignAttributedRevenue` | currency | Money that arrived because of a campaign. | none | none | **Permanently unavailable** — see section 5. |
@@ -181,14 +181,29 @@ reason and, where applicable, what would have to exist to fix it.
 **`campaignEmailsOpened`, `campaignEmailsClicked`, `campaignOpenRate`,
 `campaignClickRate`**
 
-Unavailable whenever `RESEND_WEBHOOK_SECRET` is unset. That secret gates
-`POST /api/crm/webhooks/resend`, which is the only writer of `opened`,
-`clicked` and `bounced` rows in `crm_campaign_events`. With it unset, no such
-event can ever be written, so `0%` would be the system saying "we measured, and
-nobody opened anything" when nothing is measuring.
+Availability is decided by EVIDENCE, not by configuration. The question is not
+whether a secret is set but whether an open (or a click) has ever actually been
+recorded for the current sending domain, and whether that had begun before the
+window being asked about ended. Three separate answers, all of them honest:
 
-Set the secret and configure the Resend webhook, and all four become real
-figures with no code change.
+| State | What the figure says |
+|---|---|
+| No event of that kind has ever been recorded for this sending domain | *Not measured — open/click tracking isn't enabled for this sending domain.* When `RESEND_WEBHOOK_SECRET` is also unset, the reason names it, because then no event can be received at all. |
+| Events exist, but the first one came **after** this window ended | *Not measured in this period* — nothing was measuring while these messages were sent. |
+| Events exist from before the window ended | A real figure, carrying the privacy-proxy caveat, plus a note naming the date measurement began when the window starts before it. |
+
+Open tracking and click tracking are **separate settings** on the domain in
+Resend (and both need a verified tracking subdomain), so each metric is asked
+about separately: opens can be measured while clicks are not.
+
+`0%` is never used for any of this. A zero is a measurement — it says "we
+looked, and the answer was none" — and the whole point of the distinction is
+that nobody looked.
+
+Turn tracking on for the sending domain, point the delivery webhook at
+`POST /api/crm/webhooks/resend` (`docs/crm-ops/EMAIL-EVENTS-ACTIVATION.md`), and
+all four become real figures with no code change — from the first event
+onwards, which is the date the figures then cite.
 
 > Bounce-derived numbers have the same dependency. `campaignSendFailures` is
 > reported unconditionally because the send path also writes `failed` rows

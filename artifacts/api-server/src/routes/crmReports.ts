@@ -30,6 +30,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { sql, type SQL } from "drizzle-orm";
 import { db, TRANSACTION_RECEIVED_STATUS } from "@workspace/db";
 import { requireCrmAuth } from "../lib/staffAuth.js";
+import { engagementEvidence } from "../lib/emailProviderEvents.js";
+import { engagementAvailability } from "../lib/emailDeliveryState.js";
 
 const router: IRouter = Router();
 
@@ -162,8 +164,17 @@ interface CountedFigure {
   limitations?: string[];
   /** Returns rows with columns: id, occurred_at, label, amount, href. */
   query: (ctx: ReportContext) => SQL;
-  /** A non-null string means "this is not tracked here, and here is why". */
-  availability?: () => string | null;
+  /**
+   * Set when the figure counts PROVIDER engagement events.
+   *
+   * Availability is then decided by evidence rather than by configuration:
+   * whether an open (or a click) has ever been recorded for this sending
+   * domain, and whether that had begun before the window being asked about
+   * ended. A window that closed before the first event ever arrived cannot be
+   * reported as "0 opens" — nothing was measuring then, and 0 is a claim to
+   * have looked.
+   */
+  engagement?: "opens" | "clicks";
 }
 
 interface RatioFigure {
@@ -203,15 +214,73 @@ function inWindow(column: SQL, ctx: ReportContext): SQL {
   return sql`${column} >= ${ctx.startAt} AND ${column} < ${ctx.endAt}`;
 }
 
-/** Email open/click/bounce tracking exists only when its webhook is configured. */
-function emailEngagementUnavailable(): string | null {
-  const configured = typeof process.env["RESEND_WEBHOOK_SECRET"] === "string"
-    && process.env["RESEND_WEBHOOK_SECRET"]!.length > 0;
-  if (configured) return null;
-  return "RESEND_WEBHOOK_SECRET is not set, so the provider webhook that would "
-    + "record opens, clicks and bounces is disabled and no such event can ever "
-    + "be written. Reporting 0% here would say 'we measured, and nobody opened "
-    + "anything'. Nothing is measuring.";
+/**
+ * Every campaign email this CRM has sent, in one shape.
+ *
+ * Three ledgers wrote them — the marketing recipients, the legacy broadcast
+ * recipients and the legacy sequence queue — and a provider event knows
+ * nothing about which. An event carries the provider's message id and the
+ * `crm_ref` tag the send put on it, so both are offered here and either can
+ * match.
+ *
+ * The ids are namespaced (×10 plus a ledger digit) because three tables'
+ * primary keys collide otherwise, and a detail list whose rows share an id
+ * loses rows in any client that keys on it. The row's own link is `href`; the
+ * id identifies the row in the list, not a record.
+ */
+const CAMPAIGN_EMAILS = sql`
+      SELECT (r.id * 10 + 1)::int AS id, r.provider_message_id AS provider_email_id,
+             ('marketing_recipient-' || r.id)::text AS crm_ref, c.name::text AS label,
+             ('/admin/crm/marketing?campaign=' || r.campaign_id)::text AS href,
+             r.sent_at AS sent_at
+        FROM crm_marketing_recipients r
+        JOIN crm_marketing_campaigns c ON c.id = r.campaign_id
+       WHERE r.status = 'sent'
+      UNION ALL
+      SELECT (r.id * 10 + 2)::int, r.resend_email_id,
+             ('campaign_recipient-' || r.id)::text, c.name::text,
+             ('/admin/crm/campaigns?id=' || r.campaign_id)::text, r.sent_at
+        FROM crm_campaign_recipients r
+        JOIN crm_campaigns c ON c.id = r.campaign_id
+       WHERE r.status = 'sent'
+      UNION ALL
+      SELECT (m.id * 10 + 3)::int, m.resend_email_id,
+             ('sequence_message-' || m.id)::text, c.name::text,
+             ('/admin/crm/campaigns?id=' || m.campaign_id)::text, m.sent_at
+        FROM crm_campaign_scheduled_messages m
+        JOIN crm_campaigns c ON c.id = m.campaign_id
+       WHERE m.status = 'sent'`;
+
+/**
+ * Campaign emails whose FIRST recorded open (or click) falls in the window.
+ *
+ * Counted once per message rather than once per event, for a reason visible in
+ * the ratio beneath it: one recipient opening a message four times is one
+ * person who opened it, and counting four produces rates above 100% that
+ * nobody can act on. The full event counts are kept and are what a campaign's
+ * own results screen reports.
+ */
+function firstEngagement(eventType: string, ctx: ReportContext): SQL {
+  return sql`
+    WITH campaign_emails AS (${CAMPAIGN_EMAILS}),
+    first_event AS (
+      SELECT DISTINCT ON (e.provider_email_id)
+             e.id AS id, e.provider_email_id AS provider_email_id,
+             e.crm_ref AS crm_ref, e.occurred_at AS occurred_at
+        FROM crm_email_provider_events e
+       WHERE e.event_type = ${eventType} AND e.provider_email_id IS NOT NULL
+       ORDER BY e.provider_email_id, e.occurred_at ASC
+    )
+    SELECT id, occurred_at, label, amount, href FROM (
+      SELECT DISTINCT ON (f.id) f.id AS id, f.occurred_at AS occurred_at,
+             ce.label AS label, NULL::numeric AS amount, ce.href AS href
+        FROM first_event f
+        JOIN campaign_emails ce
+          ON ce.provider_email_id = f.provider_email_id OR ce.crm_ref = f.crm_ref
+       WHERE ${inWindow(sql`f.occurred_at`, ctx)}
+       ORDER BY f.id
+    ) matched
+    ORDER BY occurred_at DESC LIMIT ${DETAIL_CAP + 1}`;
 }
 
 // ── The registry ────────────────────────────────────────────────────────────
@@ -620,18 +689,21 @@ const FIGURES: readonly FigureSpec[] = [
   {
     kind: "counted", key: "campaignEmailsSent", area: "campaigns",
     label: "Campaign emails sent", unit: "count", aggregate: "count",
-    definition: "Campaign recipients whose sent_at falls inside the window and whose status is 'sent' — that is, a send the provider accepted.",
+    definition: "Campaign emails the provider accepted, whose send falls inside the window — across the marketing campaigns and both legacy campaign ledgers, so this is the same population the open and click figures are drawn from.",
     denominatorLabel: null,
-    sources: ["crm_campaign_recipients WHERE status = 'sent' AND sent_at within the window"],
+    sources: [
+      "crm_marketing_recipients WHERE status = 'sent' AND sent_at within the window",
+      "crm_campaign_recipients WHERE status = 'sent' AND sent_at within the window",
+      "crm_campaign_scheduled_messages WHERE status = 'sent' AND sent_at within the window",
+    ],
     honours: ["dateRange"],
     limitations: ["'Sent' means the provider accepted it. It is not delivery, and it is certainly not readership."],
     query: (ctx) => sql`
-      SELECT r.id AS id, r.sent_at AS occurred_at, c.name::text AS label,
-             NULL::numeric AS amount, ('/admin/crm/campaigns?id=' || r.campaign_id)::text AS href
-      FROM crm_campaign_recipients r
-      JOIN crm_campaigns c ON c.id = r.campaign_id
-      WHERE r.status = 'sent' AND r.sent_at IS NOT NULL AND ${inWindow(sql`r.sent_at`, ctx)}
-      ORDER BY r.sent_at DESC LIMIT ${DETAIL_CAP + 1}`,
+      WITH campaign_emails AS (${CAMPAIGN_EMAILS})
+      SELECT id, sent_at AS occurred_at, label, NULL::numeric AS amount, href
+        FROM campaign_emails
+       WHERE sent_at IS NOT NULL AND ${inWindow(sql`sent_at`, ctx)}
+       ORDER BY sent_at DESC LIMIT ${DETAIL_CAP + 1}`,
   },
   {
     kind: "counted", key: "campaignSendFailures", area: "campaigns",
@@ -640,6 +712,9 @@ const FIGURES: readonly FigureSpec[] = [
     denominatorLabel: null,
     sources: ["crm_campaign_recipients WHERE status = 'failed' AND created_at within the window"],
     honours: ["dateRange"],
+    limitations: [
+      "Counts the LEGACY campaign ledger only. A marketing campaign's failures are split by what is actually known about each — refused, never handed over, or unconfirmed — on that campaign's own results screen, and folding those three into one number here would lose the distinction that decides whether a message may safely be sent again.",
+    ],
     query: (ctx) => sql`
       SELECT r.id AS id, r.created_at AS occurred_at,
              (c.name || coalesce(' — ' || r.last_error, ''))::text AS label,
@@ -652,36 +727,28 @@ const FIGURES: readonly FigureSpec[] = [
   {
     kind: "counted", key: "campaignEmailsOpened", area: "campaigns",
     label: "Campaign emails opened", unit: "count", aggregate: "count",
-    definition: "Provider 'opened' webhook events in the window. An open is a tracking pixel loading; it is an imperfect signal and not proof anybody read anything.",
+    definition: "Campaign emails whose first recorded open falls inside the window, counted once per message. The events come from the provider's own webhook; an open is a tracking image loading, which is an imperfect signal and not proof anybody read anything.",
     denominatorLabel: "Campaign emails sent in the window",
-    sources: ["crm_campaign_events WHERE event_type = 'opened' AND occurred_at within the window"],
+    sources: [
+      "crm_email_provider_events WHERE event_type = 'email.opened'",
+      "matched to a campaign email by the provider's message id or by the crm_ref tag the send carried",
+    ],
     honours: ["dateRange"],
-    availability: emailEngagementUnavailable,
-    query: (ctx) => sql`
-      SELECT e.id AS id, e.occurred_at AS occurred_at, c.name::text AS label,
-             NULL::numeric AS amount, ('/admin/crm/campaigns?id=' || r.campaign_id)::text AS href
-      FROM crm_campaign_events e
-      JOIN crm_campaign_recipients r ON r.id = e.campaign_recipient_id
-      JOIN crm_campaigns c ON c.id = r.campaign_id
-      WHERE e.event_type = 'opened' AND ${inWindow(sql`e.occurred_at`, ctx)}
-      ORDER BY e.occurred_at DESC LIMIT ${DETAIL_CAP + 1}`,
+    engagement: "opens",
+    query: (ctx) => firstEngagement("email.opened", ctx),
   },
   {
     kind: "counted", key: "campaignEmailsClicked", area: "campaigns",
     label: "Campaign emails clicked", unit: "count", aggregate: "count",
-    definition: "Provider 'clicked' webhook events in the window.",
+    definition: "Campaign emails whose first recorded click falls inside the window, counted once per message. The events come from the provider's own webhook.",
     denominatorLabel: "Campaign emails sent in the window",
-    sources: ["crm_campaign_events WHERE event_type = 'clicked' AND occurred_at within the window"],
+    sources: [
+      "crm_email_provider_events WHERE event_type = 'email.clicked'",
+      "matched to a campaign email by the provider's message id or by the crm_ref tag the send carried",
+    ],
     honours: ["dateRange"],
-    availability: emailEngagementUnavailable,
-    query: (ctx) => sql`
-      SELECT e.id AS id, e.occurred_at AS occurred_at, c.name::text AS label,
-             NULL::numeric AS amount, ('/admin/crm/campaigns?id=' || r.campaign_id)::text AS href
-      FROM crm_campaign_events e
-      JOIN crm_campaign_recipients r ON r.id = e.campaign_recipient_id
-      JOIN crm_campaigns c ON c.id = r.campaign_id
-      WHERE e.event_type = 'clicked' AND ${inWindow(sql`e.occurred_at`, ctx)}
-      ORDER BY e.occurred_at DESC LIMIT ${DETAIL_CAP + 1}`,
+    engagement: "clicks",
+    query: (ctx) => firstEngagement("email.clicked", ctx),
   },
   {
     kind: "ratio", key: "campaignOpenRate", area: "campaigns",
@@ -937,11 +1004,32 @@ router.get("/crm/reports/summary", requireCrmAuth("reports.read"), async (req: R
   // be computed from different data.
   const counted = FIGURES.filter((f): f is CountedFigure => f.kind === "counted");
   const unavailableReasons = new Map<string, string>();
+  const engagementNotes = new Map<string, string[]>();
   const evaluated = new Map<string, Evaluated>();
 
+  // One evidence read for the whole response. Whether engagement may be
+  // reported is a question about what the provider has actually recorded for
+  // this sending domain — not about what is configured here.
+  const evidence = await engagementEvidence();
+
   await Promise.all(counted.map(async (spec) => {
-    const reason = spec.availability?.() ?? null;
-    if (reason) { unavailableReasons.set(spec.key, reason); return; }
+    if (spec.engagement) {
+      const availability = engagementAvailability(evidence, spec.engagement, ctx.endAt);
+      if (!availability.measured) {
+        unavailableReasons.set(spec.key, availability.reason ?? "Not measured.");
+        return;
+      }
+      const word = spec.engagement === "opens" ? "open" : "click";
+      engagementNotes.set(spec.key, [
+        availability.caveat,
+        // A window that starts before measurement began is measured for part
+        // of itself only, and saying so is the difference between a figure and
+        // a claim.
+        ...(availability.since && availability.since.getTime() > ctx.startAt.getTime()
+          ? [`Measured only from ${availability.since.toISOString().slice(0, 10)}, when the first ${word} was recorded for this sending domain. Anything sent earlier in this window could not record one.`]
+          : []),
+      ]);
+    }
     evaluated.set(spec.key, await evaluate(spec, ctx));
   }));
 
@@ -966,6 +1054,7 @@ router.get("/crm/reports/summary", requireCrmAuth("reports.read"), async (req: R
         detail: reason ? null : detailHref(spec.key, req),
         limitations: [
           ...(spec.limitations ?? []),
+          ...(engagementNotes.get(spec.key) ?? []),
           ...(ev?.truncated
             ? [`More than ${DETAIL_CAP} rows match, so the detail list cannot hand back everything this figure counted. Narrow the window.`]
             : []),
@@ -1107,14 +1196,22 @@ router.get("/crm/reports/detail/:key", requireCrmAuth("reports.read"), async (re
     return;
   }
 
-  const reason = spec.availability?.() ?? null;
-  if (reason) {
-    res.status(409).json({ error: "This figure is not tracked in this environment.", key: spec.key, reason });
-    return;
-  }
-
   const resolved = await resolveWindow(req);
   if ("error" in resolved) { res.status(400).json({ error: resolved.error }); return; }
+
+  // Availability depends on the window: a period that closed before anything
+  // was being measured has no rows to hand back, and saying that is the point
+  // of asking. So it is decided here, after the window is known.
+  if (spec.engagement) {
+    const availability = engagementAvailability(await engagementEvidence(), spec.engagement, resolved.endAt);
+    if (!availability.measured) {
+      res.status(409).json({
+        error: "This figure is not tracked in this environment.",
+        key: spec.key, reason: availability.reason,
+      });
+      return;
+    }
+  }
 
   const ev = await evaluate(spec, resolved);
 
@@ -1141,13 +1238,19 @@ router.get("/crm/reports/detail/:key", requireCrmAuth("reports.read"), async (re
 
 /** The registry itself, so the figure catalogue can be read without guessing. */
 router.get("/crm/reports/figures", requireCrmAuth("reports.read"), async (_req: Request, res: Response) => {
+  const evidence = await engagementEvidence();
   res.json({
     figures: FIGURES.map((f) => ({
       key: f.key, area: f.area, label: f.label, unit: f.unit,
       kind: f.kind,
       definition: f.definition,
       sources: f.sources,
-      tracked: f.kind !== "gap" && !(f.kind === "counted" && f.availability?.()),
+      // The catalogue asks "is anything measuring this at all?", so there is no
+      // window here — only whether the provider has ever recorded one of these
+      // for this sending domain.
+      tracked: f.kind !== "gap"
+        && !(f.kind === "counted" && f.engagement
+          && !engagementAvailability(evidence, f.engagement).measured),
     })),
   });
 });

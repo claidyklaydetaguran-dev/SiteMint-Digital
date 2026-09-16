@@ -365,9 +365,32 @@ check constraint scoped to `origin <> 'live'`.
   `staffMail.ts`.
 * **A person's re-send can duplicate.** That is what it is for. It says so, and
   what it said is recorded against the delivery.
-* **Nothing here proves a message was *read*, or even that it left the
-  provider.** `accepted` means the provider took it. Bounces and complaints are
-  a separate signal this system does not consume.
+* **Nothing here proves a message was *read*.** `accepted` means the provider
+  took it, and that is all it has ever meant.
+
+  Bounces and complaints ARE now consumed, and so is the rest of what the
+  provider says: `crm_email_provider_events` records every verified webhook
+  event and the delivery state shown against a record is derived from those
+  events (`lib/emailDeliveryState.ts`). That changes what a screen can show. It
+  changes exactly one thing about this guarantee, and only in the direction of
+  more certainty:
+
+  > A provider `email.delivered` event for an `uncertain` delivery moves it to
+  > `accepted`. That is evidence of arrival rather than an inference from a
+  > failure class, and it is what takes the row off the operator's list without
+  > anybody having to chase it.
+
+  Nothing else changes. No event turns an uncertain outcome into a failure, no
+  event schedules an automatic retry, and a `refused` stays refused — evidence
+  that some other message arrived does not overturn a refusal of this one. An
+  `email.sent` event is recorded and displayed but deliberately rewrites
+  nothing: it says the provider accepted the message, which is what `accepted`
+  already claims, and the state it would overwrite is one a person is looking
+  at.
+
+  Matching an event to a delivery uses the provider id where one was learned
+  and the `crm_ref` tag otherwise (`lib/emailRefs.ts`) — the tag being the only
+  path to an uncertain record, which by definition never learned an id.
 * **`CRM_EMAIL_TEST_MODE` and an unset `RESEND_API_KEY` mean nothing is ever
   sent and nothing is recorded** (§3).
 * **`crm_reminder_deliveries` grows without bound.** That is deliberate — a cap

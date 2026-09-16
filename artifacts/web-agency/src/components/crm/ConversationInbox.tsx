@@ -56,6 +56,24 @@ export interface Conversation {
   previewDirection?: string | null;
 }
 
+/**
+ * What is known about an outbound email's delivery.
+ *
+ * The server decides the words. This screen never invents a label and never
+ * upgrades one: "the provider accepted it" and "the provider delivered it" are
+ * different facts, and only the second is worth telling somebody.
+ */
+interface DeliveryChip {
+  state: string;
+  label: string;
+  tone: "waiting" | "working" | "accepted" | "attention";
+  explanation: string;
+  at?: string | null;
+  source?: "provider" | "local";
+  opens?: number | null;
+  clicks?: number | null;
+}
+
 interface Message {
   id: number;
   createdAt: string;
@@ -69,6 +87,8 @@ interface Message {
   sentByStaffId?: number | null;
   sentByName?: string | null;
   origin?: string | null;
+  /** Null on anything that is not an outbound email — no delivery exists. */
+  delivery?: DeliveryChip | null;
 }
 
 interface StaffOption { id: number; displayName: string; status: string }
@@ -87,6 +107,21 @@ const STATUS_STYLE: Record<string, string> = {
   assigned: "bg-teal-50 text-teal-800 border-teal-200",
   awaiting_customer: "bg-sky-50 text-sky-800 border-sky-200",
   resolved: "bg-green-50 text-green-800 border-green-200",
+};
+
+/**
+ * Delivery chips sit on our own teal bubble, so they are light-on-dark rather
+ * than the page's usual badges.
+ *
+ * `accepted` is deliberately not a success green: the provider taking a
+ * message is not the recipient receiving it, and a tick invites exactly the
+ * reading the server refuses to make. Only a problem gets a colour of its own.
+ */
+const DELIVERY_CHIP: Record<string, string> = {
+  waiting: "bg-white/15 text-white border-white/25",
+  working: "bg-white/15 text-white border-white/25",
+  accepted: "bg-white/20 text-white border-white/30",
+  attention: "bg-red-50 text-red-700 border-red-200",
 };
 
 function timeAgo(iso?: string | null): string {
@@ -583,6 +618,23 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
                           {mine && !m.sentByName && m.origin === "legacy" && <span>· sender not recorded</span>}
                           {statusInfo && <span>· {statusInfo.label}</span>}
                         </div>
+                        {/* What the mail provider said about this one. Absent
+                            on anything that is not an outbound email, because
+                            no delivery exists for it. */}
+                        {mine && m.delivery && (
+                          <div
+                            title={m.delivery.explanation}
+                            className={`mt-1 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${
+                              DELIVERY_CHIP[m.delivery.tone] ?? DELIVERY_CHIP.waiting
+                            }`}
+                          >
+                            {m.delivery.label}
+                            {m.delivery.at && <span className="opacity-80">· {timeAgo(m.delivery.at)}</span>}
+                            {typeof m.delivery.opens === "number" && m.delivery.opens > 0 && (
+                              <span className="opacity-80">· {m.delivery.opens} open{m.delivery.opens === 1 ? "" : "s"}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

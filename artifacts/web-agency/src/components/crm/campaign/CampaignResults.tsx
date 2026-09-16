@@ -4,7 +4,7 @@ import {
   btnGhost, btnQuiet, call, cardClass, failureText, formatWhen, postJson,
   type Campaign, type Results,
 } from "./shared";
-import { engagementView, failureGroups, resultTiles, retryableCount } from "./resultsView";
+import { deliveryReport, engagementView, failureGroups, resultTiles, retryableCount } from "./resultsView";
 
 // ── What actually happened ───────────────────────────────────────────────────
 //
@@ -126,6 +126,9 @@ export default function CampaignResults({ campaign, onClose }: Props) {
   const unknownCount = groups.filter((g) => g.arrived === "unknown").reduce((s, g) => s + g.people.length, 0);
   const canRetry = retryable > 0 && (status === "sent" || status === "sending");
   const engagement = results ? engagementView(results.engagement) : null;
+  // Only the delivery states that actually occurred; a row of zeroes would
+  // read as a measurement of nothing.
+  const report = results ? deliveryReport(results) : [];
 
   return (
     <div className="space-y-4">
@@ -314,6 +317,31 @@ export default function CampaignResults({ campaign, onClose }: Props) {
             </div>
           )}
 
+          {/* ══ What the provider reported about the messages it accepted ══ */}
+          {report.length > 0 && (
+            <div className={`${cardClass} p-3.5`}>
+              <p className="text-sm font-semibold text-foreground">Delivery reports</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                From the mail provider itself, about the messages it accepted.
+              </p>
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                {report.map((row) => (
+                  <div key={row.key} className="min-w-0">
+                    <dt className={`text-xs ${row.attention ? "text-red-700" : "text-muted-foreground"} break-words`}>
+                      {row.label}
+                    </dt>
+                    <dd className={`text-sm font-semibold ${row.attention ? "text-red-800" : "text-foreground"}`}>
+                      {row.count}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+          {results.deliverySignal.providerNote && (
+            <p className="text-xs text-muted-foreground">{results.deliverySignal.providerNote}</p>
+          )}
+
           {/* ══ Opens and clicks — said as unmeasured, never as zero ══ */}
           <div className="rounded-xl border border-border bg-muted/40 p-3.5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -331,6 +359,21 @@ export default function CampaignResults({ campaign, onClose }: Props) {
             <p className="text-xs text-muted-foreground mt-1.5">{engagement.detail}</p>
             {results.engagement.why && results.engagement.why !== engagement.detail && (
               <p className="text-xs text-muted-foreground mt-1">{results.engagement.why}</p>
+            )}
+
+            {(results.engagement.clickedLinks?.length ?? 0) > 0 && (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-foreground">Links people clicked</p>
+                <ul className="mt-1 space-y-1">
+                  {results.engagement.clickedLinks!.map((link) => (
+                    <li key={link.url} className="text-xs text-muted-foreground min-w-0 break-words">
+                      <span className="font-semibold text-foreground">{link.recipients}</span>
+                      {link.recipients === 1 ? " person · " : " people · "}
+                      {link.clicks} {link.clicks === 1 ? "click" : "clicks"} — {link.url}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </>

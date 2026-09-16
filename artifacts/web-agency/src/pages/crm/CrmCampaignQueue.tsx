@@ -52,6 +52,10 @@ const STATUS_BADGE: Record<string, string> = {
   failed:    "bg-red-100 text-red-700 border-red-200",
   canceled:  "bg-muted text-muted-foreground border-border",
   skipped:   "bg-amber-100 text-amber-700 border-amber-200",
+  // Not an error and not a cancellation: a message too overdue to send by
+  // itself, waiting for somebody to decide. Ringed so it reads differently
+  // from the states a machine is still working through.
+  held:      "bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-300",
 };
 
 function fmtDateTime(iso: string) {
@@ -150,7 +154,8 @@ function MessageRow({
 }) {
   const [editing, setEditing]       = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
-  const canAct = ["scheduled", "queued"].includes(msg.status);
+  // A held message can be acted on — that is the whole point of holding it.
+  const canAct = ["scheduled", "queued", "held"].includes(msg.status);
 
   return (
     <div className={`border-b border-border/60 last:border-0 ${
@@ -246,8 +251,14 @@ function MessageRow({
 
       {msg.lastError && (
         <div className="px-4 pb-2">
-          <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded px-2 py-1">
-            Error: {msg.lastError}
+          {/* A hold is a decision waiting to be made, not a failure, and
+              calling it an error would send somebody looking for a fault. */}
+          <p className={`text-[10px] rounded px-2 py-1 border ${
+            msg.status === "held"
+              ? "text-amber-800 bg-amber-50 border-amber-200"
+              : "text-red-600 bg-red-50 border-red-100"
+          }`}>
+            {msg.status === "held" ? "Held: " : "Error: "}{msg.lastError}
           </p>
         </div>
       )}
@@ -409,7 +420,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
     return acc;
   }, {});
 
-  const STATUSES = ["scheduled", "queued", "sent", "failed", "canceled", "skipped"];
+  const STATUSES = ["scheduled", "queued", "held", "sent", "failed", "canceled", "skipped"];
 
   return (
     <CrmLayout>
@@ -521,7 +532,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
         )}
 
         {/* Status summary tiles */}
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
           {STATUSES.map(s => (
             <button
               key={s}

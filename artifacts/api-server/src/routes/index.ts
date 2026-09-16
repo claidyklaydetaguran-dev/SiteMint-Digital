@@ -18,6 +18,7 @@ import crmBillingRouter from "./crmBilling";
 import crmCalendarRouter from "./crmCalendar";
 import crmInboxRouter from "./crmInbox";
 import crmEmailInboundRouter from "./crmEmailInbound";
+import crmEmailEventsRouter from "./crmEmailEvents";
 import crmSalesRouter from "./crmSales";
 import crmSupportRouter from "./crmSupport";
 import crmPortalRouter from "./crmPortal";
@@ -80,6 +81,10 @@ router.use(crmBillingRouter);
 router.use(crmCalendarRouter);
 router.use(crmInboxRouter);
 router.use(crmEmailInboundRouter);
+// Before crmRouter: /crm/email/events/* and the delivery-event webhook are
+// literal paths and must reach their own handlers rather than one of the
+// legacy parameterised /crm/:something routes.
+router.use(crmEmailEventsRouter);
 router.use(crmSalesRouter);
 router.use(crmSupportRouter);
 // Before crmRouter: /crm/portal/* must match its own handlers rather than

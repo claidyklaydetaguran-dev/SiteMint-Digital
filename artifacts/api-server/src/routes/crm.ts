@@ -13,10 +13,15 @@ import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
 import { getResend } from "../lib/email.js";
+// Every CRM send goes through this seam. It is what keeps a test run out of a
+// real mailbox — while CRM_EMAIL_TEST_MODE is anything but the exact string
+// "false", nothing is handed to the provider at all — and it is what classifies
+// an outcome honestly, including the unknown one that must never be retried.
+import { staffMailBlockedReason, trySendStaffMail } from "../lib/staffMail.js";
+import { emailRef, emailRefTags } from "../lib/emailRefs.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
 import { getSchedulerStatus, processScheduledMessages } from "../lib/campaignScheduler.js";
-import { stampReplyAndStop } from "../lib/sequenceReply.js";
 import { getUncachableStripeClient } from "../lib/stripeClient.js";
 
 const router: IRouter = Router();
@@ -814,44 +819,86 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
     // trusting the sender header.
     const replyTo = conversation ? await replyToAddress(conversation.id) : null;
 
-    const isTestMode = testMode !== false && process.env.CRM_EMAIL_TEST_MODE !== "false";
-    let providerMessageId: string | null = null;
+    // Test mode is the SERVER's decision, not the caller's.
+    //
+    // The old rule was `testMode !== false && CRM_EMAIL_TEST_MODE !== "false"`,
+    // so a request that simply said `testMode: false` reached a real mailbox on
+    // a server whose test mode was still on. `trySendStaffMail` hands nothing
+    // to the provider while test mode is on, whatever the body asks for, and
+    // `testMode` in the request is now ignored rather than obeyed.
+    void testMode;
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
 
-    if (!isTestMode) {
-      const resend = getResend();
-      const sent = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [lead.email],
-        ...(ccList.length ? { cc: ccList } : {}),
-        ...(bccList.length ? { bcc: bccList } : {}),
-        ...(replyTo ? { replyTo } : {}),
-        subject,
-        html: body.replace(/\n/g, "<br>"),
-      });
-      providerMessageId = sent?.data?.id ?? null;
+    // The message row is written BEFORE the send and settled after it. Two
+    // reasons, and the second is the important one: a process that dies
+    // mid-send leaves a visible "Sending" rather than no record at all, and the
+    // send can carry a tag naming this row — which is what lets a later
+    // delivery event reach it even when the outcome is never learned here.
+    const who = actorLabel(req);
+    const [recorded] = conversation
+      ? await db.insert(crmMessages).values({
+          leadId: lead.id,
+          conversationId: conversation.id,
+          direction: "outbound",
+          channel: "email",
+          subject,
+          body,
+          fromNumber: process.env.RESEND_FROM_EMAIL ?? null,
+          toNumber: lead.email,
+          sentByStaffId: req.staffAuth?.staff.id ?? null,
+          sentByLabel: req.staffAuth?.staff ? who : null,
+          origin: req.staffAuth?.staff ? "staff" : "legacy",
+          status: "sending",
+          metadata: { cc: ccList, bcc: bccList, replyTo },
+        }).returning()
+      : [undefined];
+
+    const outcome = await trySendStaffMail({
+      to: lead.email,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+      ...(ccList.length ? { cc: ccList } : {}),
+      ...(bccList.length ? { bcc: bccList } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      ...(recorded ? { tags: emailRefTags(emailRef("message", recorded.id)) } : {}),
+    });
+
+    // `uncertain` is its own state and is never written as a failure: the
+    // message may be in their inbox, and a thread that says "not sent" is how a
+    // second copy gets sent.
+    const messageStatus = outcome.sent ? "sent"
+      : outcome.failure === "not_configured" ? (simulating ? "test_mode" : "not_sent")
+      : outcome.failure === "uncertain" ? "uncertain"
+      : "failed";
+
+    if (recorded && conversation) {
+      await db.update(crmMessages).set({
+        status: messageStatus,
+        providerMessageId: outcome.sent ? outcome.providerId : null,
+        metadata: {
+          cc: ccList, bcc: bccList, replyTo,
+          testMode: simulating,
+          ...(outcome.sent ? {} : { failure: outcome.failure, reason: outcome.reason.slice(0, 300) }),
+        },
+      }).where(eq(crmMessages.id, recorded.id));
+      await refreshConversationRollups(conversation.id);
     }
 
-    // Recorded as a message on the thread, not only as an activity. The
-    // activity timeline says an email happened; this is the email.
-    if (conversation) {
-      const who = actorLabel(req);
-      await db.insert(crmMessages).values({
-        leadId: lead.id,
-        conversationId: conversation.id,
-        direction: "outbound",
-        channel: "email",
-        subject,
-        body,
-        fromNumber: process.env.RESEND_FROM_EMAIL ?? null,
-        toNumber: lead.email,
-        providerMessageId,
-        sentByStaffId: req.staffAuth?.staff.id ?? null,
-        sentByLabel: req.staffAuth?.staff ? who : null,
-        origin: req.staffAuth?.staff ? "staff" : "legacy",
-        status: isTestMode ? "test_mode" : "sent",
-        metadata: { testMode: isTestMode, cc: ccList, bcc: bccList, replyTo },
+    if (!outcome.sent && !simulating) {
+      // Not sent, and which of the two reasons it was decides what the sender
+      // should do next — so it is said rather than flattened into one 500.
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false,
+        error: outcome.failure === "uncertain"
+          ? "The mail provider never confirmed this message, so whether it arrived is genuinely unknown. Check with them before sending it again — a second attempt may put a second copy in their inbox."
+          : outcome.reason,
+        failure: outcome.failure,
+        uncertain: outcome.failure === "uncertain",
+        messageId: recorded?.id ?? null,
       });
-      await refreshConversationRollups(conversation.id);
+      return;
     }
 
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
@@ -859,9 +906,9 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
     // an email happened but never what it said. Keep it with the entry.
     await logActivity(
       req, id, "email_sent", `Email sent: ${subject}`,
-      isTestMode ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`,
+      simulating ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`,
       {
-        subject, body, testMode: isTestMode,
+        subject, body, testMode: simulating,
         to: lead.email,
         // BCC is recorded internally because the team needs to know who was
         // copied; it is never echoed to a recipient.
@@ -870,7 +917,7 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
       },
     );
 
-    res.json({ ok: true, testMode: isTestMode, cc: ccList, bcc: bccList });
+    res.json({ ok: true, testMode: simulating, cc: ccList, bcc: bccList, messageId: recorded?.id ?? null });
   } catch (err) {
     req.log.error({ err }, "Error sending email");
     res.status(500).json({ error: "Failed to send email" });
@@ -1081,6 +1128,23 @@ router.patch("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"
       updates.status = status;
     }
     if (!Object.keys(updates).length) { res.status(400).json({ error: "No fields to update" }); return; }
+
+    // Releasing a HELD message is a person deciding to send something the
+    // scheduler deliberately stopped — a backlog too old to go out on its own.
+    // The decision is stamped, so the next tick sends it instead of holding it
+    // again, which would make the release appear to do nothing.
+    const [current] = await db.select().from(crmCampaignScheduledMessages)
+      .where(eq(crmCampaignScheduledMessages.id, messageId));
+    if (!current) { res.status(404).json({ error: "Message not found" }); return; }
+    if (current.status === "held" && (status === "scheduled" || status === "queued")) {
+      updates.metadata = {
+        ...(current.metadata ?? {}),
+        releasedFromHoldAt: new Date().toISOString(),
+        releasedBy: actorLabel(req),
+      };
+      updates.lastError = null;
+    }
+
     const [msg] = await db.update(crmCampaignScheduledMessages)
       .set(updates)
       .where(eq(crmCampaignScheduledMessages.id, messageId))
@@ -1102,7 +1166,9 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireCrmAuth("campaign
       .from(crmCampaignScheduledMessages)
       .where(eq(crmCampaignScheduledMessages.id, messageId));
     if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
-    if (!["scheduled","queued"].includes(msg.status)) {
+    // `held` is sendable from here on purpose: a person pressing Send Now on a
+    // message the scheduler held IS the review the hold was asking for.
+    if (!["scheduled","queued","held"].includes(msg.status)) {
       res.status(400).json({ error: "Message is not in a sendable state" }); return;
     }
     if (msg.channel !== "email") {
@@ -1118,22 +1184,51 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireCrmAuth("campaign
         .where(eq(crmCampaignScheduledMessages.id, messageId));
       res.status(400).json({ error: "No valid email address" }); return;
     }
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    let resendId: string | null = null;
-    if (!isTestMode) {
-      const resend = getResend();
-      const { data } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [lead.email],
-        subject: msg.subject ?? "(no subject)",
-        html: (msg.body ?? "").replace(/\n/g, "<br>"),
-      });
-      resendId = data?.id ?? null;
+    // Claim it first. Without this, the scheduler tick can pick up the same
+    // due message while this request is sending it, and the recipient gets two.
+    const claimed = await db.update(crmCampaignScheduledMessages)
+      .set({ status: "sending" })
+      .where(and(
+        eq(crmCampaignScheduledMessages.id, messageId),
+        inArray(crmCampaignScheduledMessages.status, ["scheduled", "queued", "held"]),
+      ))
+      .returning({ id: crmCampaignScheduledMessages.id });
+    if (claimed.length === 0) {
+      res.status(409).json({ error: "This message is already being sent." });
+      return;
     }
+
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to: lead.email,
+      subject: msg.subject ?? "(no subject)",
+      text: msg.body ?? "",
+      html: (msg.body ?? "").replace(/\n/g, "<br>"),
+      tags: emailRefTags(emailRef("sequence_message", msg.id)),
+    });
+
+    if (outcome.sent || simulating) {
+      await db.update(crmCampaignScheduledMessages)
+        .set({
+          status: "sent", sentAt: new Date(), lastError: null,
+          resendEmailId: outcome.sent ? outcome.providerId : null,
+        })
+        .where(eq(crmCampaignScheduledMessages.id, messageId));
+      res.json({ ok: true, testMode: simulating });
+      return;
+    }
+
+    // Recorded under the class the answer actually supports. An `uncertain:`
+    // prefix is what stops anybody re-queuing a message that may already have
+    // arrived, and it is what a later `delivered` event upgrades.
     await db.update(crmCampaignScheduledMessages)
-      .set({ status: "sent", sentAt: new Date(), resendEmailId: resendId })
+      .set({ status: "failed", lastError: `${outcome.failure}: ${outcome.reason}`.slice(0, 500) })
       .where(eq(crmCampaignScheduledMessages.id, messageId));
-    res.json({ ok: true, testMode: isTestMode });
+    res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+      ok: false, error: outcome.reason, failure: outcome.failure,
+      uncertain: outcome.failure === "uncertain",
+    });
   } catch (err) {
     req.log.error({ err }, "Error sending scheduled message");
     res.status(500).json({ error: "Failed to send message" });
@@ -1321,19 +1416,25 @@ router.post("/crm/campaigns/:id/test-send", requireCrmAuth("campaigns.send"), as
     const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
     if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [to],
-        subject: `[TEST] ${campaign.subject}`,
-        html: campaign.body.replace(/\n/g, "<br>"),
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to,
+      subject: `[TEST] ${campaign.subject}`,
+      text: campaign.body,
+      html: campaign.body.replace(/\n/g, "<br>"),
+    });
+
+    if (!outcome.sent && !simulating) {
+      req.log.warn({ to, campaignId: id, failure: outcome.failure }, "Campaign test email not sent");
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false, error: outcome.reason, failure: outcome.failure, to,
       });
+      return;
     }
 
-    req.log.info({ to, campaignId: id, testMode: isTestMode }, "Campaign test email dispatched");
-    res.json({ ok: true, testMode: isTestMode, to });
+    req.log.info({ to, campaignId: id, testMode: simulating }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: simulating, to });
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
@@ -1353,19 +1454,25 @@ router.post("/crm/campaigns/test-send", requireCrmAuth("campaigns.send"), async 
       res.status(400).json({ error: "Invalid test email address" }); return;
     }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [to],
-        subject: `[TEST] ${subject}`,
-        html: body.replace(/\n/g, "<br>"),
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to,
+      subject: `[TEST] ${subject}`,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+    });
+
+    if (!outcome.sent && !simulating) {
+      req.log.warn({ to, failure: outcome.failure }, "Campaign test email not sent");
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false, error: outcome.reason, failure: outcome.failure, to,
       });
+      return;
     }
 
-    req.log.info({ to, testMode: isTestMode }, "Campaign test email dispatched");
-    res.json({ ok: true, testMode: isTestMode, to });
+    req.log.info({ to, testMode: simulating }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: simulating, to });
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
@@ -1625,7 +1732,10 @@ router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (
       res.status(400).json({ error: "No recipients saved for this campaign" }); return;
     }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    // Decided by the seam, not by this route: while CRM_EMAIL_TEST_MODE is
+    // anything other than the exact string "false", nothing is handed over.
+    const isTestMode = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
     const results: Array<{ recipientId: number; leadId: number; email: string; status: string; error?: string }> = [];
     let sent = 0, failed = 0, skipped = 0;
 
@@ -1649,33 +1759,39 @@ router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (
       const subject = r.personalizedSubject ?? campaign.subject;
       const body    = r.personalizedBody   ?? campaign.body;
 
-      let resendEmailId: string | null = null;
-      try {
-        if (!isTestMode) {
-          const resend = getResend();
-          const { data } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-            to: [r.leadEmail],
-            subject,
-            html: body.replace(/\n/g, "<br>"),
-          });
-          // 200 ms rate-limit guard between live sends
-          await new Promise(resolve => setTimeout(resolve, 200));
-          resendEmailId = data?.id ?? null;
-        }
+      const outcome = await trySendStaffMail({
+        to: r.leadEmail,
+        subject,
+        text: body,
+        html: body.replace(/\n/g, "<br>"),
+        tags: emailRefTags(emailRef("campaign_recipient", r.id)),
+      });
+      // The same 200 ms gap between live sends as before: the provider rate
+      // limits, and a burst is what trips it.
+      if (outcome.sent) await new Promise(resolve => setTimeout(resolve, 200));
+
+      if (outcome.sent || isTestMode) {
         await db.update(crmCampaignRecipients)
-          .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId })
+          .set({
+            status: "sent", sentAt: new Date(), lastError: null,
+            resendEmailId: outcome.sent ? outcome.providerId : null,
+          })
           .where(eq(crmCampaignRecipients.id, r.id));
         results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "sent" });
         sent++;
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : "Unknown send error";
-        await db.update(crmCampaignRecipients)
-          .set({ status: "failed", lastError: errMsg })
-          .where(eq(crmCampaignRecipients.id, r.id));
-        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: errMsg });
-        failed++;
+        continue;
       }
+
+      // Stored under the class the answer actually supports. An `uncertain:`
+      // outcome may already be in somebody's inbox, so it is never described
+      // as not sent, and nothing re-queues it by itself — a later `delivered`
+      // event is what resolves it.
+      const recordedError = `${outcome.failure}: ${outcome.reason}`.slice(0, 500);
+      await db.update(crmCampaignRecipients)
+        .set({ status: "failed", lastError: recordedError })
+        .where(eq(crmCampaignRecipients.id, r.id));
+      results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: recordedError });
+      failed++;
     }
 
     // Mark campaign as archived if fully sent
@@ -1723,197 +1839,40 @@ router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireCrmAuth(
 
     const subject = r.personalizedSubject ?? campaign.subject;
     const body    = r.personalizedBody   ?? campaign.body;
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const isTestMode = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
 
-    let resendEmailIdSingle: string | null = null;
-    try {
-      if (!isTestMode) {
-        const resend = getResend();
-        const { data } = await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-          to: [r.leadEmail],
-          subject,
-          html: body.replace(/\n/g, "<br>"),
-        });
-        resendEmailIdSingle = data?.id ?? null;
-      }
+    const outcome = await trySendStaffMail({
+      to: r.leadEmail,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+      tags: emailRefTags(emailRef("campaign_recipient", r.id)),
+    });
+
+    if (outcome.sent || isTestMode) {
       await db.update(crmCampaignRecipients)
-        .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId: resendEmailIdSingle })
+        .set({
+          status: "sent", sentAt: new Date(), lastError: null,
+          resendEmailId: outcome.sent ? outcome.providerId : null,
+        })
         .where(eq(crmCampaignRecipients.id, recipientId));
       req.log.info({ campaignId: id, recipientId, testMode: isTestMode }, "Recipient resent");
       res.json({ ok: true, status: "sent", testMode: isTestMode, email: r.leadEmail });
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : "Unknown send error";
-      await db.update(crmCampaignRecipients)
-        .set({ status: "failed", lastError: errMsg })
-        .where(eq(crmCampaignRecipients.id, recipientId));
-      res.status(500).json({ ok: false, status: "failed", error: errMsg });
+      return;
     }
+
+    const recordedError = `${outcome.failure}: ${outcome.reason}`.slice(0, 500);
+    await db.update(crmCampaignRecipients)
+      .set({ status: "failed", lastError: recordedError })
+      .where(eq(crmCampaignRecipients.id, recipientId));
+    res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+      ok: false, status: "failed", error: outcome.reason, failure: outcome.failure,
+      uncertain: outcome.failure === "uncertain",
+    });
   } catch (err) {
     req.log.error({ err }, "Error resending to recipient");
     res.status(500).json({ error: "Failed to resend" });
-  }
-});
-
-// ── Resend Webhook ────────────────────────────────────────────────────────────
-// Public endpoint — no admin auth. Signature verified via svix (RESEND_WEBHOOK_SECRET).
-router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
-  try {
-    const secret = process.env.RESEND_WEBHOOK_SECRET;
-    if (!secret) {
-      req.log.warn("RESEND_WEBHOOK_SECRET not set — webhook endpoint disabled");
-      res.status(500).json({ error: "Webhook not configured — RESEND_WEBHOOK_SECRET is missing" });
-      return;
-    }
-
-    // req.body is a Buffer thanks to express.raw() mounted in app.ts for this path
-    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body);
-
-    // Verify Resend webhook signature using svix
-    let payload: Record<string, unknown>;
-    try {
-      const { Webhook } = await import("svix");
-      const wh = new Webhook(secret);
-      payload = wh.verify(rawBody, {
-        "svix-id":        req.headers["svix-id"] as string,
-        "svix-timestamp": req.headers["svix-timestamp"] as string,
-        "svix-signature": req.headers["svix-signature"] as string,
-      }) as Record<string, unknown>;
-    } catch (verifyErr) {
-      req.log.warn({ err: verifyErr }, "Resend webhook signature verification failed");
-      res.status(400).json({ error: "Invalid webhook signature" });
-      return;
-    }
-
-    // Delivery evidence for a receptionist post-call email lands on its
-    // notification row, matched by the message id Resend returned when it
-    // accepted the send. Checked first because `email.delivered` is not a
-    // campaign event and would otherwise be dropped as unknown below. A bounce
-    // or complaint still continues into the suppression step, so a dead
-    // business inbox is suppressed exactly as a CRM recipient's would be.
-    {
-      const voiceData = (payload.data as Record<string, unknown> | undefined) ?? {};
-      const voiceEmailId = typeof voiceData.email_id === "string" ? voiceData.email_id : null;
-      const voiceType = typeof payload.type === "string" ? payload.type : "";
-      if (voiceEmailId) {
-        const { recordVoiceNotificationDeliveryEvent } = await import("../lib/voiceNotifications/deliveryEvents.js");
-        const occurred = typeof voiceData.created_at === "string" && Number.isFinite(Date.parse(voiceData.created_at))
-          ? new Date(voiceData.created_at)
-          : new Date();
-        const voiceOutcome = await recordVoiceNotificationDeliveryEvent(voiceType, voiceEmailId, occurred);
-        if (voiceOutcome === "recorded" || voiceOutcome === "unchanged") {
-          if (voiceType !== "email.bounced" && voiceType !== "email.complained") {
-            res.json({ ok: true, voiceNotification: voiceOutcome });
-            return;
-          }
-        }
-      }
-    }
-
-    // Map Resend event type → internal event_type
-    const RESEND_EVENT_MAP: Record<string, string> = {
-      "email.opened":          "opened",
-      "email.clicked":         "clicked",
-      "email.bounced":         "bounced",
-      "email.delivery_failed": "failed",
-      "email.complained":      "complained",
-    };
-    const resendEventType = (payload.type as string) ?? "";
-    const eventType = RESEND_EVENT_MAP[resendEventType];
-    if (!eventType) {
-      // Unknown event type — ack but ignore
-      res.json({ ok: true, ignored: true, reason: "unknown_event_type" });
-      return;
-    }
-
-    // Extract Resend email id from payload data
-    const data = (payload.data as Record<string, unknown>) ?? {};
-    const resendEmailId = (data.email_id as string) ?? null;
-    if (!resendEmailId) {
-      res.json({ ok: true, ignored: true, reason: "no_email_id" });
-      return;
-    }
-
-    // Suppression is mirrored for EVERY bounce and complaint, before the
-    // campaign lookup below. It used to happen only for campaign recipients,
-    // so a hard bounce on a one-off email to a client suppressed nothing and
-    // the CRM would cheerfully keep writing to a dead mailbox — and a spam
-    // complaint from a non-campaign send was discarded entirely, which is the
-    // one that damages deliverability for every other client.
-    if (eventType === "bounced" || eventType === "complained") {
-      const { suppressAddress } = await import("../lib/inboundEmail.js");
-      const recipients = Array.isArray(data.to) ? (data.to as string[])
-        : typeof data.to === "string" ? [data.to] : [];
-      const bounce = (data.bounce as Record<string, unknown> | undefined) ?? {};
-      for (const address of recipients) {
-        await suppressAddress({
-          address,
-          reason: eventType === "complained" ? "complaint" : "bounce",
-          // Only a permanent bounce suppresses; a full mailbox empties again.
-          bounceType: typeof bounce.type === "string" ? bounce.type : "Permanent",
-          detail: typeof bounce.subType === "string" ? bounce.subType : null,
-        });
-      }
-    }
-
-    // Find matching recipient (include leadId so we can do sequence reply logic)
-    const [recipient] = await db
-      .select({ id: crmCampaignRecipients.id, campaignId: crmCampaignRecipients.campaignId, leadId: crmCampaignRecipients.leadId })
-      .from(crmCampaignRecipients)
-      .where(eq(crmCampaignRecipients.resendEmailId, resendEmailId))
-      .limit(1);
-
-    if (!recipient) {
-      res.json({ ok: true, ignored: true, reason: "no_matching_recipient" });
-      return;
-    }
-
-    // Determine occurred_at from payload if available
-    const occurredAt = data.created_at ? new Date(data.created_at as string) : new Date();
-
-    // Application-level dedup for opened/clicked — Resend retries can send duplicates
-    const errorReason = (data.reason as string) ?? (data.error as string) ?? null;
-    if (eventType === "opened" || eventType === "clicked") {
-      const [existing] = await db
-        .select({ id: crmCampaignEvents.id })
-        .from(crmCampaignEvents)
-        .where(and(
-          eq(crmCampaignEvents.campaignRecipientId, recipient.id),
-          eq(crmCampaignEvents.eventType, eventType),
-        ))
-        .limit(1);
-      if (existing) {
-        req.log.info({ recipientId: recipient.id, eventType }, "Duplicate webhook event skipped");
-        res.json({ ok: true, eventType, recipientId: recipient.id, deduplicated: true });
-        return;
-      }
-    }
-
-    await db.insert(crmCampaignEvents).values({
-      campaignRecipientId: recipient.id,
-      eventType,
-      occurredAt,
-      metadata: { resendEventType, resendEmailId, raw: data },
-    });
-
-    // For bounce / failure / complaint: update recipient status
-    if (eventType === "bounced" || eventType === "failed" || eventType === "complained") {
-      await db.update(crmCampaignRecipients)
-        .set({ status: "failed", lastError: errorReason ?? `${resendEventType} via webhook` })
-        .where(eq(crmCampaignRecipients.id, recipient.id));
-    }
-
-    // For complaint (spam report): also stop all active sequences for this lead immediately
-    if (eventType === "complained" && recipient.leadId) {
-      await stampReplyAndStop(recipient.leadId, "email", { resendEventType, resendEmailId });
-      req.log.info({ leadId: recipient.leadId }, "Sequences stopped due to spam complaint");
-    }
-
-    req.log.info({ recipientId: recipient.id, eventType, resendEmailId }, "Resend webhook event recorded");
-    res.json({ ok: true, eventType, recipientId: recipient.id });
-  } catch (err) {
-    req.log.error({ err }, "Error processing Resend webhook");
-    res.status(500).json({ error: "Internal error processing webhook" });
   }
 });
 
