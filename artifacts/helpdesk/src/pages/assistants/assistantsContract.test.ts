@@ -529,10 +529,30 @@ check(
     listCode,
   ),
 );
+/**
+ * The guarantee is unchanged; where it is defined has moved, deliberately.
+ *
+ * This page used to repeat `min-h-11` and `focus-visible:ring-2` on every
+ * control, so the 44px target and the focus ring were a habit each screen had
+ * to remember rather than a property of the design system. They now come from
+ * `sd-link` / `sd-error__action` in `v2-dashboard.css`, and the ring from the
+ * shell's own `:focus-visible` rule — so the assertion is made against the
+ * stylesheet that actually provides them, which is strictly stronger than
+ * grepping for a utility class the page could silently drop.
+ */
 check(
-  "row controls keep a 44px minimum target and a visible focus ring",
-  /min-h-11/.test(listCode) && /focus-visible:ring-2/.test(listCode),
+  "row controls take their target size from the shared design system",
+  /className="sd-link"/.test(listCode) && !/min-h-11|focus-visible:ring-2/.test(listCode),
 );
+{
+  const dashboardCss = read("artifacts/helpdesk/src/styles/v2-dashboard.css");
+  check(
+    "and that stylesheet really does define a 44px target and a focus ring",
+    /\.sd-link\s*\{[^}]*min-height:\s*44px/.test(dashboardCss) &&
+      /\.sd-error__action\s*\{[^}]*min-height:\s*44px/.test(dashboardCss) &&
+      /\.sd-app :focus-visible\s*\{[^}]*outline:/.test(dashboardCss),
+  );
+}
 check(
   "the delete item is still the only destructive one, and still status-gated",
   /disabled=\{!deletable\}/.test(listCode) && /isEligibleForDelete\(assistant\)/.test(listCode),

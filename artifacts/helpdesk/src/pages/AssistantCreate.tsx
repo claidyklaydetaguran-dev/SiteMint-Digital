@@ -1,9 +1,24 @@
-import { useLocation } from "wouter";
+/**
+ * The template picker.
+ *
+ * Presentation only: the same `sd-page`/`PageHeader` frame every other
+ * dashboard page uses, with the eight starting points as rows of one shared
+ * `sd-list`. Selecting one still navigates and creates nothing — no request is
+ * issued from this page at all.
+ */
+
+import { useLocation, Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
 import { ASSISTANT_TEMPLATES, type AssistantTemplate } from "@/lib/assistantTemplates";
 import { TemplateCard } from "@/components/common/TemplateCard";
-import { CREATE, LIST_PATH, NEW_PATH, DEFAULT_BUILDER_TAB } from "@/pages/assistants/assistantsContract";
+import { PageHeader } from "@/components/common/PageHeader";
+import {
+  CREATE,
+  LIST_PATH,
+  NEW_PATH,
+  DEFAULT_BUILDER_TAB,
+} from "@/pages/assistants/assistantsContract";
+import "@/styles/v2-dashboard.css";
 
 export default function AssistantCreate() {
   const [, navigate] = useLocation();
@@ -15,30 +30,24 @@ export default function AssistantCreate() {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-background">
-      <div className="flex-shrink-0 px-6 pb-5 pt-6">
-        <Link
-          href={LIST_PATH}
-          className="inline-flex min-h-11 items-center gap-1.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground md:min-h-0 md:py-0"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          {CREATE.back}
-        </Link>
-        <h1 className="mt-2 font-display text-xl font-semibold text-foreground">
-          {CREATE.title}
-        </h1>
-        <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-          {CREATE.detail}
-        </p>
-      </div>
+    <div className="sd-page sd-enter">
+      <PageHeader
+        eyebrow={CREATE.eyebrow}
+        title={CREATE.title}
+        description={CREATE.detail}
+        breadcrumb={
+          <Link href={LIST_PATH} className="sd-link">
+            <ArrowLeft className="sd-navlink__icon" aria-hidden="true" />
+            {CREATE.back}
+          </Link>
+        }
+      />
 
-      <div className="flex-1 px-6 pb-8">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {ASSISTANT_TEMPLATES.map((template) => (
-            <TemplateCard key={template.id} template={template} onSelect={handleSelect} />
-          ))}
-        </div>
-      </div>
+      <ul className="sd-list">
+        {ASSISTANT_TEMPLATES.map((template) => (
+          <TemplateCard key={template.id} template={template} onSelect={handleSelect} />
+        ))}
+      </ul>
     </div>
   );
 }

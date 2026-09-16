@@ -121,12 +121,10 @@ export const LIST = {
   cards: "Cards",
   table: "Table",
 
-  colName: "Name",
-  colTemplate: "Template",
-  colStatus: "Status",
-  colProviderLink: "Provider link",
+  /* The list is rows in the shared `sd-list`, not a table with a header row,
+     so the five column headings this used to carry are gone rather than left
+     unreachable. "Updated" survives because it still labels a value. */
   colUpdated: "Updated",
-  colActions: "Actions",
 
   emptyTitle: "Create your first assistant",
   emptyDetail:
@@ -165,23 +163,37 @@ export const LIST = {
 
 /* ── One-assistant status card (C-1) ─────────────────────────────────────── */
 
+/* V8 presentation pass. What this block no longer carries is the point of it.
+
+   "Provider link" left: it says whether a provider-side record exists, which
+   is a question SiteMint support asks and a business owner never does. It is
+   not deleted — it is real evidence — it moved to `DIAGNOSTICS` below, behind
+   a disclosure that names its audience.
+
+   The four per-tab quick links left too. They carried their own labels here
+   ("Configuration", "Prompt", "Voice", "Test") while the builder's rail called
+   the same four destinations something else, so a link was named differently
+   from the section it opened. They now read `SECTIONS`. */
+
 export const CARD = {
-  providerLinkLabel: "Provider link",
   lastPublishedLabel: "Last published",
   notYetPublished: "Not yet published",
-  configuration: "Configuration",
-  prompt: "Prompt",
-  voice: "Voice",
-  test: "Test",
-
-  /* V8 presentation pass. "Provider link" is a diagnostic — it says whether a
-     provider-side record exists, which is not a question a business owner has.
-     It stays available, behind a disclosure, rather than sitting on the card
-     as though it were one of the two facts that matter. */
   openLabel: "Open the builder",
   quickLinksLabel: "Jump to",
-  diagnosticsLabel: "Technical details",
-  diagnosticsDetail: "For SiteMint support. You never need these to run your assistant.",
+} as const;
+
+/* ── The builder's sections, named once ────────────────────────────────────
+   Both the list page's quick links and the builder's own rail read these.
+   `BUILDER_TABS` in `assistant-builder/BuilderShell.tsx` keeps the keys —
+   routing, the legacy-alias map and the default tab are all unchanged — and
+   takes only its labels from here. */
+
+export const SECTIONS = {
+  configuration: "Business information",
+  voice: "Greeting & voice",
+  actions: "What it can do",
+  testing: "Test & publish",
+  prompt: "Advanced",
 } as const;
 
 /** Every row control names its assistant, so a screen reader hears which row it is on. */
@@ -448,6 +460,7 @@ export const PROMPT_TAB = {
    this journey cannot deliver and which no endpoint behind it supports. */
 
 export const CREATE = {
+  eyebrow: "ASSISTANT",
   title: "Choose a starting point",
   detail:
     "Pick a template to prefill the builder, or start from a blank assistant. Nothing is saved until you select Save Draft — you can change everything before then.",
@@ -557,6 +570,7 @@ export function everyRenderableString(): string[] {
   return [
     ...Object.values(LIST),
     ...Object.values(CARD),
+    ...Object.values(SECTIONS),
     ...Object.values(BUILDER),
     ...Object.values(BUILDER_PAGE),
     ...Object.values(TEST_PUBLISH),
