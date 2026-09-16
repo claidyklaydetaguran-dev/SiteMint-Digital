@@ -22,11 +22,28 @@ import { getUncachableStripeClient } from "../lib/stripeClient.js";
 const router: IRouter = Router();
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-// M1 cutover: the CRM gate now accepts a per-person staff session first and
-// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
-// is not "false". Keeping the name leaves every route below unchanged, and
-// the route-security manifest still reads "admin" for them.
-const requireAdmin = requireCrmAuth();
+// Every route below names the permission it needs — `requireCrmAuth("…")` —
+// rather than sharing one gate that asked only "is this a staff session".
+//
+// It used to share one. `const requireAdmin = requireCrmAuth()` guarded 56
+// routes here, and holding a session was the whole test. Measured in a browser
+// on 2026-09-16 with `leads.read` revoked on the signed-in account, GET
+// /crm/leads still returned every contact; so did /crm/deals. The unguarded set
+// also included /crm/campaigns/:id/test-send, /crm/campaigns/queue/:id/send-now,
+// /crm/campaigns/scheduler/run and /crm/deals/:id/transactions/stripe-checkout —
+// bulk customer contact and money, reachable by anyone who could sign in.
+//
+// The permission names follow what the newer files already decided: money is
+// deals.read / deals.write (crmBilling.ts treats quotes, invoices and payments
+// that way), automation is settings.*, customer contact is communications.*,
+// and reading the team's task queue is tasks.read.team. `campaigns.send` is the
+// line the operations_manager role deliberately does not cross.
+//
+// `requireCrmAuth` still accepts a per-person staff session first and falls back
+// to the legacy shared bearer while CRM_LEGACY_BEARER_ENABLED is not "false";
+// the route-security manifest still classes these routes "admin", because that
+// records WHICH credential may reach them, not what it may then do.
+// Held by routes/crmPermissionEnforcement.test.ts, which crosses each line.
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 /**
@@ -81,7 +98,7 @@ function violatesForeignKey(err: unknown, constraint: string): boolean {
 // Read-only truth for the Settings page. Email test mode lives only in the
 // CRM_EMAIL_TEST_MODE env var (every send path checks it directly); the UI
 // must display the server's value, never a client-side toggle.
-router.get("/crm/settings/status", requireAdmin, (_req: Request, res: Response) => {
+router.get("/crm/settings/status", requireCrmAuth("settings.read"), (_req: Request, res: Response) => {
   res.json({ emailTestMode: process.env.CRM_EMAIL_TEST_MODE !== "false" });
 });
 
@@ -136,7 +153,7 @@ router.get("/crm/receptionist-signup-jobs", requireCrmAuth("settings.read"), asy
 });
 
 // ── Dashboard Stats ───────────────────────────────────────────────────────────
-router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/stats", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -184,7 +201,7 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
 // only supplies its inputs; step computation happens client-side via the
 // existing pure computeWorkflowSteps(). Static route — must stay above the
 // "/crm/leads/:id" route group.
-router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/intelligence/automation-queue", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db
       .select({
@@ -244,7 +261,7 @@ router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Reque
 });
 
 // ── Leads list ────────────────────────────────────────────────────────────────
-router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const { search, status, priority, source, companyId } = req.query as Record<string, string>;
     // A contact that has been merged into another one is not part of the book
@@ -303,7 +320,7 @@ router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Create lead ───────────────────────────────────────────────────────────────
-router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const data = req.body as Record<string, unknown>;
     if (!data.name || !data.email) { res.status(400).json({ error: "Name and email are required" }); return; }
@@ -343,7 +360,7 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Get lead ──────────────────────────────────────────────────────────────────
-router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -388,7 +405,7 @@ router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) =
 });
 
 // ── Update lead ───────────────────────────────────────────────────────────────
-router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -532,7 +549,7 @@ router.delete("/crm/leads/:id", requireCrmAuth("leads.delete"), async (req: Requ
 });
 
 // ── Add note ──────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/notes", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -554,7 +571,7 @@ router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Resp
 });
 
 // ── Activities (manual creation) ──────────────────────────────────────────────
-router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/activities", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -583,7 +600,7 @@ router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res:
 });
 
 // ── Tasks ──────────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/tasks", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -630,7 +647,7 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
   }
 });
 
-router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/tasks/:id", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -680,7 +697,7 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.delete("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/tasks/:id", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -694,7 +711,7 @@ router.delete("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response
 });
 
 // ── All tasks (for tasks page) ────────────────────────────────────────────────
-router.get("/crm/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/tasks", requireCrmAuth("tasks.read.team"), async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const tasks = await db.select({
@@ -950,7 +967,7 @@ router.get("/crm/communications/email-activity", requireCrmAuth("communications.
 
 // ── Campaign CRUD ─────────────────────────────────────────────────────────────
 
-router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const list = await db.select().from(crmCampaigns).orderBy(desc(crmCampaigns.updatedAt));
     // Attach recipient counts
@@ -967,7 +984,7 @@ router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) =
   }
 });
 
-router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const { name, subject, body, status, type, objective, toneProfile, description, stopOnReply, autoSend } = req.body as Record<string, unknown>;
     if (!name || !subject || !body) {
@@ -997,11 +1014,11 @@ router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) 
 
 // ── Scheduler status & manual trigger (static — before /:id) ─────────────────
 
-router.get("/crm/campaigns/scheduler/status", requireAdmin, (_req: Request, res: Response) => {
+router.get("/crm/campaigns/scheduler/status", requireCrmAuth("campaigns.read"), (_req: Request, res: Response) => {
   res.json(getSchedulerStatus());
 });
 
-router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, res: Response) => {
+router.post("/crm/campaigns/scheduler/run", requireCrmAuth("campaigns.send"), async (_req: Request, res: Response) => {
   try {
     const result = await processScheduledMessages();
     res.json({ ok: true, ...result });
@@ -1012,7 +1029,7 @@ router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, 
 
 // ── Campaign Scheduled Message Queue (static routes — must come before /:id) ──
 
-router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/queue", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const { status, campaignId } = req.query as Record<string, string>;
     const conditions = [];
@@ -1049,7 +1066,7 @@ router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1076,7 +1093,7 @@ router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reques
   }
 });
 
-router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/queue/:messageId/send-now", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1123,7 +1140,7 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req
   }
 });
 
-router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1139,7 +1156,7 @@ router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reque
 
 // ── Bulk reschedule: shift all scheduled/queued messages for a lead ───────────
 // Static path (/leads/:leadId/reschedule) — placed before /:id group per rule #8
-router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/leads/:leadId/reschedule", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const leadId = Number(req.params.leadId);
     if (isNaN(leadId)) { res.status(400).json({ error: "Invalid leadId" }); return; }
@@ -1184,7 +1201,7 @@ router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req:
 
 // ── Campaign CRUD (parameterized routes) ──────────────────────────────────────
 
-router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1213,7 +1230,7 @@ router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respons
   }
 });
 
-router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1240,7 +1257,7 @@ router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/:id", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1253,7 +1270,7 @@ router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Resp
 });
 
 // Replace all recipients for a campaign (upsert pattern)
-router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/recipients", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1292,7 +1309,7 @@ router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, 
 });
 
 // Per-campaign test send (uses persisted campaign data)
-router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/test-send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1325,7 +1342,7 @@ router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, r
 
 // ── Campaign Test Send ────────────────────────────────────────────────────────
 // Sends a single test email to a manually specified address — NOT to leads.
-router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/test-send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const { to, subject, body } = req.body as { to?: string; subject?: string; body?: string };
     if (!to || !subject || !body) {
@@ -1356,7 +1373,7 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
 });
 
 // ── Campaign Analytics ────────────────────────────────────────────────────────
-router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/analytics", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1491,7 +1508,7 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
 // ── Campaign Sequence Funnel ──────────────────────────────────────────────────
 // Per-step delivery funnel for nurture/drip campaigns.
 // Works for broadcast too (returns empty steps array).
-router.get("/crm/campaigns/:id/funnel", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/funnel", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1675,7 +1692,7 @@ router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (
 });
 
 // Resend to a single failed or skipped recipient
-router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id          = Number(req.params.id);
     const recipientId = Number(req.params.recipientId);
@@ -1998,7 +2015,7 @@ router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, r
 });
 
 // ── Import from discovery submissions ─────────────────────────────────────────
-router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import-discovery", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const submissions = await db.select().from(discoverySubmissions);
     let imported = 0, skipped = 0;
@@ -2039,7 +2056,7 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
 });
 
 // ── Single submission import ───────────────────────────────────────────────────
-router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import-discovery/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const subId = Number(req.params.id);
     if (!subId) { res.status(400).json({ error: "Invalid submission id" }); return; }
@@ -2104,7 +2121,7 @@ router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res:
 });
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
-router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals/stats", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const deals = await db.select().from(crmDeals);
     const wonDeals = deals.filter(d => d.stage === "Won");
@@ -2153,7 +2170,7 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const deals = await db.select().from(crmDeals).orderBy(desc(crmDeals.createdAt));
     const leadsMap = new Map<number, string>();
@@ -2170,7 +2187,7 @@ router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number>;
     if (!name) { res.status(400).json({ error: "Name is required" }); return; }
@@ -2189,7 +2206,7 @@ router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/deals/:id", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number | null>;
@@ -2291,7 +2308,7 @@ router.get("/crm/transactions", requireCrmAuth("deals.read"), async (req: Reques
 
 const MANUAL_METHODS = TRANSACTION_METHODS.filter(m => m !== "stripe");
 
-router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals/:id/transactions/manual", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
@@ -2321,7 +2338,7 @@ router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Requ
   }
 });
 
-router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals/:id/transactions/stripe-checkout", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
@@ -2368,7 +2385,7 @@ router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (
   }
 });
 
-router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals/:id/transactions", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const transactions = await db.select().from(crmTransactions)
@@ -2382,7 +2399,7 @@ router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res
 });
 
 // ── Pipeline (same as leads but grouped by status) ────────────────────────────
-router.get("/crm/pipeline", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/pipeline", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db.select().from(crmLeads).orderBy(desc(crmLeads.updatedAt));
     const pipeline = Object.fromEntries(CRM_STATUSES.map(s => [s, leads.filter(l => l.status === s)]));
@@ -2447,7 +2464,7 @@ function crmLeadToSubmission(lead: CrmLead): DiscoverySubmission {
 
 // ── Sales Workspace: Proposal ─────────────────────────────────────────────────
 
-router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/proposal/generate", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2473,7 +2490,7 @@ router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Reques
   }
 });
 
-router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/proposal", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2491,7 +2508,7 @@ router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: 
 
 // ── Sales Workspace: Scope of Work ────────────────────────────────────────────
 
-router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/sow/generate", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2517,7 +2534,7 @@ router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, re
   }
 });
 
-router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/sow", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2539,7 +2556,7 @@ router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Respo
 // Org-wide feed of recent behavioral events across all leads, for the
 // Behavioral Intelligence dashboard. Static route — must stay above
 // the "/crm/leads/:id/behavioral-events" route group.
-router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/behavioral-events", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 1000, 2000);
     const events = await db
@@ -2565,7 +2582,7 @@ router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Res
 
 // GET /crm/leads/:id/behavioral-events
 // Returns all behavioral events for a lead, newest first.
-router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id/behavioral-events", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2588,7 +2605,7 @@ router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request
 // Body: { eventType, label?, dClientIntent?, dUrgency?, dTrust?,
 //         dProjectReadiness?, dBudgetConfidence?, dCommunicationScore?,
 //         dReferralProbability?, metadata?, occurredAt? }
-router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/behavioral-events", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2631,7 +2648,7 @@ router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Reques
 
 // DELETE /crm/leads/:id/behavioral-events/:eventId
 // Removes a single behavioral event (manual correction).
-router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/leads/:id/behavioral-events/:eventId", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const leadId  = Number(req.params.id);
     const eventId = Number(req.params.eventId);
@@ -2648,7 +2665,7 @@ router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (
 
 // ── Campaign Steps CRUD ───────────────────────────────────────────────────────
 
-router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/steps", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2664,7 +2681,7 @@ router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: R
   }
 });
 
-router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/steps", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2706,7 +2723,7 @@ router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: 
   }
 });
 
-router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id/steps/:stepId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
@@ -2746,7 +2763,7 @@ router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Reque
   }
 });
 
-router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/:id/steps/:stepId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
@@ -2762,7 +2779,7 @@ router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Requ
 
 // ── Campaign Sequence Enrollment ──────────────────────────────────────────────
 
-router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/enroll", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2842,7 +2859,7 @@ router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res:
 
 // ── Campaign Recipient Enrollment Status ──────────────────────────────────────
 
-router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id/recipients/:rid/status", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id  = Number(req.params.id);
     const rid = Number(req.params.rid);
@@ -2876,7 +2893,7 @@ router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (r
 
 // ── Campaign Activity Feed ────────────────────────────────────────────────────
 
-router.get("/crm/campaigns/:id/activity", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/activity", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
