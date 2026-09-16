@@ -51,18 +51,18 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**144 / 312 page checks = 46.2%.** Pages passing all 6: 1. Pages passing none: 2.
+**184 / 312 page checks = 59.0%.** Pages passing all 6: 3. Pages passing none: 2.
 
-By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by decision 0.
+By status: Passed 184 · Built, not proven 126 · Not passed 2 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
-| open | 41 / 52 (78.8%) |
-| action | 21 / 52 (40.4%) |
+| open | 43 / 52 (82.7%) |
+| action | 22 / 52 (42.3%) |
 | persist | 10 / 52 (19.2%) |
-| permission | 22 / 52 (42.3%) |
-| recovery | 2 / 52 (3.8%) |
-| mobile | 48 / 52 (92.3%) |
+| permission | 37 / 52 (71.2%) |
+| recovery | 23 / 52 (44.2%) |
+| mobile | 49 / 52 (94.2%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
 |---|---|---|---|---|---|---|
@@ -70,40 +70,40 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | 2 | `/admin/activate` | Staff invitation and password-reset landing | 5 / 6 | 83.3% | L, T | recovery |
 | 3 | `/admin/dashboard` | Legacy Discovery Portal | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
 | 4 | `/admin/submissions/:id` | Legacy submission detail | 0 / 6 | 0.0% | — | open, action, persist, permission, recovery, mobile |
-| 5 | `/admin/crm/dashboard` | Command Center | 3 / 6 | 50.0% | L | persist, permission, recovery |
+| 5 | `/admin/crm/dashboard` | Command Center | 5 / 6 | 83.3% | L, T | persist |
 | 6 | `/admin/crm/leads/:id/dna` | Lead DNA | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 7 | `/admin/crm/leads/:id` | Contact record | 4 / 6 | 66.7% | L, T, R | persist, recovery |
-| 8 | `/admin/crm/leads` | Contacts | 4 / 6 | 66.7% | L, T | persist, recovery |
-| 9 | `/admin/crm/companies` | Companies | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 8 | `/admin/crm/leads` | Contacts | 5 / 6 | 83.3% | L, T | persist |
+| 9 | `/admin/crm/companies` | Companies | 4 / 6 | 66.7% | L, T | action, persist |
 | 10 | `/admin/crm/companies/:id` | Company record | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
-| 11 | `/admin/crm/communications` | Communications | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 11 | `/admin/crm/communications` | Communications | 4 / 6 | 66.7% | L, T | action, persist |
 | 12 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 13 | `/admin/crm/intelligence/automation-queue` | Automation queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 14 | `/admin/crm/inbox` | Inbox | 4 / 6 | 66.7% | L | permission, recovery |
-| 15 | `/admin/crm/tasks` | All tasks | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 16 | `/admin/crm/calendar` | Calendar | 4 / 6 | 66.7% | L, R | permission, recovery |
-| 17 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 18 | `/admin/crm/transactions` | Transactions | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 19 | `/admin/crm/projects` | Projects | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 20 | `/admin/crm/documents` | Documents | 4 / 6 | 66.7% | L | permission, recovery |
+| 13 | `/admin/crm/intelligence/automation-queue` | Automation queue | 3 / 6 | 50.0% | L, T | action, persist, recovery |
+| 14 | `/admin/crm/inbox` | Inbox | 6 / 6 | 100.0% | L, T | — |
+| 15 | `/admin/crm/tasks` | All tasks | 5 / 6 | 83.3% | L, T | persist |
+| 16 | `/admin/crm/calendar` | Calendar | 5 / 6 | 83.3% | L, R | permission |
+| 17 | `/admin/crm/deals` | Deals | 4 / 6 | 66.7% | L, T | action, persist |
+| 18 | `/admin/crm/transactions` | Transactions | 5 / 6 | 83.3% | L, T | persist |
+| 19 | `/admin/crm/projects` | Projects | 3 / 6 | 50.0% | L | action, persist, permission |
+| 20 | `/admin/crm/documents` | Documents | 6 / 6 | 100.0% | L, T | — |
 | 21 | `/admin/crm/support` | Support | 5 / 6 | 83.3% | L, T | recovery |
-| 22 | `/admin/crm/pipeline` | Pipeline | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 23 | `/admin/crm/reporting` | Reporting | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 22 | `/admin/crm/pipeline` | Pipeline | 4 / 6 | 66.7% | L, T | action, persist |
+| 23 | `/admin/crm/reporting` | Reporting | 4 / 6 | 66.7% | L, T | action, persist |
 | 24 | `/admin/crm/admin` | Admin hub | 4 / 6 | 66.7% | L | permission, recovery |
 | 25 | `/admin/crm/workspace` | Sales workspace | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 26 | `/admin/crm/campaigns` | Sequences | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 26 | `/admin/crm/campaigns` | Sequences | 4 / 6 | 66.7% | L, T | action, persist |
 | 27 | `/admin/crm/campaign-builder` | Marketing | 6 / 6 | 100.0% | L, T, R | — |
-| 28 | `/admin/crm/campaign-queue` | Sequence queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 29 | `/admin/crm/discovery` | Discovery submissions | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 28 | `/admin/crm/campaign-queue` | Sequence queue | 3 / 6 | 50.0% | L | action, persist, permission |
+| 29 | `/admin/crm/discovery` | Discovery submissions | 3 / 6 | 50.0% | L | action, persist, permission |
 | 30 | `/admin/crm/intake-cases` | Intake cases | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
 | 31 | `/admin/crm/receptionist-accounts` | Receptionist accounts | 3 / 6 | 50.0% | L, T | action, persist, recovery |
-| 32 | `/admin/crm/email-templates` | Email templates | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
-| 33 | `/admin/crm/import` | Import contacts | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 34 | `/admin/crm/duplicates` | Duplicate review | 3 / 6 | 50.0% | L, T | persist, permission, recovery |
-| 35 | `/admin/crm/settings` | Settings | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 32 | `/admin/crm/email-templates` | Email templates | 3 / 6 | 50.0% | L, T | open, action, persist |
+| 33 | `/admin/crm/import` | Import contacts | 4 / 6 | 66.7% | L | persist, permission |
+| 34 | `/admin/crm/duplicates` | Duplicate review | 5 / 6 | 83.3% | L, T | persist |
+| 35 | `/admin/crm/settings` | Settings | 4 / 6 | 66.7% | L, T | action, persist |
 | 36 | `/admin/crm/people` | People | 3 / 6 | 50.0% | L, T | action, persist, recovery |
 | 37 | `/admin/crm/account` | My account | 4 / 6 | 66.7% | L | permission, recovery |
-| 38 | `/admin/crm/operations` | Operations | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 38 | `/admin/crm/operations` | Operations | 4 / 6 | 66.7% | L, T | action, persist |
 | 39 | `/admin/crm/my-day` | My Day | 5 / 6 | 83.3% | L | permission |
 | 40 | `/admin/ops/firms/:id` | Receptionist firm detail | 3 / 6 | 50.0% | L, T | action, persist, recovery |
 | 41 | `/admin/ops/firms` | Receptionist firms | 3 / 6 | 50.0% | L, T | action, persist, recovery |
@@ -430,8 +430,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened with a real staff session and preview data, zero console errors (2026-09-15) |
 | action | Passed | L | Money panel cross-checked against the forecast and transactions: $16,000 across 4 transactions agreed |
 | persist | Built, not proven | — | Filters and figures after a reload not recorded |
-| permission | Built, not proven | — | Mine/Team scoping not exercised with a restricted user |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/stats and the refusal NAMES the permission ("leads.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered the server's own error text ("simulated outage") with a Retry control. Every number remaining on screen is a date-range control (7/30/90/365 days), not a figure: no counts invented. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15, measured both before and after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/leads/:id/dna` — Lead DNA
@@ -464,19 +464,19 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Passed | L | Export sent exactly the 16 visible ids, and 9 when filtered to Client |
 | persist | Built, not proven | — | Not reloaded |
 | permission | Passed | T | Export requires data.export; a user without it is refused (crmContacts.test.ts) |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Counts withheld rather than rendered as 0. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/companies` — Companies
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Built in this change and not opened in a browser by its author: the list, the search, the owner filter, the archived toggle and the paging are exercised through the API by crmCompanies.test.ts, which cannot prove a page renders |
+| open | Passed | L | Opened in a browser on 2026-09-16 with a real staff session (fixture owner, form sign-in) against seeded data on crm_verify_0916; the companies record rendered with its linked contacts. No console error attributable to the page. |
 | action | Built, not proven | — | Adding a company and applying reviewed suggestions are proven at the API (22 cases in crmCompanies.test.ts, including that applying twice creates nothing the second time); performing them in a browser is the reviewer's step |
 | persist | Built, not proven | — | Every write is read back from the database in the API suite, never from a reloaded page |
 | permission | Passed | T | An operations manager with leads.write revoked is refused create, edit, archive and apply with 403 and the database is then checked unchanged; deleting a company needs leads.delete, which is owner-only and refused for an operations manager (crmCompanies.test.ts) |
-| recovery | Built, not proven | — | The page carries an error panel with Try again for the list, for the suggestions dialog and for each action, but no failed request was induced in a browser to watch it recover |
-| mobile | Built, not proven | — | Written as stacked cards below md with wrapping controls, and one horizontally scrollable table above it, but not measured at 375px with the clipped-content metric |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. |
+| mobile | Passed | L | Measured at 375x812 on 2026-09-16 by the rule that overflow:hidden is not a fix: every element in main was checked for extending past the viewport WITHOUT a scrollable ancestor. 0 unreachable; documentElement.scrollWidth equalled the 375 viewport. |
 
 ### `/admin/crm/companies/:id` — Company record
 
@@ -496,8 +496,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/conversations and the refusal NAMES the permission ("communications.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no conversation counts shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/intelligence/behavioral` — Behavioral intelligence
@@ -518,7 +518,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/automation/failures and the refusal NAMES the permission ("settings.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
 | recovery | Built, not proven | — | Not exercised |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
@@ -529,8 +529,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
 | action | Passed | L | Read, assign and resolve each changed only their own fact |
 | persist | Passed | L | An unsent draft survived a full reload |
-| permission | Built, not proven | — | Not exercised with a restricted user |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/inbox/conversations and /api/crm/inbox/summary and the refusal NAMES the permission ("communications.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no message counts shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/tasks` — All tasks
@@ -538,10 +538,10 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened populated, deadline labels kind-aware (2026-09-15) |
-| action | Built, not proven | — | Not exercised on this page (tasks were created on My Day) |
+| action | Passed | L | Performed in a browser on 2026-09-16: the tab controls were operated and each bucket read back. Header figure and the tabs agree — 22 active, 22 reachable across five tabs (No date 20, Future 2) — where before the fix 22 were counted and 2 reachable. |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/tasks and the refusal NAMES the permission ("tasks.read.team"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "Couldn't load tasks. Check your connection and try again." with Retry. No task figure shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/calendar` — Calendar
@@ -552,7 +552,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Passed | L, R | On candidate a3c56b3 an appointment with an external attendee was created (201), rescheduled (200) and cancelled (200) in the browser. The invitation, the update and the cancellation each arrived in the controlled mailbox. Cancel's native confirmation was answered OK, as a user would, because this browser cannot show native dialogs |
 | persist | Passed | L | After a full reload and selecting Sep 17, the card showed the rescheduled 11:00–11:30 time, status cancelled, and “Cancellation sent” for both attendees |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no events or counts fabricated. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/deals` — Deals
@@ -562,8 +562,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
 | action | Built, not proven | — | The edit dialog was opened but no change was saved in the browser |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/deals and the refusal NAMES the permission ("deals.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Rendered "— Not available deals · — Not available total value" instead of "0 deals · $0". |
 | mobile | Passed | L | At 375px on a touch device the edit control was tapped and every dialog field was reachable |
 
 ### `/admin/crm/transactions` — Transactions
@@ -573,8 +573,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened with 4 real rows (2026-09-15) |
 | action | Passed | L | Total $16,000 and the count matched the list |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/transactions and the refusal NAMES the permission ("deals.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no payment totals shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/projects` — Projects
@@ -585,7 +585,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Rendered "— Not available projects across 14 stages". |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/documents` — Documents
@@ -595,8 +595,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened populated with the billing panel present (2026-09-15) |
 | action | Passed | L | From the billing panel, INV-00001 was drafted from the accepted quote (POST 201, line items carried across) and issued (200). The due-date prompt was answered with its proposed default, because this browser cannot show native prompts |
 | persist | Passed | L | After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/documents (the gate runs before the handler, which itself asks for a parent record) and the refusal NAMES the permission ("documents.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Rendered "Parts of this page could not be loaded"; share links no longer render "no links" for a refused read. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/support` — Support
@@ -617,8 +617,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened with a populated pipeline (2026-09-15) |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/pipeline and the refusal NAMES the permission ("leads.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "Couldn't load the pipeline. Check your connection and try again." with a Retry control. No stage counts invented. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/reporting` — Reporting
@@ -628,8 +628,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened with 39 figures and their definitions (2026-09-15) |
 | action | Built, not proven | — | Drill-down not exercised in the browser (proven by crmReports.test.ts only) |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/reports/summary and the refusal NAMES the permission ("reports.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered the server's own error text with Retry. Remaining numbers are range controls (7/30/90 days, 12 months); no figure, denominator or row count shown while the reads were failing. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/admin` — Admin hub
@@ -661,8 +661,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened with a real staff session (2026-09-15) |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/campaigns and the refusal NAMES the permission ("campaigns.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no sequence counts shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/campaign-builder` — Marketing
@@ -684,7 +684,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no queued-message count shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/discovery` — Discovery submissions
@@ -695,7 +695,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "— Not available submissions" rather than a zero. |
 | mobile | Passed | L | Rendered populated and measured at 375px after the 10-column table fix |
 
 ### `/admin/crm/intake-cases` — Intake cases
@@ -727,8 +727,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Built, not proven | — | Opened with a real session but it showed an empty state, so it has not been seen with data |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/email-templates and the refusal NAMES the permission ("communications.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "— Not available templates" rather than a zero. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/import` — Import contacts
@@ -739,7 +739,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Passed | L | Upload → preview (2 to create, 2 errors with reasons, 1 ignored column) → mapping → commit: 2 created, 2 failed |
 | persist | Built, not proven | — | The created contacts were not checked after a reload |
 | permission | Built, not proven | — | Not exercised with a restricted user |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. No display fetch to fail — the page is a file-upload form; it rendered its instructions intact under total outage and invented nothing. The only number shown is its own 5,000-row limit copy. |
 | mobile | Passed | L | At 375px the plan table scrolls inside its own 342px container |
 
 ### `/admin/crm/duplicates` — Duplicate review
@@ -749,8 +749,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened with 10 real duplicate pairs (2026-09-15) |
 | action | Passed | L, T | A merge kept history from both sides and deleted nothing |
 | persist | Built, not proven | — | Not reloaded after the merge |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/contacts/duplicates and the refusal NAMES the permission ("leads.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Stated the failure; no duplicate count shown. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/settings` — Settings
@@ -760,8 +760,8 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | open | Passed | L | Opened populated with a real staff session (2026-09-15) |
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/settings/status and the refusal NAMES the permission ("settings.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against the disposable crm_verify_0916, frontend 22066, fixture owner signed in through the real form): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. Rendered "Parts of this page could not be loaded"; no health score computed from refused reads. |
 | mobile | Passed | L | One unbreakable Twilio SID was clipped at 375px; re-measured after the fix with the clipped-content metric: 0 |
 
 ### `/admin/crm/people` — People
@@ -790,11 +790,11 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Opened with a real session; its tabs showed empty states, so it has not been seen with data |
+| open | Passed | L | Opened in a browser on 2026-09-16 with a real staff session against seeded data; the delivery board rendered with five seeded records visible. |
 | action | Built, not proven | — | Retry and acknowledge on the Automation tab are proven by tests only |
 | persist | Built, not proven | — | Not exercised |
-| permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| permission | Passed | T | Proven by crossing the line on 2026-09-16 against the verification stack (API 8090, disposable crm_verify_0916), with three real staff sessions: an owner, an operations manager, and a restricted fixture of the same role carrying 13 revoked grants. The restricted session is refused 403 on GET /api/crm/operations/jobs and the refusal NAMES the permission ("settings.read"), while the operations manager holding it is served normally — so it is scoped, not a blanket refusal. The owner is refused none of it. |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. |
 | mobile | Passed | L | Real 375×812 viewport with live data, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/my-day` — My Day

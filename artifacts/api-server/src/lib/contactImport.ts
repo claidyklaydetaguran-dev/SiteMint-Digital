@@ -253,7 +253,7 @@ const SOURCE_SET = new Set<string>(CRM_SOURCES);
  * These are conversions somebody decided once and wrote down, not guesses made
  * per row — and every application of one is reported in the row's `notices`.
  */
-const LEGACY_STATUS: Record<string, string> = {
+export const LEGACY_STATUS: Record<string, string> = {
   "new": "New Inquiry",
   "contacted": "Follow-Up Needed",
   "follow-up": "Follow-Up Needed",
@@ -265,7 +265,7 @@ const LEGACY_STATUS: Record<string, string> = {
   "closed lost": "Lost",
 };
 
-function coerceEnum(
+export function coerceEnum(
   raw: string, valid: Set<string>, legacy: Record<string, string> | null,
 ): { value: string | null; matched: "exact" | "case" | "legacy" | "none" } {
   const trimmed = raw.trim();

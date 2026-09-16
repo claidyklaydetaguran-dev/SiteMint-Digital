@@ -16,6 +16,22 @@
         "BASE_PATH": "/",
         "API_PROXY_TARGET": "http://localhost:8080"
       }
+    },
+    {
+      "name": "web-agency-verify",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@workspace/web-agency",
+        "run",
+        "dev"
+      ],
+      "port": 22066,
+      "env": {
+        "BASE_PATH": "/",
+        "API_PROXY_TARGET": "http://localhost:8090",
+        "PORT": "22066"
+      }
     }
   ]
 }
