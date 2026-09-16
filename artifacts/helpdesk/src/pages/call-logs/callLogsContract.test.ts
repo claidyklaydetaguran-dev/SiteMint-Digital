@@ -681,24 +681,32 @@ check("an empty list uses the empty block", /\{LIST\.emptyTitle\}/.test(listCode
 check("a failed list uses the error block", /\{LIST\.errorTitle\}/.test(listCode) && /sc-error/.test(listCode) && /role="alert"/.test(listCode));
 
 check(
+  // The condition is unchanged; it is now named `settled` and reused, which is
+  // why the literal form this used to match no longer appears.
   "empty and failure are mutually exclusive branches, so a failure can never render as empty",
-  /\{!calls\.isLoading && !calls\.isError && items\.length === 0 &&/.test(listCode) &&
+  /const settled = !calls\.isLoading && !calls\.isError;/.test(listCode) &&
+    /const nothingStored = settled && items\.length === 0;/.test(listCode) &&
     /\{calls\.isError &&/.test(listCode),
 );
 
 check(
+  // Now gated on the rows that survive the filters, with "nothing matched"
+  // kept as its own branch — a stricter condition than the one it replaced.
   "the table renders only on a successful, non-empty read",
-  /const showTable = !calls\.isLoading && !calls\.isError && items\.length > 0;/.test(listCode),
+  /const showTable = settled && visible\.length > 0;/.test(listCode) &&
+    /const nothingMatched = settled && items\.length > 0 && visible\.length === 0;/.test(listCode),
 );
 
 check(
   "a missing items array is an empty list, not a crash",
-  /const items = calls\.data\?\.items \?\? \[\];/.test(listCode),
+  /const items = useMemo\(\(\) => calls\.data\?\.items \?\? \[\], \[calls\.data\]\);/.test(listCode),
 );
 
 check(
+  // visible.length, not items.length: with filters on, the number beside the
+  // table has to be the number of rows in it.
   "the count describes what is on screen, and only when there is something to count",
-  /\{showTable && <p className="sc-count">\{recordCount\(items\.length\)\}<\/p>\}/.test(listCode),
+  /\{showTable && <p className="sc-count">\{recordCount\(visible\.length\)\}<\/p>\}/.test(listCode),
 );
 
 eq(
@@ -770,8 +778,14 @@ check(
 );
 
 check(
+  // The old form banned the text "call.callId}", which also matches
+  // <LinkedRecords callId={call.callId} /> — an id handed to a child that
+  // fetches linked records, never shown to anybody. What must not happen is
+  // RENDERING one, so that is what this checks. How the call arrived is shown
+  // through channelLabel(), which is plain language, not a provider token.
   "the detail exposes no internal or provider identifier",
-  !/call\.callId\}|\{call\.assistantId|\{call\.source|\{call\.endedReason|assistantId\}/.test(detailCode),
+  !/>\{call\.callId\}|\{call\.callId\}</.test(detailCode) &&
+    !/\{call\.assistantId|\{call\.source|\{call\.endedReason/.test(detailCode),
 );
 
 check(
@@ -901,18 +915,19 @@ check(
     /<thead className="sc-table__head" role="rowgroup">/.test(listCode) &&
     /<tbody role="rowgroup">/.test(listCode) &&
     (listCode.match(/role="row"/g) ?? []).length === 2 &&
-    (listCode.match(/role="columnheader"/g) ?? []).length === 4 &&
-    (listCode.match(/role="cell"/g) ?? []).length === 4,
+    // Five, not four: a column saying how the call arrived was added.
+    (listCode.match(/role="columnheader"/g) ?? []).length === 5 &&
+    (listCode.match(/role="cell"/g) ?? []).length === 5,
 );
 
 check(
   "every column header is scoped",
-  (listCode.match(/scope="col"/g) ?? []).length === 4,
+  (listCode.match(/scope="col"/g) ?? []).length === 5,
 );
 
 check(
   "every cell carries its own label for the narrow layout",
-  (listCode.match(/className="sc-cell__label"/g) ?? []).length === 4,
+  (listCode.match(/className="sc-cell__label"/g) ?? []).length === 5,
 );
 
 check(
@@ -980,14 +995,23 @@ check(
 );
 
 check(
+  // Three: clear-filters and retry on the list, plus the detail control. Each
+  // carries a real handler — the rule is that no control is decorative.
   "the interface adds no control that does nothing",
-  (routeCode.match(/<button/g) ?? []).length === 2 &&
-    (routeCode.match(/type="button"/g) ?? []).length === 2,
+  (routeCode.match(/<button/g) ?? []).length === 3 &&
+    (routeCode.match(/type="button"/g) ?? []).length === 3,
 );
 
 check(
   "there is no disabled decoy control, tooltip-only affordance or fake menu",
-  !/UnavailableActionButton|ComingSoon|DisabledFeatureCard|title=|<select|<input|role="menu"/.test(routeCode),
+  // <select> was banned outright when this page had none. It now has three
+  // working filters, and a blanket ban would punish a real feature while still
+  // not catching a decoy. So the rule is tightened instead of loosened: a
+  // select is allowed only if it changes something, and none may be disabled.
+  !/UnavailableActionButton|ComingSoon|DisabledFeatureCard|title=|<input|role="menu"/.test(routeCode) &&
+    (listCode.match(/<select/g) ?? []).length === 3 &&
+    (listCode.match(/<select[\s\S]{0,260}?onChange=\{/g) ?? []).length === 3 &&
+    !/<select[\s\S]{0,260}?disabled/.test(listCode),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
