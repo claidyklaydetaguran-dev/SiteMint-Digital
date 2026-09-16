@@ -136,6 +136,7 @@ export default function Appointments() {
       {addOpen && (
         <AddAppointmentPanel
           config={configQuery.data?.config}
+          configFailed={configQuery.isError}
           onClose={() => setAddOpen(false)}
           onDone={(notice) => setAddNotice(notice)}
         />

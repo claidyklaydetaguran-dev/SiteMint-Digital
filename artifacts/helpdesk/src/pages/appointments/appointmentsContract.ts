@@ -419,6 +419,10 @@ export const ADD = {
   slotsLoading: "Checking that day…",
   slotsEmpty: "No times available on that day.",
   slotsFailed: "Those times couldn't be loaded. Try again shortly.",
+  // Never let the service list read as "this business has no services". An
+  // empty picker with no explanation is how an owner concludes the feature is
+  // broken, or that their setup was lost.
+  configFailed: "We couldn't load your services just now, so this list is empty. It doesn't mean you have none — try again shortly.",
   pickSlotFirst: "Choose a time.",
 
   nameLabel: "Client name",

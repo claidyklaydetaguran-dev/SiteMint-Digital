@@ -196,7 +196,11 @@ export function AppointmentDetailDrawer({
                   <dt className="text-muted-foreground">{DETAIL.typeLabel}</dt>
                   <dd>{typeName(config, request.appointmentTypeId)}</dd>
                   <dt className="text-muted-foreground">{DETAIL.whenLabel}</dt>
-                  <dd>{slotDateTime(request.startUtc, config?.timezone ?? "UTC")}</dd>
+                  <dd>
+                    {config?.timezone !== undefined
+                      ? slotDateTime(request.startUtc, config.timezone)
+                      : `${slotDateTime(request.startUtc, "UTC")} UTC`}
+                  </dd>
                   <dt className="text-muted-foreground">{DETAIL.sourceLabel}</dt>
                   <dd>{sourceLabel(request.source)}</dd>
                   <dt className="text-muted-foreground">Status</dt>
