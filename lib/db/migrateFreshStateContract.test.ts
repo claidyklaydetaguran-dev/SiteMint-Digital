@@ -204,10 +204,24 @@ const INITIALIZED_DATABASE = {
 //                 Its companion `crm_leads.assigned_to_staff_id` is a COLUMN on
 //                 an existing table and is not in this count.
 //
+// 83: one more, additive, with no existing table altered.
+//
+//   email (1): crm_email_provider_events — every verified delivery and
+//              engagement event the mail provider sends about mail the CRM
+//              SENT, stored before it is interpreted. One row per svix-id, so
+//              a provider retry or a dashboard replay cannot double-count an
+//              open; delivery state and engagement are DERIVED from these rows
+//              rather than materialised beside them, so an event arriving out
+//              of order cannot leave a stale summary behind. Reviewed DDL:
+//              docs/crm-ops/schema/M6-email-provider-events.sql.
+//              It references nothing and nothing references it: records carry
+//              the provider's message id, or the crm_ref tag the send put on
+//              the message, and are matched on either.
+//
 // This number is a guard, not bookkeeping: it is what makes a table added
 // without review visible. Raise it only alongside the list above, so the
 // arithmetic can be checked rather than taken on trust.
-check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARREL.length}`);
+check("the shared barrel derives 83 base tables", BARREL.length === 83, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
@@ -215,8 +229,8 @@ check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARRE
 // (+scheduling_date_exceptions), voice 0011 (+voice_business_profiles).
 check("the committed migrations derive 34 domain tables", DOMAIN.length === 34, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 116 public tables", // 34 domain + 82 barrel
-  APPLICATION.length === 116,
+  "the application owns exactly 117 public tables", // 34 domain + 83 barrel
+  APPLICATION.length === 117,
   `${APPLICATION.length}`,
 );
 check(
