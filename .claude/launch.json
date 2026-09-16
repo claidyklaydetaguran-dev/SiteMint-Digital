@@ -11,7 +11,11 @@
         "dev"
       ],
       "port": 22065,
-      "autoPort": true
+      "autoPort": true,
+      "env": {
+        "BASE_PATH": "/",
+        "API_PROXY_TARGET": "http://localhost:8080"
+      }
     }
   ]
 }
