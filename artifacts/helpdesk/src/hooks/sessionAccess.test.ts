@@ -7,7 +7,9 @@
 //
 // Plain `tsx` runner, like every other contract test in this app.
 
-import { classifySessionAccess } from "./useSession.js";
+// Imports the rule directly, not through useSession: that file imports
+// `@/lib/api`, which plain tsx cannot resolve.
+import { classifySessionAccess } from "./sessionAccess.js";
 
 let failures = 0;
 function check(name: string, condition: boolean, detail = ""): void {

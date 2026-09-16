@@ -34,36 +34,14 @@ export function useLogout() {
   };
 }
 
-/**
- * What a failed session request actually means.
- *
- * The dashboard used to treat every session error as "signed out" and send the
- * person to the login page. A request that never completed — a restarting
- * instance, a dropped connection, a laptop waking up — counted as a refusal,
- * so an operator or a business owner could be thrown out of a half-filled form
- * by a blip that had nothing to do with their session.
- *
- *   "allowed"     — the server answered with a session.
- *   "denied"      — the server answered 401/403. This is the only signed-out
- *                   signal, and the only one that navigates away.
- *   "unreachable" — no answer, or the server failed. The page stays as it is
- *                   and says so; the next successful request clears it.
- */
-export type SessionAccess = "loading" | "allowed" | "denied" | "unreachable";
+// The rule itself lives in `sessionAccess.ts`, which imports nothing — no
+// React, no React Query, no `@/` alias. Its contract test runs under plain
+// tsx, and reaching it through this file would drag in `@/lib/api` and fail
+// at module load. Re-exported here so existing callers are unaffected.
+import { classifySessionAccess, type SessionAccess } from "./sessionAccess.js";
 
-export function classifySessionAccess(state: {
-  isLoading: boolean;
-  isError: boolean;
-  error?: unknown;
-  hasData: boolean;
-}): SessionAccess {
-  if (state.isLoading) return "loading";
-  if (state.isError) {
-    const status = (state.error as { status?: unknown } | undefined)?.status;
-    return status === 401 || status === 403 ? "denied" : "unreachable";
-  }
-  return state.hasData ? "allowed" : "unreachable";
-}
+export { classifySessionAccess };
+export type { SessionAccess };
 
 /** The session, classified — see `classifySessionAccess`. */
 export function useSessionAccess(): { access: SessionAccess; refetch: () => void } {
