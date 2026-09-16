@@ -64,7 +64,11 @@ const REACHABLE_STATE_LABEL: Partial<Record<AppointmentRequestState, string>> = 
   pending_review: "Pending review",
   held: "Held",
   booked: "Booked",
-  rescheduled: "Rescheduled",
+  // `rescheduled` is only ever the OLD row of a reschedule — the one that was
+  // replaced and whose calendar event has been removed. "Rescheduled" read as
+  // though it were the live appointment at its new time, which is a different
+  // row entirely (a fresh pending request awaiting approval).
+  rescheduled: "Replaced",
   cancelled: "Cancelled",
   expired: "Expired",
 };
@@ -80,14 +84,25 @@ export function requestStateLabel(state: string): string {
 export type StateTone = "attention" | "neutral" | "settled" | "muted";
 
 export function requestStateTone(state: string): StateTone {
-  if (state === "pending_review") return "attention";
-  if (state === "held") return "neutral";
-  if (state === "booked" || state === "rescheduled") return "settled";
+  // A held row is waiting on the owner exactly as a pending one is, so it
+  // carries the same tone rather than a quieter one.
+  if (state === "pending_review" || state === "held") return "attention";
+  if (state === "booked") return "settled";
+  // A replaced row holds no time and needs nothing — it is history.
   return "muted";
 }
 
+/**
+ * Approve is offered for exactly the states the server will approve.
+ *
+ * `approveRequestToBooked` (lib/calendar/calendarEventSync.ts) accepts
+ * `pending_review` *and* `held`, but this only offered it for the first. A
+ * held row therefore sat under "Needs your decision" with no way to decide it:
+ * the one action that would resolve it was hidden, even though the endpoint
+ * behind it works.
+ */
 export function canApprove(state: string): boolean {
-  return state === "pending_review";
+  return state === "pending_review" || state === "held";
 }
 
 export function canReschedule(state: string): boolean {
@@ -165,7 +180,7 @@ export const GROUPS: Record<AppointmentGroupId, { heading: string; detail: strin
     emptyDetail: "No confirmed appointments yet.",
   },
   closed: {
-    heading: "Cancelled and expired",
+    heading: "Cancelled, replaced and expired",
     detail: "Kept for your records. These hold no time in the calendar.",
     emptyDetail: "Nothing here.",
   },
@@ -173,9 +188,18 @@ export const GROUPS: Record<AppointmentGroupId, { heading: string; detail: strin
 
 export const GROUP_ORDER: AppointmentGroupId[] = ["decide", "confirmed", "closed"];
 
+/**
+ * `rescheduled` is closed, not confirmed.
+ *
+ * It was listed under "Confirmed appointments", which put the old, replaced
+ * row — cancelled, its calendar event deleted, nobody expected to turn up —
+ * beside the appointments that are genuinely going ahead. A business reading
+ * that list saw two entries for one customer and no way to tell which one was
+ * real.
+ */
 export function groupForState(state: string): AppointmentGroupId {
   if (state === "pending_review" || state === "held" || state === "requested") return "decide";
-  if (state === "booked" || state === "rescheduled") return "confirmed";
+  if (state === "booked") return "confirmed";
   return "closed";
 }
 
@@ -232,11 +256,22 @@ export const DETAIL = {
   reschedulePickHeading: "Pick a new time",
   reschedulePendingLabel: "Rescheduling…",
   rescheduleConfirmLabel: "Confirm new time",
-  rescheduleSuccessTitle: "Appointment rescheduled",
-  rescheduleSuccessDetail: "The calendar event was updated to the new time.",
+  // What the server actually does (`rescheduleBookedRequest`): it creates a
+  // NEW pending request at the new time, moves the original booked→rescheduled,
+  // and removes the original's calendar event. It updates no event and books
+  // nothing. The old sentence — "The calendar event was updated to the new
+  // time." — described none of that, and left a business believing the new
+  // time was on the calendar when it was still waiting to be approved.
+  rescheduleSuccessTitle: "New time requested",
+  rescheduleSuccessDetail:
+    "The original appointment is cancelled and its calendar event removed. The new time is a request waiting for your approval — nothing is on the calendar for it until you approve it.",
   rescheduleFailedTitle: "This appointment wasn't rescheduled",
   reschedulePickDay: "Select an open day",
   rescheduleSlotsEmpty: "No times left on this day.",
+  // Never "no times left" — a failed read says nothing about the day. Telling
+  // an owner a day is full while they have a customer on the phone loses the
+  // appointment.
+  rescheduleSlotsFailed: "Those times couldn't be loaded, so we can't tell you what's free. Try again shortly.",
   rescheduleCancel: "Cancel",
 
   cancelLabel: "Cancel appointment",
@@ -277,7 +312,7 @@ export function statusHistory(state: string, createdAt: string): StatusStep[] {
       created,
       { label: "Pending review", tone: "done", at: null },
       { label: "Booked", tone: "done", at: null },
-      { label: "Rescheduled", tone: "current", at: null },
+      { label: "Replaced by a new time", tone: "current", at: null },
     ];
   }
   return [created, { label: requestStateLabel(state), tone: "current", at: null }];
@@ -384,6 +419,10 @@ export const ADD = {
   slotsLoading: "Checking that day…",
   slotsEmpty: "No times available on that day.",
   slotsFailed: "Those times couldn't be loaded. Try again shortly.",
+  // Never let the service list read as "this business has no services". An
+  // empty picker with no explanation is how an owner concludes the feature is
+  // broken, or that their setup was lost.
+  configFailed: "We couldn't load your services just now, so this list is empty. It doesn't mean you have none — try again shortly.",
   pickSlotFirst: "Choose a time.",
 
   nameLabel: "Client name",

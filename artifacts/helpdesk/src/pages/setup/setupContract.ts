@@ -44,8 +44,13 @@ export const SETUP_STEP_KEYS = [
 
 export type SetupStepKey = (typeof SETUP_STEP_KEYS)[number];
 
-export type StepStatus = "pending" | "done" | "blocked";
-export type DisplayStatus = "done" | "next" | "pending" | "blocked";
+/**
+ * `unknown` is "not checked": the signal this step depends on could not be
+ * read, so SiteMint does not know. It is deliberately not the same as
+ * `pending` (we know it is outstanding) and must never be shown as `done`.
+ */
+export type StepStatus = "pending" | "done" | "blocked" | "unknown";
+export type DisplayStatus = "done" | "next" | "pending" | "blocked" | "unknown";
 
 export interface SetupStepMeta {
   key: SetupStepKey;
@@ -107,8 +112,12 @@ export const SETUP_STEPS: SetupStepMeta[] = [
   },
   {
     key: "test_call",
-    title: "Browser test call",
-    detail: "Test your receptionist with a call from your browser before it goes live.",
+    // Worded for what actually settles it: a call record existing. The old
+    // title named one particular way of producing that record (a browser
+    // test), which is not what the tick is read from and not the only way to
+    // get one.
+    title: "Test call",
+    detail: "Place a call to your receptionist and check how it answers. This is done once SiteMint has a record of a real call.",
     href: "/assistants",
   },
   {
@@ -127,9 +136,41 @@ export const SETUP_STEPS: SetupStepMeta[] = [
 
 export const BLOCKED_FALLBACK_REASON = "Complete the previous steps first.";
 
-/** The steps inferable from real, already-loaded data — never from a guess. */
+/**
+ * What to say when recording progress on the server fails.
+ *
+ * The wording matters because of what this page now is: every status below is
+ * worked out from live configuration on each visit, not read back from a
+ * stored tick. So a failed write costs the saved *record* of progress and
+ * nothing else — the checklist a customer is looking at is still correct. The
+ * sentence says that rather than implying their setup was lost, and it is
+ * shown rather than swallowed, which is the whole point: the previous version
+ * fired this write with `void`, every request was rejected with a 400, and the
+ * page reported success anyway.
+ */
+export const PROGRESS_SAVE = {
+  failedTitle: "Your progress wasn't recorded",
+  failedDetail:
+    "Everything shown here is still correct — it is worked out from your live settings each time you open this page. Only SiteMint's saved record of it didn't update.",
+  retryLabel: "Try again",
+} as const;
+
+/**
+ * What SiteMint can actually check, and what "checked" means for each.
+ *
+ * Every field is `boolean | null`: `true` the capability is genuinely in
+ * place, `false` it genuinely is not, `null` SiteMint could not find out. That
+ * third case is why this shape exists — a failed or unavailable read is
+ * reported as "not checked" rather than being quietly folded into either
+ * answer.
+ *
+ * These are capabilities, not ticks. A step reads done because the
+ * configuration behind it is in place *now*, so a calendar whose access is
+ * later withdrawn, or a number that is released, stops reading as done on the
+ * next visit rather than keeping a tick it can no longer justify.
+ */
 export interface SetupSignals {
-  /** From agent-config: firm name and industry both present. */
+  /** From the business profile: firm name and industry both present. */
   businessComplete: boolean | null;
   /**
    * From the account email-status read, which asks the SAME resolver the
@@ -137,39 +178,97 @@ export interface SetupSignals {
    * that a column somewhere looks right.
    */
   emailVerified: boolean | null;
-  /** From the availability config query: a config row exists. */
+  /** An assistant exists and its own status is exactly "published". */
+  assistantPublished: boolean | null;
+  /**
+   * The voice provider is running the configuration saved here. Not a step of
+   * its own — Overview uses it to decide whether "Live" is a claim this
+   * account has actually earned.
+   */
+  assistantSynchronized: boolean | null;
+  /**
+   * From the saved assistant configuration: there is a prompt, and a greeting
+   * whenever the assistant is the one who speaks first. An assistant set to
+   * speak first with nothing to say is not a finished step.
+   */
+  promptReady: boolean | null;
+  /** From the saved assistant configuration: a supported voice preset is chosen. */
+  voiceChosen: boolean | null;
+  /** At least one open weekday AND a timezone the server will accept. */
   availabilityConfigured: boolean | null;
-  /** From the calendar-status query. */
-  calendarConnected: boolean | null;
-  /** From the voice numbers query: at least one number is assigned to this firm. */
+  /**
+   * At least one appointment type that is actually accepting bookings. A
+   * catalogue of switched-off types books nobody.
+   */
+  appointmentTypesReady: boolean | null;
+  /**
+   * Connected, usable, and pointed at a chosen calendar. A withdrawn or
+   * failing connection is not done — that is the difference between "set up"
+   * and "working", and only the second earns a tick.
+   */
+  calendarReady: boolean | null;
+  /** A number this firm owns whose state is exactly "assigned". */
   phoneAssigned: boolean | null;
+  /** SiteMint holds a record of at least one real call. */
+  testCallMade: boolean | null;
 }
 
 const NO_SIGNAL: SetupSignals = {
   businessComplete: null,
   emailVerified: null,
+  assistantPublished: null,
+  assistantSynchronized: null,
+  promptReady: null,
+  voiceChosen: null,
   availabilityConfigured: null,
-  calendarConnected: null,
+  appointmentTypesReady: null,
+  calendarReady: null,
   phoneAssigned: null,
+  testCallMade: null,
 };
 
 export { NO_SIGNAL as EMPTY_SETUP_SIGNALS };
 
-function inferredDone(key: SetupStepKey, signals: SetupSignals): boolean {
+/** Shown wherever a step's own signal could not be read. */
+export const NOT_CHECKED_DETAIL =
+  "SiteMint couldn't check this just now. Open it to see where it stands.";
+
+/**
+ * The one signal each step is answered by, or `undefined` for a step no
+ * signal can settle. Written as an exhaustive switch so a step added later
+ * cannot silently inherit another step's answer.
+ */
+function signalFor(key: SetupStepKey, signals: SetupSignals): boolean | null | undefined {
   switch (key) {
     case "business":
-      return signals.businessComplete === true;
+      return signals.businessComplete;
     case "email_verified":
-      return signals.emailVerified === true;
+      return signals.emailVerified;
+    case "assistant":
+      return signals.assistantPublished;
+    case "prompt":
+      return signals.promptReady;
+    case "voice":
+      return signals.voiceChosen;
     case "availability":
-      return signals.availabilityConfigured === true;
+      return signals.availabilityConfigured;
+    case "appointment_types":
+      return signals.appointmentTypesReady;
     case "calendar":
-      return signals.calendarConnected === true;
+      return signals.calendarReady;
+    case "test_call":
+      return signals.testCallMade;
     case "phone_number":
-      return signals.phoneAssigned === true;
-    default:
-      return false;
+      return signals.phoneAssigned;
+    // Requesting activation is an action taken with SiteMint, not a capability
+    // to measure, so it is only ever the server's saved record.
+    case "review":
+      return undefined;
   }
+  // Unreachable while the switch covers the whole union, and written out so it
+  // stays that way: a step key added without a case here answers "not checked"
+  // rather than silently inheriting the saved tick.
+  return undefined;
 }
 
 export interface SavedStep {
@@ -179,9 +278,24 @@ export interface SavedStep {
 export type SavedSteps = Partial<Record<SetupStepKey, SavedStep>>;
 
 /**
- * The combined status for every step, in order. `done` wins over everything;
- * a saved `blocked` is preserved unless real data now proves it done; every
- * other case is `pending`.
+ * The status of every step, in order — and the single function both the Setup
+ * hub and Overview read, so the two screens cannot disagree about whether an
+ * account is ready.
+ *
+ * Derivation is authoritative; the saved tick is not. This used to treat a
+ * stored `done` as final and let inference only ever upgrade toward it, which
+ * meant a step stayed ticked long after the thing it described stopped being
+ * true — a calendar whose access was withdrawn, a number that was released.
+ * The live answer now wins:
+ *
+ *   - signal true    → `done`;
+ *   - signal false   → `pending`, or `blocked` when the server recorded a
+ *                      block (that carries a reason this page cannot
+ *                      reconstruct, so it is preserved);
+ *   - signal absent  → `unknown` — "not checked", and never `done`.
+ *
+ * Only `review` still comes from saved state, because it records an action
+ * rather than a capability.
  */
 export function deriveStepStatuses(
   saved: SavedSteps,
@@ -190,10 +304,16 @@ export function deriveStepStatuses(
   const result = {} as Record<SetupStepKey, StepStatus>;
   for (const meta of SETUP_STEPS) {
     const savedStatus = saved[meta.key]?.status ?? "pending";
-    if (savedStatus === "done" || inferredDone(meta.key, signals)) {
-      result[meta.key] = "done";
-    } else {
+    const signal = signalFor(meta.key, signals);
+
+    if (signal === undefined) {
       result[meta.key] = savedStatus;
+    } else if (signal === true) {
+      result[meta.key] = "done";
+    } else if (signal === false) {
+      result[meta.key] = savedStatus === "blocked" ? "blocked" : "pending";
+    } else {
+      result[meta.key] = "unknown";
     }
   }
   return result;
@@ -206,8 +326,9 @@ export function deriveStepStatuses(
  * page load never issues a write when nothing changed.
  */
 export function newlyInferredDone(saved: SavedSteps, signals: SetupSignals): SetupStepKey[] {
-  const keys: SetupStepKey[] = ["business", "email_verified", "availability", "calendar", "phone_number"];
-  return keys.filter((key) => saved[key]?.status !== "done" && inferredDone(key, signals));
+  return SETUP_STEPS.map((meta) => meta.key).filter(
+    (key) => saved[key]?.status !== "done" && signalFor(key, signals) === true,
+  );
 }
 
 export interface DisplayStep extends SetupStepMeta {
@@ -232,6 +353,13 @@ export function buildDisplaySteps(statuses: Record<SetupStepKey, StepStatus>): D
     if (raw === "blocked") {
       firstIncompleteSeen = true;
       return { ...meta, status: "blocked", blockedReason: BLOCKED_FALLBACK_REASON };
+    }
+    // A step SiteMint could not check keeps its own label rather than being
+    // called "next": naming it the next thing to do would assert it is
+    // outstanding, which is exactly what could not be established.
+    if (raw === "unknown") {
+      firstIncompleteSeen = true;
+      return { ...meta, status: "unknown" };
     }
     // raw === "pending"
     if (!firstIncompleteSeen) {
@@ -262,7 +390,20 @@ export interface NextAction {
 
 /** The single next-action button (S-3: "one next action"). */
 export function buildNextAction(display: DisplayStep[]): NextAction {
-  const target = display.find((s) => s.status === "next" || s.status === "blocked");
+  // An unchecked step counts as somewhere to go. Without it, a page that could
+  // not read one step would fall through to the "everything is complete"
+  // branch below and congratulate the customer on a setup it never verified.
+  const target = display.find(
+    (s) => s.status === "next" || s.status === "blocked" || s.status === "unknown",
+  );
+  if (target?.status === "unknown") {
+    return {
+      title: target.title,
+      detail: NOT_CHECKED_DETAIL,
+      actionLabel: "Open this step",
+      href: target.href ?? "#review",
+    };
+  }
   if (!target) {
     const review = display.find((s) => s.key === "review")!;
     return {

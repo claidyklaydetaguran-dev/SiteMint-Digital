@@ -101,21 +101,38 @@ section("State reachability and tone");
 
 eq("pending_review labels correctly", requestStateLabel("pending_review"), "Pending review");
 eq("booked is now a named, reachable label", requestStateLabel("booked"), "Booked");
-eq("rescheduled is now a named, reachable label", requestStateLabel("rescheduled"), "Rescheduled");
+// The old row of a reschedule is the one that was REPLACED — cancelled, its
+// event removed. "Rescheduled" read as though it were the live appointment at
+// its new time, which is a different row entirely.
+eq("the replaced row is named for what happened to it", requestStateLabel("rescheduled"), "Replaced");
 eq("cancelled labels correctly", requestStateLabel("cancelled"), "Cancelled");
 eq("an unknown state is humanised, never invented", requestStateLabel("some_future_state"), "Some future state");
 eq("empty state is Unknown", requestStateLabel(""), "Unknown");
 
 eq("booked carries a settled tone, not muted", requestStateTone("booked"), "settled");
-eq("rescheduled carries a settled tone", requestStateTone("rescheduled"), "settled");
+eq("a replaced row is history, not a settled appointment", requestStateTone("rescheduled"), "muted");
 eq("pending_review carries an attention tone", requestStateTone("pending_review"), "attention");
+eq("a held row needs the owner just as much", requestStateTone("held"), "attention");
 eq("cancelled carries a muted tone", requestStateTone("cancelled"), "muted");
 
 // ═══════════════════════════════════════════════════════════════════════════
 section("Action availability, exactly matching the calendar router's own state guards");
 // ═══════════════════════════════════════════════════════════════════════════
 
-check("only pending_review can be approved", canApprove("pending_review") && !canApprove("held") && !canApprove("booked") && !canApprove("cancelled"));
+// `approveRequestToBooked` accepts pending_review AND held, but only the first
+// was offered — so a held row sat under "Needs your decision" with no way to
+// decide it, while the endpoint that would resolve it worked fine.
+check(
+  "the two states the server approves are the two the page offers",
+  canApprove("pending_review") && canApprove("held") &&
+    !canApprove("booked") && !canApprove("cancelled") && !canApprove("rescheduled"),
+);
+check(
+  "and that matches the server's own guard",
+  /request\.status !== "pending_review" && request\.status !== "held"/.test(
+    read("artifacts/api-server/src/lib/calendar/calendarEventSync.ts"),
+  ),
+);
 check("only booked can be rescheduled", canReschedule("booked") && !canReschedule("pending_review") && !canReschedule("cancelled"));
 check("pending_review, held and booked can be cancelled; nothing else can", (
   canCancel("pending_review") && canCancel("held") && canCancel("booked") &&
@@ -161,7 +178,7 @@ section("Status history is derived, never fabricated beyond what's certain");
 const createdAt = "2026-01-01T00:00:00.000Z";
 eq("pending_review history is Created → Pending review", statusHistory("pending_review", createdAt).map((s) => s.label), ["Created", "Pending review"]);
 eq("booked history shows the full approved path", statusHistory("booked", createdAt).map((s) => s.label), ["Created", "Pending review", "Booked"]);
-eq("rescheduled history extends the booked path", statusHistory("rescheduled", createdAt).map((s) => s.label), ["Created", "Pending review", "Booked", "Rescheduled"]);
+eq("the replaced row's history ends by saying it was replaced", statusHistory("rescheduled", createdAt).map((s) => s.label), ["Created", "Pending review", "Booked", "Replaced by a new time"]);
 check("cancelled history does not invent an intermediate state it can't know", statusHistory("cancelled", createdAt).length === 2);
 check("exactly one step is marked current", statusHistory("booked", createdAt).filter((s) => s.tone === "current").length === 1);
 eq("Created always carries the real createdAt timestamp", statusHistory("booked", createdAt)[0]!.at, createdAt);
@@ -209,7 +226,10 @@ section("requests and confirmed appointments are kept apart");
 eq("a request nobody has accepted needs a decision", groupForState("pending_review"), "decide");
 eq("a held slot needs a decision too", groupForState("held"), "decide");
 eq("a booked appointment is confirmed", groupForState("booked"), "confirmed");
-eq("a rescheduled appointment is still confirmed", groupForState("rescheduled"), "confirmed");
+// The replaced row — cancelled, its event deleted, nobody turning up — used to
+// sit beside appointments that are genuinely going ahead, so a business saw
+// two entries for one customer with no way to tell which was real.
+eq("the replaced row of a reschedule is closed, not confirmed", groupForState("rescheduled"), "closed");
 eq("a cancelled appointment is closed", groupForState("cancelled"), "closed");
 eq("an expired one is closed", groupForState("expired"), "closed");
 eq("an unknown state is closed rather than silently confirmed", groupForState("something_new"), "closed");
@@ -304,6 +324,47 @@ section("when the calendar never answered");
   check("and there is exactly one insert call in the approval path", (syncSrc.match(/insertEvent\(/g) ?? []).length === 1);
 }
 
+
+section("what a reschedule actually does to each row");
+
+// The server creates a NEW pending request at the new time, moves the original
+// booked→rescheduled, and deletes the original's event. It updates no event and
+// books nothing — so "The calendar event was updated to the new time." described
+// something that never happened, and left a business believing the new time was
+// on the calendar while it was still waiting to be approved.
+{
+  const detail = DETAIL.rescheduleSuccessDetail;
+  check("it says what happened to the original", /cancelled|removed/i.test(detail));
+  check("it says the replacement still needs approving", /approv/i.test(detail));
+  check("it no longer claims an event was updated", !/updated to the new time/i.test(detail));
+  check("and it never calls the new time booked or confirmed", !/\bbooked\b|\bconfirmed\b/i.test(detail));
+  check("the title does not announce a finished reschedule", !/rescheduled/i.test(DETAIL.rescheduleSuccessTitle));
+
+  const syncSrc = read("artifacts/api-server/src/lib/calendar/calendarEventSync.ts");
+  check("the server really does create a replacement request", syncSrc.includes("submitReplacement"));
+  check("and really does remove the original's event", /removeCalendarEventForRequest\(request, deps\)/.test(syncSrc));
+}
+
+section("nothing awaiting a decision is described as booked or confirmed");
+
+{
+  check(
+    "the decision group never calls its rows confirmed",
+    !/\bconfirmed\b/i.test(`${GROUPS.decide.heading} ${GROUPS.decide.detail}`),
+  );
+  check("a held row is labelled as held", requestStateLabel("held") === "Held");
+  check(
+    "only a booked row reaches the confirmed group",
+    groupForState("booked") === "confirmed" &&
+      ["pending_review", "held", "requested", "rescheduled", "cancelled", "expired"].every(
+        (s) => groupForState(s) !== "confirmed",
+      ),
+  );
+  check(
+    "and the confirmed group's own wording is about written calendar events",
+    /calendar/i.test(GROUPS.confirmed.detail),
+  );
+}
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

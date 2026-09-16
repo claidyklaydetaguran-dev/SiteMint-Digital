@@ -2,13 +2,22 @@
  * V5 PR-7 — committed contract tests for the Availability screen.
  * Run via: tsx artifacts/helpdesk/src/pages/availability/availabilityContract.test.ts
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import {
   CALENDAR_POINTER,
   EXCEPTIONS,
   PAGE,
   PUBLIC_LINK,
   SETTINGS,
+  TIMEZONE_INVALID,
+  TYPE_DEPENDENCY,
   TYPES,
+  conflictingExceptionDates,
+  dateConflictError,
+  isValidTimeZone,
   effectiveForType,
   everyRenderableString,
   exceptionsSorted,
@@ -37,6 +46,12 @@ function eq<T>(label: string, actual: T, expected: T): void {
   check(`${label} (got ${JSON.stringify(actual)})`, JSON.stringify(actual) === JSON.stringify(expected));
 }
 function section(name: string): void { console.log(`\n── ${name} ${"─".repeat(Math.max(0, 66 - name.length))}`); }
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+// src/pages/availability → src/pages → src → helpdesk → artifacts → repo root
+const repoRoot = path.resolve(here, "../../../../..");
+const read = (rel: string) => readFileSync(path.join(repoRoot, rel), "utf8");
+const availabilityRouteSrc = read("artifacts/api-server/src/routes/receptionistAvailability.ts");
 
 section("Tabs");
 
@@ -206,6 +221,51 @@ eq("and it lands on the types tab", tabForField("appointmentTypes"), "types");
 eq("a business-wide buffer rejection is still its own field", fieldForError("bufferBeforeMin must be an integer between 0 and 240."), "bufferBeforeMin");
 eq("a date-exception rejection is its own field", fieldForError('dateExceptions[1].dateKey must be "YYYY-MM-DD".'), "dateExceptions");
 check("and it lives behind the advanced disclosure", isAdvancedField("dateExceptions"));
+
+section("a date cannot be both blocked and given different hours");
+
+// Opposite instructions held in different places. Nothing downstream
+// reconciles them, so whichever the availability engine consults first
+// silently wins — and a business that marked a date closed could still have it
+// offered to callers.
+eq("a clean config reports no conflict", conflictingExceptionDates(["2027-07-05"], [{ dateKey: "2027-07-06", closed: true }]), []);
+eq(
+  "a date in both lists is reported",
+  conflictingExceptionDates(["2027-07-05"], [{ dateKey: "2027-07-05", closed: false, hours: { start: "09:00", end: "11:00" } }]),
+  ["2027-07-05"],
+);
+check("the message names the offending date", dateConflictError("2027-07-05").includes("2027-07-05"));
+check(
+  "it is attributed to the date-exceptions field, so the form opens Advanced at it",
+  fieldForError(dateConflictError("2027-07-05")) === "dateExceptions" && isAdvancedField("dateExceptions"),
+);
+check("and the server refuses the same combination", availabilityRouteSrc.includes("also listed in blockedDates"));
+
+section("the time zone is checked before the request, not after a 400");
+
+check("a real IANA zone is accepted", isValidTimeZone("America/New_York"));
+check("UTC is accepted", isValidTimeZone("UTC"));
+check("a typo is rejected", !isValidTimeZone("America/New_Yrok"));
+check("an empty or missing value is rejected", !isValidTimeZone("") && !isValidTimeZone(null) && !isValidTimeZone(undefined));
+check("the rejection names the format to use", /IANA/.test(TIMEZONE_INVALID));
+check("and routes to the timezone field", fieldForError(TIMEZONE_INVALID) === "timezone");
+check("the server applies the same test", availabilityRouteSrc.includes("is not a recognized IANA timezone"));
+
+section("the appointment-type dependency is stated before the form is filled in");
+
+// The server refuses hours with no appointment type, and a business could fill
+// in a whole week before finding that out.
+check("the server still requires one", availabilityRouteSrc.includes("At least one appointment type is required"));
+check("the notice explains why hours alone cannot be saved", /appointment type/i.test(TYPE_DEPENDENCY.detail));
+check("it points at where to add one", TYPE_DEPENDENCY.linkLabel.trim().length > 0);
+check(
+  "and the form renders it when there are none",
+  read("artifacts/helpdesk/src/components/booking/AvailabilitySettingsForm.tsx").includes("TYPE_DEPENDENCY.heading"),
+);
+check(
+  "the form checks both rejections before sending anything",
+  read("artifacts/helpdesk/src/components/booking/AvailabilitySettingsForm.tsx").includes("preflightError(draft)"),
+);
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

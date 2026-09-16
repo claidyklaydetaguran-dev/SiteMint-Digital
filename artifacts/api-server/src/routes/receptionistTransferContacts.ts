@@ -24,12 +24,15 @@ import {
   CONTACT_ROLES,
   createTransferContact,
   deleteTransferContact,
+  describeTransferCapability,
   formatE164ForDisplay,
   getTransferContact,
   listTransferContacts,
   updateTransferContact,
   validateTransferContact,
+  type TransferBlockReason,
 } from "../lib/voiceTransferContacts/transferContactService.js";
+import { resolveEffectiveCapabilities } from "../lib/voice/tools/firmCapabilities.js";
 import { resolveTransferDestination } from "../lib/voiceNumbers/numberService.js";
 import type { VoiceTransferDestination } from "@workspace/db/schema/voice";
 
@@ -82,22 +85,28 @@ async function hasAssignedNumber(firmId: number): Promise<boolean> {
 
 router.get("/receptionist/voice/transfer-contacts", requireReceptionistAuth, async (req: Request, res: Response) => {
   try {
-    const [rows, numberAssigned] = await Promise.all([
+    // V9: the ONE shared capability resolution — the same answer the publish
+    // payload, the synchronization comparison and the in-call gate use. The
+    // banner used to be derived from "a number is assigned", which said a
+    // caller could be handed over to every business that had a number, at a
+    // time when no assistant carried a transfer tool at all.
+    const [rows, numberAssigned, effective] = await Promise.all([
       listTransferContacts(req.firmId!),
       hasAssignedNumber(req.firmId!),
+      resolveEffectiveCapabilities(req.firmId!),
     ]);
+    const transfer = effective.reports.find((report) => report.key === "transfer");
+    const blockedBy: TransferBlockReason | null =
+      transfer === undefined
+        ? "platform_disabled"
+        : ((transfer.reason as TransferBlockReason | null) ?? null);
+
     res.json({
       items: rows.map(serializeContact),
       count: rows.length,
       roles: CONTACT_ROLES,
       // What the interface needs in order to be truthful about testing.
-      capability: {
-        telephoneTransferAvailable: numberAssigned,
-        browserTransferAvailable: false,
-        explanation: numberAssigned
-          ? "A caller on your phone number can be handed to a transfer contact. Browser test calls stay in the browser and cannot be handed over."
-          : "Transfers need a phone number for this business. You can set contacts up now; handing a caller over becomes available once your number is live. Browser test calls stay in the browser and cannot be handed over.",
-      },
+      capability: describeTransferCapability(blockedBy, numberAssigned),
     });
   } catch (err) {
     req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to list transfer contacts");

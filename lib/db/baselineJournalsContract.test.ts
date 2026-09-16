@@ -102,7 +102,8 @@ const expectedAll = readAllExpectedMigrations();
 // exceptions + per-type rule overrides), scheduling 0003 (tool-call idempotency
 // key). Eighteen: voice 0012 (notification retry and delivery evidence, usage
 // channel — columns only).
-check("the committed folders describe eighteen migrations", expectedAll.length === 18, String(expectedAll.length));
+// Nineteen: voice 0013 (voice_support_requests + voice_support_messages).
+check("the committed folders describe nineteen migrations", expectedAll.length === 19, String(expectedAll.length));
 check(
   "expected migrations are unique by created_at",
   new Set(expectedAll.map((e) => e.createdAt)).size === expectedAll.length,

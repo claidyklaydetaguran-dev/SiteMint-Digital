@@ -26,7 +26,7 @@ export const VOICE_TOOLS_CAPABILITIES_ENV_VAR = "VOICE_TOOLS_CAPABILITIES";
  * The capability groups. One per coherent business outcome, so an operator
  * authorizes an outcome rather than a list of function names.
  */
-export const TOOL_CAPABILITIES = ["messages", "scheduling"] as const;
+export const TOOL_CAPABILITIES = ["messages", "scheduling", "transfer"] as const;
 export type VoiceToolCapability = (typeof TOOL_CAPABILITIES)[number];
 
 export function isVoiceToolCapability(value: unknown): value is VoiceToolCapability {
@@ -34,9 +34,35 @@ export function isVoiceToolCapability(value: unknown): value is VoiceToolCapabil
 }
 
 /**
- * Every tool belongs to exactly one capability. Total by construction: adding a
- * tool to TOOL_NAMES without classifying it here fails to typecheck, so a new
- * tool can never default into an already-authorized group.
+ * Capabilities the model exercises through a PROVIDER-NATIVE tool rather than
+ * through a dispatcher function.
+ *
+ * `transfer` is the first of them. Handing a live call to another number is
+ * something the provider performs on the telephone leg itself — there is no
+ * SiteMint function for it to call, and no arguments for us to validate, so it
+ * is deliberately absent from TOOL_NAMES and TOOL_ARG_SCHEMAS. What the
+ * provider is given is a tool with no destinations in it; when the model uses
+ * it, the provider asks our webhook where to send the call, and that answer is
+ * resolved per call, firm-scoped, against consent and hours.
+ *
+ * Keeping the list explicit is what stops the payload builder from silently
+ * treating "contributes no function tool" as "contributes nothing".
+ */
+export const PROVIDER_NATIVE_CAPABILITIES = ["transfer"] as const;
+export type ProviderNativeCapability = (typeof PROVIDER_NATIVE_CAPABILITIES)[number];
+
+export function isProviderNativeCapability(value: VoiceToolCapability): value is ProviderNativeCapability {
+  return (PROVIDER_NATIVE_CAPABILITIES as readonly string[]).includes(value);
+}
+
+/**
+ * Every DISPATCHER tool belongs to exactly one capability. Total by
+ * construction: adding a tool to TOOL_NAMES without classifying it here fails
+ * to typecheck, so a new tool can never default into an already-authorized
+ * group.
+ *
+ * A provider-native capability appears nowhere in here, because it contributes
+ * no tool the dispatcher can be asked to run.
  */
 export const CAPABILITY_BY_TOOL: Record<VoiceToolName, VoiceToolCapability> = {
   check_availability: "scheduling",

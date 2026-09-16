@@ -43,10 +43,17 @@ function todayKey(now: Date): string {
 
 export function AddAppointmentPanel({
   config,
+  configFailed = false,
   onClose,
   onDone,
 }: {
   config: AvailabilityConfig | undefined;
+  /**
+   * True when the availability config could not be read. Without it, a failed
+   * read and a business with no services configured produce the same empty
+   * picker, and the panel silently cannot be used.
+   */
+  configFailed?: boolean;
   onClose: () => void;
   onDone: (notice: { title: string; detail: string; tone: "ok" | "warn" }) => void;
 }) {
@@ -142,9 +149,11 @@ export function AddAppointmentPanel({
         <div className="sa-grid">
           <div className="sa-field">
             <label className="sa-field__label" htmlFor="sa-add-type">{ADD.typeLabel}</label>
+            {configFailed && <p className="sa-field__error">{ADD.configFailed}</p>}
             <select
               id="sa-add-type"
               className="sa-input"
+              disabled={configFailed}
               value={form.appointmentTypeId}
               aria-invalid={errors.appointmentTypeId !== undefined}
               onChange={(e) => setField({ appointmentTypeId: e.target.value })}

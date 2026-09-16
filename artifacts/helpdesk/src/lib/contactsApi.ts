@@ -35,10 +35,28 @@ export interface ContactConversationRef {
   status: string;
 }
 
+/** One saved message, reached through this contact's calls by foreign key. */
+export interface ContactInquiryRef {
+  id: number;
+  callId: string;
+  topic: string;
+  urgency: string;
+  followUpStatus: string;
+  createdAt: string;
+}
+
 export interface ContactDetailResponse {
   contact: ContactSummary;
   calls: ContactCallRef[];
   conversations: ContactConversationRef[];
+  /** Optional so a dashboard deployed ahead of its backend still renders. */
+  inquiries?: ContactInquiryRef[];
+  /**
+   * The most recent name a caller gave on one of this contact's own calls,
+   * used only when the contact record has no name of its own. A quoted value
+   * from a saved message, never an inference.
+   */
+  callerNameFromInquiry?: string | null;
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
@@ -54,6 +72,17 @@ export function fetchContacts(query: string): Promise<{ items: ContactSummary[];
   if (query.trim() !== "") params.set("query", query.trim());
   const qs = params.toString();
   return apiFetch(`/receptionist/contacts${qs ? `?${qs}` : ""}`);
+}
+
+/**
+ * The contact linked to one call, resolved server-side through the call-link
+ * foreign key — never by matching a name or a number. Resolves to `undefined`
+ * when no contact is linked, which is an ordinary answer, not a failure.
+ */
+export function fetchContactForCall(callId: string): Promise<ContactSummary | undefined> {
+  return apiFetch<{ items: ContactSummary[]; count: number }>(
+    `/receptionist/contacts?callId=${encodeURIComponent(callId)}`,
+  ).then((res) => res.items[0]);
 }
 
 export function fetchContactDetail(id: string): Promise<ContactDetailResponse | undefined> {

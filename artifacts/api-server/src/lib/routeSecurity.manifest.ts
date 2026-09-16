@@ -585,6 +585,16 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/receptionist/voice/transfer-contacts": "session",
   "POST /api/receptionist/voice/transfer-contacts/:id/test": "session",
   "POST /api/receptionist/voice/issues/:id/resolve": "session",
+  // Support requests: a business writes to SiteMint and follows up. Every one
+  // is firm-scoped from the session — another business's request reads as
+  // missing — and nothing here emails the customer. The operator side
+  // (adminSupport.ts) is requireOperator with support.read / support.write and
+  // is the only place these rows are read across firms.
+  "POST /api/admin/voice/support/requests/:id/messages": "admin",
+  "POST /api/admin/voice/support/requests/:id/in-progress": "admin",
+  "POST /api/receptionist/support/requests": "session",
+  "POST /api/receptionist/support/requests/:id/messages": "session",
+  "POST /api/receptionist/support/requests/:id/close": "session",
   "POST /api/receptionist/voice/numbers/:id/assign": "session",
   "POST /api/receptionist/voice/numbers/:id/pause": "session",
   "POST /api/receptionist/voice/numbers/:id/unpause": "session",

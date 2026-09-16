@@ -239,10 +239,17 @@ check("the shared barrel derives 84 base tables", BARREL.length === 84, `${BARRE
 // pin is derived arithmetic over it, not an independent assertion.
 // 34: voice 0010 (+voice_messages, +voice_notifications), scheduling 0002
 // (+scheduling_date_exceptions), voice 0011 (+voice_business_profiles).
-check("the committed migrations derive 34 domain tables", DOMAIN.length === 34, `${DOMAIN.length}`);
+// 36: voice 0013 (+voice_support_requests, +voice_support_messages).
+check("the committed migrations derive 36 domain tables", DOMAIN.length === 36, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 118 public tables", // 34 domain + 84 barrel
-  APPLICATION.length === 118,
+  // 84 barrel + 36 domain. Both sides of the merge that produced this line were
+  // wrong about it, each being right only about its own half: the CRM line
+  // raised the barrel to 84 (crm_email_provider_events) while still reading 34
+  // domain, and the receptionist line raised the domain to 36 (voice 0013) while
+  // still reading 83 barrel. Summing the two claims is what this pin exists to
+  // prevent, so this number is taken from running the contract, not from adding.
+  "the application owns exactly 120 public tables",
+  APPLICATION.length === 120,
   `${APPLICATION.length}`,
 );
 check(

@@ -34,6 +34,29 @@ export function useLogout() {
   };
 }
 
+// The rule itself lives in `sessionAccess.ts`, which imports nothing — no
+// React, no React Query, no `@/` alias. Its contract test runs under plain
+// tsx, and reaching it through this file would drag in `@/lib/api` and fail
+// at module load. Re-exported here so existing callers are unaffected.
+import { classifySessionAccess, type SessionAccess } from "./sessionAccess.js";
+
+export { classifySessionAccess };
+export type { SessionAccess };
+
+/** The session, classified — see `classifySessionAccess`. */
+export function useSessionAccess(): { access: SessionAccess; refetch: () => void } {
+  const query = useSession();
+  return {
+    access: classifySessionAccess({
+      isLoading: query.isLoading,
+      isError: query.isError,
+      error: query.error,
+      hasData: query.data !== undefined,
+    }),
+    refetch: () => void query.refetch(),
+  };
+}
+
 /**
  * The authenticated firm id, or `undefined` whenever it cannot be trusted —
  * while the session is still loading, on any session error, or once fully

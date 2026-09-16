@@ -264,6 +264,12 @@ export function BookingCalendar({
               <button type="button" className="sa-step" onClick={() => goToMonth(1)} aria-label="Next month">›</button>
             </div>
 
+            {daysQuery.isError && (
+              <div className="sa-notice" data-tone="error" role="alert">
+                <p className="sa-notice__title">{PREVIEW.daysFailed}</p>
+              </div>
+            )}
+
             <div className="sa-calendar__weekdays" aria-hidden="true">
               {WEEKDAY_INITIALS.map((d, i) => <span key={i}>{d}</span>)}
             </div>
@@ -280,8 +286,12 @@ export function BookingCalendar({
                 return (
                   <button
                     key={key} type="button" className="sa-day" data-tone={tone} data-selected={key === selectedDate}
-                    disabled={!open || daysQuery.isLoading} aria-pressed={key === selectedDate}
-                    aria-label={`${dayLabel(key)} — ${dayReasonLabel(reason)}`}
+                    disabled={!open || daysQuery.isLoading || daysQuery.isError} aria-pressed={key === selectedDate}
+                    aria-label={
+                      daysQuery.isError
+                        ? `${dayLabel(key)} — ${PREVIEW.daysFailed}`
+                        : `${dayLabel(key)} — ${dayReasonLabel(reason)}`
+                    }
                     onClick={() => { setSelectedDate(key); setSelectedSlot(undefined); setOutcome(null); }}
                   >
                     <span className="sa-day__num">{day}</span>

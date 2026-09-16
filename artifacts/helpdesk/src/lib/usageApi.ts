@@ -9,11 +9,33 @@
 
 const API_BASE = "/api";
 
+export interface UsageChannelBucket {
+  totalSeconds: number;
+  callCount: number;
+}
+
+/**
+ * The period split by how each call reached the assistant. `unreported` holds
+ * both the explicit "unknown" channel and the rows that carry none at all —
+ * neither can honestly be counted as a phone call or as a browser test.
+ */
+export interface UsageChannelBreakdown {
+  telephone: UsageChannelBucket;
+  browser: UsageChannelBucket;
+  unreported: UsageChannelBucket;
+}
+
 export interface UsagePeriod {
   period: string;
   callCount: number;
   totalSeconds: number;
   includedMinutes: number | null;
+  /**
+   * Null when the server could not produce a split, and absent entirely on a
+   * backend older than this field — both mean "no breakdown", which stays
+   * distinct from a period that genuinely had no calls.
+   */
+  channels?: UsageChannelBreakdown | null;
 }
 
 async function apiFetch<T>(path: string): Promise<T> {

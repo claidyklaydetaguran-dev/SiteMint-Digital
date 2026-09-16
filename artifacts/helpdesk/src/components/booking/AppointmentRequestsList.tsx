@@ -36,6 +36,10 @@ export function AppointmentRequestsList({
   emptyTitle?: string;
   emptyDetail?: string;
 }) {
+  // When the config could not be read we do not know the business's zone.
+  // Rendering UTC silently shifts every time by hours and presents it as fact,
+  // so the fallback is labelled instead of hidden.
+  const zoneKnown = config?.timezone !== undefined;
   const timezone = config?.timezone ?? "UTC";
 
   if (items.length === 0) {
@@ -76,7 +80,10 @@ export function AppointmentRequestsList({
                 <span className="sa-row__contact">{contactDetail(req.contact)}</span>
               </div>
               <div className="sa-row__cell" data-label={REQUESTS.columnType}>{typeName(config, req.appointmentTypeId)}</div>
-              <div className="sa-row__cell" data-label={REQUESTS.columnWhen}>{slotDateTime(req.startUtc, timezone)}</div>
+              <div className="sa-row__cell" data-label={REQUESTS.columnWhen}>
+                {slotDateTime(req.startUtc, timezone)}
+                {!zoneKnown && " UTC"}
+              </div>
               <div className="sa-row__cell" data-label={REQUESTS.columnStatus}>
                 <span className="sa-state" data-tone={requestStateTone(req.state)}>{requestStateLabel(req.state)}</span>
               </div>

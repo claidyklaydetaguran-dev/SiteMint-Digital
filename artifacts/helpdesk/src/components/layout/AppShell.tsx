@@ -19,7 +19,8 @@
  *
  * ── Preserved exactly ─────────────────────────────────────────────────────
  * The session query (`GET /api/receptionist/auth/me` via `useSession`), the
- * loading gate, the redirect to `/login` on a session error, the logout call
+ * loading gate, the redirect to `/login` on a session REFUSAL (a request that
+ * never completed keeps the page and says the server is unreachable), the logout call
  * (`POST /api/receptionist/auth/logout` then `queryClient.clear()` then
  * `/login`), the firm-scoped data (`me.firm.*` only ever from the server
  * session), the trial usage figures, the appearance control, and the container
@@ -42,7 +43,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { LogOut, Menu, Monitor, Moon, Sun, X } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useSession, useLogout } from "@/hooks/useSession";
+import { useSession, useSessionAccess, useLogout } from "@/hooks/useSession";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { isNavItemActive, visibleNavGroups } from "@/components/layout/dashboardNav";
 // AR-001J boundary: the voice-usage rail indicator is gated the same way the
@@ -123,16 +124,20 @@ function UsageMeter({
 
   const percent = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
+  // This meter counts text-message (SMS) intake conversations for the life of
+  // the account — not calls, and not "this period". Saying so is the whole
+  // point: beside a call product, the bare word "conversations" read as a
+  // voice business's call allowance for the month, which it never was.
   return (
     <Link
       href="/billing"
       className="sd-usage"
       onClick={onNavigate}
-      aria-label={`Trial usage: ${used} of ${limit} conversations used. Open billing.`}
+      aria-label={`Trial usage: ${used} of ${limit} SMS conversations used, all time. Open billing.`}
     >
       <span className="sd-usage__row">
         <span className="sd-usage__count">
-          {used} of {limit} conversations
+          {used} of {limit} SMS conversations, all time
         </span>
         <span className="sd-usage__cta" aria-hidden="true">
           Billing
@@ -192,7 +197,8 @@ function AppearanceControl() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
-  const { data: me, isLoading, isError } = useSession();
+  const { data: me, isLoading } = useSession();
+  const { access: sessionAccess, refetch: retrySession } = useSessionAccess();
   const logout = useLogout();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -213,11 +219,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Session failure is the only unauthenticated signal the dashboard has, and
-  // its destination is unchanged.
+  // Only a refusal signs somebody out. A session request that never completed
+  // — a restarting instance, a dropped connection — used to navigate away and
+  // discard whatever was on screen; it now leaves the page alone and says the
+  // server cannot be reached, and the next successful request clears it.
   useEffect(() => {
-    if (!isLoading && isError) navigate("/login");
-  }, [isLoading, isError, navigate]);
+    if (sessionAccess === "denied") navigate("/login");
+  }, [sessionAccess, navigate]);
 
   // Close on navigation, then hand focus back to the control that opened it.
   useEffect(() => {
@@ -314,7 +322,25 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isError || !me) return null;
+  // A refusal is already navigating to the login page, so render nothing while
+  // that happens. Anything else without a session means the server could not be
+  // reached: say so and offer a retry instead of a blank screen.
+  if (sessionAccess === "denied") return null;
+  if (!me) {
+    return (
+      <div className="sd-app sd-app--boot">
+        <div className="sd-boot" role="alert">
+          <span className="sd-boot__mark" aria-hidden="true" />
+          <span className="sd-boot__text">
+            Can&apos;t reach the server. Your sign-in has not ended — this is a connection problem.
+          </span>
+          <button type="button" className="sd-link" onClick={retrySession}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleLogout = async () => {
     await logout();

@@ -28,6 +28,8 @@
  */
 
 import type {
+  ArtifactPolicy,
+  CallChannel,
   DispositionOutcome,
   InternalCallState,
   RealCallSummary,
@@ -445,6 +447,22 @@ export function everyRenderableString(): string[] {
     formatFullTime(null),
     textOrMissing(null),
     listOrMissing(null),
+    // Everything the channel, narrowing, retention, transfer and linked-record
+    // blocks below can put on screen. A phrase absent from here is absent from
+    // both pages, which is the whole point of enumerating them.
+    ...Object.values(CHANNEL_LABEL),
+    SYNTHETIC_LABEL,
+    NO_CALLER_NUMBER_BROWSER,
+    ...Object.values(CONTROLS),
+    ...Object.values(RANGE_LABEL),
+    ...Object.values(LINKED),
+    ...Object.values(TRANSFER),
+    ...Object.values(TRANSFER_STATE).map((t) => t.label),
+    ...Object.values(TRANSFER_STATE).map((t) => t.detail),
+    RETENTION_NONE,
+    RETENTION_TRANSCRIPT_ONLY,
+    RETENTION_FULL,
+    retentionDetail(undefined),
   ];
 }
 
@@ -507,3 +525,183 @@ export const TRANSFER_STATE: Record<TransferStateKey, { label: string; detail: s
 export function transferStateLabel(state: TransferStateKey): string {
   return TRANSFER_STATE[state].label;
 }
+
+/** A row earns a mark only when something actually happened; `none` earns none. */
+export function transferBadge(state: TransferStateKey | string | null | undefined): string | null {
+  if (typeof state !== "string" || state === "none") return null;
+  return (TRANSFER_STATE[state as TransferStateKey] ?? TRANSFER_STATE.unknown).label;
+}
+
+export function transferTone(state: TransferStateKey | string | null | undefined): StateTone {
+  if (typeof state !== "string") return TRANSFER_STATE.unknown.tone;
+  return (TRANSFER_STATE[state as TransferStateKey] ?? TRANSFER_STATE.unknown).tone;
+}
+
+export function transferDetail(state: TransferStateKey | string | null | undefined): string {
+  if (typeof state !== "string") return TRANSFER_STATE.unknown.detail;
+  return (TRANSFER_STATE[state as TransferStateKey] ?? TRANSFER_STATE.unknown).detail;
+}
+
+/* ── How the call arrived ──────────────────────────────────────────────────
+   The server derives this from the provider's own call type. "unknown" means
+   no event carried one — stated plainly rather than rounded up into "Phone
+   call", which is the guess a business would act on.
+
+   A SiteMint QA event outranks the channel: it is not a real call at all, so
+   naming how it arrived would be the more misleading of the two answers. */
+
+export const CHANNEL_LABEL: Record<CallChannel, string> = {
+  telephone: "Phone call",
+  browser: "Browser test",
+  unknown: "Call type not reported",
+};
+
+export const SYNTHETIC_LABEL = "SiteMint QA event";
+
+export function channelLabel(call: { channel?: CallChannel | string | null; synthetic?: boolean }): string {
+  if (call.synthetic === true) return SYNTHETIC_LABEL;
+  const channel = call.channel;
+  if (typeof channel !== "string") return CHANNEL_LABEL.unknown;
+  return CHANNEL_LABEL[channel as CallChannel] ?? CHANNEL_LABEL.unknown;
+}
+
+/* ── Caller number ─────────────────────────────────────────────────────────
+   Null is the server saying no number was received. A browser test has none
+   by construction, so "Not provided" there would imply something went
+   missing; it says what is actually true instead. */
+
+export const NO_CALLER_NUMBER_BROWSER = "No caller number (browser test)";
+
+export function callerNumberText(call: {
+  callerNumberDisplay?: string | null;
+  channel?: CallChannel | string | null;
+}): string {
+  const value = call.callerNumberDisplay;
+  if (typeof value === "string" && value.trim() !== "") return value.trim();
+  return call.channel === "browser" ? NO_CALLER_NUMBER_BROWSER : NOT_PROVIDED;
+}
+
+/* ── Narrowing the list ────────────────────────────────────────────────────
+   Entirely local to the records already loaded: no request carries a query,
+   and nothing here asks the server for a different set. The count beside the
+   list is of what actually matched, never an estimate. */
+
+export const TIME_RANGES = ["all", "7d", "30d"] as const;
+export type TimeRange = (typeof TIME_RANGES)[number];
+
+export const RANGE_LABEL: Record<TimeRange, string> = {
+  all: "All time",
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+};
+
+export function rangeLabel(range: TimeRange): string {
+  return RANGE_LABEL[range] ?? RANGE_LABEL.all;
+}
+
+export const CONTROLS = {
+  heading: "Narrow these records",
+  channelLabel: "Call type",
+  stateLabel: "State",
+  rangeLabel: "Time range",
+  anyChannel: "All call types",
+  anyState: "All states",
+  resetLabel: "Show everything",
+  noMatchTitle: "No records match",
+  noMatchDetail: "Nothing already loaded matches these choices. Change them to see more.",
+} as const;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * `now` is a required parameter, not a clock read inside the function: every
+ * row in one render must be measured against the same instant, or a list can
+ * disagree with its own count.
+ */
+export function withinRange(iso: string | null | undefined, range: TimeRange, now: Date): boolean {
+  if (range === "all") return true;
+  const started = toDate(iso);
+  if (started === null) return false;
+  const days = range === "7d" ? 7 : 30;
+  return now.getTime() - started.getTime() <= days * DAY_MS;
+}
+
+export interface CallFilters {
+  channel: CallChannel | "all";
+  state: InternalCallState | "all";
+  range: TimeRange;
+}
+
+export const NO_FILTERS: CallFilters = { channel: "all", state: "all", range: "all" };
+
+export function filtersAreDefault(filters: CallFilters): boolean {
+  return filters.channel === "all" && filters.state === "all" && filters.range === "all";
+}
+
+export function matchesFilters(
+  call: Pick<RealCallSummary, "channel" | "state" | "startedAt">,
+  filters: CallFilters,
+  now: Date,
+): boolean {
+  if (filters.channel !== "all" && call.channel !== filters.channel) return false;
+  if (filters.state !== "all" && call.state !== filters.state) return false;
+  return withinRange(call.startedAt, filters.range, now);
+}
+
+export function applyFilters<T extends Pick<RealCallSummary, "channel" | "state" | "startedAt">>(
+  calls: readonly T[],
+  filters: CallFilters,
+  now: Date,
+): T[] {
+  return calls.filter((call) => matchesFilters(call, filters, now));
+}
+
+/* ── What is kept ──────────────────────────────────────────────────────────
+   The retention sentence is the account's CONFIGURED policy, reported by the
+   server on the record itself — not a claim this page makes on its own. The
+   page used to assert that nothing is retained while rendering stored words
+   whenever a record happened to carry them.
+
+   Only an explicitly retaining policy may display those words. An unset or
+   unrecognised value reads as "nothing is kept" and shows nothing, so the
+   failure direction can only ever withhold content. */
+
+export const RETENTION_NONE = "Transcripts and recordings are not kept for this account.";
+export const RETENTION_TRANSCRIPT_ONLY = "Transcripts are kept for this account. Call audio is not.";
+export const RETENTION_FULL = "Call audio and transcripts are kept for this account.";
+
+export function retentionDetail(policy: ArtifactPolicy | string | null | undefined): string {
+  if (policy === "none") return RETENTION_NONE;
+  if (policy === "transcript_only") return RETENTION_TRANSCRIPT_ONLY;
+  if (policy === "full") return RETENTION_FULL;
+  return DETAIL.retentionDetail;
+}
+
+/** Fail closed: stored words appear only under a policy that actually keeps them. */
+export function transcriptIsShown(policy: ArtifactPolicy | string | null | undefined): boolean {
+  return policy === "transcript_only" || policy === "full";
+}
+
+/* ── Records linked to this call ───────────────────────────────────────────
+   Both links are real foreign keys resolved by the server — a saved message
+   matches on (firm, call id), and a contact through the call-link row.
+   Neither is matched on a caller's name.
+
+   Appointment requests are named and then explicitly not listed: the request
+   row carries no key back to the call that produced it, so any list here
+   would be a guess. Saying so is more useful than an empty heading. */
+
+export const LINKED = {
+  heading: "Records from this call",
+  messagesHeading: "Saved messages",
+  messagesEmpty: "No message was saved on this call.",
+  messagesLoading: "Loading saved messages…",
+  messagesFailed: "Saved messages couldn't be loaded.",
+  contactHeading: "Contact",
+  contactEmpty: "This call isn't linked to a contact.",
+  contactLoading: "Loading the linked contact…",
+  contactFailed: "The linked contact couldn't be loaded.",
+  openContact: "Open contact",
+  openMessages: "Open Inquiries",
+  appointmentsNote: "Appointment requests aren't linked to a call yet, so none are listed here.",
+} as const;

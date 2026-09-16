@@ -25,16 +25,29 @@ export interface WorkspaceBusinessInfo {
 export function useWorkspaceBusinessInfo(): {
   data: WorkspaceBusinessInfo | null;
   isLoading: boolean;
+  /**
+   * True when the read failed, or when it answered with something this hook
+   * could not parse.
+   *
+   * Without this, `data: null` meant both "this business has saved nothing"
+   * and "we could not find out" — and a caller that cannot tell them apart
+   * will always present the first, because it reads as an ordinary empty
+   * state. A body that is not the shape we expect is a failure too, not an
+   * absence.
+   */
+  isError: boolean;
 } {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: [AGENT_CONFIG_QUERY_KEY],
     queryFn: () => apiFetch<unknown>(AGENT_CONFIG_PATH),
   });
 
   const config = data === undefined ? null : readAgentConfig(data);
+  const unreadable = !isLoading && !isError && data !== undefined && config === null;
 
   return {
     data: config ? { name: config.name ?? "", industry: config.industry ?? "" } : null,
     isLoading,
+    isError: isError || unreadable,
   };
 }

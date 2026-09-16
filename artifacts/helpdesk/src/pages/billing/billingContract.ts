@@ -211,11 +211,11 @@ export interface UsageCopy {
  * unanswered. Nothing here claims leads are lost, because they are not.
  */
 export const LIMIT_REACHED_DETAIL =
-  "Your trial conversation limit has been reached. New conversations may still be recorded, but automated replies are paused.";
+  "Your all-time trial limit for text-message (SMS) conversations has been reached. New conversations may still be recorded, but automated replies are paused.";
 
 /** The one truthful thing this frontend can say about a paid plan's usage. */
 export const PAID_LIMIT_DETAIL =
-  "The trial conversation limit does not apply to this plan.";
+  "The trial limit on text-message (SMS) conversations does not apply to this plan.";
 
 export function usageCopy(model: UsageModel): UsageCopy {
   switch (model.kind) {
@@ -225,7 +225,7 @@ export function usageCopy(model: UsageModel): UsageCopy {
         detail:
           model.level === "reached"
             ? LIMIT_REACHED_DETAIL
-            : `Conversations recorded against your trial limit of ${formatCount(model.limit)}.`,
+            : `Text-message (SMS) conversations recorded against your all-time trial limit of ${formatCount(model.limit)}.`,
         status:
           model.level === "reached"
             ? "Trial limit reached"
@@ -244,20 +244,20 @@ export function usageCopy(model: UsageModel): UsageCopy {
         figure: model.used === null ? NOT_AVAILABLE : formatCount(model.used),
         // Stated as a fact about the data, not as a fault. No percentage is
         // offered, because there is no denominator to compute one from.
-        detail: "A trial conversation limit is not recorded for this account.",
+        detail: "An all-time trial limit for text-message (SMS) conversations is not recorded for this account.",
         status: null,
       };
     case "unknown":
       return {
         figure: model.used === null ? NOT_AVAILABLE : formatCount(model.used),
-        detail: "Conversations recorded on this account.",
+        detail: "Text-message (SMS) conversations recorded on this account, all time.",
         status: null,
       };
   }
 }
 
 /** The accessible name of the usage meter, used only where it is measurable. */
-export const METER_LABEL = "Trial conversation usage";
+export const METER_LABEL = "Trial SMS conversation usage, all time";
 
 // ─── Plan record ───────────────────────────────────────────────────────────
 
@@ -284,12 +284,15 @@ export function planFields(
   }
 
   const copy = usageCopy(model);
-  fields.push({ label: "Conversation usage", value: copy.figure });
+  // This allowance counts text-message (SMS) intake conversations for the life
+  // of the account. It is not calls and it is not per billing period; voice
+  // minutes are a separate allowance, reported on Usage.
+  fields.push({ label: "SMS conversation usage", value: copy.figure });
 
   if (model.kind === "measured") {
     fields.push({
-      label: "Trial conversation limit",
-      value: `${formatCount(model.limit)} conversations`,
+      label: "Trial SMS conversation limit",
+      value: `${formatCount(model.limit)} SMS conversations, all time`,
     });
   }
   return fields;

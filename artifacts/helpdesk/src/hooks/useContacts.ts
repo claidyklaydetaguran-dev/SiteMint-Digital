@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchContactDetail, fetchContacts, type ContactDetailResponse, type ContactSummary } from "@/lib/contactsApi";
+import {
+  fetchContactDetail,
+  fetchContactForCall,
+  fetchContacts,
+  type ContactDetailResponse,
+  type ContactSummary,
+} from "@/lib/contactsApi";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 
 const ROOT = "contacts" as const;
@@ -11,6 +17,21 @@ export function useContactsList(query: string) {
     queryKey: firmId !== undefined ? [ROOT, "list", firmId, query] : UNRESOLVED_SESSION_KEY,
     queryFn: () => fetchContacts(query),
     enabled: firmId !== undefined,
+  });
+}
+
+/**
+ * The contact linked to one call, resolved server-side through the call-link
+ * foreign key — nothing here matches on a name or a number. Resolving to
+ * `undefined` means no contact is linked, which is an ordinary answer.
+ */
+export function useContactForCall(callId: string | undefined) {
+  const firmId = useAuthenticatedFirmId();
+  const resolved = firmId !== undefined && typeof callId === "string" && callId !== "";
+  return useQuery<ContactSummary | undefined>({
+    queryKey: resolved ? [ROOT, "by-call", firmId, callId] : UNRESOLVED_SESSION_KEY,
+    queryFn: () => fetchContactForCall(callId as string),
+    enabled: resolved,
   });
 }
 

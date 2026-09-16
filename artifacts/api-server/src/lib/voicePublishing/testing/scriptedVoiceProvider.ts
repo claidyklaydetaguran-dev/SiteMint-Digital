@@ -44,7 +44,22 @@ export class ScriptedVoiceProvider implements VoiceProvider {
   /** Every input handed to createAssistant, in order — lets a test assert what was (and was not) sent. */
   readonly createCalls: VoiceAssistantInput[] = [];
 
+  /**
+   * Resolves the first time createAssistant is entered.
+   *
+   * A test that wants to observe the in-flight window has to wait for the
+   * provider call to actually begin. Counting microtask yields instead ties the
+   * test to how many awaits happen to precede that call, so adding a legitimate
+   * step before it — resolving the firm's own capabilities, say — breaks a test
+   * that was never about capabilities. This is the honest signal.
+   */
+  readonly createEntered: Promise<void>;
+  private markCreateEntered!: () => void;
+
   constructor(options: ScriptedVoiceProviderOptions) {
+    this.createEntered = new Promise<void>((resolve) => {
+      this.markCreateEntered = resolve;
+    });
     this.outcomes = options.outcomes;
     this.now = options.now ?? new Date("2026-08-25T00:00:00.000Z");
   }
@@ -55,6 +70,7 @@ export class ScriptedVoiceProvider implements VoiceProvider {
   }
 
   async createAssistant(input: VoiceAssistantInput): Promise<VoiceAssistantResult> {
+    this.markCreateEntered();
     this.createCalls.push(input);
     const outcome = this.outcomes[this.index];
     this.index += 1;
