@@ -30,6 +30,23 @@ suite("support requests belong to one business (real DB)", () => {
     schema = await import("@workspace/db");
     db = schema.db;
     service = await import("./supportService.js");
+
+    // voice_support_requests and voice_support_messages are created by voice
+    // migration 0013. drizzle-kit push does not create versioned-migration
+    // tables, so a push-built database will not have them, and every test below
+    // then dies on its first insert with a raw driver error that names neither
+    // the cause nor the fix.
+    //
+    // This throws rather than skipping, deliberately. A skip would also swallow
+    // a genuinely missing table, and a suite that ran nothing is not a pass.
+    const voiceSchema = await import("@workspace/db/schema/voice");
+    try {
+      await db.select().from(voiceSchema.voiceSupportRequests).limit(1);
+    } catch {
+      throw new Error(
+        "voice_support_requests is missing from CRM_TEST_DATABASE_URL. It comes from voice migration 0013, which drizzle-kit push does not apply, so this database looks push-built. Build it with migrate:fresh, or run the voice migrations against it, and re-run.",
+      );
+    }
     // intake_firms still carries the original law-firm columns as NOT NULL, so
     // a test row has to fill them even though the receptionist never reads them.
     const firmRow = (suffix: string) => ({
