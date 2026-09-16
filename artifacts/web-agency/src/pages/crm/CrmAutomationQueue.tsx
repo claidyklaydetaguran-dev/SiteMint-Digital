@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 
 import { adminFetch } from "@/lib/adminFetch";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { describeActionFailure, parsePositiveInteger } from "@/components/crm/confirmDialogModel";
 
 // ── M4: Automation ───────────────────────────────────────────────────────────
 //
@@ -618,45 +620,88 @@ export default function CrmAutomationQueue() {
     }
   };
 
-  const runRule = async (rule: RuleRow) => {
-    const answer = window.prompt(
-      `Run "${rule.name}" against which ${words(rule.recordType ?? "record")}? Enter its id.`);
-    if (!answer) return;
-    setBusy(true);
+  const confirmation = useConfirmDialog();
+
+  const runRule = (rule: RuleRow) => {
+    const recordType = words(rule.recordType ?? "record");
+    void confirmation.ask({
+      title: `Run "${rule.name}" now?`,
+      description: `It runs once, straight away, against the ${recordType} you name.`,
+      consequences: [
+        "Its actions happen for real — whatever it sends, assigns or changes, it does.",
+        "Loop protection and the rule's own run limit still apply.",
+      ],
+      field: {
+        kind: "integer",
+        label: `${recordType.charAt(0).toUpperCase()}${recordType.slice(1)} id`,
+        placeholder: "42",
+        helper: rule.recordType === "lead"
+          ? "The number at the end of the contact's address — 42 in /admin/crm/leads/42."
+          : `The number that identifies the ${recordType}.`,
+      },
+      confirmLabel: "Run rule",
+      busyLabel: "Running…",
+      cancelLabel: "Don't run it",
+      action: async ({ value }) => {
+        // `Number(answer)` took "" and " " as 0 and "abc" as NaN, and sent all
+        // three to the server as a record id.
+        const recordId = parsePositiveInteger(value);
+        if (recordId === null) throw new Error("Enter the record's id as a whole number.");
+        setNotice(null);
+        const res = await adminFetch(`/api/crm/automation/rules/${rule.id}/run`,
+          { method: "POST", body: JSON.stringify({ recordId }) });
+        const body = await res.json().catch(() => ({})) as { error?: string; execution?: ExecutionRow };
+        if (!res.ok) throw new Error(body.error ?? `The rule could not be run (HTTP ${res.status}).`);
+        setError(null);
+        setNotice(`Run finished: ${words(body.execution?.status ?? "queued")}.`);
+        setOpenHistoryFor(rule.id);
+        await loadRules();
+      },
+    });
+  };
+
+  /** Records the decision, or throws carrying the server's own refusal. */
+  const sendDecision = async (
+    approval: ApprovalRow,
+    decision: "approve" | "reject",
+    reason: string | null,
+  ) => {
+    const res = await adminFetch(`/api/crm/automation/approvals/${approval.id}/decide`,
+      { method: "POST", body: JSON.stringify({ decision, reason }) });
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    if (!res.ok) throw new Error(body.error ?? `That decision could not be recorded (HTTP ${res.status}).`);
     setError(null);
-    setNotice(null);
-    try {
-      const res = await adminFetch(`/api/crm/automation/rules/${rule.id}/run`,
-        { method: "POST", body: JSON.stringify({ recordId: Number(answer) }) });
-      const body = await res.json().catch(() => ({})) as { error?: string; execution?: ExecutionRow };
-      if (!res.ok) { setError(body.error ?? `The rule could not be run (HTTP ${res.status}).`); return; }
-      setNotice(`Run finished: ${words(body.execution?.status ?? "queued")}.`);
-      setOpenHistoryFor(rule.id);
-      await loadRules();
-    } catch {
-      setError("The rule could not be run.");
-    } finally {
-      setBusy(false);
-    }
+    setNotice(decision === "approve" ? "Approved — the rule has continued." : "Rejected — the run has stopped.");
+    await loadRules();
   };
 
   const decide = async (approval: ApprovalRow, decision: "approve" | "reject") => {
-    let reason: string | null = null;
     if (decision === "reject") {
-      reason = window.prompt("Why are you rejecting this? The person whose rule stops needs to know.");
-      if (!reason?.trim()) return;
+      void confirmation.ask({
+        title: "Reject this step?",
+        description: `The run of "${approval.ruleName ?? "this rule"}" stops here: this step, and every step after it, do not happen.`,
+        consequences: ["Your reason is recorded against the run, for the person whose rule stopped."],
+        reason: {
+          label: "Why are you rejecting it?",
+          minLength: 3,
+          maxLength: 1000,
+          helper: "Required. The person whose rule stops needs to know.",
+          placeholder: "e.g. The client asked us to hold off until next week.",
+        },
+        tone: "destructive",
+        confirmLabel: "Reject and stop the run",
+        busyLabel: "Rejecting…",
+        cancelLabel: "Cancel",
+        action: ({ reason }) => sendDecision(approval, "reject", reason),
+      });
+      return;
     }
     setBusy(true);
     setError(null);
     try {
-      const res = await adminFetch(`/api/crm/automation/approvals/${approval.id}/decide`,
-        { method: "POST", body: JSON.stringify({ decision, reason }) });
-      const body = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) { setError(body.error ?? `That decision could not be recorded (HTTP ${res.status}).`); return; }
-      setNotice(decision === "approve" ? "Approved — the rule has continued." : "Rejected — the run has stopped.");
-      await loadRules();
-    } catch {
-      setError("That decision could not be recorded.");
+      await sendDecision(approval, "approve", null);
+    } catch (e) {
+      setError(describeActionFailure(e));
     } finally {
       setBusy(false);
     }
@@ -673,6 +718,8 @@ export default function CrmAutomationQueue() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">

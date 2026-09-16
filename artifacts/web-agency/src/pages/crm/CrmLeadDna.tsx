@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "wouter";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useParams } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { scoreLeadFromFields, type LeadScoreInput, type ScoredActivity } from "@/lib/leadScore";
 import { computeCommunicationStats, type CiLead } from "@/lib/communicationIntelligence";
@@ -12,7 +12,8 @@ import {
   ArrowLeft, Dna, Heart, MessageCircle, TrendingUp, TrendingDown, Flame,
 } from "lucide-react";
 
-import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure, dataOf } from "@/components/crm/LoadState";
 
 // Same threshold used by the org-wide Behavioral Intelligence dashboard —
 // do not redefine a second "hot spike" concept here.
@@ -39,37 +40,68 @@ function timeAgo(iso: string | null | undefined): string {
   return `${Math.floor(days / 30)} mo ago`;
 }
 
+/** The contact and its activity stream. A body with no contact is a failure. */
+interface ContactBundle { lead: Lead; activities: Activity[]; }
+
+function pickContact(body: unknown): ContactBundle | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { lead?: unknown; activities?: unknown };
+  if (!b.lead || typeof b.lead !== "object") return undefined;
+  return {
+    lead: b.lead as Lead,
+    activities: Array.isArray(b.activities) ? b.activities as Activity[] : [],
+  };
+}
+
+function pickEvents(body: unknown): BehavioralEvent[] | undefined {
+  const list = body && typeof body === "object" ? (body as { events?: unknown }).events : undefined;
+  return Array.isArray(list) ? list as BehavioralEvent[] : undefined;
+}
+
 export default function CrmLeadDna() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const [lead, setLead] = useState<Lead | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [events, setEvents] = useState<BehavioralEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [contactLoad, setContactLoad] = useState<Load<ContactBundle>>({ status: "loading" });
+  /**
+   * The behavioural signals, as their own answer.
+   *
+   * This was `evRes.ok ? … : { events: [] }`: a refused or unreachable
+   * sub-request quietly became an empty array, and the page went on to report
+   * "0 events", "last signal never" and an intent-stage badge computed from
+   * nothing — a behavioural reading of a client that nobody had been able to
+   * take, presented beside figures that were real.
+   */
+  const [eventsLoad, setEventsLoad] = useState<Load<BehavioralEvent[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
+  const [reloadingEvents, setReloadingEvents] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [leadRes, evRes] = await Promise.all([
-          adminFetch(`/api/crm/leads/${params.id}`),
-          adminFetch(`/api/crm/leads/${params.id}/behavioral-events`),
-        ]);
-        if (!leadRes.ok) throw new Error(`HTTP ${leadRes.status}`);
-        const leadData = await leadRes.json() as { lead: Lead; activities: Activity[] };
-        const evData = evRes.ok ? await evRes.json() as { events: BehavioralEvent[] } : { events: [] };
-        setLead(leadData.lead);
-        setActivities(leadData.activities ?? []);
-        setEvents(evData.events ?? []);
-      } catch {
-        setError("Failed to load Lead DNA.");
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadEvents = useCallback(async () => {
+    setReloadingEvents(true);
+    setEventsLoad(await readAdminResource(`/api/crm/leads/${params.id}/behavioral-events`, pickEvents));
+    setReloadingEvents(false);
   }, [params.id]);
+
+  const load = useCallback(async () => {
+    setReloading(true);
+    setReloadingEvents(true);
+    const [nextContact, nextEvents] = await Promise.all([
+      readAdminResource(`/api/crm/leads/${params.id}`, pickContact),
+      readAdminResource(`/api/crm/leads/${params.id}/behavioral-events`, pickEvents),
+    ]);
+    setContactLoad(nextContact);
+    setEventsLoad(nextEvents);
+    setReloading(false);
+    setReloadingEvents(false);
+  }, [params.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const contact = dataOf(contactLoad);
+  const lead = contact?.lead ?? null;
+  // Stable identity, so the memos below do not re-run on every render.
+  const activities = useMemo(() => contact?.activities ?? [], [contact]);
+  /** The signals, or null when the request for them produced none. */
+  const events = dataOf(eventsLoad);
 
   const health = useMemo(() => {
     if (!lead) return null;
@@ -106,17 +138,22 @@ export default function CrmLeadDna() {
     return computeDiscProfile(diLead, [], activities);
   }, [lead, activities]);
 
+  // Null all the way down when the signals never arrived: a DNA computed from
+  // an empty list is a reading, not a blank.
   const sortedEvents = useMemo(
-    () => [...events].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime()),
+    () => (events === null
+      ? null
+      : [...events].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())),
     [events],
   );
-  const leadDna = useMemo(() => computeLeadDna(sortedEvents), [sortedEvents]);
-  const trend = useMemo(() => computeIntentTrend(sortedEvents), [sortedEvents]);
+  const leadDna = useMemo(() => (sortedEvents === null ? null : computeLeadDna(sortedEvents)), [sortedEvents]);
+  const trend = useMemo(() => (sortedEvents === null ? null : computeIntentTrend(sortedEvents)), [sortedEvents]);
   const recentEventCount7d = useMemo(() => {
+    if (sortedEvents === null) return null;
     const cutoff = Date.now() - 7 * 86_400_000;
     return sortedEvents.filter(e => new Date(e.occurredAt).getTime() > cutoff).length;
   }, [sortedEvents]);
-  const isHotSpike = recentEventCount7d >= HOT_SPIKE_THRESHOLD;
+  const isHotSpike = recentEventCount7d !== null && recentEventCount7d >= HOT_SPIKE_THRESHOLD;
 
   // ── DNA Summary — deterministic, rule-based, no AI call ─────────────────────
   const dnaSummary = useMemo(() => {
@@ -127,8 +164,9 @@ export default function CrmLeadDna() {
     parts.push(`${discMeta.label} type (${discMeta.shortDesc.toLowerCase()})`);
     parts.push(`${health.badge} health score (${health.score}/100)`);
 
-    if (trend.direction === "rising") parts.push("engagement rising");
-    else if (trend.direction === "falling") parts.push("engagement falling");
+    // Nothing is claimed about the signal trend when the signals are missing.
+    if (trend?.direction === "rising") parts.push("engagement rising");
+    else if (trend?.direction === "falling") parts.push("engagement falling");
     if (isHotSpike) parts.push(`a recent spike of ${recentEventCount7d} signals in the last 7 days`);
 
     const goneQuietOnCalls = activities.filter(a => a.type === "call_initiated" || a.type === "call_received").length === 0
@@ -155,24 +193,51 @@ export default function CrmLeadDna() {
     return `${sentence1.charAt(0).toUpperCase()}${sentence1.slice(1)} ${sentence2}`;
   }, [lead, health, ciStats, discProfile, trend, isHotSpike, recentEventCount7d, activities]);
 
-  if (loading) {
+  /*
+    The failure, stated in the words the response gave, with a way to try it
+    again — a 403, a 5xx and an unreachable server no longer share the one
+    flat "Failed to load Lead DNA." And a contact that is simply not there is
+    named as that, with the list offered rather than substituted.
+  */
+  if (contactLoad.status === "error") {
+    const missing = contactLoad.httpStatus === 404;
     return (
       <CrmLayout>
-        <div className="p-6 max-w-5xl mx-auto">
-          <div className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
-            Loading Lead DNA…
-          </div>
+        <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+          <LoadFailure
+            what="Lead DNA"
+            reason={contactLoad.reason}
+            onRetry={missing ? undefined : () => { void load(); }}
+            retrying={reloading}
+          >
+            <p className="mt-2 text-sm text-muted-foreground break-words">
+              {missing
+                ? "This contact is no longer in the CRM. It may have been deleted, or merged into another record."
+                : "No behavioural type, health score or signal trend is shown while this is unavailable."}
+            </p>
+            <Link href="/admin/crm/leads">
+              <button className="mt-3 text-sm text-primary underline underline-offset-2 hover:opacity-80">
+                Open the contacts list
+              </button>
+            </Link>
+          </LoadFailure>
         </div>
       </CrmLayout>
     );
   }
 
-  if (error || !lead || !health || !ciStats || !discProfile) {
+  // `health`, `ciStats` and `discProfile` are all derived from the contact, so
+  // the only way they are missing is that it has not arrived yet.
+  if (!lead || !health || !ciStats || !discProfile) {
     return (
       <CrmLayout>
         <div className="p-6 max-w-5xl mx-auto">
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-            {error ?? "Lead not found."}
+          <div
+            role="status"
+            aria-live="polite"
+            className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground"
+          >
+            Loading Lead DNA…
           </div>
         </div>
       </CrmLayout>
@@ -266,9 +331,9 @@ export default function CrmLeadDna() {
           <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="crm-insight-dot" />
-              {trend.direction === "rising" ? (
+              {trend?.direction === "rising" ? (
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
-              ) : trend.direction === "falling" ? (
+              ) : trend?.direction === "falling" ? (
                 <TrendingDown className="w-4 h-4 text-red-600" />
               ) : (
                 <TrendingUp className="w-4 h-4 text-muted-foreground" />
@@ -276,20 +341,47 @@ export default function CrmLeadDna() {
               <h3 className="font-semibold text-sm text-foreground">Behavioral Signal Trend</h3>
               {isHotSpike && <Flame className="w-4 h-4 text-orange-600 ml-auto" />}
             </div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${INTENT_STAGE_COLOR[leadDna.intentStage]}`}>
-                {leadDna.intentStage}
-              </span>
-              <span className={`text-xs font-semibold flex items-center gap-1 ${
-                trend.direction === "rising" ? "text-emerald-600" : trend.direction === "falling" ? "text-red-600" : "text-muted-foreground"
-              }`}>
-                {trend.delta > 0 ? `+${trend.delta}` : trend.delta}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Client Intent {leadDna.clientIntent} · {leadDna.eventCount} events · last signal {timeAgo(leadDna.lastEventAt)}
-              {isHotSpike && ` · hot spike (${recentEventCount7d} in 7d)`}
-            </p>
+            {/*
+              The intent stage, the signal count and the last-signal date all
+              come from one sub-request. When it fails none of them is shown:
+              "0 events · last signal never" under a stage badge computed from
+              an empty list read as a dormant client who may well have been
+              busy all week.
+            */}
+            {eventsLoad.status === "loading" ? (
+              <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
+                Loading behavioural signals…
+              </p>
+            ) : leadDna === null || trend === null ? (
+              <LoadFailure
+                what="Behavioural signals"
+                reason={eventsLoad.status === "error" ? eventsLoad.reason : ""}
+                variant="inline"
+                onRetry={() => { void loadEvents(); }}
+                retrying={reloadingEvents}
+              >
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No intent stage, signal count or last-signal date is shown while this is unavailable — there may well be signals on this contact.
+                </p>
+              </LoadFailure>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${INTENT_STAGE_COLOR[leadDna.intentStage]}`}>
+                    {leadDna.intentStage}
+                  </span>
+                  <span className={`text-xs font-semibold flex items-center gap-1 ${
+                    trend.direction === "rising" ? "text-emerald-600" : trend.direction === "falling" ? "text-red-600" : "text-muted-foreground"
+                  }`}>
+                    {trend.delta > 0 ? `+${trend.delta}` : trend.delta}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Client Intent {leadDna.clientIntent} · {leadDna.eventCount} events · last signal {timeAgo(leadDna.lastEventAt)}
+                  {isHotSpike && ` · hot spike (${recentEventCount7d} in 7d)`}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
 import {
   PROJECT_STAGES, PROJECT_STAGE_STYLES, PROJECT_TYPES, type ProjectStage,
 } from "@/lib/crmTaxonomy";
@@ -156,6 +158,21 @@ interface DeliveryRow {
   availableActions: RecoveryAction[];
   guidance: string;
   resendDuplicateRisk: string;
+  /**
+   * What the mail provider said afterwards, when it has said anything.
+   *
+   * Shown beside the delivery's own state, never instead of it: one says what
+   * this server managed to hand over, the other what happened to the message,
+   * and only the first decides which recovery actions are offered.
+   */
+  provider?: {
+    state: string;
+    label: string;
+    tone: "waiting" | "working" | "accepted" | "attention";
+    explanation: string;
+    at: string | null;
+    detail: string | null;
+  } | null;
 }
 
 // ── Small shared vocabulary ─────────────────────────────────────────────────
@@ -311,6 +328,20 @@ const DELIVERY_LABEL: Record<DeliveryState, string> = {
   accepted: "Handed over",
   refused: "Refused",
   uncertain: "Unknown",
+};
+
+/**
+ * The provider's report, coloured by what it asks of somebody.
+ *
+ * `accepted` is teal rather than green for the same reason the state pill is:
+ * a provider taking or even delivering a message is not proof anybody read it,
+ * and a tick invites that reading.
+ */
+const PROVIDER_PILL: Record<string, string> = {
+  waiting: "bg-sky-100 text-sky-700",
+  working: "bg-sky-100 text-sky-700",
+  accepted: "bg-teal-100 text-teal-700",
+  attention: "bg-red-100 text-red-700",
 };
 
 const DELIVERY_PILL: Record<DeliveryState, string> = {
@@ -499,6 +530,16 @@ function DeliveryCard({ row, open, onToggle, onDone }: {
     <div className="bg-white border border-border rounded-xl p-3">
       <div className="flex flex-wrap items-start gap-2">
         <Pill className={DELIVERY_PILL[row.state]}>{DELIVERY_LABEL[row.state]}</Pill>
+        {/* The provider's own word, where it has given one. "Handed over" and
+            "Delivered" are different facts, and so are "Handed over" and
+            "Bounced" — which is the one somebody needs to see. */}
+        {row.provider && (
+          <span title={row.provider.explanation}>
+            <Pill className={PROVIDER_PILL[row.provider.tone] ?? PROVIDER_PILL.waiting}>
+              {row.provider.label}
+            </Pill>
+          </span>
+        )}
         <span className="text-sm font-medium text-foreground min-w-0 break-words">
           {deliveryRecipient(row)}
         </span>
@@ -571,53 +612,84 @@ function DeliveryCard({ row, open, onToggle, onDone }: {
  * delivery is a message somebody may never have received — a page that can drop
  * one is worse than no page at all, since it looks complete.
  */
-function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void }) {
+/** One page of the delivery queue, with the counts the server sent beside it. */
+interface DeliveryQueue {
+  rows: DeliveryRow[];
+  nextCursor: number | null;
+  /** Null when the server sent no count — never 0 standing in for one. */
+  total: number | null;
+  byState: Record<string, number>;
+}
+
+function pickDeliveryQueue(body: unknown): DeliveryQueue | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { deliveries?: unknown; nextCursor?: unknown; counts?: unknown };
+  // An answer without a list of deliveries is not an empty queue.
+  if (!Array.isArray(b.deliveries)) return undefined;
+  const counts = (b.counts && typeof b.counts === "object" ? b.counts : {}) as {
+    matchingFilters?: unknown; byState?: unknown;
+  };
+  return {
+    rows: b.deliveries as DeliveryRow[],
+    nextCursor: typeof b.nextCursor === "number" ? b.nextCursor : null,
+    total: typeof counts.matchingFilters === "number" ? counts.matchingFilters : null,
+    byState: counts.byState && typeof counts.byState === "object"
+      ? counts.byState as Record<string, number>
+      : {},
+  };
+}
+
+function DeliveryIssues({ onCountChange }: { onCountChange: (n: number | null) => void }) {
   const [state, setState] = useState("");
-  const [rows, setRows] = useState<DeliveryRow[]>([]);
-  const [cursor, setCursor] = useState<number | null>(null);
-  const [total, setTotal] = useState(0);
-  const [byState, setByState] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const [queue, setQueue] = useState<Load<DeliveryQueue>>({ status: "loading" });
+  /** A refused "Load more" must not take away the page already on screen. */
+  const [moreError, setMoreError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
 
   const seq = useRef(0);
 
   const load = useCallback(async (after: number | null = null) => {
     const mine = ++seq.current;
-    if (after === null) setLoading(true); else setLoadingMore(true);
-    setError("");
-    try {
-      const p = new URLSearchParams({ limit: "25" });
-      if (state) p.set("state", state);
-      if (after !== null) p.set("cursor", String(after));
-      const res = await adminFetch(`/api/crm/operations/deliveries?${p.toString()}`);
-      if (mine !== seq.current) return;
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json() as {
-        deliveries?: DeliveryRow[];
-        nextCursor?: number | null;
-        counts?: { matchingFilters?: number; byState?: Record<string, number> };
-      };
-      const page = data.deliveries ?? [];
-      setRows(prev => (after === null ? page : [...prev, ...page]));
-      setCursor(data.nextCursor ?? null);
-      setTotal(Number(data.counts?.matchingFilters ?? 0));
-      setByState(data.counts?.byState ?? {});
-      if (!state) onCountChange(Number(data.counts?.matchingFilters ?? 0));
-    } catch {
-      if (mine === seq.current) {
-        setError("Couldn't load delivery issues. Check your connection and try again.");
-      }
-    } finally {
-      if (mine === seq.current) { setLoading(false); setLoadingMore(false); }
+    if (after === null) setQueue({ status: "loading" }); else setLoadingMore(true);
+    setMoreError("");
+    const p = new URLSearchParams({ limit: "25" });
+    if (state) p.set("state", state);
+    if (after !== null) p.set("cursor", String(after));
+    const next = await readAdminResource(
+      `/api/crm/operations/deliveries?${p.toString()}`,
+      pickDeliveryQueue,
+    );
+    if (mine !== seq.current) return;
+    if (after === null) {
+      setQueue(next);
+    } else if (next.status === "ready") {
+      const page = next.data;
+      setQueue(prev => (prev.status === "ready"
+        ? { status: "ready", data: { ...page, rows: [...prev.data.rows, ...page.rows] } }
+        : next));
+    } else if (next.status === "error") {
+      setMoreError(next.reason);
+    }
+    setLoadingMore(false);
+    // The badge on the other views must never keep a number this read could not
+    // confirm, and must never become 0 because the read failed. With a filter
+    // on, the count is a filtered one and is not the badge's number at all.
+    if (!state) {
+      if (next.status === "ready") onCountChange(next.data.total);
+      else if (next.status === "error") onCountChange(null);
     }
   }, [state, onCountChange]);
 
   useEffect(() => { void load(null); }, [load]);
 
   const afterRecovery = () => { setOpenId(null); void load(null); };
+
+  // What actually loaded, or null. Never an empty page standing in for a
+  // request nobody managed to complete.
+  const data = queue.status === "ready" ? queue.data : null;
+  const rows = data?.rows ?? [];
+  const byState = data?.byState ?? {};
 
   return (
     <div className="flex-1 p-4 space-y-3">
@@ -628,7 +700,7 @@ function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void 
             id="delivery-state"
             className={INPUT}
             value={state}
-            onChange={e => { setState(e.target.value); setCursor(null); }}
+            onChange={e => { setState(e.target.value); }}
           >
             {DELIVERY_STATE_FILTERS.map(f => (
               <option key={f.value} value={f.value}>
@@ -637,8 +709,12 @@ function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void 
             ))}
           </select>
         </div>
+        {/* This line renders above the failure below it, so it used to read
+            "0 open · showing 0" next to "Couldn't load delivery issues" — a
+            queue of possibly unreceived messages reported as empty. */}
         <p className="text-xs text-muted-foreground sm:pb-2.5 tabular-nums">
-          {total} open · showing {rows.length}
+          <Figure value={data ? data.total : null} loading={queue.status === "loading"} /> open ·{" "}
+          showing <Figure value={data ? rows.length : null} loading={queue.status === "loading"} />
         </p>
         <Button
           variant="ghost"
@@ -651,21 +727,27 @@ function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void 
         </Button>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
+      {queue.status === "loading" ? (
+        <div className="space-y-2" role="status" aria-live="polite">
+          <span className="sr-only">Loading delivery issues…</span>
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 text-red-500" />
-          </div>
-          <p className="text-muted-foreground font-medium max-w-sm">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => void load(null)}>Retry</Button>
-        </div>
+      ) : queue.status === "error" ? (
+        <LoadFailure
+          what="Delivery issues"
+          reason={queue.reason}
+          onRetry={() => { void load(null); }}
+        >
+          <p className="mt-2 min-w-0 break-words text-sm text-muted-foreground">
+            No open count is shown while this is unavailable — reminders may be sitting in an unknown
+            or failed state.
+          </p>
+        </LoadFailure>
       ) : rows.length === 0 ? (
+        /* An empty queue is a fact about the reminders; the failure above is a
+           fact about the request. They must never look alike. */
         <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
           <Mail className="w-10 h-10 text-muted-foreground/40" />
           <p className="text-muted-foreground font-medium">Every reminder is accounted for.</p>
@@ -687,19 +769,30 @@ function DeliveryIssues({ onCountChange }: { onCountChange: (n: number) => void 
               />
             ))}
           </div>
-          {cursor !== null && (
+          {/* The page already on screen stays; only the page that did not
+              arrive is reported missing. */}
+          {moreError && (
+            <LoadFailure
+              what="More delivery issues"
+              reason={moreError}
+              variant="inline"
+              onRetry={() => { if (data && data.nextCursor !== null) void load(data.nextCursor); }}
+              retrying={loadingMore}
+            />
+          )}
+          {data && data.nextCursor !== null && (
             <div className="flex justify-center pt-1">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={loadingMore}
-                onClick={() => void load(cursor)}
+                onClick={() => void load(data.nextCursor)}
               >
                 {loadingMore ? "Loading…" : "Load more"}
               </Button>
             </div>
           )}
-          {cursor === null && rows.length > 0 && (
+          {data && data.nextCursor === null && rows.length > 0 && (
             <p className="text-center text-xs text-muted-foreground pt-1">
               That is all {rows.length} of them — nothing is hidden by the page size.
             </p>
@@ -1034,57 +1127,85 @@ function FailureCard({ row, open, onToggle, onDone }: {
  * fix — a list that can silently drop one is worse than no list at all, since
  * it looks complete.
  */
-function AutomationFailures({ onCountChange }: { onCountChange: (n: number) => void }) {
+/** One page of the automation queue. Events and rule runs page separately. */
+interface FailureQueue {
+  rows: FailureRow[];
+  nextCursor: { run: number | null; event: number | null };
+  hasMore: boolean;
+  /** Null when the server sent no count — never 0 standing in for one. */
+  total: number | null;
+}
+
+function pickFailureQueue(body: unknown): FailureQueue | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { failures?: unknown; nextCursor?: unknown; hasMore?: unknown; counts?: unknown };
+  // An answer without a list of failures is not "everything is accounted for".
+  if (!Array.isArray(b.failures)) return undefined;
+  const cursor = (b.nextCursor && typeof b.nextCursor === "object" ? b.nextCursor : {}) as {
+    run?: unknown; event?: unknown;
+  };
+  const counts = (b.counts && typeof b.counts === "object" ? b.counts : {}) as {
+    matchingFilters?: unknown;
+  };
+  return {
+    rows: b.failures as FailureRow[],
+    nextCursor: {
+      run: typeof cursor.run === "number" ? cursor.run : null,
+      event: typeof cursor.event === "number" ? cursor.event : null,
+    },
+    hasMore: b.hasMore === true,
+    total: typeof counts.matchingFilters === "number" ? counts.matchingFilters : null,
+  };
+}
+
+function AutomationFailures({ onCountChange }: { onCountChange: (n: number | null) => void }) {
   const [filter, setFilter] = useState("");
-  const [rows, setRows] = useState<FailureRow[]>([]);
-  const [cursor, setCursor] = useState<{ run: number | null; event: number | null }>(
-    { run: null, event: null },
-  );
-  const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [queue, setQueue] = useState<Load<FailureQueue>>({ status: "loading" });
+  /** A refused "Load more" must not take away the page already on screen. */
+  const [moreError, setMoreError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const seq = useRef(0);
 
   const load = useCallback(async (after: { run: number | null; event: number | null } | null = null) => {
     const mine = ++seq.current;
-    if (after === null) setLoading(true); else setLoadingMore(true);
-    setError("");
-    try {
-      const p = new URLSearchParams(filter);
-      p.set("limit", "25");
-      if (after?.run != null) p.set("runCursor", String(after.run));
-      if (after?.event != null) p.set("eventCursor", String(after.event));
-      const res = await adminFetch(`/api/crm/automation/failures?${p.toString()}`);
-      if (mine !== seq.current) return;
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json() as {
-        failures?: FailureRow[];
-        nextCursor?: { run: number | null; event: number | null };
-        hasMore?: boolean;
-        counts?: { matchingFilters?: number };
-      };
-      const page = data.failures ?? [];
-      setRows(prev => (after === null ? page : [...prev, ...page]));
-      setCursor(data.nextCursor ?? { run: null, event: null });
-      setHasMore(!!data.hasMore);
-      setTotal(Number(data.counts?.matchingFilters ?? 0));
-      if (filter === "") onCountChange(Number(data.counts?.matchingFilters ?? 0));
-    } catch {
-      if (mine === seq.current) {
-        setError("Couldn't load automation failures. Check your connection and try again.");
-      }
-    } finally {
-      if (mine === seq.current) { setLoading(false); setLoadingMore(false); }
+    if (after === null) setQueue({ status: "loading" }); else setLoadingMore(true);
+    setMoreError("");
+    const p = new URLSearchParams(filter);
+    p.set("limit", "25");
+    if (after?.run != null) p.set("runCursor", String(after.run));
+    if (after?.event != null) p.set("eventCursor", String(after.event));
+    const next = await readAdminResource(
+      `/api/crm/automation/failures?${p.toString()}`,
+      pickFailureQueue,
+    );
+    if (mine !== seq.current) return;
+    if (after === null) {
+      setQueue(next);
+    } else if (next.status === "ready") {
+      const page = next.data;
+      setQueue(prev => (prev.status === "ready"
+        ? { status: "ready", data: { ...page, rows: [...prev.data.rows, ...page.rows] } }
+        : next));
+    } else if (next.status === "error") {
+      setMoreError(next.reason);
+    }
+    setLoadingMore(false);
+    // As with the delivery badge: a read that failed leaves no number behind,
+    // and never a 0.
+    if (filter === "") {
+      if (next.status === "ready") onCountChange(next.data.total);
+      else if (next.status === "error") onCountChange(null);
     }
   }, [filter, onCountChange]);
 
   useEffect(() => { void load(null); }, [load]);
 
   const afterRecovery = () => { setOpenKey(null); void load(null); };
+
+  const data = queue.status === "ready" ? queue.data : null;
+  const rows = data?.rows ?? [];
 
   return (
     <div className="flex-1 p-4 space-y-3">
@@ -1102,8 +1223,12 @@ function AutomationFailures({ onCountChange }: { onCountChange: (n: number) => v
             ))}
           </select>
         </div>
+        {/* Above the failure, as the delivery count was: "0 in total · showing 0"
+            beside "Couldn't load automation failures" said every automation had
+            run when nobody had managed to ask. */}
         <p className="text-xs text-muted-foreground sm:pb-2.5 tabular-nums">
-          {total} in total · showing {rows.length}
+          <Figure value={data ? data.total : null} loading={queue.status === "loading"} /> in total ·{" "}
+          showing <Figure value={data ? rows.length : null} loading={queue.status === "loading"} />
         </p>
         <Button
           variant="ghost"
@@ -1116,21 +1241,26 @@ function AutomationFailures({ onCountChange }: { onCountChange: (n: number) => v
         </Button>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
+      {queue.status === "loading" ? (
+        <div className="space-y-2" role="status" aria-live="polite">
+          <span className="sr-only">Loading automation failures…</span>
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 text-red-500" />
-          </div>
-          <p className="text-muted-foreground font-medium max-w-sm">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => void load(null)}>Retry</Button>
-        </div>
+      ) : queue.status === "error" ? (
+        <LoadFailure
+          what="Automation failures"
+          reason={queue.reason}
+          onRetry={() => { void load(null); }}
+        >
+          <p className="mt-2 min-w-0 break-words text-sm text-muted-foreground">
+            No total is shown while this is unavailable — rule runs may have failed and events may be
+            sitting unprocessed.
+          </p>
+        </LoadFailure>
       ) : rows.length === 0 ? (
+        /* Only ever said about a list that arrived. */
         <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
           <Cpu className="w-10 h-10 text-muted-foreground/40" />
           <p className="text-muted-foreground font-medium">Every automation is accounted for.</p>
@@ -1153,19 +1283,28 @@ function AutomationFailures({ onCountChange }: { onCountChange: (n: number) => v
               />
             ))}
           </div>
-          {hasMore ? (
+          {moreError && (
+            <LoadFailure
+              what="More automation failures"
+              reason={moreError}
+              variant="inline"
+              onRetry={() => { if (data) void load(data.nextCursor); }}
+              retrying={loadingMore}
+            />
+          )}
+          {data && data.hasMore ? (
             <div className="flex flex-col items-center gap-1 pt-1">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={loadingMore}
-                onClick={() => void load(cursor)}
+                onClick={() => void load(data.nextCursor)}
               >
                 {loadingMore ? "Loading…" : "Load more"}
               </Button>
               <p className="text-center text-[11px] text-muted-foreground">
-                Showing {rows.length} of {total}. This is a page, not the whole list — keep loading
-                to reach the rest.
+                Showing {rows.length} of <Figure value={data.total} />. This is a page, not the whole
+                list — keep loading to reach the rest.
               </p>
             </div>
           ) : (

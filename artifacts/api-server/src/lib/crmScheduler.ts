@@ -46,6 +46,7 @@ import {
 import { startDueCampaigns, marketingAutosendEnabled } from "../routes/crmMarketing.js";
 import { processDueSupportDeliveries, ingestSupportReplies } from "./supportDelivery.js";
 import { logger } from "./logger.js";
+import { processPendingEmailEvents } from "./emailProviderEvents.js";
 
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -1647,6 +1648,19 @@ export function startCrmScheduler(intervalMs = TICK_MS): void {
         await ingestSupportReplies();
       } catch (err) {
         logger.error({ err }, "support: delivery tick failed; reminders are unaffected");
+      }
+
+      // Provider delivery and engagement events the webhook stored but could
+      // not finish interpreting — a database hiccup, or a send that was still
+      // in flight when its `delivered` event arrived. The provider's own
+      // retries are finite and long gone by now; ours are not, which is the
+      // whole reason the webhook stores before it interprets. Wrapped
+      // separately so an event fault cannot stop reminders, support or
+      // campaigns.
+      try {
+        await processPendingEmailEvents();
+      } catch (err) {
+        logger.error({ err }, "email events: processing tick failed; reminders are unaffected");
       }
 
       if (marketingAutosendEnabled()) {

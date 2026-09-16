@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "./CrmLayout";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
 import { MESSAGING_CONCEPTS } from "@/lib/messagingConcepts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -27,6 +29,13 @@ interface ScheduledMessage {
   sentAt: string | null;
   lastError: string | null;
   createdAt: string;
+}
+
+// A body that is not the shape this page expects is a failure too — not a
+// reason to render an empty queue over messages that are really scheduled.
+function pickMessages(body: unknown): ScheduledMessage[] | undefined {
+  const list = body && typeof body === "object" ? (body as { messages?: unknown }).messages : undefined;
+  return Array.isArray(list) ? list as ScheduledMessage[] : undefined;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -52,6 +61,10 @@ const STATUS_BADGE: Record<string, string> = {
   failed:    "bg-red-100 text-red-700 border-red-200",
   canceled:  "bg-muted text-muted-foreground border-border",
   skipped:   "bg-amber-100 text-amber-700 border-amber-200",
+  // Not an error and not a cancellation: a message too overdue to send by
+  // itself, waiting for somebody to decide. Ringed so it reads differently
+  // from the states a machine is still working through.
+  held:      "bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-300",
 };
 
 function fmtDateTime(iso: string) {
@@ -89,11 +102,10 @@ function InlineEdit({
         method: "PATCH",
         body: JSON.stringify({ subject: subject || null, body: body || null }),
       });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error ?? "Failed to save"); return; }
+      if (!r.ok) { setError(`Message not saved. ${await responseFailureReason(r)}`); return; }
       onSaved({ subject: subject || null, body: body || null });
     } catch {
-      setError("Network error");
+      setError(`Message not saved. ${failureReason(null)}`);
     } finally {
       setSaving(false);
     }
@@ -150,7 +162,8 @@ function MessageRow({
 }) {
   const [editing, setEditing]       = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
-  const canAct = ["scheduled", "queued"].includes(msg.status);
+  // A held message can be acted on — that is the whole point of holding it.
+  const canAct = ["scheduled", "queued", "held"].includes(msg.status);
 
   return (
     <div className={`border-b border-border/60 last:border-0 ${
@@ -246,8 +259,14 @@ function MessageRow({
 
       {msg.lastError && (
         <div className="px-4 pb-2">
-          <p className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded px-2 py-1">
-            Error: {msg.lastError}
+          {/* A hold is a decision waiting to be made, not a failure, and
+              calling it an error would send somebody looking for a fault. */}
+          <p className={`text-[10px] rounded px-2 py-1 border ${
+            msg.status === "held"
+              ? "text-amber-800 bg-amber-50 border-amber-200"
+              : "text-red-600 bg-red-50 border-red-100"
+          }`}>
+            {msg.status === "held" ? "Held: " : "Error: "}{msg.lastError}
           </p>
         </div>
       )}
@@ -281,42 +300,50 @@ interface SchedulerStatus {
   totalSkipped: number;
 }
 
+function pickScheduler(body: unknown): SchedulerStatus | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  return typeof (body as { running?: unknown }).running === "boolean" ? body as SchedulerStatus : undefined;
+}
+
 export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: Props) {
-  const [messages,   setMessages]   = useState<ScheduledMessage[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState("");
+  // The queue and the scheduler's own health are two separate answers, and each
+  // one is a `Load`. Before this, a failed read left the array empty and the
+  // page showed six status tiles of 0 over "No messages in queue" and "0
+  // messages total" — it told the operator nothing was scheduled when the queue
+  // may well have been full.
+  const [messagesLoad, setMessagesLoad] = useState<Load<ScheduledMessage[]>>({ status: "loading" });
+  const [schedulerLoad, setSchedulerLoad] = useState<Load<SchedulerStatus>>({ status: "loading" });
+  const [reloading,  setReloading]  = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [busyId,     setBusyId]     = useState<number | null>(null);
   const [feedback,   setFeedback]   = useState<{ ok: boolean; text: string } | null>(null);
-  const [scheduler,  setScheduler]  = useState<SchedulerStatus | null>(null);
   const [runningNow, setRunningNow] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<{ leadId: number; leadName: string } | null>(null);
   const [shiftDays,        setShiftDays]        = useState("7");
   const [rescheduling,     setRescheduling]     = useState(false);
 
+  // What actually loaded, or null. Never an empty array standing in for a
+  // request nobody managed to complete.
+  const messages  = messagesLoad.status === "ready" ? messagesLoad.data : null;
+  const scheduler = schedulerLoad.status === "ready" ? schedulerLoad.data : null;
+
+  /** Apply a local change to the queue, only when there is a queue to change. */
+  const updateMessages = (fn: (prev: ScheduledMessage[]) => ScheduledMessage[]) =>
+    setMessagesLoad(prev => (prev.status === "ready" ? { status: "ready", data: fn(prev.data) } : prev));
+
   const load = useCallback(async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (statusFilter) params.set("status", statusFilter);
-      if (campaignId)   params.set("campaignId", String(campaignId));
-      const r = await adminFetch(`/api/crm/campaigns/queue?${params}`);
-      const d = await r.json();
-      if (!r.ok) { setError(d.error ?? "Failed to load queue"); return; }
-      setMessages(d.messages ?? []);
-    } catch {
-      setError("Network error loading queue");
-    } finally {
-      setLoading(false);
-    }
+    setReloading(true);
+    const params = new URLSearchParams();
+    if (statusFilter) params.set("status", statusFilter);
+    if (campaignId)   params.set("campaignId", String(campaignId));
+    setMessagesLoad(await readAdminResource(`/api/crm/campaigns/queue?${params}`, pickMessages));
+    setReloading(false);
   }, [statusFilter, campaignId]);
 
+  // The scheduler card is its own part of the page: it can fail while the queue
+  // loads, and it says so rather than quietly disappearing.
   const loadScheduler = useCallback(async () => {
-    try {
-      const r = await adminFetch("/api/crm/campaigns/scheduler/status");
-      if (r.ok) setScheduler(await r.json());
-    } catch { /* ignore */ }
+    setSchedulerLoad(await readAdminResource("/api/crm/campaigns/scheduler/status", pickScheduler));
   }, []);
 
   useEffect(() => { load(); loadScheduler(); }, [load, loadScheduler]);
@@ -328,16 +355,13 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
       const r = await adminFetch("/api/crm/campaigns/scheduler/run", {
         method: "POST",
       });
-      const d = await r.json();
-      if (r.ok) {
-        setFeedback({ ok: true, text: `Scheduler ran: ${d.processed} sent, ${d.skipped} skipped, ${d.errors} errors.` });
-        await load();
-        await loadScheduler();
-      } else {
-        setFeedback({ ok: false, text: d.error ?? "Scheduler run failed" });
-      }
+      if (!r.ok) { setFeedback({ ok: false, text: `The scheduler was not run. ${await responseFailureReason(r)}` }); return; }
+      const d = await r.json().catch(() => ({})) as { processed?: number; skipped?: number; errors?: number };
+      setFeedback({ ok: true, text: `Scheduler ran: ${d.processed ?? 0} sent, ${d.skipped ?? 0} skipped, ${d.errors ?? 0} errors.` });
+      await load();
+      await loadScheduler();
     } catch {
-      setFeedback({ ok: false, text: "Network error" });
+      setFeedback({ ok: false, text: `The scheduler was not run. ${failureReason(null)}` });
     } finally {
       setRunningNow(false);
     }
@@ -350,31 +374,34 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
       const r = await adminFetch(`/api/crm/campaigns/queue/${id}/send-now`, {
         method: "POST",
       });
-      const d = await r.json();
-      if (r.ok) {
-        setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "sent", sentAt: new Date().toISOString() } : m));
-        setFeedback({ ok: true, text: d.testMode ? "Simulated send (test mode active)." : "Message sent successfully." });
-      } else {
-        setFeedback({ ok: false, text: d.error ?? "Failed to send" });
-      }
+      if (!r.ok) { setFeedback({ ok: false, text: `Message not sent. ${await responseFailureReason(r)}` }); return; }
+      const d = await r.json().catch(() => ({})) as { testMode?: boolean };
+      updateMessages(prev => prev.map(m => m.id === id ? { ...m, status: "sent", sentAt: new Date().toISOString() } : m));
+      setFeedback({ ok: true, text: d.testMode ? "Simulated send (test mode active)." : "Message sent successfully." });
     } catch {
-      setFeedback({ ok: false, text: "Network error" });
+      setFeedback({ ok: false, text: `Message not sent. ${failureReason(null)}` });
     } finally {
       setBusyId(null);
     }
   };
 
+  // A cancel that failed must not grey the row out: the message is still
+  // scheduled, and the next refresh would bring it back with no explanation.
   const cancelMsg = async (id: number) => {
+    setFeedback(null);
     try {
-      await adminFetch(`/api/crm/campaigns/queue/${id}`, {
+      const r = await adminFetch(`/api/crm/campaigns/queue/${id}`, {
         method: "DELETE",
       });
-      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "canceled" } : m));
-    } catch { /* ignore */ }
+      if (!r.ok) { setFeedback({ ok: false, text: `Message not canceled. ${await responseFailureReason(r)}` }); return; }
+      updateMessages(prev => prev.map(m => m.id === id ? { ...m, status: "canceled" } : m));
+    } catch {
+      setFeedback({ ok: false, text: `Message not canceled. ${failureReason(null)}` });
+    }
   };
 
   const onEdited = (id: number, updates: Partial<ScheduledMessage>) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    updateMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
   };
 
   const rescheduleAll = useCallback(async () => {
@@ -389,27 +416,38 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
         method: "POST",
         body: JSON.stringify({ shiftDays: days }),
       });
-      const d = await r.json();
-      if (!r.ok) { setFeedback({ ok: false, text: d.error ?? "Reschedule failed" }); return; }
-      const updated: ScheduledMessage[] = d.messages;
-      setMessages(prev => prev.map(m => updated.find(u => u.id === m.id) ?? m));
+      if (!r.ok) { setFeedback({ ok: false, text: `Nothing was rescheduled. ${await responseFailureReason(r)}` }); return; }
+      const d = await r.json().catch(() => ({})) as { messages?: unknown; updated?: unknown };
+      const updated = d.messages;
+      if (!Array.isArray(updated) || typeof d.updated !== "number") {
+        setFeedback({ ok: false, text: "The reschedule ran, but the server's answer was not in the expected shape." });
+        return;
+      }
+      const shifted = updated as ScheduledMessage[];
+      const count = d.updated;
+      setMessagesLoad(prev => (prev.status === "ready"
+        ? { status: "ready", data: prev.data.map(m => shifted.find(u => u.id === m.id) ?? m) }
+        : prev));
       const sign = days > 0 ? "+" : "";
-      setFeedback({ ok: true, text: `Shifted ${d.updated} message${d.updated !== 1 ? "s" : ""} for ${rescheduleTarget.leadName} by ${sign}${days} day${Math.abs(days) !== 1 ? "s" : ""}.` });
+      setFeedback({ ok: true, text: `Shifted ${count} message${count !== 1 ? "s" : ""} for ${rescheduleTarget.leadName} by ${sign}${days} day${Math.abs(days) !== 1 ? "s" : ""}.` });
       setRescheduleTarget(null);
     } catch {
-      setFeedback({ ok: false, text: "Network error — reschedule failed." });
+      setFeedback({ ok: false, text: `Nothing was rescheduled. ${failureReason(null)}` });
     } finally {
       setRescheduling(false);
     }
   }, [rescheduleTarget, shiftDays]);
 
-  // Summary counts
-  const counts = messages.reduce<Record<string, number>>((acc, m) => {
-    acc[m.status] = (acc[m.status] ?? 0) + 1;
-    return acc;
-  }, {});
+  // Summary counts — or null. A tile of 0 for a queue nobody could read is a
+  // claim about what is scheduled that nobody checked.
+  const counts = messages
+    ? messages.reduce<Record<string, number>>((acc, m) => {
+        acc[m.status] = (acc[m.status] ?? 0) + 1;
+        return acc;
+      }, {})
+    : null;
 
-  const STATUSES = ["scheduled", "queued", "sent", "failed", "canceled", "skipped"];
+  const STATUSES = ["scheduled", "queued", "held", "sent", "failed", "canceled", "skipped"];
 
   return (
     <CrmLayout>
@@ -442,7 +480,7 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
             className="p-2 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title="Refresh"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${reloading || messagesLoad.status === "loading" ? "animate-spin" : ""}`} />
           </button>
         </div>
 
@@ -520,20 +558,37 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
           </div>
         )}
 
-        {/* Status summary tiles */}
-        <div className="grid grid-cols-6 gap-2">
+        {/* The scheduler card is one part of this page; a failed read names it. */}
+        {!campaignId && schedulerLoad.status === "error" && (
+          <LoadFailure
+            what="Auto-Send Scheduler status"
+            reason={schedulerLoad.reason}
+            variant="inline"
+            onRetry={() => { void loadScheduler(); }}
+          />
+        )}
+
+        {/*
+          Status summary tiles. Each figure exists only when the queue behind it
+          loaded — this row is where the page used to state confident zeros
+          about a request that had failed. The incoming side widened this grid
+          for a seventh status, so the wider grid is kept.
+        */}
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
           {STATUSES.map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(statusFilter === s ? "" : s)}
-              className={`rounded-xl border p-2.5 text-center transition-all ${
+              className={`min-w-0 rounded-xl border p-2.5 text-center transition-all ${
                 statusFilter === s
                   ? `${STATUS_BADGE[s]} shadow-sm`
                   : "bg-white border-border hover:bg-accent"
               }`}
             >
-              <p className="text-lg font-black text-foreground">{counts[s] ?? 0}</p>
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mt-0.5">{s}</p>
+              <p className="text-lg font-black text-foreground">
+                <Figure value={counts ? (counts[s] ?? 0) : null} loading={messagesLoad.status === "loading"} />
+              </p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mt-0.5 break-words">{s}</p>
             </button>
           ))}
         </div>
@@ -565,18 +620,29 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
           </div>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-          </div>
-        )}
-
         {/* Table */}
-        {loading ? (
-          <div className="animate-pulse space-y-2">
+        {messagesLoad.status === "loading" ? (
+          <div className="animate-pulse space-y-2" role="status" aria-live="polite">
+            <span className="sr-only">Loading the send queue…</span>
             {[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-muted rounded-xl" />)}
           </div>
+        ) : messages === null ? (
+          /*
+            No queue at all, rather than an empty table under six zeros. An
+            empty queue and an unanswered request must never look alike — and a
+            401, 403, 404, 5xx or unreachable server each reads differently
+            here, because the words come from the response.
+          */
+          <LoadFailure
+            what="The send queue"
+            reason={messagesLoad.status === "error" ? messagesLoad.reason : ""}
+            onRetry={() => { void load(); }}
+            retrying={reloading}
+          >
+            <p className="mt-2 text-sm text-muted-foreground">
+              No status tallies and no message total are shown while this is unavailable — messages may well be scheduled.
+            </p>
+          </LoadFailure>
         ) : messages.length === 0 ? (
           <div className="bg-muted border border-border rounded-xl p-8 text-center">
             <Clock className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -608,8 +674,11 @@ export default function CrmCampaignQueue({ campaignId, campaignName, onBack }: P
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground text-center">
-          {messages.length} message{messages.length !== 1 ? "s" : ""} {statusFilter ? `with status "${statusFilter}"` : "total"}
+        {/* The total exists only when the queue behind it loaded. */}
+        <p className="text-[10px] text-muted-foreground text-center break-words">
+          {messages
+            ? <>{messages.length} message{messages.length !== 1 ? "s" : ""} {statusFilter ? `with status "${statusFilter}"` : "total"}</>
+            : <><Figure value={null} loading={messagesLoad.status === "loading"} /> messages {statusFilter ? `with status "${statusFilter}"` : "total"}</>}
         </p>
       </div>
     </CrmLayout>

@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
-import { RefreshCw, AlertCircle, Receipt, Filter } from "lucide-react";
-import { adminFetch } from "@/lib/adminFetch";
+import { RefreshCw, Receipt, Filter } from "lucide-react";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
 
 interface Transaction {
   id: number;
@@ -19,6 +20,17 @@ interface Transaction {
   receivedAt: string | null;
   notes: string | null;
   createdAt: string;
+}
+
+/** The money behind the whole filtered set, as the server totalled it. */
+interface Totals { received: number; pending: number; basis: string }
+
+/** One server page of payments: the rows, how many match, and the money. */
+interface TransactionPage {
+  transactions: Transaction[];
+  total: number;
+  /** Null only when the server did not send them — never a zero standing in. */
+  totals: Totals | null;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -45,16 +57,36 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function pickTotals(value: unknown): Totals | null {
+  if (!value || typeof value !== "object") return null;
+  const t = value as { received?: unknown; pending?: unknown; basis?: unknown };
+  if (typeof t.received !== "number" || typeof t.pending !== "number") return null;
+  return { received: t.received, pending: t.pending, basis: typeof t.basis === "string" ? t.basis : "" };
+}
+
+/**
+ * A body that is not the shape this page expects is a failure too — not a
+ * reason to show an empty payment history. The row count is required for the
+ * same reason: "of 0" is a claim about the business, and nobody checked it.
+ */
+function pickPage(body: unknown): TransactionPage | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { transactions?: unknown; total?: unknown; totals?: unknown };
+  if (!Array.isArray(b.transactions)) return undefined;
+  if (typeof b.total !== "number") return undefined;
+  return {
+    transactions: b.transactions as Transaction[],
+    total: b.total,
+    totals: pickTotals(b.totals),
+  };
+}
+
 const PAGE_SIZE = 50;
 
 export default function CrmTransactionsPage() {
   const [, navigate] = useLocation();
-  const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [totals, setTotals] = useState<{ received: number; pending: number; basis: string } | null>(null);
-  const [txns, setTxns] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [page, setPage] = useState<Load<TransactionPage>>({ status: "loading" });
   const [statusFilter, setStatusFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -62,37 +94,32 @@ export default function CrmTransactionsPage() {
   // One request, filtered and paged on the server. This used to fetch every
   // deal and then issue a request per deal — a fan-out that grew with the
   // business and re-sorted the whole payment history in the browser.
+  //
+  // The answer is a `Load`, so a refusal is a stated failure. It used to return
+  // early on a 401 and swallow every other error into a banner, then fall
+  // through to the empty state underneath it: a signed-out operator was shown
+  // "No transactions found" and a footer reading "No transactions" about a
+  // payment history nobody had managed to read.
   const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
-      if (statusFilter) params.set("status", statusFilter);
-      if (fromDate) params.set("from", fromDate);
-      if (toDate) params.set("to", toDate);
-
-      const r = await adminFetch(`/api/crm/transactions?${params}`);
-      if (r.status === 401) return;
-      if (!r.ok) throw new Error(String(r.status));
-      const data = await r.json() as {
-        transactions: Transaction[]; total: number;
-        totals: { received: number; pending: number; basis: string };
-      };
-      setTxns(data.transactions || []);
-      setTotal(data.total ?? 0);
-      setTotals(data.totals ?? null);
-    } catch {
-      setError("Couldn't load transactions. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (statusFilter) params.set("status", statusFilter);
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
+    // Back to a skeleton first: the rows on screen answer the previous query,
+    // and the footer beside them would describe this one.
+    setPage({ status: "loading" });
+    setPage(await readAdminResource(`/api/crm/transactions?${params}`, pickPage));
   }, [offset, statusFilter, fromDate, toDate]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setOffset(0); }, [statusFilter, fromDate, toDate]);
 
+  // What actually loaded, or null. Never an empty page standing in for a
+  // request nobody managed to complete.
+  const data = page.status === "ready" ? page.data : null;
   // Filtering and paging happen on the server; this is the current page.
-  const filtered = txns;
+  const filtered = data?.transactions ?? [];
+  const loading = page.status === "loading";
 
   const STATUSES = ["completed", "pending", "failed", "refunded"];
 
@@ -107,19 +134,13 @@ export default function CrmTransactionsPage() {
             </p>
           </div>
           <button
-            onClick={load}
+            onClick={() => { void load(); }}
             className="p-2 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
-
-        {error && (
-          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-          </div>
-        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -145,20 +166,37 @@ export default function CrmTransactionsPage() {
           <div className="flex items-center gap-1.5 ml-auto">
             <input
               type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+              aria-label="From date"
               className="px-2 py-1 border border-input rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
             <span className="text-[10px] text-muted-foreground">to</span>
             <input
               type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+              aria-label="To date"
               className="px-2 py-1 border border-input rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
         </div>
 
         {loading ? (
-          <div className="animate-pulse space-y-2">
+          <div className="animate-pulse space-y-2" role="status" aria-live="polite">
+            <span className="sr-only">Loading transactions…</span>
             {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-muted rounded-xl" />)}
           </div>
+        ) : page.status === "error" ? (
+          /* The failure is the whole answer here. An empty table and a "$0.00"
+             received figure underneath it would say the business has taken no
+             money, which is a different thing entirely from "we could not ask". */
+          <LoadFailure
+            what="Transactions"
+            reason={page.reason}
+            onRetry={() => { void load(); }}
+          >
+            <p className="mt-2 min-w-0 break-words text-sm text-muted-foreground">
+              No payment, total or count is listed while this is unavailable — there may well be
+              payments recorded.
+            </p>
+          </LoadFailure>
         ) : filtered.length === 0 ? (
           <div className="bg-muted border border-border rounded-xl p-8 text-center">
             <Receipt className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -212,35 +250,50 @@ export default function CrmTransactionsPage() {
 
         {/* Totals cover the whole filtered set, not this page — a page-only
             sum would be a different and misleading number, so the basis is
-            stated rather than left to be assumed. */}
-        {totals && (
+            stated rather than left to be assumed. They are shown only when the
+            page they describe actually loaded. */}
+        {data?.totals && (
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-xs">
             <span className="text-foreground">
-              Received <strong className="tabular-nums">{fmtMoney(totals.received)}</strong>
+              Received <strong className="tabular-nums">{fmtMoney(data.totals.received)}</strong>
             </span>
             <span className="text-muted-foreground">
-              Pending <strong className="tabular-nums">{fmtMoney(totals.pending)}</strong>
+              Pending <strong className="tabular-nums">{fmtMoney(data.totals.pending)}</strong>
             </span>
-            <span className="text-[10px] text-muted-foreground">{totals.basis}</span>
+            <span className="text-[10px] text-muted-foreground">{data.totals.basis}</span>
           </div>
         )}
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-[10px] text-muted-foreground tabular-nums">
-            {total === 0 ? "No transactions" : `Showing ${offset + 1}–${Math.min(offset + filtered.length, total)} of ${total}`}
+          {/* "No transactions" is a fact about the business, so it is only ever
+              said about a page that arrived. Otherwise the position is unknown
+              and says so. */}
+          <p className="text-[10px] text-muted-foreground tabular-nums min-w-0 break-words">
+            {data ? (
+              <>
+                {data.total === 0
+                  ? "No transactions"
+                  : `Showing ${offset + 1}–${Math.min(offset + filtered.length, data.total)} of ${data.total}`}
+              </>
+            ) : (
+              <>
+                Showing <Figure value={null} loading={loading} /> of{" "}
+                <Figure value={null} loading={loading} />
+              </>
+            )}
             {statusFilter ? ` with status "${statusFilter}"` : ""}
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setOffset(Math.max(offset - PAGE_SIZE, 0))}
-              disabled={offset === 0 || loading}
+              disabled={offset === 0 || !data}
               className="text-xs border border-input rounded-lg px-3 py-1.5 hover:bg-accent transition-colors disabled:opacity-40"
             >
               Previous
             </button>
             <button
               onClick={() => setOffset(offset + PAGE_SIZE)}
-              disabled={offset + filtered.length >= total || loading}
+              disabled={!data || offset + filtered.length >= data.total}
               className="text-xs border border-input rounded-lg px-3 py-1.5 hover:bg-accent transition-colors disabled:opacity-40"
             >
               Next

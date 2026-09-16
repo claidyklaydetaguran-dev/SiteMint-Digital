@@ -93,6 +93,14 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/email/suppressions/release": "admin",
   "POST /api/crm/email/inbound/events/:id/retry": "admin",
 
+  // ── Delivery and engagement events (routes/crmEmailEvents.ts) ───────────
+  // The webhook carries its own credential: a Svix signature over the raw
+  // body, verified before a row is written (lib/svixSignature.ts). Re-running
+  // the interpretation of an already-verified event is an operator action and
+  // is permission-gated — it can change a record's delivery state, so it is
+  // `settings.write` rather than a read.
+  "POST /api/crm/email/events/:id/retry": "admin",
+
   // ── The sales chain ─────────────────────────────────────────────────────
   // Closing and converting a deal both change what the business believes it
   // has sold, so both are permission-gated and audited. Conversion is

@@ -6,6 +6,8 @@ import { Search, Plus, RefreshCw, Download, FileDown, Users, Phone, MessageSquar
 import { scoreLeadFromFields } from "@/lib/leadScore";
 import { LEAD_STATUSES, PROJECT_TYPES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
 import { ownerLabel, useCrmAssignees } from "@/lib/crmAssignees";
 import { OwnerPicker } from "@/components/crm/OwnerPicker";
 
@@ -146,11 +148,19 @@ const PRIORITY_LISTS: SmartList[] = [
 
 const ALL_LISTS = [...STAGE_LISTS, ...INTELLIGENCE_LISTS, ...PRIORITY_LISTS];
 
+function pickLeads(body: unknown): Lead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as Lead[] : undefined;
+}
+
 export default function CrmLeads() {
   const [, navigate] = useLocation();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [allLeads, setAllLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Measured 2026-09-16: while this request was failing the page rendered
+  // "All People — 0 people" over an empty table, and the database held 15
+  // contacts. The list is a `Load` now, so "we could not ask" can never again
+  // be rendered as "you have none".
+  const [leadsLoad, setLeadsLoad] = useState<Load<Lead[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
@@ -163,42 +173,37 @@ export default function CrmLeads() {
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [importingDiscovery, setImportingDiscovery] = useState(false);
-  const [importMsg, setImportMsg] = useState("");
+  const [importMsg, setImportMsg] = useState<{ text: string; ok: boolean } | null>(null);
   // Collapsed by default on phones — at 375px the list rail crowded the rows.
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window === "undefined" || window.matchMedia("(min-width: 768px)").matches);
   const [listQuery, setListQuery] = useState("");
-  const [loadError, setLoadError] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError("");
-    try {
-      const r = await adminFetch("/api/crm/leads");
-      if (r.status === 401) return;
-      if (!r.ok) throw new Error(`Request failed (${r.status})`);
-      const d = await r.json() as { leads: Lead[] };
-      setAllLeads(d.leads || []);
-    } catch {
-      setLoadError("Couldn't load leads. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
+    setReloading(true);
+    setLeadsLoad(await readAdminResource("/api/crm/leads", pickLeads));
+    setReloading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  /** The contacts, or null when the request did not produce any. */
+  const allLeads = leadsLoad.status === "ready" ? leadsLoad.data : null;
+
   // ── Memoised health scores (computed once per allLeads change) ────────────
   const scoreMap = useMemo(() => {
     const map = new Map<number, ReturnType<typeof scoreLeadFromFields>>();
-    for (const l of allLeads) map.set(l.id, scoreLeadFromFields(l));
+    for (const l of allLeads ?? []) map.set(l.id, scoreLeadFromFields(l));
     return map;
   }, [allLeads]);
 
   // ── Client-side filtering (instant, no extra API calls) ───────────────────
-  useEffect(() => {
+  // null, not [], when the contacts never arrived — so nothing downstream can
+  // count it and report a zero.
+  const leads = useMemo<Lead[] | null>(() => {
+    if (allLeads === null) return null;
     let filtered = allLeads;
     const fs = activeList.filterStatus || filterStatus;
     const fp = activeList.filterPriority || filterPriority;
@@ -220,10 +225,12 @@ export default function CrmLeads() {
         (l.phone || "").includes(q)
       );
     }
-    setLeads(filtered);
+    return filtered;
   }, [allLeads, activeList, filterStatus, filterPriority, search, scoreMap]);
 
-  const countFor = (list: SmartList) => {
+  /** How many are in a smart list, or null when the contacts never arrived. */
+  const countFor = (list: SmartList): number | null => {
+    if (allLeads === null) return null;
     return allLeads.filter(l => {
       if (list.filterStatus  && normalizeLeadStatus(l.status) !== list.filterStatus)  return false;
       if (list.filterPriority && l.priority !== list.filterPriority) return false;
@@ -252,15 +259,17 @@ export default function CrmLeads() {
     if (Object.keys(errors).length) { setFormErrors(errors); return; }
     setFormErrors({});
     setSaving(true);
-    const r = await adminFetch("/api/crm/leads", {
-      method: "POST",
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    if (r.ok) { setShowCreate(false); setForm(emptyForm); load(); }
-    else {
-      const d = await r.json().catch(() => ({})) as { error?: string };
-      setFormErrors({ name: d.error || "Failed to create lead. Please try again." });
+    try {
+      const r = await adminFetch("/api/crm/leads", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      if (r.ok) { setShowCreate(false); setForm(emptyForm); load(); }
+      else setFormErrors({ name: `Lead not created. ${await responseFailureReason(r)}` });
+    } catch {
+      setFormErrors({ name: `Lead not created. ${failureReason(null)}` });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -278,19 +287,20 @@ export default function CrmLeads() {
    * holds) can be shown instead of opening a page of JSON.
    */
   const exportVisible = async () => {
-    if (leads.length === 0) return;
+    if (!leads || leads.length === 0) return;
     setExporting(true); setExportMsg("");
     try {
       const ids = leads.map(l => l.id).join(",");
       const r = await adminFetch(`/api/crm/contacts/export.csv?ids=${ids}`);
       if (r.status === 401) { setExporting(false); return; }
-      if (r.status === 403) {
-        setExportMsg("You do not have permission to export contacts.");
+      // The refusal says which grant is missing now that every CRM route names
+      // one, so this no longer has to guess at "permission to export".
+      if (!r.ok) {
+        setExportMsg(`Nothing exported. ${await responseFailureReason(r)}`);
         setExporting(false);
-        setTimeout(() => setExportMsg(""), 6000);
+        setTimeout(() => setExportMsg(""), 8000);
         return;
       }
-      if (!r.ok) throw new Error(`Request failed (${r.status})`);
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -301,20 +311,35 @@ export default function CrmLeads() {
       setExportMsg(`Exported ${r.headers.get("X-Export-Rows") ?? leads.length} contacts`);
       setTimeout(() => setExportMsg(""), 5000);
     } catch {
-      setExportMsg("The export could not be produced.");
-      setTimeout(() => setExportMsg(""), 6000);
+      setExportMsg(`Nothing exported. ${failureReason(null)}`);
+      setTimeout(() => setExportMsg(""), 8000);
     }
     setExporting(false);
   };
 
+  // A failed import used to report "Imported undefined, skipped undefined" in
+  // a success-green pill, because the body was read without checking the
+  // response at all.
   const importDiscovery = async () => {
     setImportingDiscovery(true);
-    const r = await adminFetch("/api/crm/import-discovery", { method: "POST" });
-    const d = await r.json() as { imported: number; skipped: number };
-    setImportMsg(`Imported ${d.imported}, skipped ${d.skipped} duplicates`);
-    setImportingDiscovery(false);
-    load();
-    setTimeout(() => setImportMsg(""), 5000);
+    setImportMsg(null);
+    try {
+      const r = await adminFetch("/api/crm/import-discovery", { method: "POST" });
+      if (!r.ok) {
+        setImportMsg({ text: `Nothing imported. ${await responseFailureReason(r)}`, ok: false });
+      } else {
+        const d = await r.json().catch(() => null) as { imported?: number; skipped?: number } | null;
+        setImportMsg(typeof d?.imported === "number" && typeof d?.skipped === "number"
+          ? { text: `Imported ${d.imported}, skipped ${d.skipped} duplicates`, ok: true }
+          : { text: "The import ran, but the server's answer was not in the expected shape.", ok: false });
+        load();
+      }
+    } catch {
+      setImportMsg({ text: `Nothing imported. ${failureReason(null)}`, ok: false });
+    } finally {
+      setImportingDiscovery(false);
+      setTimeout(() => setImportMsg(null), 8000);
+    }
   };
 
   return (
@@ -355,7 +380,8 @@ export default function CrmLeads() {
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
-                    {count > 0 && (
+                    {/* No badge at all when the contacts never arrived — a "0" here was the lie. */}
+                    {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
                         isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
@@ -376,7 +402,7 @@ export default function CrmLeads() {
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
-                    {count > 0 && (
+                    {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
                         isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
@@ -397,7 +423,7 @@ export default function CrmLeads() {
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
-                    {count > 0 && (
+                    {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
                         isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
@@ -421,12 +447,21 @@ export default function CrmLeads() {
             <h1 className="text-base font-bold text-foreground">
               {activeList.emoji} {activeList.label}
             </h1>
-            <span className="text-xs text-muted-foreground">— {leads.length} people</span>
+            {/* The count exists only when the contacts did. */}
+            <span className="text-xs text-muted-foreground">
+              {leads
+                ? <>— {leads.length} people</>
+                : <>— <Figure value={null} loading={leadsLoad.status === "loading"} /> people</>}
+            </span>
 
             <div className="ml-auto flex items-center gap-2 flex-wrap">
               {importMsg && (
-                <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg">
-                  {importMsg}
+                <span className={`text-xs px-3 py-1.5 rounded-lg min-w-0 break-words ${
+                  importMsg.ok
+                    ? "text-green-700 bg-green-50 border border-green-200"
+                    : "text-foreground bg-destructive/5 border border-destructive/30"
+                }`}>
+                  {importMsg.text}
                 </span>
               )}
               {exportMsg && (
@@ -438,11 +473,13 @@ export default function CrmLeads() {
                 <Download className="w-3.5 h-3.5" />
                 {importingDiscovery ? "Importing…" : "Import"}
               </Button>
-              <Button variant="outline" size="sm" onClick={exportVisible} disabled={exporting || leads.length === 0}
-                title={`Export the ${leads.length} contact(s) in "${activeList.label}"`}
+              <Button variant="outline" size="sm" onClick={exportVisible} disabled={exporting || !leads || leads.length === 0}
+                title={leads
+                  ? `Export the ${leads.length} contact(s) in "${activeList.label}"`
+                  : "Contacts could not be loaded, so there is nothing to export"}
                 className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
                 <FileDown className="w-3.5 h-3.5" />
-                {exporting ? "Exporting…" : `Export ${leads.length}`}
+                {exporting ? "Exporting…" : leads ? `Export ${leads.length}` : "Export"}
               </Button>
               <Button size="sm" className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8" onClick={() => setShowCreate(true)}>
                 <Plus className="w-3.5 h-3.5" /> + New Lead
@@ -483,7 +520,7 @@ export default function CrmLeads() {
           </div>
 
           {/* Result count strip */}
-          {leads.length > 0 && (
+          {leads && allLeads && leads.length > 0 && (
             <div className="bg-muted border-b border-border px-4 py-1.5 flex items-center gap-3">
               <span className="text-xs text-muted-foreground">Showing {leads.length} of {allLeads.length}</span>
             </div>
@@ -491,7 +528,7 @@ export default function CrmLeads() {
 
           {/* Table */}
           <div className="flex-1 overflow-auto bg-white">
-            {loading ? (
+            {leadsLoad.status === "loading" ? (
               <>
                 {/* M-3: below md, the table gives way to stacked card rows. */}
                 <div className="md:hidden divide-y divide-border/40">
@@ -533,10 +570,24 @@ export default function CrmLeads() {
                   </tbody>
                 </table>
               </>
-            ) : loadError ? (
-              <div className="py-16 text-center">
-                <p className="text-muted-foreground font-medium">{loadError}</p>
-                <Button variant="outline" size="sm" className="mt-4" onClick={load}>Retry</Button>
+            ) : leads === null ? (
+              /*
+                Deliberately NOT the "No leads found" panel below: the person
+                has to be able to tell "you have no contacts" from "we could
+                not ask". The words come from the response, so a refusal names
+                the missing permission and an unreachable server says so.
+              */
+              <div className="p-4 sm:p-5">
+                <LoadFailure
+                  what="Contacts"
+                  reason={leadsLoad.status === "error" ? leadsLoad.reason : ""}
+                  onRetry={() => { void load(); }}
+                  retrying={reloading}
+                >
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    No contact count is shown while this is unavailable — there may well be contacts here.
+                  </p>
+                </LoadFailure>
               </div>
             ) : leads.length === 0 ? (
               <div className="py-16 text-center">

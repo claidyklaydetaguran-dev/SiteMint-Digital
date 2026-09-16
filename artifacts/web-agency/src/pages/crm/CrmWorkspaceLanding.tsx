@@ -6,7 +6,8 @@ import {
   RefreshCw, UserCheck, Star,
 } from "lucide-react";
 
-import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure, dataOf, reasonOf } from "@/components/crm/LoadState";
 
 const LAST_LEAD_KEY = "lastCrmLeadId";
 
@@ -22,6 +23,13 @@ interface Lead {
   lastContactedAt?: string | null;
   nextFollowUpAt?: string | null;
   createdAt?: string;
+}
+
+// A body that is not the shape this page expects is a failure too — not a
+// reason to render a workspace with nobody in it.
+function pickLeads(body: unknown): Lead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as Lead[] : undefined;
 }
 
 const AVATAR_COLORS = [
@@ -88,54 +96,64 @@ function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
 export default function CrmWorkspaceLanding() {
   const [, navigate] = useLocation();
-  const [leads, setLeads]     = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The whole front door hangs off one request, and it had no failure path at
+  // all: `try { if (r.ok) {…} } finally { setLoading(false) }`. A refusal or an
+  // unreachable server left `leads` empty, so the page said "No contacts yet."
+  // with no hot leads and no overdue follow-ups — three claims about the
+  // business that nobody had managed to check.
+  const [leadsLoad, setLeadsLoad] = useState<Load<Lead[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch]   = useState("");
-  const [lastLead, setLastLead] = useState<Lead | null>(null);
+  const [lastLeadId, setLastLeadId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await adminFetch("/api/crm/leads?limit=50&sort=createdAt:desc");
-      if (r.ok) {
-        const data = await r.json() as { leads: Lead[] };
-        setLeads(data.leads ?? []);
-
-        const lastId = localStorage.getItem(LAST_LEAD_KEY);
-        if (lastId) {
-          const found = (data.leads ?? []).find(l => l.id === Number(lastId));
-          if (found) setLastLead(found);
-        }
-      }
-    } finally {
-      setLoading(false);
-    }
+    setReloading(true);
+    setLeadsLoad(await readAdminResource("/api/crm/leads?limit=50&sort=createdAt:desc", pickLeads));
+    setReloading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LAST_LEAD_KEY);
+      setLastLeadId(stored ? Number(stored) : null);
+    } catch { setLastLeadId(null); }
+  }, []);
+
   const openLead = (lead: Lead) => {
-    localStorage.setItem(LAST_LEAD_KEY, String(lead.id));
+    try { localStorage.setItem(LAST_LEAD_KEY, String(lead.id)); } catch { /* not worth failing the navigation */ }
     navigate(`/admin/crm/leads/${lead.id}`);
   };
 
+  /** The contacts, or null. Never an empty list standing in for a failed ask. */
+  const leads = dataOf(leadsLoad);
+  /** How many there are in total, or null — the "View all N" figure. */
+  const total = leads === null ? null : leads.length;
+
+  const lastLead = leads !== null && lastLeadId !== null
+    ? leads.find(l => l.id === lastLeadId) ?? null
+    : null;
+
   const q = search.toLowerCase();
-  const filtered = leads.filter(l =>
+  const filtered = leads === null ? null : leads.filter(l =>
     !q ||
     l.name.toLowerCase().includes(q) ||
     l.email.toLowerCase().includes(q) ||
     (l.company || "").toLowerCase().includes(q)
   );
 
-  const hotLeads = leads
+  // null, not [], when the contacts never arrived — so no panel below can
+  // count them and report a reassuring zero.
+  const hotLeads = leads === null ? null : leads
     .filter(l => l.priority === "High")
     .slice(0, 5);
 
-  const overdueLeads = leads
+  const overdueLeads = leads === null ? null : leads
     .filter(l => l.nextFollowUpAt && new Date(l.nextFollowUpAt) < new Date())
     .slice(0, 5);
 
-  const recentLeads = filtered.slice(0, 20);
+  const recentLeads = filtered === null ? null : filtered.slice(0, 20);
 
   return (
     <CrmLayout>
@@ -173,8 +191,8 @@ export default function CrmWorkspaceLanding() {
             </div>
           )}
 
-          {/* Hot leads */}
-          {hotLeads.length > 0 && (
+          {/* Hot leads — shown only when the contacts behind them loaded. */}
+          {hotLeads && hotLeads.length > 0 && (
             <div className="bg-white border border-border/60 rounded-xl overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2">
                 <Flame className="w-4 h-4 text-red-500" />
@@ -189,8 +207,8 @@ export default function CrmWorkspaceLanding() {
             </div>
           )}
 
-          {/* Overdue follow-ups */}
-          {overdueLeads.length > 0 && (
+          {/* Overdue follow-ups — likewise. An unanswered request is never "none overdue". */}
+          {overdueLeads && overdueLeads.length > 0 && (
             <div className="bg-white border border-amber-100 rounded-xl overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-amber-100 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -224,13 +242,34 @@ export default function CrmWorkspaceLanding() {
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 title="Refresh"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${reloading ? "animate-spin" : ""}`} />
               </button>
             </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center py-16">
+            {leadsLoad.status === "loading" ? (
+              <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+                <span className="sr-only">Loading contacts…</span>
                 <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+              </div>
+            ) : recentLeads === null ? (
+              /*
+                Deliberately NOT the "No contacts yet." panel below: the person
+                has to be able to tell "you have none" from "we could not ask".
+                The words come from the response, so a refusal names the missing
+                grant and an unreachable server says so.
+              */
+              <div className="p-4 sm:p-5">
+                <LoadFailure
+                  what="Contacts"
+                  reason={reasonOf(leadsLoad) ?? ""}
+                  onRetry={() => { void load(); }}
+                  retrying={reloading}
+                >
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Hot leads and overdue follow-ups are not shown while this is unavailable — there
+                    may well be contacts waiting for you.
+                  </p>
+                </LoadFailure>
               </div>
             ) : recentLeads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
@@ -250,13 +289,13 @@ export default function CrmWorkspaceLanding() {
                     <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                   ))}
                 </div>
-                {!search && leads.length > 20 && (
+                {!search && total !== null && total > 20 && (
                   <div className="px-4 py-3 border-t border-border/60 text-center">
                     <button
                       onClick={() => navigate("/admin/crm/leads")}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      View all {leads.length} contacts →
+                      View all {total} contacts →
                     </button>
                   </div>
                 )}
@@ -264,8 +303,12 @@ export default function CrmWorkspaceLanding() {
             )}
           </div>
 
-          {/* Overdue follow-up empty hint */}
-          {!loading && leads.length > 0 && overdueLeads.length === 0 && hotLeads.length === 0 && !search && (
+          {/*
+            The all-clear. It may only appear when the contacts actually
+            arrived: "nothing needs you" is the single most dangerous thing
+            this page can say about a request that failed.
+          */}
+          {total !== null && total > 0 && overdueLeads?.length === 0 && hotLeads?.length === 0 && !search && (
             <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
               <Clock className="w-4 h-4 text-green-600 shrink-0" />
               <p className="text-sm text-green-800">All caught up — no overdue follow-ups or high-priority alerts.</p>

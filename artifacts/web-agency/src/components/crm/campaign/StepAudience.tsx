@@ -9,6 +9,8 @@ import {
   btnGhost, btnQuiet, call, cardClass, failureText, inputClass, postJson,
   type AudienceMode, type AudiencePreview, type Contact, type Segment,
 } from "./shared";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure, dataOf } from "@/components/crm/LoadState";
 
 // ── Step 1: who is this going to ─────────────────────────────────────────────
 //
@@ -47,8 +49,17 @@ interface Props {
    * final step all name the audience — and asking the server twice for it
    * would be two numbers that can disagree for a moment. There is one request
    * and one answer.
+   *
+   * It is a `Load`, not `AudiencePreview | null`: a bare null told the
+   * workspace "no audience" for a request that was refused, and it printed
+   * that as "No audience yet".
    */
-  onPreview?: (preview: AudiencePreview | null) => void;
+  onPreview?: (preview: Load<AudiencePreview>) => void;
+}
+
+function pickContacts(body: unknown): Contact[] | undefined {
+  const list = body && typeof body === "object" ? (body as { contacts?: unknown }).contacts : undefined;
+  return Array.isArray(list) ? list as Contact[] : undefined;
 }
 
 const MODES: { id: AudienceMode; label: string; hint: string }[] = [
@@ -69,7 +80,7 @@ export default function StepAudience(props: Props) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const [chosen, setChosen] = useState<Contact[]>([]);
+  const [chosen, setChosen] = useState<Load<Contact[]>>({ status: "loading" });
 
   const [preview, setPreview] = useState<AudiencePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -87,10 +98,14 @@ export default function StepAudience(props: Props) {
   //
   // A row of numbers is not an audience anybody can check. The ids on the
   // campaign are resolved back into people so the step can show who is in it.
+  // A failed read used to leave this list empty and the chips simply absent,
+  // while the panel below went on stating the real audience size — two
+  // contradictory answers about one campaign on one screen. The last good list
+  // is kept while a new one is on its way, so ticking somebody never flashes
+  // the chips away.
   const loadChosen = useCallback(async (ids: number[]) => {
-    if (ids.length === 0) { setChosen([]); return; }
-    const r = await call<{ contacts: Contact[] }>(`/api/crm/marketing/contacts?ids=${ids.join(",")}`);
-    if (r.ok) setChosen(r.data.contacts ?? []);
+    if (ids.length === 0) { setChosen({ status: "ready", data: [] }); return; }
+    setChosen(await readAdminResource(`/api/crm/marketing/contacts?ids=${ids.join(",")}`, pickContacts));
   }, []);
 
   useEffect(() => { void loadChosen(leadIds); }, [loadChosen, leadIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -140,17 +155,22 @@ export default function StepAudience(props: Props) {
       }));
       if (mine !== requestId.current) return;
       if (!r.ok) {
-        setPreview(null); onPreview?.(null);
-        setPreviewError(failureText(r, "This audience could not be checked."));
+        const reason = failureText(r, "This audience could not be checked.");
+        setPreview(null);
+        setPreviewError(reason);
+        // The workspace is told it failed, and why — not handed a null it
+        // would render as an empty audience.
+        onPreview?.({ status: "error", httpStatus: r.status === 0 ? null : r.status, reason });
         return;
       }
       setPreview(r.data);
-      onPreview?.(r.data);
+      onPreview?.({ status: "ready", data: r.data });
     } catch {
       if (mine !== requestId.current) return;
+      const reason = "This audience could not be checked — the server did not answer.";
       setPreview(null);
-      onPreview?.(null);
-      setPreviewError("This audience could not be checked — the server did not answer.");
+      setPreviewError(reason);
+      onPreview?.({ status: "error", httpStatus: null, reason });
     } finally {
       if (mine === requestId.current) setPreviewLoading(false);
     }
@@ -161,6 +181,7 @@ export default function StepAudience(props: Props) {
     return () => clearTimeout(t);
   }, [audienceKey, runPreview]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const chosenContacts = dataOf(chosen);
   const chosenIds = new Set(leadIds);
   const toggle = (contact: Contact) => {
     if (readOnly) return;
@@ -213,13 +234,28 @@ export default function StepAudience(props: Props) {
       {/* ══ Choose contacts ══ */}
       {mode === "list" && (
         <div className={`${cardClass} p-3.5 space-y-3`}>
-          {chosen.length > 0 && (
+          {chosen.status === "error" && (
+            <LoadFailure
+              variant="inline"
+              what="The chosen contacts"
+              reason={chosen.reason}
+              onRetry={() => { void loadChosen(leadIds); }}
+            >
+              <p className="mt-1 min-w-0 break-words text-xs text-muted-foreground">
+                {leadIds.length} contact{leadIds.length === 1 ? " is" : "s are"} chosen on this
+                campaign — their names could not be read, so none are listed here. Who this goes
+                to has not changed.
+              </p>
+            </LoadFailure>
+          )}
+
+          {chosenContacts && chosenContacts.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-foreground mb-1.5">
-                Chosen — {chosen.length} contact{chosen.length === 1 ? "" : "s"}
+                Chosen — {chosenContacts.length} contact{chosenContacts.length === 1 ? "" : "s"}
               </p>
               <ul className="flex flex-wrap gap-1.5">
-                {chosen.map((c) => (
+                {chosenContacts.map((c) => (
                   <li key={c.id}>
                     <button
                       type="button"
@@ -351,8 +387,10 @@ export default function StepAudience(props: Props) {
                           <span className="block text-xs text-muted-foreground truncate">{s.description}</span>
                         )}
                       </span>
+                      {/* A segment whose size the server did not send is not a
+                          segment with nobody in it. */}
                       <span className="text-xs font-semibold text-teal-800 shrink-0">
-                        {s.memberCount ?? 0} now
+                        <Figure value={s.memberCount ?? null} /> now
                       </span>
                     </span>
                   </button>

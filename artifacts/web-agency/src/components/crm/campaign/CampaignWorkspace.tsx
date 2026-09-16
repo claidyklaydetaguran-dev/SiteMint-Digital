@@ -9,11 +9,13 @@ import StepEmail from "./StepEmail";
 import StepReview from "./StepReview";
 import StepSend from "./StepSend";
 import {
-  btnGhost, btnQuiet, call, failureText, filterIsSavable, formatWhen, patchJson, postJson,
+  btnGhost, btnQuiet, call, cardClass, failureText, filterIsSavable, formatWhen, patchJson, postJson,
   stateAfterSave,
-  type AiAvailability, type AudiencePreview, type Campaign,
+  type AiAvailability, type ApiResult, type AudiencePreview, type Campaign,
   type Design, type MarketingSettings, type Preflight, type Segment,
 } from "./shared";
+import { type Load, failureReason, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure, PageLoadFailures, dataOf, failedParts } from "@/components/crm/LoadState";
 import {
   adoptServerCopy, draftFrom, forgetUnsaved, preserveUnsaved, recoverableDraft, sameDraft, saveAgainst, saveIndicator,
   type CampaignDraft, type RecoverableDraft, type SaveState,
@@ -58,6 +60,46 @@ const STEPS = [
   { id: 4, label: "Send", hint: "Or schedule it" },
 ] as const;
 
+// ── The two answers this screen may never guess ──────────────────────────────
+//
+// `setPreflight(r.ok ? r.data : null)` and `setAudience(r.ok ? r.data : null)`
+// made a refused request, an unreachable server and a genuinely empty answer
+// into the same value — and `call` reports a dropped connection as
+// `{ ok: false, status: 0 }` rather than throwing, so it collapsed in there too.
+//
+// This sits one step before an irreversible send, which is what made it the
+// worst instance of the rule: with a null preflight the checks silently vanish,
+// the footer falls through to "No audience yet", and the send step reads "Goes
+// to 0 people" above a Send button. Somebody could send a campaign believing it
+// had been checked when nothing had answered.
+
+function pickPreflight(body: unknown): Preflight | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const p = body as Partial<Preflight>;
+  // `canSend` and `sendable` are what the send step reads. A body without them
+  // is an answer we did not understand — never a campaign that cannot go out.
+  if (typeof p.canSend !== "boolean" || typeof p.sendable !== "number") return undefined;
+  return body as Preflight;
+}
+
+function pickAudience(body: unknown): AudiencePreview | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const a = body as Partial<AudiencePreview>;
+  if (typeof a.label !== "string" || typeof a.eligibleCount !== "number") return undefined;
+  return body as AudiencePreview;
+}
+
+/** A `call` result as a `Load`, for the one read here that has to be a POST. */
+function loadFromCall<T>(r: ApiResult<unknown>, pick: (body: unknown) => T | undefined): Load<T> {
+  if (r.status === 0) return { status: "error", httpStatus: null, reason: failureReason(null) };
+  if (!r.ok) return { status: "error", httpStatus: r.status, reason: failureReason(r.status, r.data) };
+  const data = pick(r.data);
+  if (data === undefined) {
+    return { status: "error", httpStatus: r.status, reason: "The server's answer was not in the expected shape." };
+  }
+  return { status: "ready", data };
+}
+
 export default function CampaignWorkspace(props: Props) {
   const {
     segments, designs, vocabulary, mergeFields, settings, ai,
@@ -78,8 +120,13 @@ export default function CampaignWorkspace(props: Props) {
   const [conflict, setConflict] = useState<{ by: string | null; at: string; theirs: Campaign } | null>(null);
   const [filterHeld, setFilterHeld] = useState(false);
 
-  const [preflight, setPreflight] = useState<Preflight | null>(null);
-  const [audience, setAudience] = useState<AudiencePreview | null>(null);
+  const [preflightLoad, setPreflightLoad] = useState<Load<Preflight>>({ status: "loading" });
+  const [audienceLoad, setAudienceLoad] = useState<Load<AudiencePreview>>({ status: "loading" });
+  // Re-check flags, not "loading": each answer stays on screen while the next
+  // one is on its way, so an autosave — which re-runs both — never blanks the
+  // step somebody is reading.
+  const [preflightChecking, setPreflightChecking] = useState(false);
+  const [audienceChecking, setAudienceChecking] = useState(false);
 
   const [previewLeadId, setPreviewLeadId] = useState<number | null>(null);
   const [preview, setPreview] = useState<{
@@ -213,11 +260,15 @@ export default function CampaignWorkspace(props: Props) {
   // ── Preflight, audience and preview ────────────────────────────────────────
 
   const loadPreflight = useCallback(async () => {
-    const r = await call<Preflight>(`/api/crm/marketing/campaigns/${campaign.id}/preflight`);
-    setPreflight(r.ok ? r.data : null);
+    setPreflightChecking(true);
+    setPreflightLoad(await readAdminResource(
+      `/api/crm/marketing/campaigns/${campaign.id}/preflight`, pickPreflight,
+    ));
+    setPreflightChecking(false);
   }, [campaign.id]);
 
   const loadAudience = useCallback(async () => {
+    setAudienceChecking(true);
     const r = await call<AudiencePreview>("/api/crm/marketing/audience/preview", postJson({
       audienceMode: draft.audienceMode,
       segmentId: draft.segmentId,
@@ -225,8 +276,15 @@ export default function CampaignWorkspace(props: Props) {
       audienceLeadIds: draft.audienceLeadIds,
       campaignId: campaign.id,
     }));
-    setAudience(r.ok ? r.data : null);
+    setAudienceLoad(loadFromCall(r, pickAudience));
+    setAudienceChecking(false);
   }, [campaign.id, draft.audienceMode, draft.segmentId, draft.audienceDefinition, draft.audienceLeadIds]);
+
+  /** Re-runs only the parts that actually failed. */
+  const retryFailed = useCallback(() => {
+    if (audienceLoad.status === "error") void loadAudience();
+    if (preflightLoad.status === "error") void loadPreflight();
+  }, [audienceLoad.status, preflightLoad.status, loadAudience, loadPreflight]);
 
   const loadPreview = useCallback(async (leadId: number | null) => {
     setPreviewLoading(true);
@@ -408,7 +466,19 @@ export default function CampaignWorkspace(props: Props) {
     void save(draft, expected);
   };
 
-  const audienceLabel = audience?.label ?? campaign.audienceLabel ?? "No audience yet";
+  const audiencePreview = dataOf(audienceLoad);
+  // Never "No audience yet" for an audience nobody managed to read. The stored
+  // label on the campaign is a real answer and is used when there is one; only
+  // when there is nothing at all does this say which kind of nothing it is.
+  const audienceLabel =
+    audiencePreview?.label
+    ?? campaign.audienceLabel
+    ?? (audienceLoad.status === "error" ? "The audience could not be checked" : "No audience yet");
+
+  const failures = failedParts([
+    ["The audience", audienceLoad],
+    ["The pre-send checks", preflightLoad],
+  ]);
 
   const saveLabel = useMemo(() => saveIndicator({
     state: saveState,
@@ -509,6 +579,15 @@ export default function CampaignWorkspace(props: Props) {
       {/* Nothing can be edited until kept changes are restored or discarded, so
           new typing can never land on top of them and be lost along with them. */}
       {!recovery && (<>
+      {/* ══ What could not be read, named rather than zeroed ══ */}
+      {failures.length > 0 && (
+        <PageLoadFailures
+          failures={failures}
+          onRetry={retryFailed}
+          retrying={audienceChecking || preflightChecking}
+        />
+      )}
+
       {/* ══ Steps ══ */}
       <ol className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Campaign steps">
         {STEPS.map((s) => (
@@ -550,7 +629,7 @@ export default function CampaignWorkspace(props: Props) {
             ...(p.audienceLeadIds !== undefined ? { audienceLeadIds: p.audienceLeadIds } : {}),
           })}
           onSegmentsChanged={onSegmentsChanged}
-          onPreview={setAudience}
+          onPreview={setAudienceLoad}
         />
       )}
 
@@ -587,12 +666,13 @@ export default function CampaignWorkspace(props: Props) {
       )}
 
       {step === 3 && (
+        preflightLoad.status === "ready" ? (
         <StepReview
           blocks={draft.blocks}
           subject={draft.subject}
           preheader={draft.preheader}
-          preflight={preflight}
-          audience={audience}
+          preflight={preflightLoad.data}
+          audience={audiencePreview}
           settings={settings}
           previewHtml={preview.html}
           previewLoading={previewLoading}
@@ -609,12 +689,20 @@ export default function CampaignWorkspace(props: Props) {
           testResult={testResult}
           readOnly={readOnly}
         />
+        ) : (
+          <ChecksNotAvailable
+            load={preflightLoad}
+            onRetry={() => { void loadPreflight(); }}
+            retrying={preflightChecking}
+          />
+        )
       )}
 
       {step === 4 && (
+        preflightLoad.status === "ready" ? (
         <StepSend
           campaign={campaign}
-          preflight={preflight}
+          preflight={preflightLoad.data}
           settings={settings}
           audienceLabel={audienceLabel}
           busy={busy}
@@ -625,6 +713,13 @@ export default function CampaignWorkspace(props: Props) {
           onSchedule={(iso, tz) => void schedule(iso, tz)}
           onUnschedule={() => void unschedule()}
         />
+        ) : (
+          <ChecksNotAvailable
+            load={preflightLoad}
+            onRetry={() => { void loadPreflight(); }}
+            retrying={preflightChecking}
+          />
+        )
       )}
 
       {/* ══ Move between steps ══ */}
@@ -651,5 +746,48 @@ export default function CampaignWorkspace(props: Props) {
       </div>
       </>)}
     </div>
+  );
+}
+
+/**
+ * Steps 3 and 4 stand entirely on the server's own checks, so until those
+ * checks answer nothing may be rendered in their place.
+ *
+ * With a null preflight, StepReview's header reads "Nothing is stopping this
+ * from going out" under a green tick and StepSend reads "Goes to 0 people"
+ * above a Send button — a screen stating that a campaign passed checks that
+ * never ran. The step is withheld instead, and the reason is stated: no count,
+ * no blocker list and no Send control while the checks are unavailable.
+ */
+function ChecksNotAvailable({ load, onRetry, retrying }: {
+  load: Load<unknown>;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
+  if (load.status === "loading") {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className={`${cardClass} p-5 flex items-center gap-2 text-sm text-muted-foreground`}
+      >
+        <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden="true" />
+        Running the checks on this campaign…
+      </div>
+    );
+  }
+  return (
+    <LoadFailure
+      what="The pre-send checks"
+      reason={load.status === "error" ? load.reason : failureReason(null)}
+      onRetry={onRetry}
+      retrying={retrying}
+    >
+      <p className="mt-2 min-w-0 break-words text-sm text-muted-foreground">
+        Who this goes to, what is wrong with it and whether it can be sent all come from these
+        checks, so none of them is shown or guessed at here — and it cannot be sent from this
+        screen until they answer.
+      </p>
+    </LoadFailure>
   );
 }

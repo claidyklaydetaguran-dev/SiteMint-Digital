@@ -9,15 +9,27 @@ import {
   crmTasks,
 } from "@workspace/db/schema";
 import { eq, and, lte, gte, or, count, inArray, asc } from "drizzle-orm";
-import { getResend } from "./email.js";
+import { staffMailBlockedReason, trySendStaffMail } from "./staffMail.js";
+import { emailRef, emailRefTags } from "./emailRefs.js";
 import { getTwilio, getTwilioPhone, isTwilioConfigured } from "./twilio.js";
 import { logger } from "./logger.js";
 
-const FROM_ADDRESS =
-  process.env.RESEND_FROM_EMAIL ??
-  "SiteMint Digital Solutions <noreply@sitemintdigital.com>";
-
 const BATCH_SIZE = 30;
+
+/**
+ * How overdue a message may be and still be sent without a person looking.
+ *
+ * A backlog that is already days old is not a schedule, it is a burst waiting
+ * to happen — a first boot against an existing database, a restored copy, or a
+ * worker that was down over a weekend. Thirty a minute then go to customers
+ * who stopped expecting them, and nobody decided that. Past this, the message
+ * is HELD: visible in the queue, releasable by a person, and never sent by the
+ * passage of time alone.
+ *
+ * Matched to the reminder engine's own 24-hour floor (`crmScheduler.ts`), so
+ * the CRM has one answer to "how stale is too stale" rather than two.
+ */
+export const STALE_HOLD_MS = 24 * 60 * 60 * 1000;
 const REPLY_EVENT_TYPES = ["replied_estimated", "replied"];
 
 export interface SchedulerStatus {
@@ -210,6 +222,29 @@ async function markMessageFailed(msgId: number, error: string): Promise<void> {
     .where(and(eq(crmCampaignScheduledMessages.id, msgId), eq(crmCampaignScheduledMessages.status, "sending")));
 }
 
+/**
+ * Stops a long-overdue message and asks for a person, rather than sending it.
+ *
+ * Held rather than cancelled, and held rather than sent: cancelling would
+ * decide on somebody's behalf that the message is no longer wanted, and
+ * sending would mail a customer something scheduled for a moment that has
+ * passed. The row keeps its place in the queue, says how late it is, and goes
+ * out only when a person releases it.
+ */
+async function holdStaleMessage(msgId: number, scheduledAt: Date, now: Date): Promise<void> {
+  const hoursLate = Math.round((now.getTime() - scheduledAt.getTime()) / 3_600_000);
+  await db
+    .update(crmCampaignScheduledMessages)
+    .set({
+      status: "held",
+      lastError: `Held for review: this was due ${hoursLate} hours ago. A backlog this old usually means the worker was down, the database is a restored copy, or the campaign was forgotten — and sending it in one burst mails people who stopped expecting it. Release it in the queue, or send it from there, to let it go out.`,
+    })
+    .where(and(
+      eq(crmCampaignScheduledMessages.id, msgId),
+      eq(crmCampaignScheduledMessages.status, "scheduled"),
+    ));
+}
+
 async function markMessageSkipped(
   msgId: number,
   reason: string,
@@ -253,10 +288,14 @@ export async function processScheduledMessages(): Promise<{
   errors: number;
   skipped: number;
   deferred: number;
+  /** Long-overdue messages stopped for a person to look at (STALE_HOLD_MS). */
+  held: number;
+  /** Email messages left untouched because this server cannot send mail. */
+  heldForMail: number;
 }> {
   if (_status.running) {
     logger.debug("Campaign scheduler already running — skipping tick");
-    return { processed: 0, errors: 0, skipped: 0, deferred: 0 };
+    return { processed: 0, errors: 0, skipped: 0, deferred: 0, held: 0, heldForMail: 0 };
   }
 
   _status.running = true;
@@ -264,6 +303,8 @@ export async function processScheduledMessages(): Promise<{
   let errors = 0;
   let skipped = 0;
   let deferred = 0;
+  let held = 0;
+  let heldForMail = 0;
 
   try {
     const now = new Date();
@@ -319,6 +360,35 @@ export async function processScheduledMessages(): Promise<{
       const { msg, recipientId, stopOnReply, leadEmail, leadPhone, leadName, campaignName, sendTime, businessDaysOnly } = row;
 
       try {
+        // ── Nothing can reach a provider in this environment ─────────────────
+        //
+        // The message is left exactly where it is: unclaimed, unchanged and
+        // still due. Recording a failure here would claim it had been handled,
+        // and it would never go out once mail is configured — the same rule
+        // the reminder engine follows for a failure BEFORE the provider call.
+        if (msg.channel === "email" && staffMailBlockedReason() !== null) {
+          heldForMail++;
+          continue;
+        }
+
+        // ── A backlog is not a schedule ──────────────────────────────────────
+        //
+        // Anything overdue by more than a day is stopped for a person instead
+        // of being mailed at thirty a minute. This is the guard that decides
+        // what happens the first time this worker runs against an existing
+        // database — a restored copy, or a deployment that was down — where
+        // every message in it is due at once and nobody chose that.
+        if (
+          (msg.channel === "email" || msg.channel === "sms")
+          && msg.scheduledAt
+          && now.getTime() - msg.scheduledAt.getTime() > STALE_HOLD_MS
+          && !(msg.metadata as Record<string, unknown> | null)?.["releasedFromHoldAt"]
+        ) {
+          await holdStaleMessage(msg.id, msg.scheduledAt, now);
+          held++;
+          continue;
+        }
+
         // ── Branch gate (Phase 26D) ───────────────────────────────────────────
         // Only affects messages whose step is the branchTrue/FalseNextStepId
         // of some other step. Everything else falls straight through.
@@ -390,16 +460,28 @@ export async function processScheduledMessages(): Promise<{
             continue;
           }
 
-          let resendEmailId: string | null = null;
-          const resend = getResend();
-          const { data } = await resend.emails.send({
-            from: FROM_ADDRESS,
-            to: [leadEmail],
+          const outcome = await trySendStaffMail({
+            to: leadEmail,
             subject,
+            text: body || subject,
             html: buildSequenceEmailHtml(fullName, subject, body),
+            // The provider echoes this back on every event about the message,
+            // which is what lets a delivery report reach this queue row.
+            tags: emailRefTags(emailRef("sequence_message", msg.id)),
           });
-          resendEmailId = data?.id ?? null;
-          await markMessageSent(msg.id, resendEmailId);
+
+          if (!outcome.sent) {
+            // Recorded under the class the answer actually supports. The
+            // `uncertain:` one must never read as "not sent": the message may
+            // be in their inbox, nothing re-queues it by itself, and a later
+            // `delivered` event is what resolves it.
+            await markMessageFailed(msg.id, `${outcome.failure}: ${outcome.reason}`.slice(0, 500));
+            errors++;
+            _status.totalErrors++;
+            continue;
+          }
+
+          await markMessageSent(msg.id, outcome.providerId);
           await db
             .update(crmCampaignRecipients)
             .set({ currentStep: (row.recipientCurrentStep ?? 0) + 1 })
@@ -503,7 +585,14 @@ export async function processScheduledMessages(): Promise<{
     _status.lastRunErrors = errors;
   }
 
-  return { processed, errors, skipped, deferred };
+  if (held > 0 || heldForMail > 0) {
+    logger.warn(
+      { held, heldForMail },
+      "Campaign scheduler: messages not sent — held for review, or left alone because this server cannot send mail",
+    );
+  }
+
+  return { processed, errors, skipped, deferred, held, heldForMail };
 }
 
 export function startScheduler(intervalMs = 60_000): ReturnType<typeof setInterval> {

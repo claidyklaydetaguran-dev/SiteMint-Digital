@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
 import { ConnectionBanner } from "@/components/crm/ConnectionBanner";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
   Search, Mail, Phone, MessageSquare, Bell, LogOut,
@@ -16,7 +16,12 @@ import {
   ExternalLink, Building2, FileText, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { adminFetch, adminProbe, adminLogout, getAdminToken, bindDraftOwner } from "@/lib/adminFetch";
+import { adminFetch, adminProbe, adminLogout, bindDraftOwner } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import {
+  Figure, LoadFailure, PageLoadFailures, dataOf, failedParts, reasonOf,
+  type FailedPart,
+} from "@/components/crm/LoadState";
 import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
 import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
 import { OwnerPicker } from "@/components/crm/OwnerPicker";
@@ -36,6 +41,81 @@ interface NavTask {
 interface Notification {
   id: string; type: "overdue_task" | "due_today" | "new_lead" | "followup_due";
   title: string; sub: string; href: string; urgent: boolean;
+}
+
+// ── What the chrome reads ──────────────────────────────────────────────────────
+// A body that is not the shape this chrome expects is a failure too — not a
+// reason to render an empty picker or a bell with nothing in it.
+function pickLeads(body: unknown): CrmLead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as CrmLead[] : undefined;
+}
+
+function pickTasks(body: unknown): NavTask[] | undefined {
+  const list = body && typeof body === "object" ? (body as { tasks?: unknown }).tasks : undefined;
+  return Array.isArray(list) ? list as NavTask[] : undefined;
+}
+
+function pickTemplates(body: unknown): Template[] | undefined {
+  const list = body && typeof body === "object" ? (body as { templates?: unknown }).templates : undefined;
+  return Array.isArray(list) ? list as Template[] : undefined;
+}
+
+function pickPhoneConfigured(body: unknown): boolean | undefined {
+  const value = body && typeof body === "object" ? (body as { configured?: unknown }).configured : undefined;
+  return typeof value === "boolean" ? value : undefined;
+}
+
+/**
+ * The bell's items, derived from whatever actually loaded.
+ *
+ * Pure on purpose: the caller decides whether the resulting list is the whole
+ * truth. Passing it a list that never arrived would manufacture an all-clear.
+ */
+function buildNotifications(leads: CrmLead[], tasks: NavTask[]): Notification[] {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart.getTime() + 86400000);
+  const yesterday = new Date(now.getTime() - 86400000);
+  const notifs: Notification[] = [];
+
+  tasks.filter(t => t.status !== "completed").forEach(t => {
+    if (!t.dueDate) return;
+    const due = new Date(t.dueDate);
+    if (due < todayStart) {
+      notifs.push({ id: `task-overdue-${t.id}`, type: "overdue_task", title: t.title,
+        sub: t.leadName ? `Overdue task for ${t.leadName}` : `Overdue ${t.type} task`,
+        href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: true });
+    } else if (due >= todayStart && due < todayEnd) {
+      notifs.push({ id: `task-today-${t.id}`, type: "due_today", title: t.title,
+        sub: t.leadName ? `Due today — ${t.leadName}` : `Due today · ${t.type}`,
+        href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: false });
+    }
+  });
+
+  leads.forEach(l => {
+    if (l.nextFollowUpAt) {
+      const fu = new Date(l.nextFollowUpAt);
+      if (fu < todayStart) {
+        notifs.push({ id: `followup-overdue-${l.id}`, type: "followup_due",
+          title: `Follow-up overdue: ${l.name}`,
+          sub: `${l.status || "Lead"} · was due ${fu.toLocaleDateString()}`,
+          href: `/admin/crm/leads/${l.id}`, urgent: true });
+      } else if (fu >= todayStart && fu < todayEnd) {
+        notifs.push({ id: `followup-today-${l.id}`, type: "followup_due",
+          title: `Follow-up today: ${l.name}`,
+          sub: `${l.status || "Lead"}${l.company ? ` · ${l.company}` : ""}`,
+          href: `/admin/crm/leads/${l.id}`, urgent: false });
+      }
+    }
+    if (normalizeLeadStatus(l.status) === "New Inquiry" && l.createdAt && new Date(l.createdAt) > yesterday) {
+      notifs.push({ id: `new-lead-${l.id}`, type: "new_lead", title: `New lead: ${l.name}`,
+        sub: `${l.source || "Uncontacted"}${l.company ? ` · ${l.company}` : ""}`,
+        href: `/admin/crm/leads/${l.id}`, urgent: false });
+    }
+  });
+
+  return notifs;
 }
 
 // ── Avatar helpers ─────────────────────────────────────────────────────────────
@@ -261,9 +341,14 @@ export function CrmNotFound() {
 }
 
 // ── Email Compose Modal ────────────────────────────────────────────────────────
-function EmailComposeModal({ leads, templates, onClose }: {
-  leads: CrmLead[]; templates: Template[]; onClose: () => void;
+function EmailComposeModal({ leadsLoad, templatesLoad, onRetry, retrying, onClose }: {
+  leadsLoad: Load<CrmLead[]>; templatesLoad: Load<Template[]>;
+  onRetry: () => void; retrying: boolean; onClose: () => void;
 }) {
+  // Null, never an empty list: a recipient picker with nobody in it is a claim
+  // that this business has no contacts.
+  const leads = dataOf(leadsLoad);
+  const templates = dataOf(templatesLoad);
   const [toSearch, setToSearch] = useState("");
   const [toLead, setToLead] = useState<CrmLead | null>(null);
   const [ccOpen, setCcOpen] = useState(false);
@@ -278,7 +363,7 @@ function EmailComposeModal({ leads, templates, onClose }: {
   const [tplOpen, setTplOpen] = useState(false);
 
   const toResults = toSearch.length > 0 && !toLead
-    ? leads.filter(l =>
+    ? (leads ?? []).filter(l =>
         (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) ||
         (l.email ?? "").toLowerCase().includes(toSearch.toLowerCase()) ||
         (l.phone || "").includes(toSearch)
@@ -297,13 +382,21 @@ function EmailComposeModal({ leads, templates, onClose }: {
     if (!body.trim()) { setError("Body is required."); return; }
     setError("");
     setSending(true);
-    const r = await adminFetch(`/api/crm/leads/${toLead.id}/email`, {
-      method: "POST",
-      body: JSON.stringify({ subject, body, cc, bcc }),
-    });
-    setSending(false);
-    if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
-    else { const d = await r.json().catch(() => ({})); setError((d as {error?: string}).error || "Failed to send email."); }
+    try {
+      const r = await adminFetch(`/api/crm/leads/${toLead.id}/email`, {
+        method: "POST",
+        body: JSON.stringify({ subject, body, cc, bcc }),
+      });
+      // The server's own words. The flat "Failed to send email." said the same
+      // thing for a refused grant, an ended session and a server that was never
+      // reached — three different problems with three different answers.
+      if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
+      else setError(`Email not sent. ${await responseFailureReason(r)}`);
+    } catch {
+      setError(`Email not sent. ${failureReason(null)}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -360,6 +453,17 @@ function EmailComposeModal({ leads, templates, onClose }: {
                     ))}
                   </div>
                 )}
+                {/* Searching an unloaded list finds nobody, which reads as "you have nobody". */}
+                {leads === null && !toLead && (
+                  <LoadFailure
+                    what="Contacts"
+                    reason={reasonOf(leadsLoad) ?? ""}
+                    variant="inline"
+                    className="mt-2"
+                    onRetry={onRetry}
+                    retrying={retrying}
+                  />
+                )}
               </div>
               {ccOpen && (
                 <div className="px-5 py-2.5 flex items-center gap-2">
@@ -396,7 +500,19 @@ function EmailComposeModal({ leads, templates, onClose }: {
                 <button onClick={() => setTplOpen(o => !o)} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">📋 Templates</button>
                 {tplOpen && (
                   <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-border rounded-xl shadow-xl z-10 overflow-hidden">
-                    {templates.length === 0
+                    {/* "No templates yet." is a fact about the account. Only say it when we know. */}
+                    {templates === null
+                      ? (
+                        <LoadFailure
+                          what="Templates"
+                          reason={reasonOf(templatesLoad) ?? ""}
+                          variant="inline"
+                          className="p-3"
+                          onRetry={onRetry}
+                          retrying={retrying}
+                        />
+                      )
+                      : templates.length === 0
                       ? <p className="p-3 text-xs text-muted-foreground">No templates yet.</p>
                       : templates.map(t => (
                           <button key={t.id} onClick={() => applyTemplate(t)} className="w-full text-left px-4 py-2.5 text-xs hover:bg-accent transition-colors">
@@ -423,7 +539,10 @@ function EmailComposeModal({ leads, templates, onClose }: {
 }
 
 // ── Phone Call Dropdown ────────────────────────────────────────────────────────
-function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => void }) {
+function PhoneDropdown({ leadsLoad, onRetry, retrying, onClose }: {
+  leadsLoad: Load<CrmLead[]>; onRetry: () => void; retrying: boolean; onClose: () => void;
+}) {
+  const leads = dataOf(leadsLoad);
   const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
@@ -433,9 +552,12 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
     return () => document.removeEventListener("mousedown", h);
   }, [onClose]);
 
-  const results = q.length > 0
-    ? leads.filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
-    : leads.filter(l => l.phone).slice(0, 6);
+  // null when the contacts never arrived — distinct from "nobody matched".
+  const results = leads === null
+    ? null
+    : q.length > 0
+      ? leads.filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
+      : leads.filter(l => l.phone).slice(0, 6);
 
   return (
     <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-border shadow-2xl z-[200]">
@@ -447,7 +569,17 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
         </div>
       </div>
       <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
-        {results.length === 0
+        {results === null
+          ? (
+            <LoadFailure
+              what="Contacts"
+              reason={reasonOf(leadsLoad) ?? ""}
+              className="m-3"
+              onRetry={onRetry}
+              retrying={retrying}
+            />
+          )
+          : results.length === 0
           ? <p className="p-4 text-xs text-muted-foreground text-center">No leads with phone found</p>
           : results.map(l => (
               <a key={l.id} href={`tel:${l.phone}`} onClick={onClose}
@@ -470,8 +602,13 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
 }
 
 // ── SMS Modal ──────────────────────────────────────────────────────────────────
-function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void }) {
-  const [configured, setConfigured] = useState<boolean | null>(null);
+function SmsModal({ leadsLoad, onRetry, retrying, onClose }: {
+  leadsLoad: Load<CrmLead[]>; onRetry: () => void; retrying: boolean; onClose: () => void;
+}) {
+  const leads = dataOf(leadsLoad);
+  // A probe that failed is not "SMS is not configured". That answer sent
+  // somebody off to add Twilio credentials this account may already have.
+  const [statusLoad, setStatusLoad] = useState<Load<boolean>>({ status: "loading" });
   const [toSearch, setToSearch] = useState("");
   const [toLead, setToLead] = useState<CrmLead | null>(null);
   const [body, setBody] = useState("");
@@ -479,15 +616,16 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    adminFetch("/api/crm/phone/status")
-      .then(r => r.json())
-      .then(d => setConfigured((d as { configured: boolean }).configured))
-      .catch(() => setConfigured(false));
+  const loadStatus = useCallback(async () => {
+    setStatusLoad(await readAdminResource("/api/crm/phone/status", pickPhoneConfigured));
   }, []);
 
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const configured = dataOf(statusLoad);
+
   const toResults = toSearch.length > 0 && !toLead
-    ? leads.filter(l => (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
+    ? (leads ?? []).filter(l => (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
     : [];
 
   const send = async () => {
@@ -495,13 +633,18 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
     if (!body.trim()) { setError("Message body is required."); return; }
     setError("");
     setSending(true);
-    const r = await adminFetch(`/api/crm/leads/${toLead.id}/sms`, {
-      method: "POST",
-      body: JSON.stringify({ body: body.trim() }),
-    });
-    setSending(false);
-    if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
-    else { const d = await r.json().catch(() => ({})); setError((d as { error?: string }).error || "Failed to send SMS."); }
+    try {
+      const r = await adminFetch(`/api/crm/leads/${toLead.id}/sms`, {
+        method: "POST",
+        body: JSON.stringify({ body: body.trim() }),
+      });
+      if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
+      else setError(`SMS not sent. ${await responseFailureReason(r)}`);
+    } catch {
+      setError(`SMS not sent. ${failureReason(null)}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -517,9 +660,29 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
             <p className="font-semibold text-foreground">SMS sent!</p>
             <p className="text-xs text-muted-foreground">Logged to {toLead?.name}'s timeline.</p>
           </div>
-        ) : configured === null ? (
-          <div className="flex items-center justify-center py-16">
+        ) : statusLoad.status === "loading" ? (
+          <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+            <span className="sr-only">Checking whether texting is set up…</span>
             <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+          </div>
+        ) : configured === null ? (
+          /*
+            Not the setup panel below: "SMS is not configured" is a statement
+            about this account's settings, and a probe that failed did not read
+            them. Showing the env-var list here sent people to fix something
+            that may not be broken.
+          */
+          <div className="p-5">
+            <LoadFailure
+              what="Texting settings"
+              reason={reasonOf(statusLoad) ?? ""}
+              onRetry={() => { void loadStatus(); }}
+            >
+              <p className="mt-2 text-sm text-muted-foreground">
+                Whether texting is switched on here is unknown — which is not the same as it being
+                off, so no setup steps are shown.
+              </p>
+            </LoadFailure>
           </div>
         ) : !configured ? (
           <div className="p-6 text-center space-y-4">
@@ -574,6 +737,17 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                     ))}
                   </div>
                 )}
+                {/* Searching an unloaded list finds nobody, which reads as "you have nobody". */}
+                {leads === null && !toLead && (
+                  <LoadFailure
+                    what="Contacts"
+                    reason={reasonOf(leadsLoad) ?? ""}
+                    variant="inline"
+                    className="mt-2"
+                    onRetry={onRetry}
+                    retrying={retrying}
+                  />
+                )}
               </div>
               <div className="px-5 py-3">
                 <textarea className="w-full text-sm focus:outline-none resize-none placeholder:text-muted-foreground/60 min-h-[160px]"
@@ -606,20 +780,28 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
 }
 
 // ── New Person Modal ───────────────────────────────────────────────────────────
-function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClose: () => void; onCreated: () => void }) {
+function NewPersonModal({ leadsLoad, onRetry, retrying, onClose, onCreated }: {
+  leadsLoad: Load<CrmLead[]>; onRetry: () => void; retrying: boolean;
+  onClose: () => void; onCreated: () => void;
+}) {
+  const leads = dataOf(leadsLoad);
   const [step, setStep] = useState<"search" | "form">("search");
   const [q, setQ] = useState("");
   const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedToStaffId: null as number | null, notes:"" });
   // M6: a picker over real staff accounts, not three names typed into the source.
   const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [dupWarning, setDupWarning] = useState("");
 
   const searchResults = q.length > 1
-    ? leads.filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.email ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
+    ? (leads ?? []).filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.email ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
     : [];
 
   const checkDup = (email: string, phone: string) => {
+    // No list, no duplicate check. Silence here would read as "no duplicate
+    // found", which is the same lie in a quieter voice.
+    if (leads === null) { setDupWarning(""); return; }
     const byEmail = email && leads.find(l => (l.email ?? "").toLowerCase() === email.toLowerCase());
     const byPhone = phone && leads.find(l => l.phone === phone);
     if (byEmail) setDupWarning(`Duplicate: ${byEmail.name} has this email.`);
@@ -630,12 +812,21 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
   const save = async () => {
     if (!form.name || !form.email) return;
     setSaving(true);
-    const r = await adminFetch("/api/crm/leads", {
-      method: "POST",
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    if (r.ok) { onCreated(); onClose(); }
+    setSaveError("");
+    try {
+      const r = await adminFetch("/api/crm/leads", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      // A refused save used to close nothing and say nothing: the form simply
+      // sat there, and the contact had not been created.
+      if (r.ok) { onCreated(); onClose(); }
+      else setSaveError(`Contact not created. ${await responseFailureReason(r)}`);
+    } catch {
+      setSaveError(`Contact not created. ${failureReason(null)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -648,6 +839,21 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
         {step === "search" ? (
           <div className="p-5">
             <p className="text-sm text-muted-foreground mb-3">Search for an existing contact first to avoid duplicates.</p>
+            {/* Without the list there is no duplicate check — say so before they type. */}
+            {leads === null && (
+              <LoadFailure
+                what="Existing contacts"
+                reason={reasonOf(leadsLoad) ?? ""}
+                variant="inline"
+                className="mb-3"
+                onRetry={onRetry}
+                retrying={retrying}
+              >
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nothing can be matched against, so this will not warn you about a duplicate.
+                </p>
+              </LoadFailure>
+            )}
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input autoFocus className="w-full pl-9 pr-3 py-2.5 text-sm border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20"
@@ -678,6 +884,17 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
           </div>
         ) : (
           <div className="p-5 space-y-3">
+            {saveError && (
+              <p role="alert" className="flex items-start gap-2 text-xs text-muted-foreground bg-destructive/5 border border-destructive/30 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-destructive" aria-hidden="true" />
+                <span className="min-w-0 break-words">{saveError}</span>
+              </p>
+            )}
+            {leads === null && (
+              <p className="text-xs text-muted-foreground break-words">
+                Existing contacts could not be loaded, so this form cannot warn you about a duplicate.
+              </p>
+            )}
             {dupWarning && (
               <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {dupWarning}
@@ -754,7 +971,12 @@ function NotifIcon({ type }: { type: string }) {
   if (type === "new_lead")     return <UserCheck className="w-4 h-4 text-blue-500" />;
   return <Bell className="w-4 h-4 text-orange-500" />;
 }
-function BellDropdown({ notifications, onClose }: { notifications: Notification[]; onClose: () => void }) {
+function BellDropdown({ notifications, failures, onRetry, retrying, onClose }: {
+  notifications: Notification[];
+  /** The lists behind the bell that could not be loaded. */
+  failures: readonly FailedPart[];
+  onRetry: () => void; retrying: boolean; onClose: () => void;
+}) {
   const [, navigate] = useLocation();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -769,18 +991,33 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
       <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-foreground">Notifications</span>
-          {notifications.length > 0 && (
+          {failures.length > 0 ? (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground leading-tight">
+              <Figure value={null} />
+            </span>
+          ) : notifications.length > 0 ? (
             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-tight">{notifications.length}</span>
-          )}
+          ) : null}
         </div>
         <Link href="/admin/crm/tasks"><button onClick={onClose} className="text-xs text-primary hover:underline">View Tasks →</button></Link>
       </div>
+      {/*
+        A false all-clear is worse than a false zero, and this one was on every
+        screen in the product: with the loads swallowed, the bell told every
+        operator there was nothing to do when nobody had managed to ask.
+        "All caught up!" now requires both lists to have actually arrived.
+      */}
+      {failures.length > 0 && (
+        <PageLoadFailures failures={failures} onRetry={onRetry} retrying={retrying} className="m-3" />
+      )}
       {notifications.length === 0 ? (
-        <div className="p-8 text-center">
-          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-muted-foreground/40" /></div>
-          <p className="text-sm font-medium text-foreground">All caught up!</p>
-          <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
-        </div>
+        failures.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-muted-foreground/40" /></div>
+            <p className="text-sm font-medium text-foreground">All caught up!</p>
+            <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
+          </div>
+        ) : null
       ) : (
         <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
           {[...urgent, ...normal].map(n => (
@@ -813,7 +1050,8 @@ const PRIORITY_BADGE: Record<string, string> = { High:"bg-red-50 text-red-600", 
 function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: () => void; onNavigate: (href: string) => void }) {
   const [results, setResults] = useState<CrmLead[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(false);
+  /** The stated reason the search failed, or null. */
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [selIdx, setSelIdx] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -824,13 +1062,29 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
   }, [onClose]);
 
   useEffect(() => {
-    if (q.length < 2) { setResults([]); setLoading(false); setFetchError(false); return; }
-    setLoading(true); setFetchError(false); setSelIdx(0);
+    if (q.length < 2) { setResults([]); setLoading(false); setSearchError(null); return; }
+    setLoading(true); setSearchError(null); setSelIdx(0);
     const ctrl = new AbortController();
-    adminFetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, { signal: ctrl.signal })
-      .then(r => { if (!r.ok) throw new Error("api"); return r.json() as Promise<{ leads: CrmLead[] }>; })
-      .then(d => { setResults((d.leads || []).slice(0, 8)); setLoading(false); })
-      .catch(err => { if ((err as Error).name !== "AbortError") { setFetchError(true); setLoading(false); } });
+    void (async () => {
+      try {
+        const r = await adminFetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+        if (!r.ok) {
+          // The words come from the response, so a refusal names the missing
+          // grant instead of the one flat sentence every code used to get.
+          const reason = await responseFailureReason(r);
+          if (!ctrl.signal.aborted) { setSearchError(reason); setLoading(false); }
+          return;
+        }
+        const d = await r.json() as { leads?: CrmLead[] };
+        if (ctrl.signal.aborted) return;
+        setResults((d.leads || []).slice(0, 8));
+        setLoading(false);
+      } catch (err) {
+        if ((err as Error).name === "AbortError" || ctrl.signal.aborted) return;
+        setSearchError(failureReason(null));
+        setLoading(false);
+      }
+    })();
     return () => ctrl.abort();
   }, [q]);
 
@@ -853,8 +1107,13 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
         <div className="flex items-center gap-2.5 px-4 py-3.5 text-xs text-muted-foreground">
           <div className="w-3 h-3 border-2 border-border border-t-muted-foreground rounded-full animate-spin shrink-0" /> Searching…
         </div>
-      ) : fetchError ? (
-        <div className="flex items-center gap-2 px-4 py-3.5 text-xs text-red-600"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> Search unavailable — please try again.</div>
+      ) : searchError ? (
+        <div role="alert" className="flex items-start gap-2 px-4 py-3.5 text-xs text-muted-foreground">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-destructive" aria-hidden="true" />
+          <span className="min-w-0 break-words">
+            <span className="font-medium text-foreground">Search unavailable.</span> {searchError}
+          </span>
+        </div>
       ) : results.length === 0 ? (
         <div className="px-4 py-3.5 text-xs text-muted-foreground text-center">No results for <span className="font-medium text-foreground">"{q}"</span></div>
       ) : (
@@ -1006,9 +1265,11 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   const initials = signedIn
     ? signedIn.displayName.replace(/\[[^\]]*\]/g, "").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?"
     : "SM";
-  const [allLeads, setAllLeads] = useState<CrmLead[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // The chrome's three reads, each keeping its own answer.
+  const [leadsLoad, setLeadsLoad] = useState<Load<CrmLead[]>>({ status: "loading" });
+  const [tasksLoad, setTasksLoad] = useState<Load<NavTask[]>>({ status: "loading" });
+  const [templatesLoad, setTemplatesLoad] = useState<Load<Template[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1045,68 +1306,46 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const buildNotifications = useCallback((leads: CrmLead[], tasks: NavTask[]) => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(todayStart.getTime() + 86400000);
-    const yesterday = new Date(now.getTime() - 86400000);
-    const notifs: Notification[] = [];
-
-    tasks.filter(t => t.status !== "completed").forEach(t => {
-      if (!t.dueDate) return;
-      const due = new Date(t.dueDate);
-      if (due < todayStart) {
-        notifs.push({ id: `task-overdue-${t.id}`, type: "overdue_task", title: t.title,
-          sub: t.leadName ? `Overdue task for ${t.leadName}` : `Overdue ${t.type} task`,
-          href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: true });
-      } else if (due >= todayStart && due < todayEnd) {
-        notifs.push({ id: `task-today-${t.id}`, type: "due_today", title: t.title,
-          sub: t.leadName ? `Due today — ${t.leadName}` : `Due today · ${t.type}`,
-          href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: false });
-      }
-    });
-
-    leads.forEach(l => {
-      if (l.nextFollowUpAt) {
-        const fu = new Date(l.nextFollowUpAt);
-        if (fu < todayStart) {
-          notifs.push({ id: `followup-overdue-${l.id}`, type: "followup_due",
-            title: `Follow-up overdue: ${l.name}`,
-            sub: `${l.status || "Lead"} · was due ${fu.toLocaleDateString()}`,
-            href: `/admin/crm/leads/${l.id}`, urgent: true });
-        } else if (fu >= todayStart && fu < todayEnd) {
-          notifs.push({ id: `followup-today-${l.id}`, type: "followup_due",
-            title: `Follow-up today: ${l.name}`,
-            sub: `${l.status || "Lead"}${l.company ? ` · ${l.company}` : ""}`,
-            href: `/admin/crm/leads/${l.id}`, urgent: false });
-        }
-      }
-      if (normalizeLeadStatus(l.status) === "New Inquiry" && l.createdAt && new Date(l.createdAt) > yesterday) {
-        notifs.push({ id: `new-lead-${l.id}`, type: "new_lead", title: `New lead: ${l.name}`,
-          sub: `${l.source || "Uncontacted"}${l.company ? ` · ${l.company}` : ""}`,
-          href: `/admin/crm/leads/${l.id}`, urgent: false });
-      }
-    });
-
-    setNotifications(notifs);
+  /**
+   * The chrome's data, honestly.
+   *
+   * This used to swallow every failure with `.catch(() => {})` — and, before
+   * that could even matter, returned early unless a legacy bearer token was in
+   * localStorage. A per-person staff session never has one, so for signed-in
+   * staff these three requests were never sent at all: the bell said "All
+   * caught up!", the call list said "No leads with phone found" and the
+   * template list said "No templates yet." for ever, on every CRM screen.
+   */
+  const loadLeads = useCallback(async () => {
+    setReloading(true);
+    const [nextLeads, nextTasks, nextTemplates] = await Promise.all([
+      readAdminResource("/api/crm/leads", pickLeads),
+      readAdminResource("/api/crm/tasks", pickTasks),
+      readAdminResource("/api/crm/email-templates", pickTemplates),
+    ]);
+    setLeadsLoad(nextLeads);
+    setTasksLoad(nextTasks);
+    setTemplatesLoad(nextTemplates);
+    setReloading(false);
   }, []);
 
-  const loadLeads = useCallback(() => {
-    if (!getAdminToken()) return;
-    Promise.all([
-      adminFetch("/api/crm/leads").then(r => r.json()),
-      adminFetch("/api/crm/tasks").then(r => r.json()),
-      adminFetch("/api/crm/email-templates").then(r => r.json()),
-    ]).then(([ld, td, tmpl]) => {
-      const leads: CrmLead[] = ld.leads || [];
-      const tasks: NavTask[] = td.tasks || [];
-      setAllLeads(leads);
-      setTemplates(tmpl.templates || []);
-      buildNotifications(leads, tasks);
-    }).catch(() => {});
-  }, [buildNotifications]);
+  useEffect(() => { void loadLeads(); }, [loadLeads]);
 
-  useEffect(() => { loadLeads(); }, [loadLeads]);
+  const allLeads = dataOf(leadsLoad);
+  const navTasks = dataOf(tasksLoad);
+
+  // Whatever did load still produces items; the parts that did not are named
+  // beside them rather than counted as nothing.
+  const notifications = useMemo(
+    () => buildNotifications(allLeads ?? [], navTasks ?? []),
+    [allLeads, navTasks],
+  );
+  const notifFailures = failedParts([
+    ["Contacts", leadsLoad] as const,
+    ["Tasks", tasksLoad] as const,
+  ]);
+  /** How many need attention, or null when either list behind it failed. */
+  const notifCount = notifFailures.length === 0 ? notifications.length : null;
 
   useEffect(() => {
     if (search.length < 2) { setDebouncedSearch(""); return; }
@@ -1167,9 +1406,27 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
     <div className="h-screen flex flex-col overflow-hidden bg-crm-content">
 
       {/* ── Modals ── */}
-      {modal === "email"  && <EmailComposeModal leads={allLeads} templates={templates} onClose={() => setModal(null)} />}
-      {modal === "sms"    && <SmsModal leads={allLeads} onClose={() => setModal(null)} />}
-      {modal === "person" && <NewPersonModal leads={allLeads} onClose={() => setModal(null)} onCreated={loadLeads} />}
+      {modal === "email"  && (
+        <EmailComposeModal
+          leadsLoad={leadsLoad} templatesLoad={templatesLoad}
+          onRetry={() => { void loadLeads(); }} retrying={reloading}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "sms"    && (
+        <SmsModal
+          leadsLoad={leadsLoad}
+          onRetry={() => { void loadLeads(); }} retrying={reloading}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "person" && (
+        <NewPersonModal
+          leadsLoad={leadsLoad}
+          onRetry={() => { void loadLeads(); }} retrying={reloading}
+          onClose={() => setModal(null)} onCreated={() => { void loadLeads(); }}
+        />
+      )}
 
       {/* ── Topbar ── */}
       <header className="h-11 bg-crm-header flex items-center gap-2 px-3 shrink-0 z-50 relative">
@@ -1231,7 +1488,13 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
               className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
               <Phone className="w-3.5 h-3.5 text-primary" />
             </button>
-            {modal === "phone" && <PhoneDropdown leads={allLeads} onClose={() => setModal(null)} />}
+            {modal === "phone" && (
+              <PhoneDropdown
+                leadsLoad={leadsLoad}
+                onRetry={() => { void loadLeads(); }} retrying={reloading}
+                onClose={() => setModal(null)}
+              />
+            )}
           </div>
           <button onClick={() => setModal("sms")} title="Send SMS"
             className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
@@ -1247,13 +1510,28 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             <button onClick={() => setModal(m => m === "bell" ? null : "bell")} title="Notifications"
               className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
               <Bell className="w-3.5 h-3.5 text-white/60" />
-              {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
-                  {notifications.length > 9 ? "9+" : notifications.length}
+              {/*
+                A number on the bell is a promise that somebody counted. When a
+                list behind it failed there is no number — a dash, never a 0,
+                and never the quiet absence that reads as "nothing for you".
+              */}
+              {notifCount === null ? (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-white/25 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
+                  <Figure value={null} />
                 </span>
-              )}
+              ) : notifCount > 0 ? (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
+                  {notifCount > 9 ? "9+" : notifCount}
+                </span>
+              ) : null}
             </button>
-            {modal === "bell" && <BellDropdown notifications={notifications} onClose={() => setModal(null)} />}
+            {modal === "bell" && (
+              <BellDropdown
+                notifications={notifications} failures={notifFailures}
+                onRetry={() => { void loadLeads(); }} retrying={reloading}
+                onClose={() => setModal(null)}
+              />
+            )}
           </div>
 
           {/* Profile */}

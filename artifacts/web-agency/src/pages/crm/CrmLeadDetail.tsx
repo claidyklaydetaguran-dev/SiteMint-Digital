@@ -34,6 +34,8 @@ import {
   type RiLead, type RiActivity,
 } from "@/lib/relationshipIntelligence";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure, dataOf } from "@/components/crm/LoadState";
 import { useCrmAssignees } from "@/lib/crmAssignees";
 import CustomerTimeline from "@/components/crm/CustomerTimeline";
 import CustomerPortalPanel from "@/components/crm/CustomerPortalPanel";
@@ -150,6 +152,39 @@ interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
   dueDate?:string; status:string; completedAt?:string; createdAt:string;
 }
+/** Everything `/api/crm/leads/:id` answers with, as one value. */
+interface LeadBundle {
+  lead: Lead;
+  activities: Activity[];
+  tasks: Task[];
+  linkedCompany: LinkedCompany | null;
+}
+
+/**
+ * A body with no contact in it is a failure, not an empty contact.
+ *
+ * The activity and task arrays may legitimately be absent — the contact is
+ * the record being asked for, and a contact with nothing logged against it is
+ * a real answer.
+ */
+function pickLeadBundle(body: unknown): LeadBundle | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { lead?: unknown; activities?: unknown; tasks?: unknown; linkedCompany?: unknown };
+  if (!b.lead || typeof b.lead !== "object") return undefined;
+  return {
+    lead: b.lead as Lead,
+    activities: Array.isArray(b.activities) ? b.activities as Activity[] : [],
+    tasks: Array.isArray(b.tasks) ? b.tasks as Task[] : [],
+    linkedCompany: (b.linkedCompany ?? null) as LinkedCompany | null,
+  };
+}
+
+/** The thread reads oldest-first; the endpoint answers newest-first. */
+function pickMessages(body: unknown): CrmMessage[] | undefined {
+  const list = body && typeof body === "object" ? (body as { messages?: unknown }).messages : undefined;
+  return Array.isArray(list) ? (list as CrmMessage[]).slice().reverse() : undefined;
+}
+
 type ModalType = "call"|"calllog"|"logact"|"text"|"email"|"note"|"task"|"status"|null;
 
 const LOG_ACTIVITY_TYPES = [
@@ -167,13 +202,30 @@ interface ToastItem { id:number; type:"success"|"error"|"info"; msg:string; }
 export default function CrmLeadDetail() {
   const params = useParams<{id:string}>();
   const [, navigate] = useLocation();
-  const [lead, setLead] = useState<Lead|null>(null);
-  const [linkedCompany, setLinkedCompany] = useState<LinkedCompany|null>(null);
+  /**
+   * The contact, and everything that arrives with it, as one answer.
+   *
+   * Measured 2026-09-16: opening a contact id that does not exist rendered
+   * the whole contacts list — "All People — 15 people" — with nothing to say
+   * the record asked for was missing. The API answered 404 and the page
+   * quietly navigated away, so somebody following a stale link from an email
+   * or a bookmark could believe they were looking at the record they asked
+   * for. A read that produced no contact is stated now, and the list is
+   * offered as a link rather than substituted for the record.
+   */
+  const [contactLoad, setContactLoad] = useState<Load<LeadBundle>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [showCompanyDialog, setShowCompanyDialog] = useState(false);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // What actually loaded, or null — never an empty record standing in for a
+  // request nobody completed.
+  const bundle = dataOf(contactLoad);
+  const lead = bundle?.lead ?? null;
+  const linkedCompany = bundle?.linkedCompany ?? null;
+  // Stable identities: a fresh `[]` each render would re-run every memo below.
+  const activities = useMemo(() => bundle?.activities ?? [], [bundle]);
+  const tasks = useMemo(() => bundle?.tasks ?? [], [bundle]);
 
   const health = useMemo(
     () => (lead ? scoreLeadFromFields(lead, activities) : null),
@@ -314,8 +366,20 @@ export default function CrmLeadDetail() {
   }, []);
 
   // SMS / call state
-  const [messages, setMessages] = useState<CrmMessage[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
+  /**
+   * The phone system's log for this contact.
+   *
+   * `/api/crm/leads/:id/messages` is one of the `TRANSITIONAL_FOREIGN_AUTH`
+   * routes (lib/adminFetch.ts): its 401 raises no "your session has ended"
+   * dialog, so this surface has to state its own unavailability. Read with
+   * `if (r.ok)` alone, a refused request left the thread saying "No messages
+   * yet", the call list saying "No call history yet" and the Call Summary
+   * reporting "No calls yet" over tiles of zeros — three claims about a
+   * client that nobody had been able to check.
+   */
+  const [messagesLoad, setMessagesLoad] = useState<Load<CrmMessage[]>>({ status: "loading" });
+  const [reloadingMessages, setReloadingMessages] = useState(false);
+  const messages = dataOf(messagesLoad);
   const [smsBody, setSmsBody] = useState("");
   const [sendingSms, setSendingSms] = useState(false);
   const [callingLead, setCallingLead] = useState(false);
@@ -328,18 +392,27 @@ export default function CrmLeadDetail() {
   const [callFilter, setCallFilter] = useState<"all"|"connected"|"missed"|"voicemail"|"follow_up"|"inbound"|"outbound">("all");
 
   const callSummary = useMemo(() => {
-    const msgs = messages.filter(m => m.channel === "call");
+    // Two sources, and only one of them can fail here: outcomes logged by
+    // hand arrive with the contact, while the phone system's own log is a
+    // separate request. Anything that depends on that log stays null when it
+    // did not arrive. "0 calls" is a claim nobody checked — and so is a "last
+    // call" date that is only the latest of the calls we happened to see.
+    const msgs = messages === null ? null : messages.filter(m => m.channel === "call");
     const acts = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type));
     const connected = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Connected").length;
     const voicemail = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Left Voicemail").length;
     const followUp  = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Follow Up").length;
     const missed    = acts.filter(a => a.type === "call_missed").length;
-    const allTs     = [...msgs.map(m => new Date(m.createdAt).getTime()), ...acts.map(a => new Date(a.createdAt).getTime())];
-    const lastCallTs = allTs.length > 0 ? Math.max(...allTs) : null;
+    const allTs     = msgs === null
+      ? null
+      : [...msgs.map(m => new Date(m.createdAt).getTime()), ...acts.map(a => new Date(a.createdAt).getTime())];
+    const lastCallTs = allTs !== null && allTs.length > 0 ? Math.max(...allTs) : null;
     const mostRecent = acts.filter(a => a.type === "call_outcome").sort((x,y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime())[0];
     return {
-      totalCalls: msgs.length,
+      totalCalls: msgs === null ? null : msgs.length,
       connected, missed, voicemail, followUp,
+      /** Outcomes logged by hand — known whether or not the phone log loaded. */
+      loggedOutcomes: acts.length,
       lastCallAt: lastCallTs ? new Date(lastCallTs).toLocaleDateString() : null,
       recentOutcome: mostRecent ? (mostRecent.metadata?.disposition as string | undefined) : undefined,
     };
@@ -393,25 +466,24 @@ export default function CrmLeadDetail() {
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const r = await adminFetch(`/api/crm/leads/${params.id}`);
-    if (r.status === 401) return;
-    if (!r.ok) { navigate("/admin/crm/leads"); return; }
-    const d = await r.json() as { lead:Lead; activities:Activity[]; tasks:Task[]; linkedCompany?:LinkedCompany|null };
-    setLead(d.lead);
-    setLinkedCompany(d.linkedCompany ?? null);
-    setActivities(d.activities || []);
-    setTasks(d.tasks || []);
-    setEditStatus(d.lead.status);
-    setEditPriority(d.lead.priority);
-    setEditOwner(ownerChoiceFor(d.lead));
-    setEditFollowUp(d.lead.nextFollowUpAt ? d.lead.nextFollowUpAt.substring(0,10) : "");
-    setEditEstValue(d.lead.estimatedValue || "");
-    setEditPackage(d.lead.packageType || "");
-    setLoading(false);
-  }, [params.id, navigate]);
+    setReloading(true);
+    setContactLoad(await readAdminResource(`/api/crm/leads/${params.id}`, pickLeadBundle));
+    setReloading(false);
+  }, [params.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // The editable sidebar fields follow whatever actually loaded, and are left
+  // alone when nothing did.
+  useEffect(() => {
+    if (!lead) return;
+    setEditStatus(lead.status);
+    setEditPriority(lead.priority);
+    setEditOwner(ownerChoiceFor(lead));
+    setEditFollowUp(lead.nextFollowUpAt ? lead.nextFollowUpAt.substring(0,10) : "");
+    setEditEstValue(lead.estimatedValue || "");
+    setEditPackage(lead.packageType || "");
+  }, [lead]);
 
   useEffect(() => {
     adminFetch("/api/crm/email-templates")
@@ -420,15 +492,20 @@ export default function CrmLeadDetail() {
 
   const loadMessages = useCallback(async () => {
     if (!params.id) return;
-    setLoadingMessages(true);
-    const r = await adminFetch(`/api/crm/leads/${params.id}/messages`);
-    if (r.ok) {
-      const d = await r.json() as { messages: CrmMessage[] };
-      setMessages((d.messages || []).slice().reverse());
+    setReloadingMessages(true);
+    const next = await readAdminResource(`/api/crm/leads/${params.id}/messages`, pickMessages);
+    setMessagesLoad(next);
+    setReloadingMessages(false);
+    if (next.status === "ready") {
       setTimeout(() => smsThreadRef.current?.scrollTo({ top: 99999, behavior: "smooth" }), 100);
     }
-    setLoadingMessages(false);
   }, [params.id]);
+
+  // Asked for on mount, not only when the Communications tab is opened: the
+  // Call Summary panel is in the sidebar from the moment the page renders and
+  // is a statement about this client's call history. It used to report "No
+  // calls yet" about a request nobody had made.
+  useEffect(() => { void loadMessages(); }, [loadMessages]);
 
   useEffect(() => {
     if (activeTab === "communications") loadMessages();
@@ -698,15 +775,55 @@ export default function CrmLeadDetail() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (loading) return (
+  if (contactLoad.status === "loading") return (
     <CrmLayout>
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
+        <span className="sr-only">Loading this contact…</span>
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
       </div>
     </CrmLayout>
   );
 
-  if (!lead) return <CrmLayout><div className="p-8 text-center text-muted-foreground">Lead not found.</div></CrmLayout>;
+  /*
+    A contact that is not there, said out loud.
+
+    This is where the page used to call `navigate("/admin/crm/leads")`: the
+    404 was swallowed and the contacts list appeared in its place, so the
+    person was silently shown a different screen. The list is still one click
+    away — offered, never substituted — and a 403, a 5xx and an unreachable
+    server each keep their own wording, with a way to try again.
+  */
+  if (!lead) {
+    const missing = contactLoad.status === "error" && contactLoad.httpStatus === 404;
+    return (
+      <CrmLayout>
+        <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+          <Link href="/admin/crm/leads">
+            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Leads
+            </button>
+          </Link>
+          <LoadFailure
+            what="This contact"
+            reason={contactLoad.status === "error" ? contactLoad.reason : ""}
+            onRetry={missing ? undefined : () => { void load(); }}
+            retrying={reloading}
+          >
+            <p className="mt-2 text-sm text-muted-foreground break-words">
+              {missing
+                ? "This contact is no longer in the CRM. It may have been deleted, or merged into another record — if you followed a link from an email or a bookmark, the record it pointed at has gone since."
+                : "Nothing about this contact is shown while this is unavailable — the record may well still be here."}
+            </p>
+            <Link href="/admin/crm/leads">
+              <button className="mt-3 text-sm text-primary underline underline-offset-2 hover:opacity-80">
+                Open the contacts list
+              </button>
+            </Link>
+          </LoadFailure>
+        </div>
+      </CrmLayout>
+    );
+  }
 
   const pendingTasks = tasks.filter(t => t.status !== "completed");
 
@@ -1195,10 +1312,25 @@ export default function CrmLeadDetail() {
                     </div>
                   )}
                   <div ref={smsThreadRef} className="flex-1 overflow-y-auto p-5 space-y-3">
-                    {loadingMessages ? (
-                      <div className="flex items-center justify-center h-32">
+                    {messagesLoad.status === "loading" ? (
+                      <div className="flex items-center justify-center h-32" role="status" aria-live="polite">
+                        <span className="sr-only">Loading messages…</span>
                         <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
                       </div>
+                    ) : messages === null ? (
+                      /* Deliberately not the empty state below it: "there are
+                         no messages" and "we could not read the thread" must
+                         never look alike. */
+                      <LoadFailure
+                        what="Messages"
+                        reason={messagesLoad.status === "error" ? messagesLoad.reason : ""}
+                        onRetry={() => { void loadMessages(); }}
+                        retrying={reloadingMessages}
+                      >
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          The thread is not shown while this is unavailable — there may well be messages in it.
+                        </p>
+                      </LoadFailure>
                     ) : messages.length === 0 ? (
                       <div className="text-center text-muted-foreground text-sm py-12">
                         {lead.phone ? "No messages yet. Send an SMS below." : "No phone number on record for this lead."}
@@ -1288,7 +1420,7 @@ export default function CrmLeadDetail() {
 
               {/* ── Calls tab ─── */}
               {commSubTab === "calls" && (() => {
-                const callMsgs = messages.filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
+                const callMsgs = (messages ?? []).filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
                 const callActs = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type)).map(a => ({ key:`act-${a.id}`, kind:"activity" as const, ts: new Date(a.createdAt).getTime(), data: a }));
                 const all = [...callMsgs, ...callActs].sort((a,b) => b.ts - a.ts);
                 const merged = callFilter === "all" ? all : all.filter(entry => {
@@ -1336,17 +1468,40 @@ export default function CrmLeadDetail() {
                         </button>
                       ))}
                     </div>
-                    {loadingMessages ? (
-                      <div className="flex items-center justify-center py-12">
+                    {messagesLoad.status === "loading" ? (
+                      <div className="flex items-center justify-center py-12" role="status" aria-live="polite">
+                        <span className="sr-only">Loading the call log…</span>
                         <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
                       </div>
-                    ) : merged.length === 0 ? (
-                      <div className="text-center text-muted-foreground text-sm py-12">
-                        <p className="text-2xl mb-2">📵</p>
-                        <p>No call history yet.</p>
-                        <p className="text-xs mt-1">Bridge calls and missed calls will appear here.</p>
-                      </div>
                     ) : (
+                      <>
+                        {/* Partial, and named as such: outcomes logged by hand
+                            are still real when the phone system's own log is
+                            not available. What is missing is stated rather
+                            than counted as nothing. */}
+                        {messages === null && (
+                          <LoadFailure
+                            what="The call log"
+                            reason={messagesLoad.status === "error" ? messagesLoad.reason : ""}
+                            variant="inline"
+                            className="mb-4"
+                            onRetry={() => { void loadMessages(); }}
+                            retrying={reloadingMessages}
+                          >
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Calls recorded by the phone system are missing from this list. Outcomes logged by hand are still shown.
+                            </p>
+                          </LoadFailure>
+                        )}
+                        {merged.length === 0 ? (
+                          messages !== null && (
+                            <div className="text-center text-muted-foreground text-sm py-12">
+                              <p className="text-2xl mb-2">📵</p>
+                              <p>No call history yet.</p>
+                              <p className="text-xs mt-1">Bridge calls and missed calls will appear here.</p>
+                            </div>
+                          )
+                        ) : (
                       <ul className="space-y-3">
                         {merged.map(entry => {
                           if (entry.kind === "message") {
@@ -1404,6 +1559,8 @@ export default function CrmLeadDetail() {
                           }
                         })}
                       </ul>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -1665,14 +1822,32 @@ export default function CrmLeadDetail() {
                   <span className="text-[10px] text-muted-foreground">Last: {callSummary.lastCallAt}</span>
                 )}
               </div>
-              {callSummary.totalCalls === 0 ? (
+              {/*
+                The phone system's log is a separate request. When it fails
+                this panel used to collapse to "No calls yet" over four tiles
+                of zeros — a statement about this client's call history that
+                nobody had been able to check.
+              */}
+              {messagesLoad.status === "error" && (
+                <LoadFailure
+                  what="The call log"
+                  reason={messagesLoad.reason}
+                  variant="inline"
+                  onRetry={() => { void loadMessages(); }}
+                  retrying={reloadingMessages}
+                />
+              )}
+              {messagesLoad.status === "ready" && callSummary.totalCalls === 0 && callSummary.loggedOutcomes === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">No calls yet</p>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-muted rounded-lg px-2.5 py-2">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Total Calls</p>
-                      <p className="text-2xl font-bold text-foreground">{callSummary.totalCalls}</p>
+                      {/* A dash, never a 0, when the log behind it is unknown. */}
+                      <p className="text-2xl font-bold text-foreground">
+                        <Figure value={callSummary.totalCalls} loading={messagesLoad.status === "loading"} />
+                      </p>
                     </div>
                     <div className="bg-emerald-50 rounded-lg px-2.5 py-2">
                       <p className="text-[10px] text-emerald-700 uppercase tracking-wide mb-0.5">Connected</p>

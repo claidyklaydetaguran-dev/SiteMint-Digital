@@ -9,10 +9,12 @@ import {
 import { useCrmAssignees } from "@/lib/crmAssignees";
 import { CompanyFormDialog } from "@/components/crm/companies/CompanyFormDialog";
 import {
-  archiveCompany, deleteCompany, getCompany, money, restoreCompany, searchContacts,
+  archiveCompany, deleteCompany, getCompany, money, restoreCompany,
   setContactCompany, websiteHref, websiteLabel,
   type Company, type CompanyPerson, type CompanySummaries, type ContactSearchResult,
 } from "@/lib/crmCompanies";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure } from "@/components/crm/LoadState";
 
 /**
  * One company: who we know there, and everything that reaches it through them.
@@ -54,6 +56,12 @@ function Row({ href, primary, secondary, trailing }: {
   return href ? <Link href={href}><div className="cursor-pointer hover:bg-accent rounded-lg px-2 -mx-2">{body}</div></Link> : body;
 }
 
+/** A body that is not the shape the picker expects is a failure, not "nobody". */
+function pickLeadSearch(body: unknown): ContactSearchResult[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as ContactSearchResult[] : undefined;
+}
+
 export default function CrmCompanyDetail() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -74,8 +82,11 @@ export default function CrmCompanyDetail() {
   // Every hook runs before the early returns below — the picker's list included.
   const assignees = useCrmAssignees();
   const [linkQuery, setLinkQuery] = useState("");
-  const [linkResults, setLinkResults] = useState<ContactSearchResult[] | null>(null);
+  /** null while no search is running — a short query, or the panel closed. */
+  const [linkResults, setLinkResults] = useState<Load<ContactSearchResult[]> | null>(null);
   const [linkSearching, setLinkSearching] = useState(false);
+  /** Bumped by Try again, to re-run the search below. */
+  const [linkAttempt, setLinkAttempt] = useState(0);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
 
   const load = useCallback(async () => {
@@ -110,22 +121,26 @@ export default function CrmCompanyDetail() {
   }
 
   // Contact search for "link an existing contact", debounced like the list.
+  // A search that failed used to land in the same empty array as a search that
+  // found nobody, so a refusal or a dropped connection read as "No contact
+  // matches that." — and somebody would conclude the person is not in the CRM.
   useEffect(() => {
     if (!showLinkPanel || linkQuery.trim().length < 2) { setLinkResults(null); return; }
     let cancelled = false;
     const timer = setTimeout(async () => {
       setLinkSearching(true);
-      try {
-        const result = await searchContacts(linkQuery.trim());
-        if (!cancelled) setLinkResults(result.leads.filter((c) => c.companyId !== id));
-      } catch {
-        if (!cancelled) setLinkResults([]);
-      } finally {
-        if (!cancelled) setLinkSearching(false);
-      }
+      const result = await readAdminResource(
+        `/api/crm/leads?search=${encodeURIComponent(linkQuery.trim())}`,
+        pickLeadSearch,
+      );
+      if (cancelled) return;
+      setLinkResults(result.status === "ready"
+        ? { status: "ready", data: result.data.filter((c) => c.companyId !== id) }
+        : result);
+      setLinkSearching(false);
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [linkQuery, showLinkPanel, id]);
+  }, [linkQuery, showLinkPanel, id, linkAttempt]);
 
   if (loading && !company) {
     return (
@@ -293,10 +308,24 @@ export default function CrmCompanyDetail() {
                 />
               </div>
               {linkSearching && <p className="text-xs text-muted-foreground">Searching…</p>}
-              {linkResults && linkResults.length === 0 && !linkSearching && (
+              {linkResults?.status === "error" && !linkSearching && (
+                <LoadFailure
+                  variant="inline"
+                  what="The contact search"
+                  reason={linkResults.reason}
+                  onRetry={() => setLinkAttempt((n) => n + 1)}
+                  retrying={linkSearching}
+                >
+                  <p className="mt-1 min-w-0 break-words text-xs text-muted-foreground">
+                    Nobody is listed and nobody is ruled out — this says nothing about whether
+                    that contact exists.
+                  </p>
+                </LoadFailure>
+              )}
+              {linkResults?.status === "ready" && linkResults.data.length === 0 && !linkSearching && (
                 <p className="text-xs text-muted-foreground">No contact matches that. A contact already here is not offered.</p>
               )}
-              {(linkResults ?? []).slice(0, 8).map((c) => (
+              {(linkResults?.status === "ready" ? linkResults.data : []).slice(0, 8).map((c) => (
                 <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 border border-border rounded-lg px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-sm text-foreground break-words">{c.name}</p>

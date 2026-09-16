@@ -107,6 +107,21 @@ interface DeliveryView {
   resolutionNote?: string | null;
   availableActions: Array<"retry" | "resend" | "acknowledge">;
   retryCouldDuplicate: boolean;
+  /**
+   * What the mail provider said afterwards, where it has said anything.
+   *
+   * Beside the state above, never instead of it: one is what this server
+   * managed to hand over, the other is what became of the message. A reply
+   * recorded as accepted and then bounced is exactly the case worth seeing.
+   */
+  provider?: {
+    state: string;
+    label: string;
+    tone: "waiting" | "working" | "accepted" | "attention";
+    explanation: string;
+    at?: string | null;
+    detail?: string | null;
+  } | null;
 }
 
 interface DeliveryStatus {
@@ -247,13 +262,28 @@ const DELIVERY_ICON: Record<DeliveryView["tone"], typeof Check> = {
 /** The one-line state of a message, in the server's own words. */
 function DeliveryBadge({ delivery }: { delivery: DeliveryView }) {
   const Icon = DELIVERY_ICON[delivery.tone];
+  const provider = delivery.provider;
+  const ProviderIcon = provider ? DELIVERY_ICON[provider.tone] : null;
   return (
-    <span
-      title={delivery.explanation}
-      className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[delivery.tone]}`}>
-      <Icon className={`w-3 h-3 shrink-0 ${delivery.tone === "working" ? "animate-spin" : ""}`} />
-      {delivery.label}
-    </span>
+    <>
+      <span
+        title={delivery.explanation}
+        className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[delivery.tone]}`}>
+        <Icon className={`w-3 h-3 shrink-0 ${delivery.tone === "working" ? "animate-spin" : ""}`} />
+        {delivery.label}
+      </span>
+      {/* The provider's own word. Shown as a second badge rather than folded
+          into the first, because "we handed it over" and "it bounced" are both
+          true and only one of them needs somebody. */}
+      {provider && ProviderIcon && (
+        <span
+          title={provider.explanation}
+          className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[provider.tone]}`}>
+          <ProviderIcon className={`w-3 h-3 shrink-0 ${provider.tone === "working" ? "animate-spin" : ""}`} />
+          {provider.label}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -312,6 +342,14 @@ export default function CrmSupport() {
   const [newRequestType, setNewRequestType] = useState("");
 
   const [articles, setArticles] = useState<Article[]>([]);
+  /**
+   * Why there are no articles to show, when that is the reason.
+   *
+   * Without this, a knowledge-base read that failed left `articles` empty and
+   * the screen said "No articles yet" — a claim about the knowledge base
+   * nobody had managed to read.
+   */
+  const [articlesError, setArticlesError] = useState<string | null>(null);
   const [articleCursor, setArticleCursor] = useState<number | null>(null);
   const [articleSearch, setArticleSearch] = useState("");
   const [articleApplied, setArticleApplied] = useState("");
@@ -364,6 +402,7 @@ export default function CrmSupport() {
     const data = await read(`/api/crm/support/kb?${params.toString()}`, "The knowledge base");
     setArticles(prev => (cursor == null ? data.articles : [...prev, ...data.articles]));
     setArticleCursor(data.nextCursor ?? null);
+    setArticlesError(null);
   }, [read, articleApplied, articleStatus]);
 
   const loadDetail = useCallback(async (id: number) => {
@@ -393,7 +432,15 @@ export default function CrmSupport() {
       ]);
       if (people?.ok) setAssignees((await people.json().catch(() => ({}))).assignees ?? []);
       if (contacts?.ok) setLeads((await contacts.json().catch(() => ({}))).leads ?? []);
-      await loadArticles().catch(() => { /* the queue does not depend on it */ });
+      // Best-effort, but never silent. Swallowing this left `articles` empty,
+      // so the knowledge base tab said "No articles yet. Write the answer you
+      // keep repeating." and every ticket offered "No articles yet — write one
+      // on the Knowledge base tab", about a list that had failed to load.
+      try {
+        await loadArticles();
+      } catch (e) {
+        setArticlesError(e instanceof Error ? e.message : "The knowledge base could not be loaded.");
+      }
     } catch (e) {
       setFatal(e instanceof Error ? e.message : "Support could not be loaded.");
     } finally {
@@ -420,7 +467,11 @@ export default function CrmSupport() {
     (async () => {
       setBusy(true);
       try { await loadArticles(); setError(null); }
-      catch (e) { setError(e instanceof Error ? e.message : "The knowledge base could not be loaded."); }
+      catch (e) {
+        const reason = e instanceof Error ? e.message : "The knowledge base could not be loaded.";
+        setError(reason);
+        setArticlesError(reason);
+      }
       finally { setBusy(false); }
     })();
   }, [tab, loadArticles]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1291,11 +1342,15 @@ export default function CrmSupport() {
                               <option key={a.id} value={String(a.id)}>{a.title}</option>
                             ))}
                           </select>
-                          {articles.length === 0 && (
+                          {articlesError ? (
+                            <span role="alert" className="text-[11px] text-muted-foreground break-words">
+                              The knowledge base could not be read, so an article that answers this may well exist.
+                            </span>
+                          ) : articles.length === 0 ? (
                             <span className="text-[11px] text-muted-foreground">
                               No articles yet — write one on the Knowledge base tab.
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       )}
                     </div>
@@ -1329,7 +1384,26 @@ export default function CrmSupport() {
                 </select>
               </div>
 
-              {articles.length === 0 ? (
+              {articlesError ? (
+                /* Not the "No articles yet" line below: an empty knowledge
+                   base and an unread one must not look the same. */
+                <div role="alert" className="px-4 py-10 text-center">
+                  <p className="text-xs font-semibold text-foreground">
+                    The knowledge base could not be loaded, so no articles are listed here.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground break-words">{articlesError}</p>
+                  <button
+                    onClick={() => {
+                      setBusy(true);
+                      loadArticles()
+                        .catch(e => setArticlesError(e instanceof Error ? e.message : "The knowledge base could not be loaded."))
+                        .finally(() => setBusy(false));
+                    }}
+                    disabled={busy} className={`${GHOST_BUTTON} mt-3 justify-center`}>
+                    Try again
+                  </button>
+                </div>
+              ) : articles.length === 0 ? (
                 <p className="px-4 py-10 text-center text-xs text-muted-foreground">
                   No articles yet. Write the answer you keep repeating.
                 </p>

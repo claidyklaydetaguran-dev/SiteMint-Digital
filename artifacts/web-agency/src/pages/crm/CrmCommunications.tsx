@@ -7,8 +7,12 @@ import {
   Edit2, Trash2, FileText, X, Search, ExternalLink, Clock, Inbox,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure, countOf, dataOf } from "@/components/crm/LoadState";
 import { ConversationInbox } from "@/components/crm/ConversationInbox";
 import { normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,6 +25,18 @@ interface EmailActivity {
 }
 interface Template {
   id: number; name: string; type: string; subject: string; body: string;
+}
+
+// A body that is not the shape this page expects is a failure too — not a
+// reason to render an empty panel and a zero.
+function pickEmails(body: unknown): EmailActivity[] | undefined {
+  const list = body && typeof body === "object" ? (body as { emails?: unknown }).emails : undefined;
+  return Array.isArray(list) ? list as EmailActivity[] : undefined;
+}
+
+function pickTemplates(body: unknown): Template[] | undefined {
+  const list = body && typeof body === "object" ? (body as { templates?: unknown }).templates : undefined;
+  return Array.isArray(list) ? list as Template[] : undefined;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,12 +67,18 @@ const DEFAULT_TEMPLATES: Omit<Template, "id">[] = [
 
 const EMPTY_FORM = { name: "", type: "Other", subject: "", body: "" };
 
+/** The cadence <ConversationInbox> itself polls on, so the badge agrees with the list. */
+const UNREAD_POLL_MS = 30_000;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CrmCommunications() {
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<CommTab>("conversations");
-  const [toast, setToast] = useState("");
+  /** A completed action, or one the server refused — never the same shape twice. */
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [unread, setUnread] = useState<number | null>(null);
+  const confirmation = useConfirmDialog();
 
   // Conversations live entirely in the shared <ConversationInbox>. The
   // thirty-odd pieces of state that used to sit here — threads, selection,
@@ -65,40 +87,73 @@ export default function CrmCommunications() {
   // the two screens drifted apart.
 
   // ── Email activity state ─────────────────────────────────────────────────
-  const [emails, setEmails] = useState<EmailActivity[]>([]);
-  const [emailLoading, setEmailLoading] = useState(false);
+  // Both panels used to read their request with `if (r.ok) {…}` and nothing
+  // else. A refusal, a 500 or an unreachable server left the arrays empty, so
+  // the header said "0 emails" / "0 templates" over "No email activity found."
+  // and "No templates yet." — a request nobody managed to complete, displayed
+  // as a fact about the business.
+  const [emailsLoad, setEmailsLoad] = useState<Load<EmailActivity[]>>({ status: "loading" });
+  const [emailsReloading, setEmailsReloading] = useState(false);
   const [emailSearch, setEmailSearch] = useState("");
 
   // ── Templates state ──────────────────────────────────────────────────────
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesLoad, setTemplatesLoad] = useState<Load<Template[]>>({ status: "loading" });
+  const [templatesReloading, setTemplatesReloading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingTpl, setEditingTpl] = useState<Template | null>(null);
   const [tplForm, setTplForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
   const [savingTpl, setSavingTpl] = useState(false);
+  const [tplError, setTplError] = useState("");
   const [seeding, setSeeding] = useState(false);
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 3500);
+  const showToast = useCallback((text: string, ok: boolean) => {
+    setToast({ text, ok });
+    // A refusal is worth reading; a confirmation is not worth re-reading.
+    setTimeout(() => setToast(null), ok ? 3500 : 8000);
   }, []);
+
+  // ── Unread count for the Conversations tab ────────────────────────────────
+  //
+  // The badge was hard-coded to `0 || undefined`, so it could never appear.
+  // The inbox summary already counts this — conversations carrying an inbound
+  // message newer than the last time THIS person opened them — so the badge
+  // now says that, or says nothing.
+
+  const loadUnread = useCallback(async () => {
+    try {
+      const r = await adminFetch("/api/crm/inbox/summary");
+      if (!r.ok) return;
+      const d = await r.json() as { unreadConversations?: number; readStateAvailable?: boolean };
+      // A legacy shared sign-in has no person behind it, so "unread for you"
+      // has no meaning and no badge is the honest answer.
+      setUnread(d.readStateAvailable === false ? null : Number(d.unreadConversations ?? 0));
+    } catch {
+      // A badge must not shout: the inbox itself reports its own failures.
+    }
+  }, []);
+
+  useEffect(() => { void loadUnread(); }, [loadUnread, tab]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void loadUnread();
+    }, UNREAD_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [loadUnread]);
 
   // ── Email Activity logic ──────────────────────────────────────────────────
 
   const loadEmails = useCallback(async () => {
-    setEmailLoading(true);
-    try {
-      const r = await adminFetch("/api/crm/communications/email-activity");
-      if (r.ok) {
-        const d = await r.json() as { emails: EmailActivity[] };
-        setEmails(d.emails || []);
-      }
-    } finally { setEmailLoading(false); }
+    setEmailsReloading(true);
+    setEmailsLoad(await readAdminResource("/api/crm/communications/email-activity", pickEmails));
+    setEmailsReloading(false);
   }, []);
 
   useEffect(() => { if (tab === "email") loadEmails(); }, [tab, loadEmails]);
 
-  const filteredEmails = emails.filter(e =>
+  /** The activity that actually loaded, or null. Never an empty list standing in for a failure. */
+  const emails = dataOf(emailsLoad);
+  const filteredEmails = emails === null ? null : emails.filter(e =>
     !emailSearch ||
     (e.leadName ?? "").toLowerCase().includes(emailSearch.toLowerCase()) ||
     (e.leadEmail ?? "").toLowerCase().includes(emailSearch.toLowerCase()) ||
@@ -108,51 +163,105 @@ export default function CrmCommunications() {
   // ── Templates logic ───────────────────────────────────────────────────────
 
   const loadTemplates = useCallback(async () => {
-    setTemplatesLoading(true);
-    try {
-      const r = await adminFetch("/api/crm/email-templates");
-      if (r.ok) { const d = await r.json() as { templates: Template[] }; setTemplates(d.templates || []); }
-    } finally { setTemplatesLoading(false); }
+    setTemplatesReloading(true);
+    setTemplatesLoad(await readAdminResource("/api/crm/email-templates", pickTemplates));
+    setTemplatesReloading(false);
   }, []);
 
   useEffect(() => { if (tab === "templates") loadTemplates(); }, [tab, loadTemplates]);
 
-  const openCreate = () => { setEditingTpl(null); setTplForm(EMPTY_FORM); setShowForm(true); };
-  const openEdit = (t: Template) => { setEditingTpl(t); setTplForm({ name: t.name, type: t.type, subject: t.subject, body: t.body }); setShowForm(true); };
+  /** The templates that actually loaded, or null. */
+  const templates = dataOf(templatesLoad);
+  const templateCount = countOf(templatesLoad);
 
+  const openCreate = () => { setEditingTpl(null); setTplForm(EMPTY_FORM); setTplError(""); setShowForm(true); };
+  const openEdit = (t: Template) => { setEditingTpl(t); setTplForm({ name: t.name, type: t.type, subject: t.subject, body: t.body }); setTplError(""); setShowForm(true); };
+
+  // The response was thrown away entirely, so a template the server refused to
+  // save closed the form and reported nothing — indistinguishable from a save.
   const saveTemplate = async () => {
     if (!tplForm.name || !tplForm.subject || !tplForm.body) return;
     setSavingTpl(true);
+    setTplError("");
     const url = editingTpl ? `/api/crm/email-templates/${editingTpl.id}` : "/api/crm/email-templates";
-    await adminFetch(url, {
-      method: editingTpl ? "PUT" : "POST",
-      body: JSON.stringify(tplForm),
+    try {
+      const r = await adminFetch(url, {
+        method: editingTpl ? "PUT" : "POST",
+        body: JSON.stringify(tplForm),
+      });
+      if (!r.ok) { setTplError(`Template not saved. ${await responseFailureReason(r)}`); return; }
+      setShowForm(false); setEditingTpl(null); setTplForm(EMPTY_FORM);
+      void loadTemplates();
+    } catch {
+      setTplError(`Template not saved. ${failureReason(null)}`);
+    } finally {
+      setSavingTpl(false);
+    }
+  };
+
+  // The dialog says what will happen; `refusalMessage` keeps a refused delete
+  // from ever looking like a successful one. Both halves are needed.
+  const deleteTemplate = (template: Template) => {
+    void confirmation.ask({
+      title: `Delete the template "${template.name}"?`,
+      description: "It is removed for everyone, and this cannot be undone.",
+      consequences: [
+        "It disappears from this list, and from the template picker used when composing an email.",
+        "Emails already sent using it are not affected.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete template",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep template",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/email-templates/${template.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That template could not be deleted."));
+        await loadTemplates();
+      },
     });
-    setSavingTpl(false); setShowForm(false); setEditingTpl(null); setTplForm(EMPTY_FORM);
-    loadTemplates();
   };
 
-  const deleteTemplate = async (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    await adminFetch(`/api/crm/email-templates/${id}`, { method: "DELETE" });
-    loadTemplates();
-  };
-
+  /**
+   * Seed the default set.
+   *
+   * Only offered when the templates read SUCCEEDED and came back empty. It
+   * used to be offered whenever the list was empty for any reason — including
+   * a read that had failed against a backend that was perfectly fine and
+   * already held these six — so one click could put a second copy of every
+   * default template into the CRM. It also ignored every response, so a run
+   * that was refused six times looked exactly like a run that worked.
+   */
   const seedTemplates = async () => {
     setSeeding(true);
+    let added = 0;
+    let failure = "";
     for (const t of DEFAULT_TEMPLATES) {
-      await adminFetch("/api/crm/email-templates", {
-        method: "POST",
-        body: JSON.stringify(t),
-      });
+      try {
+        const r = await adminFetch("/api/crm/email-templates", {
+          method: "POST",
+          body: JSON.stringify(t),
+        });
+        if (!r.ok) { failure = await responseFailureReason(r); break; }
+        added++;
+      } catch {
+        failure = failureReason(null);
+        break;
+      }
     }
-    setSeeding(false); loadTemplates();
+    setSeeding(false);
+    showToast(
+      failure
+        ? `${added} of ${DEFAULT_TEMPLATES.length} default templates were added, then it stopped. ${failure}`
+        : `Added ${added} default template${added !== 1 ? "s" : ""}.`,
+      !failure,
+    );
+    void loadTemplates();
   };
 
   // ── Tab config ────────────────────────────────────────────────────────────
 
   const TABS: { id: CommTab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: "conversations", label: "Conversations", icon: MessageSquare, badge: 0 || undefined },
+    { id: "conversations", label: "Conversations", icon: MessageSquare, badge: unread !== null && unread > 0 ? unread : undefined },
     { id: "email",         label: "Email Activity", icon: Mail },
     { id: "templates",    label: "Templates",      icon: FileText },
   ];
@@ -161,11 +270,22 @@ export default function CrmCommunications() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          {toast}
+        <div
+          role={toast.ok ? "status" : "alert"}
+          className={`fixed bottom-6 right-4 left-4 sm:left-auto sm:right-6 z-50 sm:max-w-sm px-5 py-3 rounded-xl shadow-xl text-sm font-medium flex items-start gap-2 ${
+            toast.ok
+              ? "bg-foreground text-background"
+              : "border border-destructive/30 bg-background text-foreground"
+          }`}
+        >
+          {toast.ok
+            ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            : <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />}
+          <span className="min-w-0 break-words">{toast.text}</span>
         </div>
       )}
 
@@ -195,7 +315,8 @@ export default function CrmCommunications() {
                 {t.label}
                 {t.badge != null && (
                   <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                    {t.badge > 99 ? "99+" : t.badge}
+                    <span aria-hidden="true">{t.badge > 99 ? "99+" : t.badge}</span>
+                    <span className="sr-only">{`${t.badge} unread`}</span>
                   </span>
                 )}
               </button>
@@ -231,19 +352,44 @@ export default function CrmCommunications() {
                   className="w-full pl-8 pr-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
-              <Button size="sm" variant="outline" onClick={loadEmails} className="gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              <Button size="sm" variant="outline" onClick={loadEmails} disabled={emailsReloading} className="gap-1.5">
+                <RefreshCw className={`w-3.5 h-3.5 ${emailsReloading ? "animate-spin" : ""}`} />
+                {emailsReloading ? "Refreshing…" : "Refresh"}
               </Button>
-              <span className="text-xs text-muted-foreground ml-auto">
-                {emailLoading ? "Loading…" : `${filteredEmails.length} email${filteredEmails.length !== 1 ? "s" : ""}`}
+              {/* The count exists only when the activity behind it loaded. */}
+              <span className="text-xs text-muted-foreground ml-auto min-w-0 break-words">
+                {emailsLoad.status === "loading"
+                  ? "Loading…"
+                  : filteredEmails === null
+                    ? <><Figure value={null} /> emails</>
+                    : `${filteredEmails.length} email${filteredEmails.length !== 1 ? "s" : ""}`}
               </span>
             </div>
 
             {/* Table */}
             <div className="flex-1 overflow-auto">
-              {emailLoading ? (
+              {emailsLoad.status === "loading" ? (
                 <div className="flex items-center justify-center py-20">
                   <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+                </div>
+              ) : filteredEmails === null ? (
+                /*
+                  Deliberately NOT the "No email activity found" panel below:
+                  the person has to be able to tell "nothing has been sent"
+                  from "we could not ask". The words come from the response,
+                  so a refusal names the missing permission.
+                */
+                <div className="p-4 sm:p-6">
+                  <LoadFailure
+                    what="Email activity"
+                    reason={emailsLoad.status === "error" ? emailsLoad.reason : ""}
+                    onRetry={() => { void loadEmails(); }}
+                    retrying={emailsReloading}
+                  >
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      No email count is shown while this is unavailable — messages may well have been sent.
+                    </p>
+                  </LoadFailure>
                 </div>
               ) : filteredEmails.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
@@ -308,13 +454,23 @@ export default function CrmCommunications() {
               <Button size="sm" onClick={openCreate} className="gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> New Template
               </Button>
-              {templates.length === 0 && !templatesLoading && (
+              {/*
+                Offered only when the read SUCCEEDED and came back empty —
+                `templates?.length === 0` is false while the list is unknown,
+                which is the whole point: seeding against a backend that
+                already holds these six would duplicate every one of them.
+              */}
+              {templates?.length === 0 && (
                 <Button size="sm" variant="outline" onClick={seedTemplates} disabled={seeding} className="gap-1.5">
                   {seeding ? "Seeding…" : "Seed Default Templates"}
                 </Button>
               )}
-              <span className="text-xs text-muted-foreground ml-auto">
-                {templatesLoading ? "Loading…" : `${templates.length} template${templates.length !== 1 ? "s" : ""}`}
+              <span className="text-xs text-muted-foreground ml-auto min-w-0 break-words">
+                {templatesLoad.status === "loading"
+                  ? "Loading…"
+                  : templateCount === null
+                    ? <><Figure value={null} /> templates</>
+                    : `${templateCount} template${templateCount !== 1 ? "s" : ""}`}
               </span>
             </div>
 
@@ -329,6 +485,11 @@ export default function CrmCommunications() {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+                {tplError && (
+                  <p role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-muted-foreground break-words">
+                    {tplError}
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 block">Name</label>
@@ -370,10 +531,22 @@ export default function CrmCommunications() {
 
             {/* Template grid */}
             <div className="flex-1 overflow-auto p-6">
-              {templatesLoading ? (
+              {templatesLoad.status === "loading" ? (
                 <div className="flex items-center justify-center py-20">
                   <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
                 </div>
+              ) : templates === null ? (
+                <LoadFailure
+                  what="Templates"
+                  reason={templatesLoad.status === "error" ? templatesLoad.reason : ""}
+                  onRetry={() => { void loadTemplates(); }}
+                  retrying={templatesReloading}
+                >
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Seeding the default set is hidden until this loads: the templates may already be here, and seeding
+                    blind would add a second copy of every one of them.
+                  </p>
+                </LoadFailure>
               ) : templates.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
                   <FileText className="w-8 h-8 opacity-30" />
@@ -398,7 +571,8 @@ export default function CrmCommunications() {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => deleteTemplate(t.id)}
+                            onClick={() => deleteTemplate(t)}
+                            aria-label={`Delete ${t.name}`}
                             className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                             title="Delete"
                           >

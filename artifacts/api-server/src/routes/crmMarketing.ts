@@ -58,6 +58,11 @@ import {
   type CrmMarketingCampaignStatus, type CrmMarketingAudienceMode,
   type CrmMergeField, type CrmLead, type CrmMarketingRecipient,
 } from "@workspace/db";
+import { emailRef } from "../lib/emailRefs.js";
+import {
+  clickedLinks, deliveryFor, engagementEvidence, loadProviderDeliveries,
+} from "../lib/emailProviderEvents.js";
+import { engagementAvailability } from "../lib/emailDeliveryState.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { trySendStaffMail, staffMailBlockedReason, type MailFailure } from "../lib/staffMail.js";
 import { NEVER_LEFT_CODES, reasonProvesNeverLeft } from "../lib/mailOutcome.js";
@@ -2421,6 +2426,77 @@ router.get("/crm/marketing/campaigns/:id/results", requireCrmAuth("campaigns.rea
     .where(eq(crmMarketingRecipients.campaignId, id))
     .orderBy(asc(crmMarketingRecipients.id));
 
+  // ── What the provider said ────────────────────────────────────────────────
+  //
+  // By the id it returned for an accepted send, and by the `crm_ref` tag for
+  // the sends that never learned one — an uncertain outcome has no id, and
+  // those are exactly the ones a delivery report is most worth having for.
+  // None of this is a stored summary: it is recomputed from the events, so a
+  // late or out-of-order event cannot leave a stale figure behind.
+  const lookup = await loadProviderDeliveries({
+    providerIds: rows.map((r) => r.providerMessageId),
+    refs: rows.map((r) => emailRef("marketing_recipient", r.id)),
+  });
+  const providerFor = (row: { id: number; providerMessageId: string | null }) =>
+    deliveryFor(lookup, row.providerMessageId, emailRef("marketing_recipient", row.id));
+
+  const withDelivery = rows.map((row) => {
+    const provider = providerFor(row);
+    return {
+      ...row,
+      delivery: provider?.state
+        ? {
+            state: provider.state,
+            label: provider.label,
+            tone: provider.tone,
+            explanation: provider.explanation,
+            at: provider.at?.toISOString() ?? null,
+            detail: provider.detail,
+          }
+        : null,
+      engagement: provider && (provider.opens > 0 || provider.clicks > 0)
+        ? {
+            opens: provider.opens,
+            firstOpenedAt: provider.firstOpenedAt?.toISOString() ?? null,
+            lastOpenedAt: provider.lastOpenedAt?.toISOString() ?? null,
+            clicks: provider.clicks,
+            firstClickedAt: provider.firstClickedAt?.toISOString() ?? null,
+            lastClickedAt: provider.lastClickedAt?.toISOString() ?? null,
+          }
+        : null,
+    };
+  });
+
+  const sentRows = rows.filter((r) => r.status === "sent");
+  const deliveryCounts = {
+    sent: 0, delayed: 0, delivered: 0, bounced: 0,
+    complained: 0, failed: 0, suppressed: 0, noReport: 0,
+  };
+  for (const row of sentRows) {
+    const provider = providerFor(row);
+    if (provider?.state) deliveryCounts[provider.state] += 1;
+    else deliveryCounts.noReport += 1;
+  }
+
+  // Engagement is reported only on evidence: an open or a click actually
+  // recorded for this sending domain. Open tracking and click tracking are
+  // separate settings, so each is asked about separately and one can be
+  // measured while the other is not.
+  const evidence = await engagementEvidence();
+  const opensAvailable = engagementAvailability(evidence, "opens");
+  const clicksAvailable = engagementAvailability(evidence, "clicks");
+
+  const openedRows = sentRows.filter((r) => (providerFor(r)?.opens ?? 0) > 0);
+  const clickedRows = sentRows.filter((r) => (providerFor(r)?.clicks ?? 0) > 0);
+  const totalOpens = sentRows.reduce((sum, r) => sum + (providerFor(r)?.opens ?? 0), 0);
+  const totalClicks = sentRows.reduce((sum, r) => sum + (providerFor(r)?.clicks ?? 0), 0);
+  // Per RECIPIENT, not per event: one contact opening four times is one person
+  // who opened it, and a rate over 100% is a number nobody can act on.
+  const rate = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : null);
+  const links = clicksAvailable.measured
+    ? await clickedLinks(sentRows.map((r) => providerFor(r)?.providerEmailId ?? r.providerMessageId))
+    : [];
+
   const of = (status: string) => rows.filter((r) => r.status === status);
   const excludedRows = of("excluded");
 
@@ -2460,22 +2536,41 @@ router.get("/crm/marketing/campaigns/:id/results", requireCrmAuth("campaigns.rea
     },
     excludedByReason: byReason,
     failedByOutcome,
-    recipients: rows,
+    recipients: withDelivery,
     engagement: {
-      tracked: false,
-      opens: null,
-      clicks: null,
-      openRate: null,
-      clickRate: null,
-      unavailableReason: "No custom tracking domain is configured, so nothing records an open or a click.",
-      why: "Opens and clicks are not tracked for these campaigns. No custom tracking domain is configured, so there is no tracking pixel and no link rewriting, and nothing writes an open or a click event. A 0% here would be a claim about your customers that we have no evidence for, so the figures are absent instead. Even where opens are tracked, an open only means an image was loaded — privacy features and security scanners load images automatically — so it is never proof that a person read the email.",
+      /** The flag older clients read. The per-metric detail is beside it. */
+      tracked: opensAvailable.measured || clicksAvailable.measured,
+      opens: opensAvailable.measured ? totalOpens : null,
+      clicks: clicksAvailable.measured ? totalClicks : null,
+      /** People, not events — this is what the rates are computed from. */
+      uniqueOpens: opensAvailable.measured ? openedRows.length : null,
+      uniqueClicks: clicksAvailable.measured ? clickedRows.length : null,
+      openRate: opensAvailable.measured ? rate(openedRows.length, sentRows.length) : null,
+      clickRate: clicksAvailable.measured ? rate(clickedRows.length, sentRows.length) : null,
+      opensMeasured: opensAvailable.measured,
+      clicksMeasured: clicksAvailable.measured,
+      measuredSince: (opensAvailable.since ?? clicksAvailable.since)?.toISOString() ?? null,
+      sendingDomain: evidence.sendingDomain,
+      clickedLinks: links,
+      unavailableReason: opensAvailable.measured ? null : opensAvailable.reason,
+      clicksUnavailableReason: clicksAvailable.measured ? null : clicksAvailable.reason,
+      caveat: opensAvailable.measured ? opensAvailable.caveat : null,
+      why: opensAvailable.measured
+        ? `${opensAvailable.caveat} Rates count people rather than events: a contact who opened four times counts once.`
+        : opensAvailable.reason
+          ?? "Opens and clicks are not measured for this sending domain, so the figures are absent rather than zero.",
     },
     deliverySignal: {
-      meaning: "\"Sent\" means the mail provider accepted the message and returned an id. It is not a delivery confirmation and not a read receipt.",
+      meaning: "\"Sent\" means the mail provider accepted the message and returned an id. It is not a delivery confirmation and not a read receipt — where the provider has since reported on delivery, that report is beside the recipient.",
       providerIdsRecorded: rows.filter((r) => r.providerMessageId).length,
       notDelivered: failedRows.length - unconfirmed,
       unconfirmed,
       retryable,
+      /** Counted from the provider's events, over the messages it accepted. */
+      provider: { ...deliveryCounts, messagesWithReports: lookup.size },
+      providerNote: lookup.size === 0
+        ? "No delivery report has arrived for this campaign. Either the provider's event webhook is not connected, or these messages are too recent for one — \"Sent\" remains the strongest thing known about them."
+        : null,
       unconfirmedNote: unconfirmed > 0
         ? "An attempt was made for each of these and no answer from the mail provider was recorded, so whether it arrived is unknown. None of them is sent again automatically, and trying again leaves them out. Ask the person whether it arrived before sending anything again."
         : null,

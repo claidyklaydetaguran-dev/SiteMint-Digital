@@ -11,7 +11,7 @@
  *     somebody send a second copy.
  */
 import { describe, it, expect } from "vitest";
-import { engagementView, failureGroups, resultTiles, retryableCount } from "./resultsView";
+import { deliveryReport, engagementView, failureGroups, resultTiles, retryableCount } from "./resultsView";
 import type { Results } from "./shared";
 
 const person = (id: number, status: string, lastError: string | null = null) => ({
@@ -113,5 +113,55 @@ describe("opens and clicks", () => {
     const view = engagementView({ ...results().engagement, tracked: true, opens: 5, clicks: 1 });
     expect(view.detail).toMatch(/never proof that a person read/i);
     for (const f of view.figures) expect(f.label).not.toMatch(/read|seen|viewed/i);
+  });
+
+  it("measures each metric on its own evidence, and says so for the other", () => {
+    // Open tracking and click tracking are separate settings on the sending
+    // domain. One measured and one not is an ordinary state, and collapsing
+    // them either hides a real figure or invents a missing one.
+    const view = engagementView({
+      ...results().engagement,
+      tracked: true, opensMeasured: true, clicksMeasured: false,
+      opens: 9, uniqueOpens: 4, openRate: 40,
+      clicks: null, uniqueClicks: null, clickRate: null,
+      caveat: "Opens are inflated by mail privacy proxies.",
+    });
+    expect(view.headline).toBe("Recorded by the mail provider");
+
+    const byLabel = Object.fromEntries(view.figures.map((f) => [f.label, f.value]));
+    expect(byLabel["Opens recorded"]).toBe("9");
+    // The rate divides PEOPLE by people: one contact opening nine times is one
+    // person who opened it.
+    expect(byLabel["People who opened"]).toBe("4 · 40%");
+    expect(byLabel["Clicks recorded"]).toBe("Not measured");
+    expect(byLabel["People who clicked"]).toBe("Not measured");
+    expect(view.detail).toMatch(/privacy proxies/i);
+  });
+});
+
+describe("the provider's delivery report", () => {
+  it("lists only the states that actually occurred, and marks the ones that need somebody", () => {
+    const r = results({
+      deliverySignal: {
+        meaning: "\"Sent\" means the provider accepted it.",
+        providerIdsRecorded: 6,
+        provider: {
+          sent: 1, delayed: 0, delivered: 3, bounced: 2,
+          complained: 0, failed: 0, suppressed: 0, noReport: 1, messagesWithReports: 6,
+        },
+      },
+    });
+
+    const rows = deliveryReport(r);
+    // A row of zeroes reads as a measurement of nothing, so the states that
+    // did not happen are absent rather than shown as 0.
+    expect(rows.map((x) => x.key)).toEqual(["delivered", "sent", "bounced", "noReport"]);
+    expect(rows.find((x) => x.key === "bounced")!.attention).toBe(true);
+    expect(rows.find((x) => x.key === "delivered")!.attention).toBe(false);
+    expect(rows.reduce((sum, x) => sum + x.count, 0)).toBe(7);
+  });
+
+  it("shows nothing at all against a server that has no delivery reports", () => {
+    expect(deliveryReport(results())).toEqual([]);
   });
 });

@@ -3,6 +3,10 @@ import {
   AlertCircle, Check, FilePlus2, Loader2, Plus, Receipt, Send, Trash2, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure, countOf, dataOf } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { addDaysToDateKey, dueDateIso, localDateKey } from "@/components/crm/confirmDialogModel";
 
 // ── M5: quotes and invoices, on the record you are already looking at ───────
 //
@@ -78,6 +82,26 @@ interface Invoice {
 }
 
 interface DealOption { id: number; name: string; stage: string }
+
+/** `/api/crm/deals` answers with every deal; this contact's are picked out here. */
+interface DealRow extends DealOption { leadId: number | null }
+
+// A body that is not the shape this panel expects is a failure too — never a
+// reason to report that a client is waiting on nothing and owes nothing.
+function pickQuotes(body: unknown): Quote[] | undefined {
+  const list = body && typeof body === "object" ? (body as { quotes?: unknown }).quotes : undefined;
+  return Array.isArray(list) ? list as Quote[] : undefined;
+}
+
+function pickInvoices(body: unknown): Invoice[] | undefined {
+  const list = body && typeof body === "object" ? (body as { invoices?: unknown }).invoices : undefined;
+  return Array.isArray(list) ? list as Invoice[] : undefined;
+}
+
+function pickDeals(body: unknown): DealRow[] | undefined {
+  const list = body && typeof body === "object" ? (body as { deals?: unknown }).deals : undefined;
+  return Array.isArray(list) ? list as DealRow[] : undefined;
+}
 
 const PAYMENT_METHODS = [
   { value: "manual_transfer", label: "Bank transfer" },
@@ -207,10 +231,14 @@ export default function CrmBillingPanel({
   /** Sending or issuing writes a file, so the Files list above needs a re-read. */
   onDocumentsChanged: () => void;
 }) {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [deals, setDeals] = useState<DealOption[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Three separate answers, each one a `Load`. A failed read used to leave the
+  // arrays empty, and the panel then reported "0" waiting on an answer,
+  // "$0.00" outstanding and "No quotes for this contact yet" — telling somebody
+  // a client owes the business nothing when nobody had managed to ask.
+  const [quotes, setQuotes] = useState<Load<Quote[]>>({ status: "loading" });
+  const [invoices, setInvoices] = useState<Load<Invoice[]>>({ status: "loading" });
+  const [deals, setDeals] = useState<Load<DealRow[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -228,44 +256,55 @@ export default function CrmBillingPanel({
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("manual_transfer");
   const [payDeal, setPayDeal] = useState("");
+  const confirmation = useConfirmDialog();
 
+  // A different contact must never be shown the previous one's money while
+  // their own is still in flight.
+  useEffect(() => {
+    setQuotes({ status: "loading" });
+    setInvoices({ status: "loading" });
+    setDeals({ status: "loading" });
+  }, [leadId]);
+
+  // Each part keeps its own answer: quotes can load while invoices are refused,
+  // and the panel names the one that is missing instead of adding up what it
+  // happens to hold as though that were everything.
   const load = useCallback(async () => {
-    if (!leadId) { setQuotes([]); setInvoices([]); setDeals([]); return; }
-    setLoading(true);
-    try {
-      const [q, i, d] = await Promise.all([
-        adminFetch(`/api/crm/quotes?leadId=${leadId}`),
-        adminFetch(`/api/crm/invoices?leadId=${leadId}`),
-        adminFetch(`/api/crm/deals`),
-      ]);
-      if (!q.ok || !i.ok) {
-        const failed = q.ok ? i : q;
-        const data = await body(failed);
-        throw new Error(data.error || `Quotes and invoices could not be loaded (${failed.status}).`);
-      }
-      setQuotes(((await q.json()).quotes ?? []) as Quote[]);
-      setInvoices(((await i.json()).invoices ?? []) as Invoice[]);
-      if (d.ok) {
-        const all = ((await d.json()).deals ?? []) as Array<DealOption & { leadId: number | null }>;
-        setDeals(all.filter(deal => deal.leadId === leadId));
-      } else {
-        setDeals([]);
-      }
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Quotes and invoices could not be loaded.");
-    } finally {
-      setLoading(false);
-    }
+    // With no contact chosen there is nothing to ask for, and the panel renders
+    // its "pick one on the left" state rather than any figure at all.
+    if (!leadId) return;
+    setReloading(true);
+    const [q, i, d] = await Promise.all([
+      readAdminResource(`/api/crm/quotes?leadId=${leadId}`, pickQuotes),
+      readAdminResource(`/api/crm/invoices?leadId=${leadId}`, pickInvoices),
+      readAdminResource("/api/crm/deals", pickDeals),
+    ]);
+    setQuotes(q);
+    setInvoices(i);
+    setDeals(d);
+    setReloading(false);
   }, [leadId]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const outstanding = useMemo(
-    () => invoices.filter(i => i.status === "issued" || i.status === "part_paid"),
-    [invoices],
-  );
-  const awaitingAnswer = useMemo(() => quotes.filter(q => q.status === "sent"), [quotes]);
+  // What actually loaded, or null. Never an empty list standing in for a
+  // request nobody managed to complete.
+  const quoteList = dataOf(quotes);
+  const invoiceList = dataOf(invoices);
+  /** This contact's deals, or null when the deal list never arrived. */
+  const dealList = useMemo(() => {
+    const all = dataOf(deals);
+    return all ? all.filter(deal => deal.leadId === leadId) : null;
+  }, [deals, leadId]);
+
+  // Money owed, or nothing at all. "$0.00" for a read that failed is the worst
+  // figure on this screen: it says a client is square with the business.
+  const outstandingTotal = invoiceList
+    ? invoiceList
+        .filter(i => i.status === "issued" || i.status === "part_paid")
+        .reduce((s, i) => s + i.amountOutstanding, 0)
+    : null;
+  const awaitingAnswer = quoteList ? quoteList.filter(q => q.status === "sent").length : null;
 
   function resetForm() {
     setForm("none"); setTitle(""); setDealId(""); setLines([blankLine()]);
@@ -289,20 +328,21 @@ export default function CrmBillingPanel({
           body: JSON.stringify(init.payload),
         }),
       });
-      const data = await body(res);
       if (!res.ok) {
-        // The server's own wording. It explains WHY a transition was refused —
-        // "a quote at draft cannot become accepted" — and rewriting that here
-        // would lose the reason.
-        setError(data.error || `That was refused (${res.status}).`);
+        // The shared wording, which carries the server's own explanation of WHY
+        // a transition was refused — "a quote at draft cannot become accepted" —
+        // and names the missing grant when a 403 names one. Read before the body
+        // below: a response body can only be read once.
+        setError(`That did not go through. ${await responseFailureReason(res)}`);
         return null;
       }
+      const data = await body(res);
       setNotice(success);
       await load();
       if (touchesDocuments) onDocumentsChanged();
       return data;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "That did not go through.");
+    } catch {
+      setError(`That did not go through. ${failureReason(null)}`);
       return null;
     } finally {
       setBusy(false);
@@ -344,17 +384,40 @@ export default function CrmBillingPanel({
     resetForm();
   }
 
-  async function invoiceFromQuote(quote: Quote) {
-    const due = window.prompt(
-      `Invoice ${quote.reference} for ${money(quote.total, quote.currency)}.\n\n`
-      + "Due date (YYYY-MM-DD). An issued invoice needs one so it can be chased.",
-      new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10),
-    );
-    if (!due) return;
-    await act("/api/crm/invoices", {
-      method: "POST",
-      payload: { quoteId: quote.id, dueDate: new Date(`${due}T17:00:00`).toISOString() },
-    }, "Invoice drafted from the accepted quote, with its line items carried across.");
+  function invoiceFromQuote(quote: Quote) {
+    const today = localDateKey();
+    void confirmation.ask({
+      title: `Draft an invoice from ${quote.reference}?`,
+      description: `It is for ${money(quote.total, quote.currency)}, with the quote's line items and discount carried across.`,
+      consequences: ["Nothing goes to the client until you issue it."],
+      field: {
+        kind: "date",
+        label: "Due date",
+        min: today,
+        defaultValue: addDaysToDateKey(today, 14),
+        helper: "An issued invoice needs one so it can be chased. It falls due at 5pm on that day.",
+      },
+      confirmLabel: "Draft invoice",
+      busyLabel: "Drafting…",
+      cancelLabel: "Not now",
+      action: async ({ value }) => {
+        // The prompt this replaces validated nothing: "next friday" went
+        // straight into `new Date(...).toISOString()` as an uncaught
+        // RangeError, and an empty answer silently did nothing.
+        const dueDate = dueDateIso(value);
+        if (!dueDate) throw new Error("That due date could not be read. Pick it again.");
+        const res = await adminFetch("/api/crm/invoices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quoteId: quote.id, dueDate }),
+        });
+        const data = await body(res);
+        if (!res.ok) throw new Error(data.error || `That was refused (${res.status}).`);
+        setError(null);
+        setNotice("Invoice drafted from the accepted quote, with its line items carried across.");
+        await load();
+      },
+    });
   }
 
   async function recordPayment() {
@@ -382,11 +445,15 @@ export default function CrmBillingPanel({
 
   return (
     <div className="bg-background border border-border rounded-xl overflow-hidden">
+      {confirmation.element}
+
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border">
         <h2 className="text-sm font-bold text-foreground truncate flex items-center gap-2">
           <Receipt className="w-4 h-4 text-teal-600" /> Quotes &amp; invoices
         </h2>
-        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+        {(quotes.status === "loading" || invoices.status === "loading" || reloading) && (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" aria-label="Loading" />
+        )}
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => { resetForm(); setForm("quote"); }} disabled={busy}
             className={GHOST_BUTTON}>
@@ -399,12 +466,14 @@ export default function CrmBillingPanel({
         </div>
       </div>
 
+      {/* An action the server refused. A read that failed is stated where the
+          missing thing would have been, not here. */}
       {error && (
-        <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-4 py-2">
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-700 flex-1">{error}</p>
+        <div role="alert" className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2">
+          <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+          <p className="min-w-0 flex-1 break-words text-xs text-muted-foreground">{error}</p>
           <button onClick={() => setError(null)} aria-label="Dismiss"
-            className="text-red-600 hover:text-red-800"><X className="w-3.5 h-3.5" /></button>
+            className="shrink-0 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
       {notice && (
@@ -434,8 +503,15 @@ export default function CrmBillingPanel({
               <span className={LABEL}>Deal</span>
               <select value={dealId} onChange={e => setDealId(e.target.value)} className={`${FIELD} mt-1`}>
                 <option value="">Not linked yet</option>
-                {deals.map(d => <option key={d.id} value={d.id}>{d.name} · {d.stage}</option>)}
+                {(dealList ?? []).map(d => <option key={d.id} value={d.id}>{d.name} · {d.stage}</option>)}
               </select>
+              {/* An empty picker would say this contact has no deals. Say which it is. */}
+              {deals.status === "error" && (
+                <span className="mt-1 block min-w-0 break-words text-[11px] text-muted-foreground">
+                  Deals could not be loaded, so none can be linked here. {deals.reason} You can still
+                  save this and link a deal later.
+                </span>
+              )}
             </label>
             {form === "invoice" && (
               <label className="block">
@@ -494,14 +570,19 @@ export default function CrmBillingPanel({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Waiting on an answer
           </p>
-          <p className="text-lg font-bold text-foreground">{awaitingAnswer.length}</p>
+          <p className="text-lg font-bold text-foreground">
+            <Figure value={awaitingAnswer} loading={quotes.status === "loading"} />
+          </p>
         </div>
         <div className="bg-background px-4 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Outstanding
           </p>
           <p className="text-lg font-bold text-foreground">
-            {money(outstanding.reduce((s, i) => s + i.amountOutstanding, 0))}
+            <Figure
+              value={outstandingTotal === null ? null : money(outstandingTotal)}
+              loading={invoices.status === "loading"}
+            />
           </p>
         </div>
       </div>
@@ -509,14 +590,27 @@ export default function CrmBillingPanel({
       {/* ── Quotes ──────────────────────────────────────────────────────── */}
       <div className="px-4 py-2 border-t border-border">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          Quotes ({quotes.length})
+          Quotes (<Figure value={countOf(quotes)} loading={quotes.status === "loading"} />)
         </h3>
       </div>
-      {quotes.length === 0 ? (
+      {quotes.status === "error" ? (
+        /* Deliberately not the empty state below it: "no quotes yet" is a fact
+           about this contact, and this is a fact about the request. */
+        <LoadFailure
+          what="Quotes"
+          reason={quotes.reason}
+          onRetry={() => { void load(); }}
+          retrying={reloading}
+          variant="inline"
+          className="px-4 pb-3"
+        />
+      ) : quoteList === null ? (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">Loading quotes…</p>
+      ) : quoteList.length === 0 ? (
         <p className="px-4 pb-3 text-xs text-muted-foreground">No quotes for this contact yet.</p>
       ) : (
         <div className="divide-y divide-border/60 border-t border-border">
-          {quotes.map(q => (
+          {quoteList.map(q => (
             <div key={q.id} className="px-4 py-3 flex flex-wrap items-start gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground break-words">
@@ -576,14 +670,30 @@ export default function CrmBillingPanel({
       {/* ── Invoices ────────────────────────────────────────────────────── */}
       <div className="px-4 py-2 border-t border-border">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          Invoices ({invoices.length})
+          Invoices (<Figure value={countOf(invoices)} loading={invoices.status === "loading"} />)
         </h3>
       </div>
-      {invoices.length === 0 ? (
+      {invoices.status === "error" ? (
+        <LoadFailure
+          what="Invoices"
+          reason={invoices.reason}
+          onRetry={() => { void load(); }}
+          retrying={reloading}
+          variant="inline"
+          className="px-4 pb-3"
+        >
+          <p className="mt-1 min-w-0 break-words text-[11px] text-muted-foreground">
+            Nothing outstanding is totalled above while this is unavailable — this contact may well
+            owe money.
+          </p>
+        </LoadFailure>
+      ) : invoiceList === null ? (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">Loading invoices…</p>
+      ) : invoiceList.length === 0 ? (
         <p className="px-4 pb-3 text-xs text-muted-foreground">No invoices for this contact yet.</p>
       ) : (
         <div className="divide-y divide-border/60 border-t border-border">
-          {invoices.map(i => (
+          {invoiceList.map(i => (
             <div key={i.id} className="px-4 py-3 flex flex-wrap items-start gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground break-words">
@@ -685,8 +795,21 @@ export default function CrmBillingPanel({
                   <select value={payDeal} onChange={e => setPayDeal(e.target.value)}
                     className={`${FIELD} mt-1`}>
                     <option value="">Choose a deal</option>
-                    {deals.map(d => <option key={d.id} value={d.id}>{d.name} · {d.stage}</option>)}
+                    {(dealList ?? []).map(d => <option key={d.id} value={d.id}>{d.name} · {d.stage}</option>)}
                   </select>
+                  {/* Recording the payment needs a deal. An empty picker would
+                      read as "this contact has none" and leave the button dead
+                      with no reason given for it. */}
+                  {deals.status === "error" && (
+                    <LoadFailure
+                      what="Deals"
+                      reason={deals.reason}
+                      onRetry={() => { void load(); }}
+                      retrying={reloading}
+                      variant="inline"
+                      className="mt-1"
+                    />
+                  )}
                   <span className="mt-1 block text-[11px] text-muted-foreground">
                     Payments are recorded against a deal so they appear in the money
                     figures on the Command Center, the forecast and the client's portal.

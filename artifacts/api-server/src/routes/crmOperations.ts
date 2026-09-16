@@ -25,8 +25,32 @@ import {
 // One overdue rule, shared with the automation sweep, so My Day and a rule
 // firing on `task_overdue` can never disagree about the same task.
 import { isOverdueInZone } from "../lib/automationSweep.js";
+import { deliveryFor, loadProviderDeliveries } from "../lib/emailProviderEvents.js";
+import { emailRef } from "../lib/emailRefs.js";
+import type { ProviderDelivery } from "../lib/emailDeliveryState.js";
 
 const router: IRouter = Router();
+
+/**
+ * What the provider said about the message a delivery handed over.
+ *
+ * Returned BESIDE the delivery's own state rather than merged into it. The two
+ * answer different questions — "what did this server manage to hand over" and
+ * "what happened to the message afterwards" — and the recovery actions on offer
+ * are decided by the first. A reminder recorded as accepted and then bounced is
+ * the case this exists to make visible; collapsing them would hide it.
+ */
+function providerSummary(provider: ProviderDelivery | null) {
+  if (!provider?.state) return null;
+  return {
+    state: provider.state,
+    label: provider.label,
+    tone: provider.tone,
+    explanation: provider.explanation,
+    at: provider.at?.toISOString() ?? null,
+    detail: provider.detail,
+  };
+}
 
 /** Who is acting, for attribution. Null on the legacy shared bearer. */
 function actor(req: Request): { id: number | null; label: string } {
@@ -978,12 +1002,23 @@ router.get("/crm/operations/deliveries", requireCrmAuth("settings.read"), async 
   const jobById = new Map(jobs.map((j) => [j.id, j]));
   const staffById = new Map(people.map((p) => [p.id, p]));
 
+  // The provider's own reports for this page. Matched by the id it returned
+  // and by the tag the send carried — the tag being the only path to a
+  // delivery whose outcome was never learned, which is most of this list.
+  const providerReports = await loadProviderDeliveries({
+    providerIds: page.map((d) => d.providerRef),
+    refs: page.map((d) => emailRef("reminder_delivery", d.id)),
+  });
+
   const now = Date.now();
   res.json({
     deliveries: page.map((row) => {
       const staff = row.recipientStaffId != null ? staffById.get(row.recipientStaffId) : undefined;
       return {
         ...deliveryAttentionShape(row, jobById.get(row.jobId), now),
+        provider: providerSummary(
+          deliveryFor(providerReports, row.providerRef, emailRef("reminder_delivery", row.id)),
+        ),
         recipientName: staff?.displayName ?? null,
         // The address is shown so an operator can tell the recipient apart
         // without opening another screen; it is staff-internal, never a lead.
@@ -1014,13 +1049,22 @@ router.get("/crm/operations/deliveries/:id", requireCrmAuth("settings.read"), as
     dedupeKey: crmScheduledJobs.dedupeKey, status: crmScheduledJobs.status,
   }).from(crmScheduledJobs).where(eq(crmScheduledJobs.id, row.jobId)).limit(1);
 
-  const history = await db.select().from(crmDeliveryRecoveryActions)
-    .where(eq(crmDeliveryRecoveryActions.deliveryId, id))
-    .orderBy(desc(crmDeliveryRecoveryActions.id)).limit(100);
+  const [history, providerReports] = await Promise.all([
+    db.select().from(crmDeliveryRecoveryActions)
+      .where(eq(crmDeliveryRecoveryActions.deliveryId, id))
+      .orderBy(desc(crmDeliveryRecoveryActions.id)).limit(100),
+    loadProviderDeliveries({
+      providerIds: [row.providerRef],
+      refs: [emailRef("reminder_delivery", row.id)],
+    }),
+  ]);
 
   res.json({
     delivery: {
       ...deliveryAttentionShape(row, job),
+      provider: providerSummary(
+        deliveryFor(providerReports, row.providerRef, emailRef("reminder_delivery", row.id)),
+      ),
       resendDuplicateRisk: resendDuplicateRisk(row),
     },
     recoveryActions: history,

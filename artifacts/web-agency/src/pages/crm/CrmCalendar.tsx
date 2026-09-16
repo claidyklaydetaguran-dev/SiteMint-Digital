@@ -6,6 +6,10 @@ import {
   Download, Link2, Loader2, MapPin, Plus, RefreshCw, Send, Trash2, Users, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { LoadFailure, PageLoadFailures, dataOf, failedParts } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { describeActionFailure } from "@/components/crm/confirmDialogModel";
 
 // ── M3: the internal calendar ────────────────────────────────────────────────
 //
@@ -154,6 +158,45 @@ interface OverlayEvent {
   href: string;
 }
 
+/** A task, as the overlay reads it. */
+interface TaskRow {
+  id: number;
+  title: string;
+  dueDate?: string | null;
+  status?: string | null;
+}
+
+/** A lead, as the overlay reads it. */
+interface LeadRow {
+  id: number;
+  name: string;
+  nextFollowUpAt?: string | null;
+}
+
+// A body that is not the shape this page expects is a failure too, never an
+// empty day: `pick` returning undefined is what stops "we could not read the
+// answer" from rendering as "nothing is booked".
+
+function pickAppointments(body: unknown): Appointment[] | undefined {
+  const list = body && typeof body === "object" ? (body as { appointments?: unknown }).appointments : undefined;
+  return Array.isArray(list) ? list as Appointment[] : undefined;
+}
+
+function pickTasks(body: unknown): TaskRow[] | undefined {
+  const list = body && typeof body === "object" ? (body as { tasks?: unknown }).tasks : undefined;
+  return Array.isArray(list) ? list as TaskRow[] : undefined;
+}
+
+function pickLeads(body: unknown): LeadRow[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as LeadRow[] : undefined;
+}
+
+function pickStaff(body: unknown): StaffMember[] | undefined {
+  const list = body && typeof body === "object" ? (body as { staff?: unknown }).staff : undefined;
+  return Array.isArray(list) ? list as StaffMember[] : undefined;
+}
+
 type Scope = "mine" | "team";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -278,15 +321,19 @@ export default function CrmCalendar() {
   const [scope, setScope] = useState<Scope>("mine");
   const [selected, setSelected] = useState<string>(dateKey(new Date()));
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [overlay, setOverlay] = useState<OverlayEvent[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [staffUnavailable, setStaffUnavailable] = useState<string | null>(null);
+  // Each layer keeps its own answer. Before this the reads all collapsed into
+  // empty arrays, so a refused request drew an empty month and told the
+  // operator "Nothing scheduled on this day" — a free day they did not have.
+  const [appointmentsLoad, setAppointmentsLoad] = useState<Load<Appointment[]>>({ status: "loading" });
+  const [tasksLoad, setTasksLoad] = useState<Load<TaskRow[]>>({ status: "loading" });
+  const [followUpsLoad, setFollowUpsLoad] = useState<Load<LeadRow[]>>({ status: "loading" });
+  const [staffLoad, setStaffLoad] = useState<Load<StaffMember[]>>({ status: "loading" });
 
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /** An action the server refused — not the same thing as a layer that never loaded. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const confirmation = useConfirmDialog();
 
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [composing, setComposing] = useState(false);
@@ -305,92 +352,57 @@ export default function CrmCalendar() {
 
   const loadAppointments = useCallback(async () => {
     const params = new URLSearchParams({ scope, from: windowFrom, to: windowTo, includeCancelled: "true" });
-    const res = await adminFetch(`/api/crm/appointments?${params.toString()}`);
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `The calendar could not be loaded (${res.status}).`);
-    }
-    const data = await res.json();
-    setAppointments(data.appointments ?? []);
+    setAppointmentsLoad(await readAdminResource(`/api/crm/appointments?${params.toString()}`, pickAppointments));
   }, [scope, windowFrom, windowTo]);
 
   const loadOverlay = useCallback(async () => {
     // Tasks and follow-ups are supporting context. If either is unavailable the
-    // calendar still works, so a failure here dims a layer instead of the page.
-    const events: OverlayEvent[] = [];
-    const [tasksRes, leadsRes] = await Promise.all([
-      adminFetch("/api/crm/tasks").catch(() => null),
-      adminFetch("/api/crm/leads").catch(() => null),
+    // calendar still works, so a failure here states that one layer is missing
+    // rather than quietly drawing the day without it.
+    const [tasks, leads] = await Promise.all([
+      readAdminResource("/api/crm/tasks", pickTasks),
+      readAdminResource("/api/crm/leads", pickLeads),
     ]);
-    if (tasksRes?.ok) {
-      const data = await tasksRes.json().catch(() => ({}));
-      for (const t of data.tasks ?? []) {
-        if (!t.dueDate || t.status === "completed") continue;
-        events.push({
-          id: `task-${t.id}`,
-          dateKey: keyOfInstant(t.dueDate),
-          title: t.title,
-          kind: "task",
-          href: "/admin/crm/my-day",
-        });
-      }
-    }
-    if (leadsRes?.ok) {
-      const data = await leadsRes.json().catch(() => ({}));
-      for (const l of data.leads ?? []) {
-        if (!l.nextFollowUpAt) continue;
-        events.push({
-          id: `followup-${l.id}`,
-          dateKey: keyOfInstant(l.nextFollowUpAt),
-          title: `Follow up: ${l.name}`,
-          kind: "followUp",
-          href: `/admin/crm/leads/${l.id}`,
-        });
-      }
-    }
-    setOverlay(events);
+    setTasksLoad(tasks);
+    setFollowUpsLoad(leads);
   }, []);
 
+  // Every layer keeps what it last showed until its own new answer lands, so a
+  // retry never flashes the month back to empty.
   const refresh = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
-    try {
-      await Promise.all([loadAppointments(), loadOverlay()]);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "The calendar could not be loaded.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    await Promise.all([loadAppointments(), loadOverlay()]);
+    setRefreshing(false);
   }, [loadAppointments, loadOverlay]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
   // The attendee picker needs the staff list, which requires staff.read. A
-  // legacy bearer session does not have it, so say the picker is unavailable
-  // rather than rendering an empty list that looks like "nobody works here".
+  // legacy bearer session does not have it, so say the picker is unavailable —
+  // in the server's own words — rather than rendering an empty list that looks
+  // like "nobody works here".
+  const loadStaff = useCallback(async () => {
+    setStaffLoad({ status: "loading" });
+    setStaffLoad(await readAdminResource("/api/crm/staff", pickStaff));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const res = await adminFetch("/api/crm/staff").catch(() => null);
-      if (cancelled) return;
-      if (!res?.ok) {
-        setStaffUnavailable(
-          res?.status === 403
-            ? "Sign in with your own staff account to pick attendees from the team."
-            : "The team list could not be loaded, so attendees cannot be picked here.",
-        );
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-      // Anyone who has not been disabled can be expected at a meeting. Somebody
-      // who was invited last week and has not signed in yet is still a person
-      // you book a kickoff with — filtering on "active" would have made them
-      // unschedulable until they set a password.
-      setStaff((data.staff ?? []).filter((s: StaffMember) => s.status !== "disabled"));
+    void (async () => {
+      const next = await readAdminResource("/api/crm/staff", pickStaff);
+      if (!cancelled) setStaffLoad(next);
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Anyone who has not been disabled can be expected at a meeting. Somebody who
+  // was invited last week and has not signed in yet is still a person you book a
+  // kickoff with — filtering on "active" would have made them unschedulable
+  // until they set a password. Null when the list never arrived.
+  const bookableStaff = useMemo(() => {
+    const list = dataOf(staffLoad);
+    return list ? list.filter(s => s.status !== "disabled") : null;
+  }, [staffLoad]);
 
   // ── Grid ───────────────────────────────────────────────────────────────────
 
@@ -411,9 +423,12 @@ export default function CrmCalendar() {
     return out;
   }, [year, month]);
 
+  // What actually loaded, or null.
+  const appointments = dataOf(appointmentsLoad);
+
   const byDay = useMemo(() => {
     const map = new Map<string, Appointment[]>();
-    for (const a of appointments) {
+    for (const a of appointments ?? []) {
       const k = keyOfInstant(a.startAt);
       const list = map.get(k) ?? [];
       list.push(a);
@@ -423,22 +438,52 @@ export default function CrmCalendar() {
     return map;
   }, [appointments]);
 
+  // The overlay is built from whichever layers answered; the ones that did not
+  // are named on screen rather than silently contributing nothing.
   const overlayByDay = useMemo(() => {
     const map = new Map<string, OverlayEvent[]>();
-    for (const e of overlay) {
+    const add = (e: OverlayEvent) => {
       const list = map.get(e.dateKey) ?? [];
       list.push(e);
       map.set(e.dateKey, list);
+    };
+    for (const t of dataOf(tasksLoad) ?? []) {
+      if (!t.dueDate || t.status === "completed") continue;
+      add({
+        id: `task-${t.id}`,
+        dateKey: keyOfInstant(t.dueDate),
+        title: t.title,
+        kind: "task",
+        href: "/admin/crm/my-day",
+      });
+    }
+    for (const l of dataOf(followUpsLoad) ?? []) {
+      if (!l.nextFollowUpAt) continue;
+      add({
+        id: `followup-${l.id}`,
+        dateKey: keyOfInstant(l.nextFollowUpAt),
+        title: `Follow up: ${l.name}`,
+        kind: "followUp",
+        href: `/admin/crm/leads/${l.id}`,
+      });
     }
     return map;
-  }, [overlay]);
+  }, [tasksLoad, followUpsLoad]);
+
+  /** The layers that did not load, each with the reason the server gave. */
+  const loadFailures = failedParts([
+    ["Appointments", appointmentsLoad],
+    ["Tasks due", tasksLoad],
+    ["Lead follow-ups", followUpsLoad],
+  ]);
+  const missingLayers = loadFailures.map(f => f.what).join(" and ");
 
   const selectedAppointments = byDay.get(selected) ?? [];
   const selectedOverlay = overlayByDay.get(selected) ?? [];
 
   const upcoming = useMemo(() => {
     const now = Date.now();
-    return appointments
+    return (appointments ?? [])
       .filter(a => a.status === "scheduled" && new Date(a.startAt).getTime() >= now)
       .sort((a, b) => a.startAt.localeCompare(b.startAt))
       .slice(0, 8);
@@ -499,10 +544,12 @@ export default function CrmCalendar() {
         : await adminFetch("/api/crm/appointments", {
             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
           });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setFormError(data.error || `Save failed (${res.status}).`); return; }
+      if (!res.ok) { setFormError(`The appointment was not saved. ${await responseFailureReason(res)}`); return; }
+      const data = await res.json().catch(() => ({})) as {
+        appointment?: Appointment; invitations?: InvitationReport; invitationNote?: unknown;
+      };
 
-      setSelected(keyOfInstant(data.appointment.startAt));
+      if (data.appointment) setSelected(keyOfInstant(data.appointment.startAt));
       // The server's own words. It reports what the mail seam said — including
       // "nothing was sent, and here is why" — so this never invents a cheerful
       // summary the backend did not stand behind.
@@ -513,35 +560,66 @@ export default function CrmCalendar() {
       closeForm();
       await refresh(true);
     } catch {
-      setFormError("The appointment could not be saved. Check your connection and try again.");
+      setFormError(`The appointment was not saved. ${failureReason(null)}`);
     } finally {
       setSaving(false);
     }
   }
 
+  /** Applies the change, or throws carrying the server's own refusal. */
+  async function changeStatus(a: Appointment, status: "completed" | "cancelled" | "scheduled") {
+    const res = await adminFetch(`/api/crm/appointments/${a.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `That change was refused (${res.status}).`);
+    const base = status === "cancelled" ? "Appointment cancelled and its reminder withdrawn."
+      : status === "completed" ? "Marked as held."
+      : "Reopened as scheduled.";
+    setNotice(`${base} ${describeInvitations(data.invitations, data.invitationNote)}`);
+    await refresh(true);
+  }
+
   async function setStatus(a: Appointment, status: "completed" | "cancelled" | "scheduled") {
-    const invitedSomebody = a.attendees.some(x => x.invitation?.outcome === "sent");
-    if (status === "cancelled" && !window.confirm(
-      `Cancel "${a.title}"?\n\nIt stays on the record as cancelled and its reminder is withdrawn.`
-      + (invitedSomebody
-        ? "\n\nEveryone who was invited is emailed a cancellation, so it leaves their calendar."
-        : ""),
-    )) return;
+    if (status === "cancelled") {
+      const invitedSomebody = a.attendees.some(x => x.invitation?.outcome === "sent");
+      void confirmation.ask({
+        title: `Cancel "${a.title}"?`,
+        description: "It stays on the record as cancelled, and its reminder is withdrawn.",
+        consequences: [
+          invitedSomebody
+            ? "Everyone who was invited is emailed a cancellation, so it leaves their calendar — and that email cannot be taken back."
+            : "Nobody was invited, so no email goes out.",
+          "You can reopen it afterwards if it goes ahead after all.",
+        ],
+        tone: "destructive",
+        confirmLabel: "Cancel appointment",
+        busyLabel: "Cancelling…",
+        cancelLabel: "Keep appointment",
+        action: () => changeStatus(a, status),
+      });
+      return;
+    }
     setRefreshing(true);
+    setActionError(null);
     try {
       const res = await adminFetch(`/api/crm/appointments/${a.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || `That change was refused (${res.status}).`);
+        setActionError(`That change was not saved. ${await responseFailureReason(res)}`);
         return;
       }
-      const base = status === "cancelled" ? "Appointment cancelled and its reminder withdrawn."
-        : status === "completed" ? "Marked as held."
-        : "Reopened as scheduled.";
+      const data = await res.json().catch(() => ({})) as {
+        invitations?: InvitationReport; invitationNote?: unknown;
+      };
+      // Cancelling is intercepted above and routed through the confirmation
+      // dialog, so only these two reach here — a "cancelled" arm would be dead.
+      const base = status === "completed" ? "Marked as held." : "Reopened as scheduled.";
       setNotice(`${base} ${describeInvitations(data.invitations, data.invitationNote)}`);
       await refresh(true);
+    } catch {
+      setActionError(`That change was not saved. ${failureReason(null)}`);
     } finally {
       setRefreshing(false);
     }
@@ -554,28 +632,56 @@ export default function CrmCalendar() {
    * meeting booked while this server had no mail key has attendees who were
    * never told, and this is how they get told once it does.
    */
+  async function deliverInvitations(a: Appointment) {
+    const res = await adminFetch(`/api/crm/appointments/${a.id}/invitations`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `The invitations could not be sent (${res.status}).`);
+    setNotice(describeInvitations(data.invitations, data.invitationNote));
+    await refresh(true);
+  }
+
   async function sendInvitations(a: Appointment) {
     const alreadySent = a.attendees.some(x => x.invitation?.outcome === "sent");
-    if (alreadySent && !window.confirm(
-      `Send "${a.title}" to all ${a.attendees.length} attendee(s) again?\n\n`
-      + "Anyone already invited will receive a second copy — this is a deliberate "
-      + "re-send, so the mail provider will not collapse it into the first.",
-    )) return;
+    if (alreadySent) {
+      const count = a.attendees.length;
+      const cancellation = a.status === "cancelled";
+      void confirmation.ask({
+        title: cancellation
+          ? `Send the cancellation for "${a.title}" again?`
+          : `Send "${a.title}" to everyone again?`,
+        description: `All ${count} attendee${count === 1 ? "" : "s"} are emailed ${
+          cancellation ? "the cancellation" : "the current invitation"
+        } again.`,
+        consequences: [
+          "Anyone already emailed gets a second copy: this is a deliberate re-send, so the mail provider will not collapse it into the first.",
+        ],
+        confirmLabel: "Send it again",
+        busyLabel: "Sending…",
+        cancelLabel: "Don't send",
+        action: () => deliverInvitations(a),
+      });
+      return;
+    }
 
     setRefreshing(true);
+    setActionError(null);
     try {
       const res = await adminFetch(`/api/crm/appointments/${a.id}/invitations`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || `The invitations could not be sent (${res.status}).`);
+        setActionError(`The invitations were not sent. ${await responseFailureReason(res)}`);
         return;
       }
+      const data = await res.json().catch(() => ({})) as {
+        invitations?: InvitationReport; invitationNote?: unknown;
+      };
       setNotice(describeInvitations(data.invitations, data.invitationNote));
       await refresh(true);
     } catch {
-      setError("The invitations could not be sent. Check your connection and try again.");
+      setActionError(`The invitations were not sent. ${failureReason(null)}`);
     } finally {
       setRefreshing(false);
     }
@@ -585,8 +691,18 @@ export default function CrmCalendar() {
   // browser would send no Authorization header. Fetch it, then hand the bytes
   // to the user as a download.
   async function exportIcs(a: Appointment) {
-    const res = await adminFetch(`/api/crm/appointments/${a.id}/ics`);
-    if (!res.ok) { setError("That appointment could not be exported."); return; }
+    setActionError(null);
+    let res: Response;
+    try {
+      res = await adminFetch(`/api/crm/appointments/${a.id}/ics`);
+    } catch {
+      setActionError(`That appointment was not exported. ${failureReason(null)}`);
+      return;
+    }
+    if (!res.ok) {
+      setActionError(`That appointment was not exported. ${await responseFailureReason(res)}`);
+      return;
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -599,7 +715,8 @@ export default function CrmCalendar() {
     setNotice("Exported. This is a one-time copy — later changes here will not follow it.");
   }
 
-  if (loading) {
+  // Nothing has been read yet — which is not the same as nothing being booked.
+  if (appointmentsLoad.status === "loading") {
     return (
       <CrmLayout>
         <div className="flex items-center justify-center h-64">
@@ -611,6 +728,8 @@ export default function CrmCalendar() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       <div className="p-4 sm:p-6 space-y-4">
 
         {/* Header */}
@@ -646,11 +765,20 @@ export default function CrmCalendar() {
           </div>
         </div>
 
-        {error && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-700 flex-1">{error}</p>
-            <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800"><X className="w-3.5 h-3.5" /></button>
+        {/* Which layers did not load, in the server's own words. The page below
+            then says what it cannot show, instead of drawing an empty month. */}
+        <PageLoadFailures
+          failures={loadFailures}
+          onRetry={() => { void refresh(true); }}
+          retrying={refreshing}
+        />
+
+        {actionError && (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+            <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground flex-1 min-w-0 break-words">{actionError}</p>
+            <button onClick={() => setActionError(null)} aria-label="Dismiss"
+              className="text-destructive hover:opacity-80 shrink-0"><X className="w-3.5 h-3.5" /></button>
           </div>
         )}
         {notice && (
@@ -684,6 +812,12 @@ export default function CrmCalendar() {
                 Today
               </button>
             </div>
+
+            {loadFailures.length > 0 && (
+              <p className="px-4 py-2 border-b border-border text-[11px] text-muted-foreground break-words">
+                {missingLayers} could not be loaded, so days below may look emptier than they are.
+              </p>
+            )}
 
             <div className="grid grid-cols-7 border-b border-border bg-muted/40">
               {DAYS.map(d => (
@@ -760,9 +894,17 @@ export default function CrmCalendar() {
               </div>
 
               <div className="divide-y divide-border/60 max-h-[360px] overflow-y-auto">
-                {selectedAppointments.length === 0 && selectedOverlay.length === 0 && (
+                {/* "Nothing scheduled" is a claim about the day, and it is only
+                    made when every layer behind it actually answered. An
+                    operator reading it over a failed request takes the day off. */}
+                {loadFailures.length > 0 ? (
+                  <p role="status" className="px-4 py-6 text-xs text-muted-foreground break-words">
+                    {missingLayers} could not be loaded, so this day is not shown as free — more may be
+                    scheduled than is listed here. The reason is at the top of the page.
+                  </p>
+                ) : selectedAppointments.length === 0 && selectedOverlay.length === 0 ? (
                   <p className="px-4 py-8 text-center text-xs text-muted-foreground">Nothing scheduled on this day.</p>
-                )}
+                ) : null}
 
                 {selectedAppointments.map(a => (
                   <div key={a.id} className="px-4 py-3">
@@ -895,7 +1037,12 @@ export default function CrmCalendar() {
                 <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Next up</h3>
               </div>
               <div className="divide-y divide-border/60">
-                {upcoming.length === 0 ? (
+                {appointmentsLoad.status === "error" ? (
+                  <p className="px-4 py-6 text-xs text-muted-foreground break-words">
+                    Appointments could not be loaded, so nothing is listed here. This is not an empty
+                    diary — use Try again at the top of the page.
+                  </p>
+                ) : upcoming.length === 0 ? (
                   <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                     No appointments are scheduled in this window.
                   </p>
@@ -1010,13 +1157,26 @@ export default function CrmCalendar() {
 
               <div>
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Who is expected</span>
-                {staffUnavailable ? (
-                  <p className="mt-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
-                    {staffUnavailable}
-                  </p>
+                {staffLoad.status === "error" ? (
+                  /* The words come from the response: a 403 names the grant the
+                     account is missing, so nobody is sent to ask an owner for a
+                     permission they already hold. */
+                  <LoadFailure
+                    variant="inline"
+                    className="mt-1"
+                    what="The team list"
+                    reason={staffLoad.reason}
+                    onRetry={() => { void loadStaff(); }}
+                  >
+                    <p className="mt-1 min-w-0 break-words text-[11px] text-muted-foreground">
+                      Nobody is shown as unavailable — you can still save this appointment and add people to it later.
+                    </p>
+                  </LoadFailure>
+                ) : staffLoad.status === "loading" ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">Loading the team…</p>
                 ) : (
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {staff.map(s => {
+                    {(bookableStaff ?? []).map(s => {
                       const on = form.attendeeStaffIds.includes(s.id);
                       return (
                         <button key={s.id} type="button"
@@ -1035,7 +1195,7 @@ export default function CrmCalendar() {
                         </button>
                       );
                     })}
-                    {staff.length === 0 && (
+                    {(bookableStaff ?? []).length === 0 && (
                       <p className="text-[11px] text-muted-foreground">No other active staff accounts yet.</p>
                     )}
                   </div>

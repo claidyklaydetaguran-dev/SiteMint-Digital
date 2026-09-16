@@ -31,8 +31,32 @@ import {
 } from "@workspace/db";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { attachConversationToContact, refreshConversationRollups } from "../lib/conversations.js";
+import { deliveryFor, loadProviderDeliveries } from "../lib/emailProviderEvents.js";
+import { emailDeliveryChip, type LocalSendOutcome } from "../lib/emailDeliveryState.js";
+import { emailRef } from "../lib/emailRefs.js";
 
 const router: IRouter = Router();
+
+/**
+ * `crm_messages.status` on an outbound email, in the delivery vocabulary.
+ *
+ * `uncertain` is the one that must survive the translation intact: the message
+ * may be in somebody's inbox, and a thread that renders it as "not sent" is how
+ * a second copy gets sent. Anything unrecognised — including every row written
+ * before this column meant anything — reads as "no delivery record" rather than
+ * being guessed into success.
+ */
+function localSendOutcome(status: string | null): LocalSendOutcome {
+  switch (status) {
+    case "sent": return "accepted";
+    case "sending": return "in_flight";
+    case "uncertain": return "uncertain";
+    case "failed": return "refused";
+    case "not_sent": return "not_sent";
+    case "test_mode": return "test_mode";
+    default: return "unknown";
+  }
+}
 
 const num = (v: unknown): number | undefined => {
   if (v === null || v === undefined || v === "") return undefined;
@@ -270,6 +294,16 @@ router.get("/crm/inbox/conversations/:id", requireCrmAuth("communications.read")
       : Promise.resolve([]),
   ]);
 
+  // What the provider has said about the outbound email on this thread. The
+  // tag path matters as much as the id: a send whose outcome was never learned
+  // has no provider id, and those are the messages a delivery report is worth
+  // the most for.
+  const outbound = page.filter((m) => m.direction === "outbound" && m.channel === "email");
+  const deliveries = await loadProviderDeliveries({
+    providerIds: outbound.map((m) => m.providerMessageId),
+    refs: outbound.map((m) => emailRef("message", m.id)),
+  });
+
   res.json({
     conversation: enriched[0],
     participants,
@@ -281,6 +315,21 @@ router.get("/crm/inbox/conversations/:id", requireCrmAuth("communications.read")
       sentByName: m.sentByStaffId
         ? senderMap.get(m.sentByStaffId) ?? m.sentByLabel ?? null
         : m.sentByLabel ?? null,
+      // Null on anything that is not an outbound email: an inbound message and
+      // a text message have no delivery of ours to describe, and inventing an
+      // "n/a" state for them would be a fifth word meaning nothing.
+      delivery: m.direction === "outbound" && m.channel === "email"
+        ? emailDeliveryChip(
+            {
+              outcome: localSendOutcome(m.status),
+              at: m.createdAt,
+              detail: typeof (m.metadata as Record<string, unknown> | null)?.["reason"] === "string"
+                ? (m.metadata as Record<string, string>)["reason"]
+                : null,
+            },
+            deliveryFor(deliveries, m.providerMessageId, emailRef("message", m.id)),
+          )
+        : null,
     })),
     hasMoreMessages: hasMore,
     olderCursor: hasMore && page[0] ? page[0].id : null,
