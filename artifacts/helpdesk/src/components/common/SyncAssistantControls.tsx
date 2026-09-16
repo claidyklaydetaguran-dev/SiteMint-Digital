@@ -10,30 +10,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface SyncButtonProps {
   /** True only when clicking should open the confirmation dialog. */
   eligible: boolean;
   /** True while a synchronization request is in flight. */
   pending: boolean;
-  /** Accessible explanation shown whenever the control is not eligible. Always present when `eligible` is false. */
+  /** Why the update is unavailable. Always present when `eligible` is false. */
   disabledReason?: string;
   onClick: () => void;
 }
 
 /**
- * AR-001V: the header control that offers to send the saved configuration to
- * the voice provider. Mirrors PublishButton/BrowserTestButton's accessibility
- * pattern — `aria-disabled` plus a guarded no-op rather than a native
- * `disabled` attribute, so keyboard and screen-reader users can always
- * discover why it is unavailable.
+ * The control that sends the saved configuration to the voice provider.
  *
- * The annotation matters for the build boundary: `forwardRef(...)` is a call
- * expression at module top level, which a bundler must otherwise assume has
- * side effects and keep even when nothing references the result.
+ * Mirrors PublishButton and BrowserTestButton: `aria-disabled` plus a guarded
+ * no-op rather than a native `disabled` attribute, so keyboard and
+ * screen-reader users can always discover why it is unavailable — and the
+ * reason is rendered as visible text rather than only in a tooltip.
+ *
+ * The `/*#__PURE__*\/` annotation matters for the build boundary:
+ * `forwardRef(...)` is a call expression at module top level, which a bundler
+ * must otherwise assume has side effects and keep even when nothing
+ * references the result.
  */
 export const SyncAssistantButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, SyncButtonProps>(
   function SyncAssistantButton({ eligible, pending, disabledReason, onClick }, ref) {
@@ -47,50 +47,48 @@ export const SyncAssistantButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, S
         e.preventDefault();
       };
       return (
-        <Tooltip delayDuration={200}>
-          <TooltipTrigger asChild>
-            <button
-              ref={ref}
-              type="button"
-              aria-disabled="true"
-              aria-describedby={descriptionId}
-              onClick={guardedNoop}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") guardedNoop(e);
-              }}
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "min-h-11 cursor-not-allowed gap-1.5 opacity-50 md:min-h-8",
-              )}
-            >
-              {pending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              Publish update
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-52 text-xs">
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sd-space-2, .5rem)", minWidth: 0 }}>
+          <Button
+            ref={ref}
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-disabled="true"
+            aria-describedby={descriptionId}
+            onClick={guardedNoop}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") guardedNoop(e);
+            }}
+            style={{ cursor: "not-allowed", opacity: 0.65, alignSelf: "flex-start" }}
+          >
+            {pending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            Publish update
+          </Button>
+          <p
+            id={descriptionId}
+            style={{
+              margin: 0,
+              maxWidth: "34rem",
+              fontSize: "var(--sd-text-small, .8125rem)",
+              lineHeight: 1.5,
+              color: "var(--sd-text-muted, #3b5265)",
+            }}
+          >
             {reason}
-          </TooltipContent>
-          <span id={descriptionId} className="sr-only">
-            Publish update — {reason}
-          </span>
-        </Tooltip>
+          </p>
+        </div>
       );
     }
 
     return (
-      <button
-        ref={ref}
-        type="button"
-        onClick={onClick}
-        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 gap-1.5 md:min-h-8")}
-      >
+      <Button ref={ref} type="button" variant="outline" size="sm" onClick={onClick}>
         <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
         Publish update
-      </button>
+      </Button>
     );
   },
 );
@@ -103,10 +101,10 @@ interface SyncConfirmDialogProps {
 }
 
 /**
- * AR-001V: the explicit confirmation boundary required before any provider
- * update can occur. Nothing in the builder reaches the provider without a
- * deliberate second action here. Never renders a provider id, credential,
- * digest, or assistant config/prompt content.
+ * The explicit confirmation boundary required before any provider update can
+ * occur. Nothing in the builder reaches the provider without a deliberate
+ * second action here. Never renders a provider id, credential, digest, or
+ * assistant config/prompt content.
  */
 export function SyncConfirmDialog({ open, assistantName, onCancel, onConfirm }: SyncConfirmDialogProps) {
   return (

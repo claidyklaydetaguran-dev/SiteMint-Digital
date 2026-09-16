@@ -7,35 +7,122 @@ interface TemplateCardProps {
   onSelect: (template: AssistantTemplate) => void;
 }
 
-/** One of eight template options in the assistant creation experience — original SiteMint styling. */
+/**
+ * One starting point in the assistant creation experience, rendered as a row
+ * of the shared `sd-list` rather than as a card in a grid of its own — the
+ * same shape Settings uses for its configuration destinations, so the picker
+ * reads as part of the dashboard.
+ *
+ * Selecting one only prefills local builder state; nothing is created or
+ * saved, which is what the copy says.
+ */
 export function TemplateCard({ template, onSelect }: TemplateCardProps) {
   const Icon = template.icon;
+  const titleId = `template-${template.id}-title`;
+
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-xs transition-shadow hover:shadow-md">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-surface-muted text-primary">
-        <Icon className="h-5 w-5" aria-hidden="true" />
-      </div>
-      <h3 className="font-display text-base font-semibold text-foreground">{template.name}</h3>
-      <p className="mt-1.5 text-sm text-muted-foreground">{template.outcome}</p>
-
-      <ul className="mt-3 space-y-1">
-        {template.responsibilities.map((r) => (
-          <li key={r} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-            <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-accent" aria-hidden="true" />
-            <span>{r}</span>
-          </li>
-        ))}
-      </ul>
-
-      <p className="mt-3 text-[11px] italic text-muted-foreground">{template.useCase}</p>
-
-      <Button
-        onClick={() => onSelect(template)}
-        variant={template.id === "blank" ? "outline" : "default"}
-        className="mt-4 h-9 w-full text-sm"
+    <li className="sd-list__item">
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "flex-start",
+          gap: "var(--sd-space-4, 1rem)",
+          padding: "var(--sd-space-4, 1rem)",
+        }}
       >
-        {template.id === "blank" ? CREATE.startBlank : CREATE.select}
-      </Button>
-    </div>
+        <span
+          aria-hidden="true"
+          style={{
+            flex: "0 0 auto",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 36,
+            height: 36,
+            borderRadius: "var(--sd-radius-control, 6px)",
+            background: "var(--sd-surface-accent, #f0f9f6)",
+            color: "var(--sd-accent-ink, #051824)",
+          }}
+        >
+          <Icon className="sd-navlink__icon" />
+        </span>
+
+        <div style={{ flex: "1 1 18rem", minWidth: 0 }}>
+          <h3 className="sd-h2" id={titleId}>
+            {template.name}
+          </h3>
+          <p
+            style={{
+              margin: "var(--sd-space-1, .25rem) 0 0",
+              fontSize: "var(--sd-text-small, .8125rem)",
+              lineHeight: 1.55,
+              color: "var(--sd-text-muted, #3b5265)",
+            }}
+          >
+            {template.outcome}
+          </p>
+
+          <ul
+            style={{
+              listStyle: "none",
+              margin: "var(--sd-space-3, .75rem) 0 0",
+              padding: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sd-space-1, .25rem)",
+            }}
+          >
+            {template.responsibilities.map((r) => (
+              <li
+                key={r}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "var(--sd-space-2, .5rem)",
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  lineHeight: 1.5,
+                  color: "var(--sd-text-muted, #3b5265)",
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    flex: "0 0 auto",
+                    width: 4,
+                    height: 4,
+                    marginTop: 8,
+                    borderRadius: "50%",
+                    background: "var(--sd-accent, #27e9b5)",
+                  }}
+                />
+                <span style={{ minWidth: 0 }}>{r}</span>
+              </li>
+            ))}
+          </ul>
+
+          <p
+            style={{
+              margin: "var(--sd-space-3, .75rem) 0 0",
+              fontSize: "var(--sd-text-small, .8125rem)",
+              lineHeight: 1.5,
+              color: "var(--sd-text-muted, #3b5265)",
+            }}
+          >
+            {template.useCase}
+          </p>
+        </div>
+
+        <div style={{ flex: "0 0 auto" }}>
+          <Button
+            onClick={() => onSelect(template)}
+            variant={template.id === "blank" ? "outline" : "default"}
+            aria-describedby={titleId}
+          >
+            {template.id === "blank" ? CREATE.startBlank : CREATE.select}
+          </Button>
+        </div>
+      </div>
+    </li>
   );
 }

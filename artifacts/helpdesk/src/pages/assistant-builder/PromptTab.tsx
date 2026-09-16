@@ -10,16 +10,34 @@ import type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 import type { FirstMessageMode } from "@/hooks/useAssistantDrafts";
 
 /**
- * V5 PR-6 (C-3): the guided structured prompt. Every section below writes to
- * the same draft fields the Configuration tab and `composeSystemPrompt` read
- * — there is no separate copy of "the prompt" living in this component.
+ * "Advanced" — the guided structured prompt.
  *
- * While `promptMode` is "guided" (the default for a new assistant), the
- * "Generated prompt" preview below is exactly what `assistantConfig.ts`
- * saves into `systemInstructions` — same function, same input, so nothing
- * shown here can drift from what gets published. Flip the switch at the foot
- * of this tab to edit the full prompt directly instead.
+ * Every section below writes to the same draft fields the other sections and
+ * `composeSystemPrompt` read; there is no separate copy of "the prompt" living
+ * in this component. While `promptMode` is "guided" (the default for a new
+ * assistant) the "Generated prompt" preview is exactly what `assistantConfig.ts`
+ * saves into `systemInstructions` — same function, same input — so nothing
+ * shown here can drift from what gets published. The switch at the foot hands
+ * editing over entirely.
+ *
+ * Presentation only in this pass.
  */
+
+const MUTED = {
+  margin: "var(--sd-space-1, .25rem) 0 0",
+  fontSize: "var(--sd-text-small, .8125rem)",
+  lineHeight: 1.55,
+  color: "var(--sd-text-muted, #3b5265)",
+} as const;
+
+const PANEL = {
+  padding: "var(--sd-space-4, 1rem)",
+  border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
+  borderRadius: "var(--sd-radius-card, 10px)",
+  background: "var(--sd-surface, #fff)",
+  minWidth: 0,
+} as const;
+
 export default function PromptTab({ draft, update, businessInfo }: BuilderTabProps) {
   const { prompt, setup, tools } = draft;
   const set = (patch: Partial<typeof prompt>) =>
@@ -59,28 +77,31 @@ export default function PromptTab({ draft, update, businessInfo }: BuilderTabPro
     assistantName: setup.assistantName,
   });
 
-  const selectedActionLabels = PERMITTED_ACTIONS.filter((a) => tools.permittedActions.includes(a.id)).map(
-    (a) => a.label,
-  );
+  const selectedActionLabels = PERMITTED_ACTIONS.filter((a) =>
+    tools.permittedActions.includes(a.id),
+  ).map((a) => a.label);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <>
       <div>
-        <h2 className="font-display text-lg font-semibold text-foreground">{PROMPT_TAB.title}</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">{PROMPT_TAB.detail}</p>
+        <h2 className="sd-h2">{PROMPT_TAB.title}</h2>
+        <p style={MUTED}>{PROMPT_TAB.detail}</p>
       </div>
 
-      <div>
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">First message mode</p>
+      <div className="si-field">
+        <span className="si-label">First message</span>
         <SegmentedControl<FirstMessageMode>
           value={prompt.firstMessageMode}
           onChange={(v) => set({ firstMessageMode: v })}
-          aria-label="First message mode"
+          aria-label="First message"
           options={[
             { value: "assistant-speaks-first", label: "Assistant speaks first" },
             { value: "wait-for-caller", label: "Wait for caller" },
           ]}
         />
+        <p className="si-hint">
+          Whether the assistant opens the call, or waits for the caller to speak first.
+        </p>
       </div>
 
       <CharCountField
@@ -131,12 +152,12 @@ export default function PromptTab({ draft, update, businessInfo }: BuilderTabPro
         placeholder="What should the assistant know before creating an appointment request?"
       />
 
-      <div className="rounded-lg border border-border bg-card p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Allowed actions</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+      <div style={PANEL}>
+        <h3 className="sd-h2">Allowed actions</h3>
+        <p style={MUTED}>
           {selectedActionLabels.length > 0 ? selectedActionLabels.join(", ") : "None selected yet."}
         </p>
-        <p className="mt-1.5 text-[11px] text-muted-foreground">{PROMPT_TAB.permittedActionsNote}</p>
+        <p style={MUTED}>{PROMPT_TAB.permittedActionsNote}</p>
       </div>
 
       <CharCountField
@@ -179,82 +200,153 @@ export default function PromptTab({ draft, update, businessInfo }: BuilderTabPro
         placeholder="e.g. Warm, professional, efficient"
       />
 
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">{PROMPT_TAB.generatedHeading}</p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{PROMPT_TAB.generatedDetail}</p>
-        <pre className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-muted p-3 text-xs text-foreground">
+      <div style={PANEL}>
+        <h3 className="sd-h2">{PROMPT_TAB.generatedHeading}</h3>
+        <p style={MUTED}>{PROMPT_TAB.generatedDetail}</p>
+        <pre
+          style={{
+            margin: "var(--sd-space-3, .75rem) 0 0",
+            maxHeight: "18rem",
+            overflow: "auto",
+            padding: "var(--sd-space-3, .75rem)",
+            border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
+            borderRadius: "var(--sd-radius-control, 6px)",
+            background: "var(--sd-surface-alt, #f6fbfa)",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            fontSize: "var(--sd-text-small, .8125rem)",
+            lineHeight: 1.55,
+            color: "var(--sd-text, #051824)",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+          }}
+        >
           {currentPrompt || "Nothing generated yet — fill in the sections above."}
         </pre>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
-            {PROMPT_TAB.callerPreviewHeading}
-          </p>
-          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {PROMPT_TAB.callerPreviewSimulatedLabel}
-          </span>
+      <div style={PANEL}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--sd-space-2, .5rem)",
+          }}
+        >
+          <h3 className="sd-h2">{PROMPT_TAB.callerPreviewHeading}</h3>
+          <span className="sd-chip">{PROMPT_TAB.callerPreviewSimulatedLabel}</span>
         </div>
         {callerPreview ? (
-          <div className="mt-3 space-y-2">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sd-space-2, .5rem)",
+              marginTop: "var(--sd-space-3, .75rem)",
+              minWidth: 0,
+            }}
+          >
             {callerPreview.map((turn, i) => (
-              <div
+              <p
                 key={i}
-                className={`max-w-[85%] rounded-lg px-3 py-2 text-xs ${
-                  turn.speaker === "assistant"
-                    ? "bg-surface-muted text-foreground"
-                    : "ml-auto bg-primary/10 text-foreground"
-                }`}
+                style={{
+                  margin: 0,
+                  maxWidth: "85%",
+                  alignSelf: turn.speaker === "assistant" ? "flex-start" : "flex-end",
+                  padding: "var(--sd-space-2, .5rem) var(--sd-space-3, .75rem)",
+                  borderRadius: "var(--sd-radius-card, 10px)",
+                  background:
+                    turn.speaker === "assistant"
+                      ? "var(--sd-surface-alt, #f6fbfa)"
+                      : "var(--sd-surface-accent, #f0f9f6)",
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  lineHeight: 1.55,
+                  color: "var(--sd-text, #051824)",
+                  overflowWrap: "anywhere",
+                }}
               >
                 {turn.text}
-              </div>
+              </p>
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-xs text-muted-foreground">{PROMPT_TAB.callerPreviewEmpty}</p>
+          <p style={MUTED}>{PROMPT_TAB.callerPreviewEmpty}</p>
         )}
       </div>
 
       <Collapsible defaultOpen={prompt.promptMode === "advanced"}>
-        <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-border bg-card px-3.5 py-2.5 text-left text-sm font-medium text-foreground hover-elevate">
-          Advanced
-          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+        <CollapsibleTrigger
+          className="sd-error__action"
+          style={{ width: "100%", justifyContent: "space-between", background: "var(--sd-surface-alt, #f6fbfa)" }}
+        >
+          Edit the prompt directly
+          <ChevronDown className="sd-navlink__icon" aria-hidden="true" />
         </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3 space-y-3 rounded-lg border border-dashed border-border p-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">{PROMPT_TAB.advancedToggleLabel}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{PROMPT_TAB.advancedToggleDetail}</p>
-            </div>
-            <Switch
-              checked={prompt.promptMode === "advanced"}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  // Freeze the current generated text so switching to manual
-                  // editing never appears to erase anything.
-                  set({ promptMode: "advanced", systemInstructions: generatedPrompt });
-                } else {
-                  set({ promptMode: "guided" });
-                }
+        <CollapsibleContent>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sd-space-3, .75rem)",
+              marginTop: "var(--sd-space-3, .75rem)",
+              padding: "var(--sd-space-4, 1rem)",
+              border: "1px dashed var(--sd-border-strong, rgba(59,82,101,.24))",
+              borderRadius: "var(--sd-radius-card, 10px)",
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--sd-space-3, .75rem)",
               }}
-              aria-label={PROMPT_TAB.advancedToggleLabel}
-            />
+            >
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--sd-text-body, .875rem)",
+                    fontWeight: 600,
+                    color: "var(--sd-text, #051824)",
+                  }}
+                >
+                  {PROMPT_TAB.advancedToggleLabel}
+                </span>
+                <span style={{ ...MUTED, display: "block" }}>{PROMPT_TAB.advancedToggleDetail}</span>
+              </span>
+              <Switch
+                checked={prompt.promptMode === "advanced"}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    // Freeze the current generated text so switching to manual
+                    // editing never appears to erase anything.
+                    set({ promptMode: "advanced", systemInstructions: generatedPrompt });
+                  } else {
+                    set({ promptMode: "guided" });
+                  }
+                }}
+                aria-label={PROMPT_TAB.advancedToggleLabel}
+              />
+            </div>
+            {prompt.promptMode === "advanced" && (
+              <CharCountField
+                id="system-instructions-advanced"
+                label="Full prompt"
+                value={prompt.systemInstructions}
+                onChange={(v) => set({ systemInstructions: v })}
+                maxLength={10000}
+                rows={14}
+                placeholder="The complete system prompt sent on every call"
+                helpText="Edited here directly — the guided sections above are no longer applied while this is on."
+              />
+            )}
           </div>
-          {prompt.promptMode === "advanced" && (
-            <CharCountField
-              id="system-instructions-advanced"
-              label="Full prompt"
-              value={prompt.systemInstructions}
-              onChange={(v) => set({ systemInstructions: v })}
-              maxLength={10000}
-              rows={14}
-              placeholder="The complete system prompt sent on every call"
-              helpText="Edited here directly — the guided sections above are no longer applied while this is on."
-            />
-          )}
         </CollapsibleContent>
       </Collapsible>
-    </div>
+    </>
   );
 }

@@ -1,18 +1,25 @@
 import { Link } from "wouter";
 import { ArrowUpRight } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { CharCountField } from "@/components/common/CharCountField";
 import { CONFIGURATION } from "@/pages/assistants/assistantsContract";
 import { ROUTES } from "@/lib/routes";
 import type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
 /**
- * V5 PR-6 (C-2): "Setup" renamed "Configuration". Business name and industry
- * are no longer editable here — AR-001I's SetupTab had them as free-text
- * fields that silently diverged from Workspace Settings. They are now a
- * read-only display sourced from `useWorkspaceBusinessInfo` (see
- * `BuilderShell.tsx`, which fetches it once and passes it down), with a link
- * to the page that actually owns them.
+ * "Business information" — who this assistant is for, and the facts it may
+ * rely on when answering.
+ *
+ * Business name and industry are not editable here. They are read live from
+ * Workspace Settings (see `BuilderShell.tsx`, which fetches them once and
+ * passes them down) and shown for reference with a link to the page that owns
+ * them, because free-text copies of them used to drift silently.
+ *
+ * The assistant's own name is not repeated here either: it is edited once, in
+ * the builder header, where it stays visible from every section. Two inputs
+ * bound to one value on the same screen is a question, not a feature.
+ *
+ * Presentation only — the shared `si-*` field classes, inside the `si-form`
+ * the shell wraps every section in.
  */
 
 function Field({
@@ -31,20 +38,21 @@ function Field({
   helpText?: string;
 }) {
   return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-foreground">
+    <div className="si-field">
+      <label htmlFor={id} className="si-label">
         {label}
       </label>
-      <Input
+      <input
         id={id}
+        className="si-input"
+        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 text-sm"
         aria-describedby={helpText ? `${id}-help` : undefined}
       />
       {helpText && (
-        <p id={`${id}-help`} className="mt-1 text-[11px] text-muted-foreground">
+        <p className="si-hint" id={`${id}-help`}>
           {helpText}
         </p>
       )}
@@ -63,45 +71,88 @@ export default function ConfigurationTab({ draft, update, businessInfo }: Builde
   const industry = businessInfo?.industry || setup.industry;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <>
       <div>
-        <h2 className="font-display text-lg font-semibold text-foreground">{CONFIGURATION.title}</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">{CONFIGURATION.detail}</p>
+        <h2 className="sd-h2">{CONFIGURATION.title}</h2>
+        <p
+          style={{
+            margin: "var(--sd-space-1, .25rem) 0 0",
+            fontSize: "var(--sd-text-small, .8125rem)",
+            lineHeight: 1.55,
+            color: "var(--sd-text-muted, #3b5265)",
+          }}
+        >
+          {CONFIGURATION.detail}
+        </p>
       </div>
 
-      <div className="rounded-lg border border-dashed border-border bg-card px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {CONFIGURATION.businessFromWorkspace}
-            </p>
-            <p className="mt-0.5 truncate text-sm font-medium text-foreground">
-              {businessName || "Not set"}
-              {industry ? ` · ${industry}` : ""}
-            </p>
-          </div>
-          <Link
-            href={ROUTES.settings}
-            className="inline-flex min-h-8 flex-shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--sd-space-3, .75rem)",
+          padding: "var(--sd-space-3, .75rem) var(--sd-space-4, 1rem)",
+          border: "1px dashed var(--sd-border-strong, rgba(59,82,101,.24))",
+          borderRadius: "var(--sd-radius-control, 6px)",
+          background: "var(--sd-surface-alt, #f6fbfa)",
+          minWidth: 0,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <span className="sd-eyebrow" style={{ color: "var(--sd-text-muted, #3b5265)" }}>
+            {CONFIGURATION.businessFromWorkspace}
+          </span>
+          <p
+            style={{
+              margin: "var(--sd-space-1, .25rem) 0 0",
+              fontSize: "var(--sd-text-body, .875rem)",
+              fontWeight: 600,
+              color: "var(--sd-text, #051824)",
+              overflowWrap: "anywhere",
+            }}
           >
-            {CONFIGURATION.editWorkspaceSettings}
-            <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-          </Link>
+            {businessName || "Not set"}
+            {industry ? ` · ${industry}` : ""}
+          </p>
         </div>
+        <Link href={ROUTES.settings} className="sd-link">
+          {CONFIGURATION.editWorkspaceSettings}
+          <ArrowUpRight className="sd-navlink__icon" aria-hidden="true" />
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field id="assistant-name" label="Assistant name" value={setup.assistantName} onChange={(v) => setSetup({ assistantName: v })} placeholder="e.g. Front Desk Assistant" />
-        <Field id="role" label="Role" value={setup.role} onChange={(v) => setSetup({ role: v })} placeholder="e.g. Front-desk receptionist" />
-        <Field id="primary-goal" label="Primary goal" value={setup.primaryGoal} onChange={(v) => setSetup({ primaryGoal: v })} placeholder="What should this assistant accomplish on most calls?" />
-        <Field id="timezone" label="Business timezone" value={setup.timezone} onChange={(v) => setSetup({ timezone: v })} placeholder="e.g. America/New_York" />
-        <Field id="language" label="Supported language" value={setup.language} onChange={(v) => setSetup({ language: v })} placeholder="e.g. English (US)" />
-      </div>
+      <Field
+        id="role"
+        label="Role"
+        value={setup.role}
+        onChange={(v) => setSetup({ role: v })}
+        placeholder="e.g. Front-desk receptionist"
+      />
+      <Field
+        id="primary-goal"
+        label="Primary goal"
+        value={setup.primaryGoal}
+        onChange={(v) => setSetup({ primaryGoal: v })}
+        placeholder="What should this assistant accomplish on most calls?"
+      />
+      <Field
+        id="timezone"
+        label="Business timezone"
+        value={setup.timezone}
+        onChange={(v) => setSetup({ timezone: v })}
+        placeholder="e.g. America/New_York"
+        helpText="Needed before publishing, so any times it offers are the ones you actually keep."
+      />
+      <Field
+        id="language"
+        label="Supported language"
+        value={setup.language}
+        onChange={(v) => setSetup({ language: v })}
+        placeholder="e.g. English (US)"
+      />
 
-      {/* The greeting moved to "Greeting & voice", where it sits beside the
-          voice that speaks it. It is one decision for a business owner, and
-          splitting it across two screens is part of what made this journey
-          read as a configuration editor. */}
       <CharCountField
         id="business-context"
         label="Business context"
@@ -110,11 +161,8 @@ export default function ConfigurationTab({ draft, update, businessInfo }: Builde
         maxLength={2000}
         rows={4}
         placeholder="Hours, location, services, policies — anything the assistant needs to answer questions accurately."
+        helpText="The more specific this is, the fewer questions it has to guess at."
       />
-
-      {/* "What you want it to do" and the hand-over rule moved to the
-          "What it can do" section, where they sit next to what the assistant
-          can ACTUALLY do — so a ticked box that is not yet available says so. */}
-    </div>
+    </>
   );
 }

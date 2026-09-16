@@ -121,12 +121,10 @@ export const LIST = {
   cards: "Cards",
   table: "Table",
 
-  colName: "Name",
-  colTemplate: "Template",
-  colStatus: "Status",
-  colProviderLink: "Provider link",
+  /* The list is rows in the shared `sd-list`, not a table with a header row,
+     so the five column headings this used to carry are gone rather than left
+     unreachable. "Updated" survives because it still labels a value. */
   colUpdated: "Updated",
-  colActions: "Actions",
 
   emptyTitle: "Create your first assistant",
   emptyDetail:
@@ -152,18 +150,50 @@ export const LIST = {
      legacy data — the create flow itself is unchanged). Once exactly one
      exists, this line replaces it. */
   contactToAddAnother: "Contact SiteMint to add another assistant.",
+
+  /* V8 presentation pass. The page previously had no loading state of its own
+     (a bare skeleton grid), and its failure state named no recovery. Both are
+     stated now, in the same words the rest of the dashboard uses. */
+  eyebrow: "ASSISTANT",
+  loading: "Loading your assistant",
+  errorDetail: "The request failed. Nothing was lost — your settings are still saved.",
+  retry: "Try again",
+  retrying: "Trying again…",
 } as const;
 
 /* ── One-assistant status card (C-1) ─────────────────────────────────────── */
 
+/* V8 presentation pass. What this block no longer carries is the point of it.
+
+   "Provider link" left: it says whether a provider-side record exists, which
+   is a question SiteMint support asks and a business owner never does. It is
+   not deleted — it is real evidence — it moved to `DIAGNOSTICS` below, behind
+   a disclosure that names its audience.
+
+   The four per-tab quick links left too. They carried their own labels here
+   ("Configuration", "Prompt", "Voice", "Test") while the builder's rail called
+   the same four destinations something else, so a link was named differently
+   from the section it opened. They now read `SECTIONS`. */
+
 export const CARD = {
-  providerLinkLabel: "Provider link",
   lastPublishedLabel: "Last published",
   notYetPublished: "Not yet published",
-  configuration: "Configuration",
-  prompt: "Prompt",
-  voice: "Voice",
-  test: "Test",
+  openLabel: "Open the builder",
+  quickLinksLabel: "Jump to",
+} as const;
+
+/* ── The builder's sections, named once ────────────────────────────────────
+   Both the list page's quick links and the builder's own rail read these.
+   `BUILDER_TABS` in `assistant-builder/BuilderShell.tsx` keeps the keys —
+   routing, the legacy-alias map and the default tab are all unchanged — and
+   takes only its labels from here. */
+
+export const SECTIONS = {
+  configuration: "Business information",
+  voice: "Greeting & voice",
+  actions: "What it can do",
+  testing: "Test & publish",
+  prompt: "Advanced",
 } as const;
 
 /** Every row control names its assistant, so a screen reader hears which row it is on. */
@@ -204,6 +234,80 @@ export function providerLinkLabel(assistant: {
 export const BUILDER = {
   linkedNote: "Linked to the voice provider.",
   notLinkedNote: "Not linked to a voice provider.",
+} as const;
+
+/* ── Builder chrome (V8 presentation pass) ─────────────────────────────────
+   The builder used to carry its own header, its own card stack and its own
+   footer, written in raw utility classes — a second visual language inside a
+   dashboard that already has one. These are the strings that chrome needs so
+   it can be rebuilt from the shared page/section/field vocabulary instead. */
+
+export const BUILDER_PAGE = {
+  eyebrow: "ASSISTANT",
+  back: "Assistants",
+  untitled: "Untitled assistant",
+  nameLabel: "Assistant name",
+  nameHelp: "Only you see this. It labels the assistant in SiteMint, and callers never hear it.",
+  sectionsLabel: "Assistant builder sections",
+  /* The name field and the state chip sit together, so the group needs a name
+     of its own for assistive technology. */
+  identityLabel: "Name and current state",
+} as const;
+
+/* ── Test & publish (V8 presentation pass) ─────────────────────────────────
+   These three sentences were inline in the builder shell. They are the most
+   consequential copy in the journey — one of them describes the only
+   irreversible action a customer can take here — so they belong in the
+   module the contract test can enumerate. Wording is unchanged from what
+   shipped, except that "Current state" now says what the state is about. */
+
+export const TEST_PUBLISH = {
+  stateTitle: "What callers reach right now",
+  stateDetail: "And whether it matches the settings you last saved.",
+  testTitle: "Hear it yourself",
+  testDetail:
+    "A test call runs in this browser, using your microphone. No caller is involved and nothing is dialled.",
+  publishTitle: "Put it live",
+  publishDetail:
+    "Publishing sends your saved settings to the voice provider. Callers hear the published version, never your unsaved edits.",
+  testLabel: "Test call",
+  publishLabel: "Publish",
+  /* Shown in place of a control this build does not have. It names the state
+     of the workspace rather than a checkpoint or a flag. */
+  notEnabled: "Not switched on for this workspace yet.",
+  testUnavailableDefault: "Save and publish this assistant before testing.",
+  publishUnavailableDefault: "Save this assistant as a draft before publishing.",
+} as const;
+
+/* ── Saving (V8 presentation pass) ─────────────────────────────────────────
+   Saved-versus-unsaved was previously carried by a badge in the header and a
+   button in a footer bar, which could disagree at a glance. One save bar now
+   states the condition in words and holds the only save control. */
+
+export const SAVE = {
+  save: "Save changes",
+  saving: "Saving…",
+  saved: "Changes saved",
+  clean: "No unsaved changes",
+  dirty: "Unsaved changes",
+  failedTitle: "Your changes weren't saved",
+  retry: "Retry",
+} as const;
+
+/* ── Diagnostics (V8 presentation pass) ────────────────────────────────────
+   Provider link state, the last synchronisation time and the raw status the
+   server reports are useful to SiteMint and to nobody else. They stay on the
+   page — removing them would lose real evidence — but behind a disclosure
+   that says who they are for, so the main flow reads as a business setting
+   rather than a console. */
+
+export const DIAGNOSTICS = {
+  label: "Technical details",
+  detail: "For SiteMint support. You never need these to run your assistant.",
+  providerLink: "Provider link",
+  lastSynced: "Last sent to the voice provider",
+  reportedStatus: "Status SiteMint has recorded",
+  never: "Never",
 } as const;
 
 /* ── Keeping the provider in step with what is saved ───────────────────────
@@ -356,6 +460,7 @@ export const PROMPT_TAB = {
    this journey cannot deliver and which no endpoint behind it supports. */
 
 export const CREATE = {
+  eyebrow: "ASSISTANT",
   title: "Choose a starting point",
   detail:
     "Pick a template to prefill the builder, or start from a blank assistant. Nothing is saved until you select Save Draft — you can change everything before then.",
@@ -465,7 +570,12 @@ export function everyRenderableString(): string[] {
   return [
     ...Object.values(LIST),
     ...Object.values(CARD),
+    ...Object.values(SECTIONS),
     ...Object.values(BUILDER),
+    ...Object.values(BUILDER_PAGE),
+    ...Object.values(TEST_PUBLISH),
+    ...Object.values(SAVE),
+    ...Object.values(DIAGNOSTICS),
     ...Object.values(SYNC),
     ...Object.values(PRESET_RECOVERY),
     ...Object.values(VOICE_MODEL),

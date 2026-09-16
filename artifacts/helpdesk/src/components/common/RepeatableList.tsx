@@ -1,5 +1,4 @@
 import { Plus, Trash2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 interface RepeatableListProps {
@@ -13,7 +12,12 @@ interface RepeatableListProps {
   helpText?: string;
 }
 
-/** Locally editable repeatable list of short strings (objectives, info to collect, etc). */
+/**
+ * A locally editable list of short strings (questions to ask, conversation
+ * objectives). Presentation only: the shared `si-*` field classes and the
+ * shared `Button`, so it matches every other field in the builder. Each row
+ * keeps its own accessible name and its own 44px remove control.
+ */
 export function RepeatableList({
   label,
   items,
@@ -29,52 +33,96 @@ export function RepeatableList({
   const updateItem = (i: number, value: string) =>
     onChange(items.map((v, idx) => (idx === i ? value : v)));
 
+  const atLimit = items.length >= maxItems;
+
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-foreground">{label}</span>
+    <div className="si-field">
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: "var(--sd-space-2, .5rem)",
+        }}
+      >
+        <span className="si-label">{label}</span>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="h-7 gap-1 px-2 text-xs text-primary"
           onClick={addItem}
-          disabled={items.length >= maxItems}
+          disabled={atLimit}
           aria-label={`${addLabel} — ${label}`}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           {addLabel}
         </Button>
       </div>
-      {helpText && <p className="mb-2 text-[11px] text-muted-foreground">{helpText}</p>}
+
+      {helpText && <p className="si-hint">{helpText}</p>}
+
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border py-5 text-center text-xs text-muted-foreground">
-          Nothing added yet
-        </div>
+        <p
+          style={{
+            margin: 0,
+            padding: "var(--sd-space-4, 1rem)",
+            border: "1px dashed var(--sd-border-strong, rgba(59,82,101,.24))",
+            borderRadius: "var(--sd-radius-control, 6px)",
+            background: "var(--sd-surface-alt, #f6fbfa)",
+            fontSize: "var(--sd-text-small, .8125rem)",
+            color: "var(--sd-text-muted, #3b5265)",
+          }}
+        >
+          Nothing added yet.
+        </p>
       ) : (
-        <div className="space-y-2">
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--sd-space-2, .5rem)",
+          }}
+        >
           {items.map((item, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
+            <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "var(--sd-space-2, .5rem)" }}>
+              <input
+                className="si-input"
                 value={item}
                 onChange={(e) => updateItem(i, e.target.value)}
                 placeholder={`${itemPlaceholder} ${i + 1}`}
                 maxLength={itemMaxLength}
                 aria-label={`${label} item ${i + 1}`}
-                className="h-9 flex-1 text-sm"
               />
               <button
                 type="button"
                 onClick={() => removeItem(i)}
                 aria-label={`Remove ${label.toLowerCase()} item ${i + 1}`}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground hover-elevate hover:text-destructive"
+                style={{
+                  flex: "0 0 auto",
+                  width: 44,
+                  height: 44,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
+                  borderRadius: "var(--sd-radius-control, 6px)",
+                  background: "var(--sd-surface, #fff)",
+                  color: "var(--sd-text-muted, #3b5265)",
+                  cursor: "pointer",
+                }}
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
+
+      {atLimit && <p className="si-hint">That&rsquo;s the maximum of {maxItems}. Remove one to add another.</p>}
     </div>
   );
 }
