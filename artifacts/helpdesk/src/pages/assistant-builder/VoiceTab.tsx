@@ -132,7 +132,7 @@ export default function VoiceTab({ draft, update }: BuilderTabProps) {
         maxLength={300}
         rows={2}
         placeholder="What the assistant says first"
-        helpText="The opening line on every call. Also editable under Advanced."
+        helpText="The opening line on every call."
       />
 
       {preset === undefined && (
