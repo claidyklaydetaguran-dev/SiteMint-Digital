@@ -109,14 +109,26 @@ Measured against the code, not assumed:
 - `VITE_VOICE_*` are **build-time** flags for the helpdesk bundle, not runtime.
 - `STRIPE_BOOT_SYNC_ENABLED=false`. `TRUSTED_PROXY_HOPS` is decided only after
   observing real forwarded headers in production.
-- **`CRM_LEGACY_BEARER_ENABLED=false`, set immediately after the first owner has
-  signed in with their own account — a requirement, not a preference.** Both
-  gates fall back to the legacy shared credential, and that path carries no
-  identity, so there are no permissions to check and it calls straight through.
-  Until the flag is `false`, every permission in the CRM and on the operator
-  routes is advisory for whoever holds that one password. Do not set it before
-  the first owner exists: bootstrap uses `ADMIN_PASSWORD`, and the shared
-  credential is the only way in until a person can sign in as themselves.
+- **`CRM_LEGACY_BEARER_ENABLED=false`, set BEFORE the first publish — a
+  requirement, not a preference.** Both gates fall back to the legacy shared
+  credential, and that path carries no identity, so there are no permissions to
+  check and it calls straight through. Until the flag is `false`, every
+  permission in the CRM and on the operator routes is advisory for whoever holds
+  that one password.
+
+  It is safe before the first owner exists, which was checked rather than
+  assumed: `GET /crm/staff/bootstrap-state` and `POST /crm/staff/bootstrap`
+  (crmStaff.ts:185, :194) carry no gate at all — the first is a bare count, and
+  the second throttles by IP, refuses once any staff row exists, and verifies
+  `ADMIN_PASSWORD` from the request body. The sign-in screen reads that ungated
+  count and shows the setup stage, then posts straight to bootstrap. Nothing in
+  that path consults the flag, so setting it first leaves no window in which
+  production is both public and maximally permissive.
+
+  **Caveat for whoever runs the bootstrap:** the screen currently treats "could
+  not read the count" as "accounts exist" and shows the sign-in form. If the
+  setup screen does not appear on a fresh deployment, reload before concluding
+  anything is wrong.
 
 ## 5. The schema upgrade
 
