@@ -156,6 +156,21 @@ interface DeliveryRow {
   availableActions: RecoveryAction[];
   guidance: string;
   resendDuplicateRisk: string;
+  /**
+   * What the mail provider said afterwards, when it has said anything.
+   *
+   * Shown beside the delivery's own state, never instead of it: one says what
+   * this server managed to hand over, the other what happened to the message,
+   * and only the first decides which recovery actions are offered.
+   */
+  provider?: {
+    state: string;
+    label: string;
+    tone: "waiting" | "working" | "accepted" | "attention";
+    explanation: string;
+    at: string | null;
+    detail: string | null;
+  } | null;
 }
 
 // ── Small shared vocabulary ─────────────────────────────────────────────────
@@ -311,6 +326,20 @@ const DELIVERY_LABEL: Record<DeliveryState, string> = {
   accepted: "Handed over",
   refused: "Refused",
   uncertain: "Unknown",
+};
+
+/**
+ * The provider's report, coloured by what it asks of somebody.
+ *
+ * `accepted` is teal rather than green for the same reason the state pill is:
+ * a provider taking or even delivering a message is not proof anybody read it,
+ * and a tick invites that reading.
+ */
+const PROVIDER_PILL: Record<string, string> = {
+  waiting: "bg-sky-100 text-sky-700",
+  working: "bg-sky-100 text-sky-700",
+  accepted: "bg-teal-100 text-teal-700",
+  attention: "bg-red-100 text-red-700",
 };
 
 const DELIVERY_PILL: Record<DeliveryState, string> = {
@@ -499,6 +528,16 @@ function DeliveryCard({ row, open, onToggle, onDone }: {
     <div className="bg-white border border-border rounded-xl p-3">
       <div className="flex flex-wrap items-start gap-2">
         <Pill className={DELIVERY_PILL[row.state]}>{DELIVERY_LABEL[row.state]}</Pill>
+        {/* The provider's own word, where it has given one. "Handed over" and
+            "Delivered" are different facts, and so are "Handed over" and
+            "Bounced" — which is the one somebody needs to see. */}
+        {row.provider && (
+          <span title={row.provider.explanation}>
+            <Pill className={PROVIDER_PILL[row.provider.tone] ?? PROVIDER_PILL.waiting}>
+              {row.provider.label}
+            </Pill>
+          </span>
+        )}
         <span className="text-sm font-medium text-foreground min-w-0 break-words">
           {deliveryRecipient(row)}
         </span>

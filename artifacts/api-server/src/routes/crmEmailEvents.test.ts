@@ -250,6 +250,10 @@ suite("provider delivery and engagement events (real DB)", () => {
   // ── 1. The intake ─────────────────────────────────────────────────────────
 
   describe("the intake", () => {
+    // The first request through this route pays for the dynamic `svix` import,
+    // the first connection, and the first query against a database the rest of
+    // the run has been using — comfortably past Vitest's 5s default when this
+    // file is not first. Every later test here is warm.
     it("accepts a genuine event, stores it, and interprets it", async () => {
       const emailId = providerId("intake");
       const res = await deliver(payloadFor("email.delivered", { emailId }));
@@ -266,7 +270,7 @@ suite("provider delivery and engagement events (real DB)", () => {
       expect(row.state).toBe("processed");
       // It reached nothing of ours, which is a normal answer and not an error.
       expect(row.matchStatus).toBe("unmatched");
-    });
+    }, 60_000);
 
     it("refuses a body changed after signing, and stores nothing", async () => {
       const before = await countEvents();

@@ -46,6 +46,10 @@
 // crmSupport.ts records why Support owns its own tables.
 
 import { Router, type IRouter, type Request, type Response } from "express";
+import { deliveryFor, loadProviderDeliveries } from "../lib/emailProviderEvents.js";
+import { emailRef } from "../lib/emailRefs.js";
+import type { ProviderDelivery } from "../lib/emailDeliveryState.js";
+import type { SupportProviderDelivery } from "../lib/supportDelivery.js";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import {
   db, crmSupportTickets, crmSupportMessages, crmKbArticles,
@@ -165,7 +169,43 @@ function ticketShape(t: CrmSupportTicket, extra: {
  * not a placeholder state, because no delivery exists for either. That is the
  * API half of the guarantee the check constraint holds in the database.
  */
-function messageShape(m: CrmSupportMessage) {
+/** The provider's own report for one reply, in the shape the thread renders. */
+function providerReport(provider: ProviderDelivery | null): SupportProviderDelivery | null {
+  if (!provider?.state) return null;
+  return {
+    state: provider.state,
+    label: provider.label,
+    tone: provider.tone,
+    explanation: provider.explanation,
+    at: provider.at?.toISOString() ?? null,
+    detail: provider.detail,
+  };
+}
+
+/**
+ * What the provider said about each of these replies, keyed by message id.
+ *
+ * Only rows that were actually handed over are asked about — an internal note
+ * and the client's own words have no delivery — and each is matched by the
+ * provider id it recorded AND by the tag the send carried, because a reply
+ * whose outcome was never learned has no id to match on.
+ */
+async function providerReportsFor(
+  messages: CrmSupportMessage[],
+): Promise<Map<number, SupportProviderDelivery | null>> {
+  const handedOver = messages.filter((m) => m.deliveryState != null);
+  if (handedOver.length === 0) return new Map();
+  const lookup = await loadProviderDeliveries({
+    providerIds: handedOver.map((m) => m.deliveryProviderRef),
+    refs: handedOver.map((m) => emailRef("support_message", m.id)),
+  });
+  return new Map(handedOver.map((m) => [
+    m.id,
+    providerReport(deliveryFor(lookup, m.deliveryProviderRef, emailRef("support_message", m.id))),
+  ]));
+}
+
+function messageShape(m: CrmSupportMessage, provider: SupportProviderDelivery | null = null) {
   return {
     id: m.id,
     ticketId: m.ticketId,
@@ -177,7 +217,7 @@ function messageShape(m: CrmSupportMessage) {
     authorKnown: m.origin !== "legacy" && (m.sentByStaffId != null || m.origin === "customer"),
     /** True when the client's own words arrived here by email. */
     arrivedByEmail: m.inboundMessageId != null,
-    delivery: supportDeliveryView(m),
+    delivery: supportDeliveryView(m, Date.now(), provider),
     createdAt: m.createdAt,
   };
 }
@@ -418,6 +458,8 @@ router.get("/crm/support/tickets/:id", requireCrmAuth("support.read"), async (re
       : [],
   ]);
 
+  const reports = await providerReportsFor(messages);
+
   res.json({
     ticket: ticketShape(ticket, {
       contactName: lead[0]?.name ?? null,
@@ -431,7 +473,7 @@ router.get("/crm/support/tickets/:id", requireCrmAuth("support.read"), async (re
     article: article[0] ?? null,
     resolvedByName: resolver[0]?.displayName ?? null,
     openedByName: opener[0]?.displayName ?? ticket.openedByLabel ?? null,
-    messages: messages.map(messageShape),
+    messages: messages.map((m) => messageShape(m, reports.get(m.id) ?? null)),
     counts: {
       messages: messages.length,
       customerVisible: messages.filter((m) => m.visibility === "customer").length,
@@ -1020,6 +1062,7 @@ router.get("/crm/support/deliveries", requireCrmAuth("support.read"), async (req
       }).from(crmSupportTickets).where(inArray(crmSupportTickets.id, ticketIds))
     : [];
   const ticketById = new Map(tickets.map((t) => [t.id, t]));
+  const reports = await providerReportsFor(rows);
 
   res.json({
     deliveries: rows.map((m) => ({
@@ -1031,7 +1074,7 @@ router.get("/crm/support/deliveries", requireCrmAuth("support.read"), async (req
       writtenBy: m.sentByLabel,
       writtenAt: m.createdAt,
       excerpt: m.body.slice(0, 200),
-      delivery: supportDeliveryView(m),
+      delivery: supportDeliveryView(m, Date.now(), reports.get(m.id) ?? null),
       resendRisk: supportResendRisk(m),
     })),
     counts: { open: total?.n ?? 0, returnedOnThisPage: rows.length },
