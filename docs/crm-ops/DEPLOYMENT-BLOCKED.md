@@ -194,11 +194,29 @@ Publish; classify the migration gate; then verify:
 ### The hosting question that must be answered before reminders are trusted
 
 The reminder engine, the signup worker and the delivery queues run **inside the
-api-server process**. Web Asset Builder is an **Autoscale** deployment, which
-can scale to zero: while nothing is serving traffic, nothing fires, and the work
-arrives late in a burst. Either keep an instance always running, or drive
-`POST /api/crm/operations/jobs/run` from a platform scheduler. This is an owner
-decision with a cost attached; it is not solvable in code.
+api-server process**. Web Asset Builder is an **Autoscale** deployment
+(2 vCPU / 4 GiB, max 3 — read from its own settings on 2026-09-16), and
+Autoscale scales to zero: while nothing is serving traffic, nothing fires, and
+the work arrives late in a burst. Nothing in the code can compensate.
+
+Three options, with what each actually costs the owner:
+
+1. **Reserved VM** — always on, from about $15/month for the smallest shared
+   machine (0.5 vCPU / 2 GiB). The deployment settings say changing type
+   "requires unpublish and publish again", so it means a deliberate republish
+   rather than a toggle. Reminders then fire on time with no extra moving parts.
+2. **Stay on Autoscale and drive the queue from outside**, by calling
+   `POST /api/crm/operations/jobs/run` on a schedule. That route exists and is
+   permission-gated, so this is configuration, not new code — but it needs
+   something outside this deployment to do the calling, on a schedule at least
+   as frequent as the shortest reminder you care about.
+3. **Accept late reminders**, in which case say so in the product rather than
+   letting someone believe a reminder will arrive at a particular minute.
+
+**Recommendation: (1) for the first release.** It is the only option that makes
+the reminder engine's promise true without adding a second system to maintain,
+and $15/month is small against the cost of a missed client follow-up. This is an
+owner decision because it is a recurring charge.
 
 ## Do not
 
