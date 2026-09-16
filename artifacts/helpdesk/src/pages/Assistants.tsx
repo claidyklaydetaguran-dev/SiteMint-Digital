@@ -1,24 +1,30 @@
-import { useMemo, useRef, useState } from "react";
+/**
+ * The Assistant list.
+ *
+ * Presentation only. This page used to be written in raw utility classes — its
+ * own card grid, its own skeletons, its own empty and error blocks — so it read
+ * as a different product from every screen around it. It now uses the same
+ * vocabulary as Settings, Issues, Support and Overview: `sd-page`/`PageHeader`
+ * for the frame, `sd-section` for grouping, `sd-list`/`sd-row` for rows,
+ * `sd-empty` and `sd-error` for the states, `si-*` for the filter controls, and
+ * the shared `Button`, `StatusChip` and `PageSkeleton`.
+ *
+ * Every control, destination and guard is the one that was here before:
+ * a single Open control per row, an overflow menu carrying only Duplicate and
+ * Delete, delete still gated on `isEligibleForDelete`, the one-assistant view
+ * still replacing the list, and "New Assistant" still hidden once one exists.
+ * Nothing here issues a provider request.
+ *
+ * The provider-link readout moved under a "Technical details" disclosure. It
+ * says whether a provider-side record exists, which is a question SiteMint
+ * support asks and a business owner never does — it is kept, not deleted,
+ * because it is real evidence.
+ */
+
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { useLocation } from "wouter";
-import {
-  Bot,
-  LayoutGrid,
-  List as ListIcon,
-  Plus,
-  MoreVertical,
-  Copy,
-  Trash2,
-  ArrowRight,
-  Loader2,
-} from "lucide-react";
+import { ArrowRight, Copy, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,20 +41,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { EmptyState } from "@/components/common/EmptyState";
-import { InlineError } from "@/components/common/InlineError";
-import { SearchInput } from "@/components/common/SearchInput";
+import { PageHeader } from "@/components/common/PageHeader";
+import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { SegmentedControl } from "@/components/common/SegmentedControl";
-import { SkeletonCard, SkeletonRow } from "@/components/common/Skeletons";
-import { StatusBadge } from "@/components/common/StatusBadge";
+import { StatusChip, type StatusTone } from "@/components/common/StatusChip";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAssistantsList,
@@ -63,20 +59,24 @@ import {
 import { ASSISTANT_TEMPLATES } from "@/lib/assistantTemplates";
 import {
   STATUS_LABEL,
-  STATUS_TONE,
   isEligibleForDelete,
   assistantCardStatus,
+  type CardStatusKey,
 } from "@/lib/assistantStatus";
 import {
-  LIST,
   CARD,
+  DIAGNOSTICS,
+  LIST,
   NEW_PATH,
+  SECTIONS,
   assistantHref,
   deleteDialogTitle,
   moreActionsAccessibleName,
   openAccessibleName,
   providerLinkLabel,
 } from "@/pages/assistants/assistantsContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-signin.css";
 
 type ViewMode = "cards" | "table";
 type StatusFilter = "all" | AssistantStatus;
@@ -90,60 +90,109 @@ const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "publish_uncertain", label: "Publish uncertain" },
 ];
 
+/**
+ * The shared chip's tones, not the badge's. `assistantStatus.ts` still owns
+ * every label — only the visual tone is chosen here, so the six statuses this
+ * journey reports keep one source of truth for what they are called.
+ */
+const STATUS_CHIP_TONE: Record<AssistantStatus, StatusTone> = {
+  draft: "pending",
+  publishing: "next",
+  published: "live",
+  error: "blocked",
+  publish_uncertain: "warn",
+  unknown: "neutral",
+};
+
+const CARD_CHIP_TONE: Record<CardStatusKey, StatusTone> = {
+  draft: "pending",
+  published: "live",
+  needs_update: "warn",
+};
+
+const MUTED: CSSProperties = {
+  margin: "var(--sd-space-1, .25rem) 0 0",
+  fontSize: "var(--sd-text-small, .8125rem)",
+  lineHeight: 1.55,
+  color: "var(--sd-text-muted, #3b5265)",
+};
+
 function templateDisplayName(templateKey: string): string {
-  return (
-    ASSISTANT_TEMPLATES.find((t) => t.id === templateKey)?.name ?? templateKey
-  );
+  return ASSISTANT_TEMPLATES.find((t) => t.id === templateKey)?.name ?? templateKey;
 }
 
 function formatUpdatedAt(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function AssistantsListSkeleton({ view }: { view: ViewMode }) {
-  if (view === "table") {
-    return (
-      <div
-        className="overflow-hidden rounded-xl border border-border bg-card"
-        aria-hidden="true"
-      >
-        {[0, 1, 2, 3].map((i) => (
-          <SkeletonRow key={i} />
-        ))}
-      </div>
-    );
-  }
+/**
+ * The technical readouts, behind a disclosure that names its audience. Shared
+ * by the one-assistant view and the legacy list so the two cannot disagree
+ * about what they expose.
+ */
+function Diagnostics({ assistant }: { assistant: AssistantDto }) {
   return (
-    <div
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-      aria-hidden="true"
+    <details
+      style={{
+        marginTop: "var(--sd-space-3, .75rem)",
+        border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
+        borderRadius: "var(--sd-radius-control, 6px)",
+        background: "var(--sd-surface-alt, #f6fbfa)",
+      }}
     >
-      {[0, 1, 2].map((i) => (
-        <SkeletonCard key={i} className="h-40" />
-      ))}
-    </div>
+      <summary
+        style={{
+          display: "flex",
+          alignItems: "center",
+          minHeight: 44,
+          padding: "0 var(--sd-space-3, .75rem)",
+          fontSize: "var(--sd-text-small, .8125rem)",
+          fontWeight: 600,
+          color: "var(--sd-text, #051824)",
+          cursor: "pointer",
+        }}
+      >
+        {DIAGNOSTICS.label}
+      </summary>
+      <div style={{ padding: "0 var(--sd-space-3, .75rem) var(--sd-space-3, .75rem)" }}>
+        <p style={MUTED}>{DIAGNOSTICS.detail}</p>
+        <dl style={{ margin: "var(--sd-space-2, .5rem) 0 0" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+            <dt style={{ ...MUTED, margin: 0, minWidth: "10rem" }}>{DIAGNOSTICS.providerLink}</dt>
+            <dd style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)", overflowWrap: "anywhere" }}>
+              {providerLinkLabel(assistant)}
+            </dd>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+            <dt style={{ ...MUTED, minWidth: "10rem" }}>{DIAGNOSTICS.lastSynced}</dt>
+            <dd style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)" }}>
+              {assistant.lastSyncedAt ? formatUpdatedAt(assistant.lastSyncedAt) : DIAGNOSTICS.never}
+            </dd>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+            <dt style={{ ...MUTED, minWidth: "10rem" }}>{DIAGNOSTICS.reportedStatus}</dt>
+            <dd style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)" }}>
+              {STATUS_LABEL[assistant.status]}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </details>
   );
 }
 
 /**
- * AR-001I: a row carries exactly one control that leaves the list, and it is
- * named for what it does.
+ * A row carries exactly one control that leaves the list, and it is named for
+ * what it does. It used to carry two more — a play icon labelled "Test {name}"
+ * and a rocket icon labelled "Publish {name}" — neither of which started a test
+ * or published anything: both navigated to this same builder tab. The menu
+ * keeps only the two items that genuinely act on the row.
  *
- * It used to carry two more: a play icon labelled "Test {name}" and a rocket
- * icon labelled "Publish {name}". Neither started a test or published
- * anything — both called `navigate()` to this same builder tab, which is
- * also where the row's name and the menu's Edit item already went. Four
- * controls, one destination, two of them named after actions that only
- * happen inside the builder behind an explicit confirmation.
- *
- * So: one Open control, and the menu keeps only the two items that genuinely
- * act on the row. Nothing here issues a provider request.
+ * The 44px target and the focus ring come from `sd-link` in v2-dashboard.css
+ * rather than from utility classes repeated per page, so one screen can no
+ * longer drift from the guarantee.
  */
 function RowActions({
   assistant,
@@ -163,33 +212,31 @@ function RowActions({
   const deletable = isEligibleForDelete(assistant);
 
   return (
-    <div className="flex flex-shrink-0 items-center gap-1.5">
+    <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: "var(--sd-space-2, .5rem)" }}>
       <button
         type="button"
         onClick={onOpen}
         aria-label={openAccessibleName(assistant.name)}
-        className="inline-flex h-11 min-h-11 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover-elevate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8 md:min-h-0"
+        className="sd-link"
+        style={{ border: 0, background: "none", cursor: "pointer", font: "inherit", fontWeight: 600 }}
       >
         {LIST.open}
-        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
             ref={menuTriggerRef}
             type="button"
-            className="inline-flex h-11 min-h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover-elevate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8 md:min-h-0 md:w-8"
+            variant="outline"
+            size="icon"
             aria-label={moreActionsAccessibleName(assistant.name)}
           >
             <MoreVertical className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={onDuplicate}
-            disabled={duplicatePending}
-            className="gap-2"
-          >
+          <DropdownMenuItem onSelect={onDuplicate} disabled={duplicatePending} className="gap-2">
             <Copy className="h-3.5 w-3.5" aria-hidden="true" /> {LIST.duplicate}
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -206,12 +253,12 @@ function RowActions({
 }
 
 /**
- * V5 PR-6 (C-1): the one-assistant experience. Shown instead of the
- * list/table whenever exactly one assistant exists — the beta's normal case.
- * The list/table stay for the >1 case (legacy data only; "New Assistant" is
- * hidden once one exists, so a firm cannot reach two through this UI).
+ * The one-assistant experience, shown instead of the list whenever exactly one
+ * assistant exists — the beta's normal case. The list stays for the >1 case
+ * (legacy data only; "New Assistant" is hidden once one exists, so a firm
+ * cannot reach two through this UI).
  */
-function AssistantStatusCard({
+function AssistantSummary({
   assistant,
   onOpen,
   onOpenTab,
@@ -231,53 +278,64 @@ function AssistantStatusCard({
   const cardStatus = assistantCardStatus(assistant);
 
   return (
-    <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 shadow-xs">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate font-display text-lg font-semibold text-foreground">{assistant.name}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{templateDisplayName(assistant.templateKey)}</p>
+    <section className="sd-section" aria-labelledby="assistant-summary-title">
+      <div className="sd-section__head">
+        <div style={{ minWidth: 0 }}>
+          <h2 className="sd-h2" id="assistant-summary-title" style={{ overflowWrap: "anywhere" }}>
+            {assistant.name}
+          </h2>
+          <p style={MUTED}>{templateDisplayName(assistant.templateKey)}</p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <StatusBadge label={cardStatus.label} tone={cardStatus.tone} />
-          <RowActions
-            assistant={assistant}
-            onOpen={onOpen}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-            duplicatePending={duplicatePending}
-            menuTriggerRef={menuTriggerRef}
-          />
-        </div>
+        <StatusChip label={cardStatus.label} tone={CARD_CHIP_TONE[cardStatus.key]} />
       </div>
 
-      <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4 text-xs sm:grid-cols-3">
-        <div>
-          <dt className="text-muted-foreground">{CARD.providerLinkLabel}</dt>
-          <dd className="mt-0.5 font-medium text-foreground">{providerLinkLabel(assistant)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">{CARD.lastPublishedLabel}</dt>
-          <dd className="mt-0.5 font-medium text-foreground">
+      <dl className="sd-figures">
+        <div className="sd-figure">
+          <span className="sd-figure__value" data-empty="true">
             {assistant.lastSyncedAt ? formatUpdatedAt(assistant.lastSyncedAt) : CARD.notYetPublished}
-          </dd>
+          </span>
+          <span className="sd-figure__label">{CARD.lastPublishedLabel}</span>
+        </div>
+        <div className="sd-figure">
+          <span className="sd-figure__value" data-empty="true">
+            {formatUpdatedAt(assistant.updatedAt)}
+          </span>
+          <span className="sd-figure__label">{LIST.colUpdated}</span>
         </div>
       </dl>
 
-      <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("configuration")}>
-          {CARD.configuration}
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("prompt")}>
-          {CARD.prompt}
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("voice")}>
-          {CARD.voice}
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenTab("voice")}>
-          {CARD.test}
-        </Button>
+      <div>
+        <p style={{ ...MUTED, marginTop: 0 }}>{CARD.quickLinksLabel}</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+          <Button variant="outline" size="sm" onClick={() => onOpenTab("configuration")}>
+            {SECTIONS.configuration}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenTab("voice")}>
+            {SECTIONS.voice}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenTab("actions")}>
+            {SECTIONS.actions}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenTab("testing")}>
+            {SECTIONS.testing}
+          </Button>
+        </div>
       </div>
-    </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--sd-space-3, .75rem)" }}>
+        <Button onClick={onOpen}>{CARD.openLabel}</Button>
+        <RowActions
+          assistant={assistant}
+          onOpen={onOpen}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          duplicatePending={duplicatePending}
+          menuTriggerRef={menuTriggerRef}
+        />
+      </div>
+
+      <Diagnostics assistant={assistant} />
+    </section>
   );
 }
 
@@ -290,13 +348,7 @@ export default function Assistants() {
   const [deleteTarget, setDeleteTarget] = useState<AssistantDto | null>(null);
   const rowMenuRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-  const {
-    data: assistants,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useAssistantsList();
+  const { data: assistants, isLoading, isError, error, refetch } = useAssistantsList();
   const duplicateMutation = useDuplicateAssistant();
   const deleteMutation = useDeleteAssistant();
 
@@ -318,7 +370,7 @@ export default function Assistants() {
     navigate(assistantHref(assistant.id));
   };
 
-  /** V5 PR-6 (C-1): the status card's per-tab quick links. */
+  /** The summary view's per-section quick links. */
   const openAssistantTab = (assistant: AssistantDto, tab: string) => {
     navigate(assistantHref(assistant.id, tab));
   };
@@ -334,14 +386,8 @@ export default function Assistants() {
       },
       onError: (err) => {
         const message =
-          err instanceof AssistantApiRequestError
-            ? err.message
-            : "Duplicate failed. Please try again.";
-        toast({
-          title: "Duplicate failed",
-          description: message,
-          variant: "destructive",
-        });
+          err instanceof AssistantApiRequestError ? err.message : "Duplicate failed. Please try again.";
+        toast({ title: "Duplicate failed", description: message, variant: "destructive" });
       },
     });
   };
@@ -362,261 +408,164 @@ export default function Assistants() {
     deleteMutation.mutate(target.id, {
       onSuccess: () => {
         setDeleteTarget(null);
-        toast({
-          title: "Assistant deleted",
-          description: `"${target.name}" was permanently deleted.`,
-        });
+        toast({ title: "Assistant deleted", description: `"${target.name}" was permanently deleted.` });
         rowMenuRefs.current.delete(target.id);
       },
       onError: (err) => {
         const message =
-          err instanceof AssistantApiRequestError
-            ? err.message
-            : "Delete failed. Please try again.";
-        toast({
-          title: "Couldn't delete assistant",
-          description: message,
-          variant: "destructive",
-        });
+          err instanceof AssistantApiRequestError ? err.message : "Delete failed. Please try again.";
+        toast({ title: "Couldn't delete assistant", description: message, variant: "destructive" });
         // Row is preserved — dialog stays open so the user sees why.
       },
     });
   };
 
-  // V5 PR-6 (C-1): one assistant per firm in beta. Exactly one existing
-  // assistant switches this page from the list/table to a single status
-  // card, and hides "New Assistant" — a firm cannot reach a second assistant
-  // through this UI. Zero or more-than-one (legacy data) keep the page
-  // exactly as it was.
+  // One assistant per firm in beta. Exactly one existing assistant switches
+  // this page to the summary and hides "New Assistant". Zero or more-than-one
+  // (legacy data) keep the list.
   const singleAssistant = assistants && assistants.length === 1 ? assistants[0] : null;
 
+  if (isLoading) return <PageSkeleton label={LIST.loading} list />;
+
+  const showFilters = !singleAssistant && !isError && assistants && assistants.length > 0;
+
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-background">
-      <div className="flex-shrink-0 px-6 pb-5 pt-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="font-display text-xl font-semibold text-foreground">
-              {LIST.title}
-            </h1>
-            <p className="mt-0.5 max-w-lg text-sm text-muted-foreground">
-              {LIST.detail}
-            </p>
-          </div>
-          {singleAssistant ? (
-            <p className="text-xs text-muted-foreground">{LIST.contactToAddAnother}</p>
+    <div className="sd-page sd-enter">
+      <PageHeader
+        eyebrow={LIST.eyebrow}
+        title={LIST.title}
+        description={LIST.detail}
+        action={
+          singleAssistant ? (
+            <p style={{ ...MUTED, marginTop: 0 }}>{LIST.contactToAddAnother}</p>
           ) : (
-            <Button
-              onClick={() => navigate(NEW_PATH)}
-              className="h-9 gap-1.5 text-sm"
-            >
+            <Button onClick={() => navigate(NEW_PATH)}>
               <Plus className="h-4 w-4" aria-hidden="true" />
               {LIST.newAssistant}
             </Button>
-          )}
-        </div>
+          )
+        }
+      />
 
-        {!singleAssistant && !isLoading && !isError && assistants && assistants.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2.5">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder={LIST.searchPlaceholder}
-              aria-label={LIST.searchLabel}
-              className="w-full sm:max-w-xs"
-            />
-            <Select
-              value={status}
-              onValueChange={(v) => setStatus(v as StatusFilter)}
-            >
-              <SelectTrigger
-                className="h-9 w-full text-sm sm:w-40"
-                aria-label={LIST.statusFilterLabel}
+      {isError && (
+        <section className="sd-error" role="alert">
+          <div className="sd-error__body">
+            <span className="sd-error__title">{LIST.errorTitle}</span>
+            <p className="sd-error__detail">
+              {error instanceof AssistantApiRequestError ? error.message : LIST.errorDetail}
+            </p>
+          </div>
+          <button type="button" className="sd-error__action" onClick={() => refetch()}>
+            {LIST.retry}
+          </button>
+        </section>
+      )}
+
+      {showFilters && (
+        <div className="si-form" style={{ maxWidth: "none" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "var(--sd-space-3, .75rem)" }}>
+            <div className="si-field" style={{ flex: "1 1 14rem", minWidth: 0 }}>
+              <label className="si-label" htmlFor="assistants-search">
+                {LIST.searchLabel}
+              </label>
+              <input
+                id="assistants-search"
+                className="si-input"
+                type="search"
+                value={search}
+                placeholder={LIST.searchPlaceholder}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="si-field" style={{ flex: "0 1 12rem", minWidth: 0 }}>
+              <label className="si-label" htmlFor="assistants-status">
+                {LIST.statusFilterLabel}
+              </label>
+              <select
+                id="assistants-status"
+                className="si-input"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as StatusFilter)}
               >
-                <SelectValue placeholder={LIST.allStatuses} />
-              </SelectTrigger>
-              <SelectContent>
                 {STATUS_FILTER_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
+                  <option key={option.value} value={option.value}>
                     {option.label}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+            </div>
             <SegmentedControl<ViewMode>
               value={view}
               onChange={setView}
               aria-label={LIST.viewLabel}
-              className="sm:ml-auto"
               options={[
-                {
-                  value: "cards",
-                  label: LIST.cards,
-                  icon: LayoutGrid,
-                  "aria-label": LIST.cardsView,
-                },
-                {
-                  value: "table",
-                  label: LIST.table,
-                  icon: ListIcon,
-                  "aria-label": LIST.tableView,
-                },
+                { value: "cards", label: LIST.cards, "aria-label": LIST.cardsView },
+                { value: "table", label: LIST.table, "aria-label": LIST.tableView },
               ]}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="flex-1 px-6 pb-6">
-        {isLoading ? (
-          <AssistantsListSkeleton view={view} />
-        ) : isError ? (
-          <div className="rounded-xl border border-border bg-card shadow-xs">
-            <InlineError
-              title={LIST.errorTitle}
-              description={
-                error instanceof AssistantApiRequestError
-                  ? error.message
-                  : undefined
-              }
-              onRetry={() => refetch()}
-              className="py-16"
-            />
-          </div>
-        ) : singleAssistant ? (
-          <AssistantStatusCard
-            assistant={singleAssistant}
-            onOpen={() => openAssistant(singleAssistant)}
-            onOpenTab={(tab) => openAssistantTab(singleAssistant, tab)}
-            onDuplicate={() => handleDuplicate(singleAssistant)}
-            onDelete={() => setDeleteTarget(singleAssistant)}
-            duplicatePending={duplicateMutation.isPending}
-            menuTriggerRef={(el) => {
-              if (el) rowMenuRefs.current.set(singleAssistant.id, el);
-              else rowMenuRefs.current.delete(singleAssistant.id);
-            }}
-          />
-        ) : !assistants || assistants.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card shadow-xs">
-            <EmptyState
-              icon={Bot}
-              title={LIST.emptyTitle}
-              description={LIST.emptyDetail}
-              action={
-                <Button
-                  onClick={() => navigate(NEW_PATH)}
-                  className="h-9 gap-1.5 text-sm"
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  {LIST.newAssistant}
-                </Button>
-              }
-              className="py-16"
-            />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card shadow-xs">
-            <EmptyState
-              icon={Bot}
-              title={LIST.noMatchTitle}
-              description={LIST.noMatchDetail}
-              className="py-16"
-            />
-          </div>
-        ) : view === "table" ? (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{LIST.colName}</TableHead>
-                  <TableHead>{LIST.colTemplate}</TableHead>
-                  <TableHead>{LIST.colStatus}</TableHead>
-                  <TableHead>{LIST.colProviderLink}</TableHead>
-                  <TableHead>{LIST.colUpdated}</TableHead>
-                  <TableHead className="text-right">{LIST.colActions}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((assistant) => (
-                  <TableRow key={assistant.id}>
-                    <TableCell className="max-w-[220px]">
-                      <button
-                        type="button"
-                        onClick={() => openAssistant(assistant)}
-                        aria-label={openAccessibleName(assistant.name)}
-                        className="truncate rounded-sm text-left text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {assistant.name}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {templateDisplayName(assistant.templateKey)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge
-                        label={STATUS_LABEL[assistant.status]}
-                        tone={STATUS_TONE[assistant.status]}
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {providerLinkLabel(assistant)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatUpdatedAt(assistant.updatedAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end">
-                        <RowActions
-                          assistant={assistant}
-                          onOpen={() => openAssistant(assistant)}
-                          onDuplicate={() => handleDuplicate(assistant)}
-                          onDelete={() => setDeleteTarget(assistant)}
-                          duplicatePending={duplicateMutation.isPending}
-                          menuTriggerRef={(el) => {
-                            if (el) rowMenuRefs.current.set(assistant.id, el);
-                            else rowMenuRefs.current.delete(assistant.id);
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((assistant) => (
-              <div
-                key={assistant.id}
-                className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-xs"
-              >
-                <div className="flex items-start justify-between gap-2">
+      {!isError && singleAssistant && (
+        <AssistantSummary
+          assistant={singleAssistant}
+          onOpen={() => openAssistant(singleAssistant)}
+          onOpenTab={(tab) => openAssistantTab(singleAssistant, tab)}
+          onDuplicate={() => handleDuplicate(singleAssistant)}
+          onDelete={() => setDeleteTarget(singleAssistant)}
+          duplicatePending={duplicateMutation.isPending}
+          menuTriggerRef={(el) => {
+            if (el) rowMenuRefs.current.set(singleAssistant.id, el);
+            else rowMenuRefs.current.delete(singleAssistant.id);
+          }}
+        />
+      )}
+
+      {!isError && !singleAssistant && (!assistants || assistants.length === 0) && (
+        <div className="sd-empty">
+          <h3 className="sd-empty__title">{LIST.emptyTitle}</h3>
+          <p className="sd-empty__detail">{LIST.emptyDetail}</p>
+          <p style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
+            <Button onClick={() => navigate(NEW_PATH)}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {LIST.newAssistant}
+            </Button>
+          </p>
+        </div>
+      )}
+
+      {!isError && !singleAssistant && assistants && assistants.length > 0 && filtered.length === 0 && (
+        <div className="sd-empty">
+          <h3 className="sd-empty__title">{LIST.noMatchTitle}</h3>
+          <p className="sd-empty__detail">{LIST.noMatchDetail}</p>
+        </div>
+      )}
+
+      {!isError && !singleAssistant && filtered.length > 0 && (
+        <ul className="sd-list">
+          {filtered.map((assistant) => (
+            <li className="sd-list__item" key={assistant.id}>
+              {view === "table" ? (
+                <div className="sd-row">
                   <button
                     type="button"
                     onClick={() => openAssistant(assistant)}
                     aria-label={openAccessibleName(assistant.name)}
-                    className="min-w-0 flex-1 truncate rounded-sm text-left font-display text-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="sd-row__who"
+                    style={{
+                      border: 0,
+                      background: "none",
+                      cursor: "pointer",
+                      font: "inherit",
+                      fontWeight: 500,
+                      textAlign: "left",
+                    }}
                   >
                     {assistant.name}
                   </button>
-                  <StatusBadge
-                    label={STATUS_LABEL[assistant.status]}
-                    tone={STATUS_TONE[assistant.status]}
-                  />
-                </div>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {templateDisplayName(assistant.templateKey)}
-                </p>
-                <div className="mt-3 space-y-1 text-[11px] text-muted-foreground">
-                  <p>
-                    {LIST.colProviderLink}: {providerLinkLabel(assistant)}
-                  </p>
-                  <p>Updated {formatUpdatedAt(assistant.updatedAt)}</p>
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                  <span className="text-[11px] text-muted-foreground">
-                    {isEligibleForDelete(assistant) ? LIST.draft : LIST.locked}
-                  </span>
+                  <StatusChip label={STATUS_LABEL[assistant.status]} tone={STATUS_CHIP_TONE[assistant.status]} />
+                  <span className="sd-row__when">{formatUpdatedAt(assistant.updatedAt)}</span>
                   <RowActions
                     assistant={assistant}
                     onOpen={() => openAssistant(assistant)}
@@ -629,11 +578,63 @@ export default function Assistants() {
                     }}
                   />
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ) : (
+                <div style={{ padding: "var(--sd-space-4, 1rem)" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: "var(--sd-space-3, .75rem)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openAssistant(assistant)}
+                      aria-label={openAccessibleName(assistant.name)}
+                      className="sd-link"
+                      style={{ border: 0, background: "none", cursor: "pointer", font: "inherit", fontWeight: 600 }}
+                    >
+                      {assistant.name}
+                    </button>
+                    <StatusChip label={STATUS_LABEL[assistant.status]} tone={STATUS_CHIP_TONE[assistant.status]} />
+                  </div>
+                  <p style={MUTED}>
+                    {templateDisplayName(assistant.templateKey)} · {LIST.colUpdated}{" "}
+                    {formatUpdatedAt(assistant.updatedAt)}
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "var(--sd-space-3, .75rem)",
+                      marginTop: "var(--sd-space-3, .75rem)",
+                    }}
+                  >
+                    <span style={{ ...MUTED, marginTop: 0 }}>
+                      {isEligibleForDelete(assistant) ? LIST.draft : LIST.locked}
+                    </span>
+                    <RowActions
+                      assistant={assistant}
+                      onOpen={() => openAssistant(assistant)}
+                      onDuplicate={() => handleDuplicate(assistant)}
+                      onDelete={() => setDeleteTarget(assistant)}
+                      duplicatePending={duplicateMutation.isPending}
+                      menuTriggerRef={(el) => {
+                        if (el) rowMenuRefs.current.set(assistant.id, el);
+                        else rowMenuRefs.current.delete(assistant.id);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <AlertDialog
         open={!!deleteTarget}
@@ -643,29 +644,19 @@ export default function Assistants() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deleteDialogTitle(deleteTarget?.name ?? "")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{deleteDialogTitle(deleteTarget?.name ?? "")}</AlertDialogTitle>
             <AlertDialogDescription>{LIST.deleteDetail}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
-              {LIST.cancel}
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>{LIST.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
                 confirmDelete();
               }}
               disabled={deleteMutation.isPending}
-              className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending && (
-                <Loader2
-                  className="h-3.5 w-3.5 animate-spin"
-                  aria-hidden="true"
-                />
-              )}
               {LIST.delete}
             </AlertDialogAction>
           </AlertDialogFooter>

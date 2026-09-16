@@ -58,7 +58,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   BUILDER,
+  BUILDER_PAGE,
   CREATE,
+  DIAGNOSTICS,
   ESTIMATE_CHIP,
   ESTIMATE_NOTE,
   GUIDANCE_CHIP,
@@ -68,7 +70,9 @@ import {
   NEW_PATH,
   PRESET_RECOVERY,
   PROVIDER_LINKED,
+  SAVE,
   SYNC,
+  TEST_PUBLISH,
   PROVIDER_NOT_LINKED,
   RETIRED_VOICE_PRESET_IDS,
   SAVE_PROMPT_EITHER,
@@ -525,10 +529,30 @@ check(
     listCode,
   ),
 );
+/**
+ * The guarantee is unchanged; where it is defined has moved, deliberately.
+ *
+ * This page used to repeat `min-h-11` and `focus-visible:ring-2` on every
+ * control, so the 44px target and the focus ring were a habit each screen had
+ * to remember rather than a property of the design system. They now come from
+ * `sd-link` / `sd-error__action` in `v2-dashboard.css`, and the ring from the
+ * shell's own `:focus-visible` rule — so the assertion is made against the
+ * stylesheet that actually provides them, which is strictly stronger than
+ * grepping for a utility class the page could silently drop.
+ */
 check(
-  "row controls keep a 44px minimum target and a visible focus ring",
-  /min-h-11/.test(listCode) && /focus-visible:ring-2/.test(listCode),
+  "row controls take their target size from the shared design system",
+  /className="sd-link"/.test(listCode) && !/min-h-11|focus-visible:ring-2/.test(listCode),
 );
+{
+  const dashboardCss = read("artifacts/helpdesk/src/styles/v2-dashboard.css");
+  check(
+    "and that stylesheet really does define a 44px target and a focus ring",
+    /\.sd-link\s*\{[^}]*min-height:\s*44px/.test(dashboardCss) &&
+      /\.sd-error__action\s*\{[^}]*min-height:\s*44px/.test(dashboardCss) &&
+      /\.sd-app :focus-visible\s*\{[^}]*outline:/.test(dashboardCss),
+  );
+}
 check(
   "the delete item is still the only destructive one, and still status-gated",
   /disabled=\{!deletable\}/.test(listCode) && /isEligibleForDelete\(assistant\)/.test(listCode),
@@ -1320,6 +1344,79 @@ check(
 check(
   "the retired promises are gone from the template copy",
   !/Keeps the phone answered|never missing a call|calendar fills itself|Answers every call/.test(templatesCode),
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+section("V8 presentation pass — the chrome's own copy, and where it lives");
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The builder's header, its test/publish section, its save bar and its
+ * diagnostics used to be sentences inlined in JSX. Moving them here is what
+ * lets the banned-phrase surface below reach them at all: the whole point of
+ * `everyRenderableString()` is that a phrase which cannot be enumerated
+ * cannot be checked, and the most consequential copy in this journey — the
+ * sentence beside the only irreversible control — was in that blind spot.
+ */
+
+check(
+  "every new chrome string is reachable from the enumerable surface",
+  [
+    ...Object.values(BUILDER_PAGE),
+    ...Object.values(TEST_PUBLISH),
+    ...Object.values(SAVE),
+    ...Object.values(DIAGNOSTICS),
+  ].every((s) => everyRenderableString().includes(s)),
+);
+
+// Publishing is the one irreversible action here, so its sentence has to say
+// what a caller gets, and has to deny the reading that unsaved edits go live.
+check(
+  "the publish section says callers hear the published version",
+  /callers hear the published version/i.test(TEST_PUBLISH.publishDetail),
+);
+check(
+  "and that unsaved edits are not part of it",
+  /unsaved/i.test(TEST_PUBLISH.publishDetail),
+);
+
+// A browser test is not a call to anybody, and the copy must not let it read
+// as one — this is the same claim the confirmation dialog makes.
+check(
+  "the test section says no caller is involved",
+  /no caller is involved/i.test(TEST_PUBLISH.testDetail) &&
+    /browser/i.test(TEST_PUBLISH.testDetail),
+);
+check(
+  "an unavailable control names the workspace, never a flag or a checkpoint",
+  /workspace/i.test(TEST_PUBLISH.notEnabled) &&
+    !/flag|checkpoint|milestone|enabled|VITE_/i.test(TEST_PUBLISH.notEnabled),
+);
+
+// Saved-versus-unsaved has to be a word, not a colour or a disabled button.
+check(
+  "saved and unsaved are distinct sentences",
+  SAVE.saved !== SAVE.dirty && /unsaved/i.test(SAVE.dirty) && /saved/i.test(SAVE.saved),
+);
+check(
+  "a failed save says the changes were not kept, and offers a retry",
+  /weren't saved|were not saved/i.test(SAVE.failedTitle) && SAVE.retry.length > 0,
+);
+
+// Diagnostics stay on the page — they are real evidence — but they say who
+// they are for, so the main flow is not read as a console.
+check(
+  "the diagnostics disclosure names its audience",
+  /SiteMint support/i.test(DIAGNOSTICS.detail) && /never need/i.test(DIAGNOSTICS.detail),
+);
+check(
+  "and it is where the provider-link and sync diagnostics now live",
+  DIAGNOSTICS.providerLink === "Provider link" && /voice provider/i.test(DIAGNOSTICS.lastSynced),
+);
+
+check(
+  "the assistant's name is described as internal, never as something callers hear",
+  /callers never hear/i.test(BUILDER_PAGE.nameHelp),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════

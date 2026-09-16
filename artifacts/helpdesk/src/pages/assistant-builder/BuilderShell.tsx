@@ -1,14 +1,18 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, PlayCircle, Rocket } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/common/PageHeader";
 import { UnavailableActionButton } from "@/components/common/UnavailableActionButton";
 import { CostBreakdown } from "@/components/common/CostBreakdown";
 import { LatencyMeter } from "@/components/common/LatencyMeter";
 import { findVoicePreset } from "@/lib/assistantEstimates";
-import { PRESET_RECOVERY } from "@/pages/assistants/assistantsContract";
+import {
+  BUILDER_PAGE,
+  PRESET_RECOVERY,
+  SECTIONS,
+  TEST_PUBLISH,
+} from "@/pages/assistants/assistantsContract";
 import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { useWorkspaceBusinessInfo, type WorkspaceBusinessInfo } from "@/hooks/useWorkspaceBusinessInfo";
@@ -17,55 +21,51 @@ import ActionsTab from "@/pages/assistant-builder/ActionsTab";
 import ConfigurationTab from "@/pages/assistant-builder/ConfigurationTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
 import VoiceTab from "@/pages/assistant-builder/VoiceTab";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-signin.css";
 
 /**
- * ── V5 PR-6 (C-5) ─────────────────────────────────────────────────────────
- *
- * Within a voice-enabled build, the Test call and Publish controls are now
- * always rendered — as a real control when their own sub-flag is on, and as
- * a disabled placeholder naming the reason when it is off. A build with
- * `voicePlatformEnabled` false still shows neither: this is "always visible
- * in the voice build", not "always visible everywhere", so a default build
- * still ships no voice-builder chrome at all.
+ * Within a voice-enabled build, the Test call and Publish controls are always
+ * rendered — as a real control when their own sub-flag is on, and as a
+ * disabled placeholder naming the reason when it is off. A build with
+ * `voicePlatformEnabled` false shows neither: this is "always visible in the
+ * voice build", not "always visible everywhere", so a default build still
+ * ships no voice-builder chrome at all.
  *
  * The disabled placeholder is `UnavailableActionButton` — already imported
  * unconditionally above and carrying no publish/browser-test/provider
- * dependency of its own — so a build with a sub-flag off still never pulls
- * in `PublishButton`, `BrowserTestButton`, or anything past them; only the
- * caller (`AssistantBuilder.tsx`/`AssistantBuilderNew.tsx`) still supplies
- * the real control, and only from its own flag-on branch, exactly as before.
+ * dependency of its own — so a build with a sub-flag off still never pulls in
+ * `PublishButton`, `BrowserTestButton`, or anything past them.
  */
 const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 const browserTestInBuild = voicePlatformEnabled && voiceBrowserTestEnabled;
 /**
- * AR-001V: the provider-synchronization control is gated by the platform flag
- * alone. It is neither a publish nor a browser test — it updates a resource
- * that already exists — and the server independently refuses to contact the
- * provider unless VOICE_PUBLISH_ENABLED is true, so nothing here can reach a
- * provider on its own.
+ * The provider-synchronization control is gated by the platform flag alone. It
+ * is neither a publish nor a browser test — it updates a resource that already
+ * exists — and the server independently refuses to contact the provider unless
+ * VOICE_PUBLISH_ENABLED is true, so nothing here can reach a provider on its
+ * own.
  */
 const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;
 
-const NOT_ENABLED_REASON = "Not enabled on this workspace yet.";
-
 /**
- * V5 PR-6 (C-2/C-4): "Setup" -> "Configuration", "Voice & Model" -> "Voice".
+ * The builder's five sections. The keys are routing and are unchanged; only
+ * the labels moved, into `SECTIONS` in the contract module, so the list page's
+ * quick links and this rail cannot name the same destination differently.
  * `BUILDER_TAB_ALIASES` below maps the old keys so a previously-shared or
  * bookmarked URL still resolves — see `resolveBuilderTab`.
  */
 export const BUILDER_TABS = [
-  { key: "configuration", label: "Business information" },
-  { key: "voice", label: "Greeting & voice" },
-  { key: "actions", label: "What it can do" },
-  { key: "testing", label: "Test & publish" },
-  { key: "prompt", label: "Advanced" },
+  { key: "configuration", label: SECTIONS.configuration },
+  { key: "voice", label: SECTIONS.voice },
+  { key: "actions", label: SECTIONS.actions },
+  { key: "testing", label: SECTIONS.testing },
+  { key: "prompt", label: SECTIONS.prompt },
 ] as const;
 
 export type BuilderTabKey = (typeof BUILDER_TABS)[number]["key"];
 
-export function isBuilderTabKey(
-  value: string | undefined,
-): value is BuilderTabKey {
+export function isBuilderTabKey(value: string | undefined): value is BuilderTabKey {
   return BUILDER_TABS.some((t) => t.key === value);
 }
 
@@ -73,9 +73,9 @@ export function isBuilderTabKey(
 export const BUILDER_TAB_ALIASES: Record<string, BuilderTabKey> = {
   setup: "configuration",
   "voice-model": "voice",
-  // V8 renamed the sections but kept their keys, so every previously shared
-  // link still resolves. These two additions cover the business-language names
-  // a customer might type or a future link might use.
+  // The sections were renamed but kept their keys, so every previously shared
+  // link still resolves. These three cover the business-language names a
+  // customer might type or a future link might use.
   business: "configuration",
   greeting: "voice",
   advanced: "prompt",
@@ -83,9 +83,9 @@ export const BUILDER_TAB_ALIASES: Record<string, BuilderTabKey> = {
 
 /**
  * Resolves a raw route param to a tab key: the value itself when already
- * canonical, its alias when it's a known legacy key, or `undefined` when
- * it's neither (an unrecognized tab, or no tab at all) — the caller decides
- * the default and whether to redirect.
+ * canonical, its alias when it's a known legacy key, or `undefined` when it's
+ * neither (an unrecognized tab, or no tab at all) — the caller decides the
+ * default and whether to redirect.
  */
 export function resolveBuilderTab(value: string | undefined): BuilderTabKey | undefined {
   if (value === undefined) return undefined;
@@ -96,16 +96,11 @@ export function resolveBuilderTab(value: string | undefined): BuilderTabKey | un
 export interface BuilderTabProps {
   draft: AssistantDraft;
   update: (updater: (draft: AssistantDraft) => AssistantDraft) => void;
-  /** V5 PR-6 (C-2): the firm's business name/industry from Workspace Settings, or `null` until it loads. Read-only. */
+  /** The firm's business name/industry from Workspace Settings, or `null` until it loads. Read-only. */
   businessInfo: WorkspaceBusinessInfo | null;
 }
 
-function TabPanel({
-  tab,
-  draft,
-  update,
-  businessInfo,
-}: { tab: BuilderTabKey } & BuilderTabProps) {
+function TabPanel({ tab, draft, update, businessInfo }: { tab: BuilderTabKey } & BuilderTabProps) {
   switch (tab) {
     case "configuration":
       return <ConfigurationTab draft={draft} update={update} businessInfo={businessInfo} />;
@@ -132,44 +127,34 @@ interface BuilderShellProps extends Pick<BuilderTabProps, "draft" | "update"> {
   footerRight: ReactNode;
   /** Screen-reader-only save-status announcement (aria-live). */
   announcement: string;
-  /**
-   * Milestone 1 / Checkpoint E3C: the Publish control for this builder
-   * instance. Defaults to the standing "unavailable" placeholder (matching
-   * pre-E3C behavior) when the caller doesn't supply one — the new/unsaved
-   * builder always uses the default, since publishing is never eligible for
-   * an unpersisted assistant.
-   */
+  /** The Publish control for this builder instance. */
   publishControl?: ReactNode;
-  /**
-   * Milestone 1 / Checkpoint F1: the Test control for this builder
-   * instance. Defaults to the standing "unavailable" placeholder when the
-   * caller doesn't supply one — the new/unsaved builder always uses the
-   * default, since testing is never eligible for an unpersisted assistant.
-   */
+  /** The Test control for this builder instance. */
   testControl?: ReactNode;
-  /**
-   * AR-001V: the provider-synchronization control for this builder instance.
-   * Omitted entirely by the new/unsaved builder, where no published provider
-   * resource exists to update.
-   */
+  /** The provider-synchronization control. Omitted by the new/unsaved builder. */
   syncControl?: ReactNode;
-  /** Milestone 1 / Checkpoint F1: the active browser-test panel, rendered below the header banner when a test is in progress or has just ended. */
+  /** The active browser-test panel. */
   testPanel?: ReactNode;
   /**
-   * True while a publish request is in flight for this assistant. Disables
-   * the name field and every tab's editable controls (via a fieldset) so a
-   * publish attempt can't race a concurrent edit — mirrors the existing
-   * disabled Save Draft behavior during that same window.
+   * True while a publish request is in flight. Disables the name field and
+   * every section's editable controls (via a fieldset) so a publish attempt
+   * can't race a concurrent edit.
    */
   contentDisabled?: boolean;
 }
 
 /**
- * Shared chrome for both the new-unsaved and persisted assistant builder
- * routes: header (name field, status badge, disabled Test/Publish), the
- * launch-candidate builder tabs, and the sticky estimate/save footer. Only the parts
- * that differ between "new" and "persisted" (status badge, save control,
- * banner) are passed in by the caller.
+ * Shared chrome for both the new-unsaved and persisted builder routes.
+ *
+ * This used to be a header card, a tab strip, a content card and a footer bar,
+ * all written in utility classes — a second visual language inside a dashboard
+ * that already had one. It is now the same `sd-page`/`PageHeader` frame every
+ * other screen uses, with the sections as a plain labelled nav and each
+ * section's fields inside one `si-form` (which is what makes the shared
+ * `si-input` tokens resolve — see `.sd-app .si-form` in `v5-app.css`).
+ *
+ * Only the parts that genuinely differ between "new" and "persisted" — the
+ * status, the save control, the banners — are still passed in by the caller.
  */
 export function BuilderShell({
   draft,
@@ -187,17 +172,16 @@ export function BuilderShell({
   testPanel,
   contentDisabled = false,
 }: BuilderShellProps) {
-  // Undefined when the saved config carries a retired preset. The footer
-  // then says the estimates are unavailable rather than showing figures
-  // belonging to a preset the customer never chose.
+  // Undefined when the saved config carries a retired preset. The foot then
+  // says the estimates are unavailable rather than showing figures belonging
+  // to a preset the customer never chose.
   const preset = findVoicePreset(draft.voiceModel.preset);
 
-  // V5 PR-6 (C-2): fetched once here so every tab sees the same read-only
-  // workspace business name/industry, then one-way synced into
-  // `draft.setup` so a save (which runs synchronously — see
-  // `serializeDraftToConfig`) always has a value even before this fetch
-  // resolves. Never synced back the other way, and never itself a source of
-  // an "unsaved changes" state: the effect only fires when the fetched value
+  // Fetched once here so every section sees the same read-only workspace
+  // business name/industry, then one-way synced into `draft.setup` so a save
+  // (which runs synchronously) always has a value even before this fetch
+  // resolves. Never synced back the other way, and never itself a source of an
+  // "unsaved changes" state: the effect only fires when the fetched value
   // actually differs from what the draft already holds.
   const businessInfo = useWorkspaceBusinessInfo();
   const updateRef = useRef(update);
@@ -205,7 +189,7 @@ export function BuilderShell({
   const syncedBusinessInfoRef = useRef<string | null>(null);
   useEffect(() => {
     if (!businessInfo.data) return;
-    const key = `${businessInfo.data.name} ${businessInfo.data.industry}`;
+    const key = `${businessInfo.data.name} ${businessInfo.data.industry}`;
     if (syncedBusinessInfoRef.current === key) return;
     syncedBusinessInfoRef.current = key;
     if (draft.setup.businessName === businessInfo.data.name && draft.setup.industry === businessInfo.data.industry) {
@@ -215,8 +199,8 @@ export function BuilderShell({
       ...d,
       setup: { ...d.setup, businessName: businessInfo.data!.name, industry: businessInfo.data!.industry },
     }));
-    // Only the fetched value should re-trigger this — reading draft.setup
-    // here would fight with the customer's own edits to unrelated fields.
+    // Only the fetched value should re-trigger this — reading draft.setup here
+    // would fight with the customer's own edits to unrelated fields.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessInfo.data]);
 
@@ -224,135 +208,137 @@ export function BuilderShell({
 
   return (
     <div className="sd-page sd-enter">
-      <div aria-live="polite" className="sr-only">
+      <div aria-live="polite" className="sd-sr">
         {announcement}
       </div>
 
-      {/* Header — the same shell every other dashboard page uses. */}
-      <div className="sd-page__head">
-        <div className="min-w-0">
-          <Link
-            href="/assistants"
-            className="mb-1 inline-flex min-h-11 items-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-0 md:py-0"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            Assistants
+      <PageHeader
+        eyebrow={BUILDER_PAGE.eyebrow}
+        title={draft.setup.assistantName || BUILDER_PAGE.untitled}
+        description={activeTabLabel}
+        breadcrumb={
+          <Link href={backHref} className="sd-link">
+            <ArrowLeft className="sd-navlink__icon" aria-hidden="true" />
+            {BUILDER_PAGE.back}
           </Link>
-          <span className="sd-eyebrow">ASSISTANT</span>
-          <h1 className="sd-page__title">
-            {draft.setup.assistantName || "Untitled assistant"}
-          </h1>
-          <p className="sd-page__meta">{activeTabLabel}</p>
-        </div>
-      </div>
+        }
+        action={<span className="sd-chip">{statusBadge}</span>}
+      />
 
-      <div className="mb-4 rounded-lg border border-card-border bg-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <Input
-              aria-label="Assistant name"
+      {/* The name is edited once, here, so it stays visible from every
+          section — it used to be both a header field and a field inside the
+          first section, two inputs bound to one value on one screen. */}
+      <section className="sd-section" aria-label={BUILDER_PAGE.identityLabel}>
+        <div className="si-form" style={{ maxWidth: "none" }}>
+          <div className="si-field">
+            <label className="si-label" htmlFor="assistant-name">
+              {BUILDER_PAGE.nameLabel}
+            </label>
+            <input
+              id="assistant-name"
+              className="si-input"
+              type="text"
               value={draft.setup.assistantName}
               onChange={(e) =>
-                update((d) => ({
-                  ...d,
-                  setup: { ...d.setup, assistantName: e.target.value },
-                }))
+                update((d) => ({ ...d, setup: { ...d.setup, assistantName: e.target.value } }))
               }
-              placeholder="Untitled assistant"
+              placeholder={BUILDER_PAGE.untitled}
               maxLength={100}
               disabled={contentDisabled}
-              className="h-9 max-w-xs text-sm font-semibold"
+              aria-describedby="assistant-name-help"
             />
-            <Badge
-              variant="secondary"
-              className="flex-shrink-0 text-xs font-medium"
-            >
-              {statusBadge}
-            </Badge>
+            <p className="si-hint" id="assistant-name-help">
+              {BUILDER_PAGE.nameHelp}
+            </p>
           </div>
-          {/* Publishing and testing live in their own section now. Repeating
-              them here is what made every screen look like a launch console.
-              The platform gate stays exactly as it was: a build with the voice
-              platform off renders no action affordance here at all. */}
-          {voicePlatformEnabled && (
-            <>
-              {tab !== "testing" && (
-                <button
-                  type="button"
-                  onClick={() => onTabChange("testing")}
-                  className="flex-shrink-0 text-sm font-medium text-primary hover:underline"
-                >
-                  Test &amp; publish &rarr;
-                </button>
-              )}
-            </>
-          )}
         </div>
-        {headerBanner && <div className="mt-3">{headerBanner}</div>}
-        {browserTestInBuild && testPanel && <div className="mt-3">{testPanel}</div>}
-      </div>
+      </section>
 
-      {/* Tabs + content */}
-      <Tabs
-        value={tab}
-        onValueChange={(v) => isBuilderTabKey(v) && onTabChange(v)}
-        className="flex flex-col gap-4 md:flex-row"
-      >
-        <div className="relative flex-shrink-0 md:w-56">
-          <TabsList
-            aria-label="Assistant builder sections"
-            className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg border border-card-border bg-card p-2 md:w-56 md:flex-col md:overflow-visible"
-          >
-            {BUILDER_TABS.map((t) => (
-              <TabsTrigger
-                key={t.key}
-                value={t.key}
-                className="w-auto min-h-11 shrink-0 justify-start whitespace-nowrap rounded-lg px-3 py-2 text-sm data-[state=active]:bg-surface-muted data-[state=active]:text-primary data-[state=active]:shadow-none md:w-full"
+      {headerBanner && <section className="sd-section">{headerBanner}</section>}
+      {browserTestInBuild && testPanel && <section className="sd-section">{testPanel}</section>}
+
+      <nav aria-label={BUILDER_PAGE.sectionsLabel}>
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--sd-space-2, .5rem)",
+          }}
+        >
+          {BUILDER_TABS.map((t) => (
+            <li key={t.key}>
+              <Button
+                type="button"
+                variant={tab === t.key ? "default" : "outline"}
+                size="sm"
+                aria-current={tab === t.key ? "page" : undefined}
+                onClick={() => onTabChange(t.key)}
               >
                 {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent md:hidden"
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div style={{ minWidth: 0 }}>
+        {tab === "testing" ? (
+          <TestAndPublishPanel
+            statusBadge={statusBadge}
+            testControl={testControl}
+            publishControl={publishControl}
+            syncControl={syncControl}
           />
-        </div>
+        ) : (
+          <fieldset
+            disabled={contentDisabled}
+            className="si-form"
+            style={{ maxWidth: "none", border: 0, margin: 0, padding: 0, minWidth: 0 }}
+          >
+            <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
+          </fieldset>
+        )}
 
-        <div className="min-w-0 flex-1 rounded-lg border border-card-border bg-card p-4 sm:p-5">
-          {tab === "testing" ? (
-            <TestAndPublishPanel
-              statusBadge={statusBadge}
-              testControl={testControl}
-              publishControl={publishControl}
-              syncControl={syncControl}
-            />
-          ) : (
-            <fieldset disabled={contentDisabled} className="min-w-0">
-              <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
-            </fieldset>
-          )}
-
-          {/* Technical guidance is secondary, so it sits at the foot of the
-              Advanced section rather than in a bar over every screen. */}
-          {tab === "prompt" && (
-            <div className="mt-6 border-t border-card-border pt-4">
-              {preset === undefined ? (
-                <p className="text-[11px] text-muted-foreground">{PRESET_RECOVERY.estimatesUnavailable}</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 sm:flex sm:gap-8">
-                  <CostBreakdown preset={preset} compact />
-                  <LatencyMeter latencyMs={preset.latencyMs} compact />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </Tabs>
-
-      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-card-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-end">
-        {footerRight}
+        {/* Technical guidance is secondary, so it sits at the foot of the
+            Advanced section rather than in a bar over every screen. */}
+        {tab === "prompt" && (
+          <div
+            style={{
+              marginTop: "var(--sd-space-6, 1.5rem)",
+              paddingTop: "var(--sd-space-4, 1rem)",
+              borderTop: "1px solid var(--sd-border, rgba(59,82,101,.12))",
+            }}
+          >
+            {preset === undefined ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  color: "var(--sd-text-muted, #3b5265)",
+                }}
+              >
+                {PRESET_RECOVERY.estimatesUnavailable}
+              </p>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))",
+                  gap: "var(--sd-space-4, 1rem)",
+                }}
+              >
+                <CostBreakdown preset={preset} compact />
+                <LatencyMeter latencyMs={preset.latencyMs} compact />
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      <div className="sd-section">{footerRight}</div>
     </div>
   );
 }
@@ -377,56 +363,80 @@ function TestAndPublishPanel({
   publishControl?: ReactNode;
   syncControl?: ReactNode;
 }) {
-  return (
-    <div className="space-y-5">
-      <section>
-        <h2 className="text-sm font-semibold text-foreground">Current state</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          What callers reach right now, and whether it matches what you last saved.
-        </p>
-        <div className="mt-2">{statusBadge}</div>
-      </section>
+  // A build without the voice platform drops this row entirely, rather than
+  // rendering headed sections about features it does not contain. Returning
+  // null rather than gating inside the wrapper leaves no empty container.
+  if (!voicePlatformEnabled) return null;
 
-      <section>
-        <h2 className="text-sm font-semibold text-foreground">Hear it yourself</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          A test call runs in this browser. It does not use your phone number and no
-          caller is involved.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {browserTestInBuild ? (
-            testControl ?? (
-              <UnavailableActionButton
-                icon={PlayCircle}
-                label="Test call"
-                availability="Save and publish this assistant before testing."
-              />
-            )
-          ) : (
-            <UnavailableActionButton icon={PlayCircle} label="Test call" availability={NOT_ENABLED_REASON} />
-          )}
+  const detail = {
+    margin: "var(--sd-space-1, .25rem) 0 var(--sd-space-3, .75rem)",
+    fontSize: "var(--sd-text-small, .8125rem)",
+    lineHeight: 1.55,
+    color: "var(--sd-text-muted, #3b5265)",
+  } as const;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sd-space-6, 1.5rem)" }}>
+      <section className="sd-section" aria-labelledby="test-publish-state">
+        <div>
+          <h2 className="sd-h2" id="test-publish-state">
+            {TEST_PUBLISH.stateTitle}
+          </h2>
+          <p style={detail}>{TEST_PUBLISH.stateDetail}</p>
+          <span className="sd-chip">{statusBadge}</span>
         </div>
       </section>
 
-      <section>
-        <h2 className="text-sm font-semibold text-foreground">Put it live</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Publishing sends your setup to the voice provider. Callers hear the published
-          version, not your unsaved edits.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {publishInBuild ? (
-            publishControl ?? (
+      <section className="sd-section" aria-labelledby="test-publish-test">
+        <div>
+          <h2 className="sd-h2" id="test-publish-test">
+            {TEST_PUBLISH.testTitle}
+          </h2>
+          <p style={detail}>{TEST_PUBLISH.testDetail}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+            {browserTestInBuild ? (
+              testControl ?? (
+                <UnavailableActionButton
+                  icon={PlayCircle}
+                  label={TEST_PUBLISH.testLabel}
+                  availability={TEST_PUBLISH.testUnavailableDefault}
+                />
+              )
+            ) : (
+              <UnavailableActionButton
+                icon={PlayCircle}
+                label={TEST_PUBLISH.testLabel}
+                availability={TEST_PUBLISH.notEnabled}
+              />
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="sd-section" aria-labelledby="test-publish-live">
+        <div>
+          <h2 className="sd-h2" id="test-publish-live">
+            {TEST_PUBLISH.publishTitle}
+          </h2>
+          <p style={detail}>{TEST_PUBLISH.publishDetail}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+            {publishInBuild ? (
+              publishControl ?? (
+                <UnavailableActionButton
+                  icon={Rocket}
+                  label={TEST_PUBLISH.publishLabel}
+                  availability={TEST_PUBLISH.publishUnavailableDefault}
+                />
+              )
+            ) : (
               <UnavailableActionButton
                 icon={Rocket}
-                label="Publish"
-                availability="Save this assistant as a draft before publishing."
+                label={TEST_PUBLISH.publishLabel}
+                availability={TEST_PUBLISH.notEnabled}
               />
-            )
-          ) : (
-            <UnavailableActionButton icon={Rocket} label="Publish" availability={NOT_ENABLED_REASON} />
-          )}
-          {syncInBuild && syncControl}
+            )}
+            {syncInBuild && syncControl}
+          </div>
         </div>
       </section>
     </div>

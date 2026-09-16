@@ -1,19 +1,24 @@
 /**
- * V8 — "What it can do": the actions the assistant may take on a call.
+ * "What it can do" — the actions the assistant may take on a call.
  *
- * Two different questions live on this screen, and the whole point is that they
- * are not merged:
+ * Two different questions live on this screen, and the whole point is that
+ * they are not merged:
  *
- *   WHAT YOU WANT IT TO DO — the checkboxes. Part of the assistant draft, saved
- *     with everything else, and entirely under the customer's control.
- *   WHAT IT CAN ACTUALLY DO — the capability cards. Derived by the server from
- *     the published payload's own rules, and not editable here.
+ *   WHAT YOU WANT IT TO DO — the checkboxes. Part of the assistant draft,
+ *     saved with everything else, and entirely under the customer's control.
+ *   WHAT IT CAN ACTUALLY DO — the capability cards. Derived by the server
+ *     from the published payload's own rules, and not editable here.
  *
  * Before this screen existed, only the first was shown. A customer could tick
- * "Book appointments", save, publish, and reasonably believe callers could book
- * — while the published assistant carried no booking tool at all. Now a ticked
- * action whose capability is unavailable says so, next to the tick, with the
- * specific thing that would unblock it.
+ * "Book appointments", save, publish, and reasonably believe callers could
+ * book — while the published assistant carried no booking tool at all. A
+ * ticked action whose capability is unavailable now says so, next to the tick,
+ * with the specific thing that would unblock it.
+ *
+ * Presentation only in this pass: the shared `sd-*` and `si-*` vocabulary
+ * replaces the utility classes. Every state the screen could reach before —
+ * loading, failed, nothing attachable, blocked-with-a-reason — is still here,
+ * and the failure is still announced.
  */
 
 import { Link } from "wouter";
@@ -33,28 +38,68 @@ const BLOCKER_LINK: Record<string, { href: string; label: string } | undefined> 
   needs_transfer_contact: { href: ROUTES.transferContacts, label: "Add a transfer contact" },
 };
 
+const MUTED = {
+  margin: "var(--sd-space-1, .25rem) 0 0",
+  fontSize: "var(--sd-text-small, .8125rem)",
+  lineHeight: 1.55,
+  color: "var(--sd-text-muted, #3b5265)",
+} as const;
+
 function CapabilityCard({ capability }: { capability: AssistantCapability }) {
   const active = capability.state === "active";
   const link = capability.blockedBy ? BLOCKER_LINK[capability.blockedBy] : undefined;
+
   return (
-    <li className="rounded-lg border border-card-border bg-card p-3">
-      <div className="flex items-start gap-2.5">
+    <li className="sd-list__item">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "var(--sd-space-3, .75rem)",
+          padding: "var(--sd-space-4, 1rem)",
+          minWidth: 0,
+        }}
+      >
         {active ? (
-          <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
+          <CheckCircle2
+            className="sd-navlink__icon"
+            style={{ flex: "0 0 auto", marginTop: 2, color: "var(--sd-accent-ink, #051824)" }}
+            aria-hidden="true"
+          />
         ) : (
-          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+          <AlertTriangle
+            className="sd-navlink__icon"
+            style={{ flex: "0 0 auto", marginTop: 2, color: "var(--sd-warn, #8a5200)" }}
+            aria-hidden="true"
+          />
         )}
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "var(--sd-text-body, .875rem)",
+              fontWeight: 600,
+              color: "var(--sd-text, #051824)",
+            }}
+          >
             {capability.label}
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
+            <span
+              style={{
+                marginLeft: "var(--sd-space-2, .5rem)",
+                fontSize: "var(--sd-text-micro, .6875rem)",
+                fontWeight: 600,
+                letterSpacing: "var(--sd-tracking-eyebrow, .1em)",
+                textTransform: "uppercase",
+                color: "var(--sd-text-muted, #3b5265)",
+              }}
+            >
               {active ? ACTIONS.stateActive : ACTIONS.stateUnavailable}
             </span>
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{capability.detail}</p>
+          <p style={MUTED}>{capability.detail}</p>
           {link && (
-            <Link href={link.href} className="mt-1 inline-block text-xs text-primary hover:underline">
-              {link.label} &rarr;
+            <Link href={link.href} className="sd-link">
+              {link.label}
             </Link>
           )}
         </div>
@@ -104,38 +149,56 @@ export function ActionsTab({ draft, update }: BuilderTabProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <section>
-        <h2 className="text-sm font-semibold text-foreground">{ACTIONS.availableTitle}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{ACTIONS.availableDetail}</p>
+    <>
+      <section className="sd-section" aria-labelledby="actions-available-title">
+        <div>
+          <h2 className="sd-h2" id="actions-available-title">
+            {ACTIONS.availableTitle}
+          </h2>
+          <p style={MUTED}>{ACTIONS.availableDetail}</p>
+        </div>
 
-        {capabilities.isLoading && (
-          <p className="mt-2 text-xs text-muted-foreground">{ACTIONS.loading}</p>
-        )}
+        {capabilities.isLoading && <p style={MUTED}>{ACTIONS.loading}</p>}
+
         {capabilities.isError && (
-          <p className="mt-2 text-xs text-destructive" role="alert">{ACTIONS.loadFailed}</p>
+          <div className="sd-error" role="alert">
+            <div className="sd-error__body">
+              <span className="sd-error__title">{ACTIONS.loadFailed}</span>
+            </div>
+            <button type="button" className="sd-error__action" onClick={() => capabilities.refetch()}>
+              Try again
+            </button>
+          </div>
         )}
+
         {!capabilities.isLoading && !capabilities.isError && (
           <>
             {capabilities.data && !capabilities.data.toolsAttachable && (
-              <p className="mt-2 rounded-md border border-card-border bg-background p-2.5 text-xs text-muted-foreground">
-                {ACTIONS.noneAttachable}
-              </p>
+              <div className="sd-empty">
+                <p className="sd-empty__detail">{ACTIONS.noneAttachable}</p>
+              </div>
             )}
-            <ul className="mt-2 space-y-2">
-              {items.map((c) => (
-                <CapabilityCard key={c.key} capability={c} />
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-muted-foreground">{ACTIONS.publishToApply}</p>
+            {items.length > 0 && (
+              <ul className="sd-list">
+                {items.map((c) => (
+                  <CapabilityCard key={c.key} capability={c} />
+                ))}
+              </ul>
+            )}
+            <p style={MUTED}>{ACTIONS.publishToApply}</p>
           </>
         )}
       </section>
 
-      <section>
-        <h2 className="text-sm font-semibold text-foreground">{ACTIONS.permittedTitle}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{ACTIONS.permittedDetail}</p>
-        <div className="mt-2 space-y-2.5">
+      <section className="sd-section" aria-labelledby="actions-permitted-title">
+        <div>
+          <h2 className="sd-h2" id="actions-permitted-title">
+            {ACTIONS.permittedTitle}
+          </h2>
+          <p style={MUTED}>{ACTIONS.permittedDetail}</p>
+        </div>
+
+        <ul className="sd-list">
           {PERMITTED_ACTIONS.map((action) => {
             const checked = tools.permittedActions.includes(action.id);
             const inputId = `permitted-action-${action.id}`;
@@ -144,31 +207,55 @@ export function ActionsTab({ draft, update }: BuilderTabProps) {
             // assistant cannot currently do. An unticked action needs no notice.
             const unavailable = checked && capability !== undefined && capability.state !== "active";
             return (
-              <label
-                key={action.id}
-                htmlFor={inputId}
-                className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card p-3 hover-elevate"
-              >
-                <Checkbox
-                  id={inputId}
-                  checked={checked}
-                  onCheckedChange={(v) => togglePermittedAction(action.id, v === true)}
-                  className="mt-0.5"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{action.label}</p>
-                  <p className="text-xs text-muted-foreground">{action.description}</p>
-                  {unavailable && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      <AlertTriangle className="mr-1 inline h-3 w-3 align-[-2px]" aria-hidden="true" />
-                      {ACTIONS.wantedButUnavailable} {capability!.detail}
-                    </p>
-                  )}
-                </div>
-              </label>
+              <li className="sd-list__item" key={action.id}>
+                <label
+                  htmlFor={inputId}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "var(--sd-space-3, .75rem)",
+                    padding: "var(--sd-space-4, 1rem)",
+                    cursor: "pointer",
+                    minWidth: 0,
+                  }}
+                >
+                  <Checkbox
+                    id={inputId}
+                    checked={checked}
+                    onCheckedChange={(v) => togglePermittedAction(action.id, v === true)}
+                    style={{ flex: "0 0 auto", marginTop: 2 }}
+                  />
+                  <span style={{ minWidth: 0 }}>
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: "var(--sd-text-body, .875rem)",
+                        fontWeight: 600,
+                        color: "var(--sd-text, #051824)",
+                      }}
+                    >
+                      {action.label}
+                    </span>
+                    <span style={{ ...MUTED, display: "block" }}>{action.description}</span>
+                    {unavailable && (
+                      <span
+                        style={{
+                          display: "block",
+                          margin: "var(--sd-space-2, .5rem) 0 0",
+                          fontSize: "var(--sd-text-small, .8125rem)",
+                          lineHeight: 1.5,
+                          color: "var(--sd-warn, #8a5200)",
+                        }}
+                      >
+                        {ACTIONS.wantedButUnavailable} {capability!.detail}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </section>
 
       <CharCountField
@@ -181,7 +268,7 @@ export function ActionsTab({ draft, update }: BuilderTabProps) {
         placeholder={ACTIONS.escalationPlaceholder}
         helpText={ACTIONS.escalationHelp}
       />
-    </div>
+    </>
   );
 }
 

@@ -1,5 +1,4 @@
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { Fragment } from "react";
 
 interface CharCountFieldProps {
   id: string;
@@ -13,7 +12,20 @@ interface CharCountFieldProps {
   rows?: number;
 }
 
-/** Labeled field with a live-announced character counter — used for long prompt fields. */
+/**
+ * A labelled field with a live-announced character count.
+ *
+ * Presentation only: it now uses the dashboard's own `si-field` / `si-label` /
+ * `si-input` / `si-hint` classes instead of utility classes of its own, so a
+ * prompt field looks like a field on Settings. Those classes read `--v2-*`
+ * custom properties that only resolve inside an element carrying `si-form`
+ * (see the `.sd-app .si-form` block in `v5-app.css`) — every builder section is
+ * rendered inside one, which is why this component does not carry its own.
+ *
+ * The counter keeps its `aria-live` announcement and is referenced by the
+ * control's `aria-describedby`, so the remaining allowance is available to a
+ * screen reader rather than only to the eye.
+ */
 export function CharCountField({
   id,
   label,
@@ -28,49 +40,65 @@ export function CharCountField({
   const len = value.length;
   const overLimit = len > maxLength;
   const nearLimit = !overLimit && len >= Math.floor(maxLength * 0.85);
+  const countId = `${id}-count`;
+  const helpId = `${id}-help`;
+  const describedBy = helpText ? `${helpId} ${countId}` : countId;
+
+  const common = {
+    id,
+    className: "si-input",
+    value,
+    placeholder,
+    maxLength,
+    "aria-describedby": describedBy,
+    onChange: (e: { target: { value: string } }) => onChange(e.target.value),
+  };
 
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-foreground">
-          {label}
-        </label>
+    <div className="si-field">
+      <label className="si-label" htmlFor={id}>
+        {label}
+      </label>
+
+      {multiline ? (
+        <textarea {...common} rows={rows} style={{ resize: "vertical", minHeight: "6rem" }} />
+      ) : (
+        <input {...common} type="text" />
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "var(--sd-space-3, .75rem)",
+        }}
+      >
+        {helpText ? (
+          <p className="si-hint" id={helpId}>
+            {helpText}
+          </p>
+        ) : (
+          <Fragment />
+        )}
         <span
+          id={countId}
           aria-live="polite"
-          className={`text-[11px] tabular-nums ${
-            overLimit ? "font-semibold text-destructive" : nearLimit ? "text-warning" : "text-muted-foreground"
-          }`}
+          style={{
+            flex: "0 0 auto",
+            fontSize: "var(--sd-text-micro, .6875rem)",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: overLimit ? 600 : 400,
+            color: overLimit
+              ? "var(--sd-danger, #9c2233)"
+              : nearLimit
+                ? "var(--sd-warn, #8a5200)"
+                : "var(--sd-text-muted, #3b5265)",
+          }}
         >
-          {len}/{maxLength}
+          {len} of {maxLength}
         </span>
       </div>
-      {multiline ? (
-        <Textarea
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          maxLength={maxLength}
-          placeholder={placeholder}
-          rows={rows}
-          className="resize-none text-sm"
-          aria-describedby={helpText ? `${id}-help` : undefined}
-        />
-      ) : (
-        <Input
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          maxLength={maxLength}
-          placeholder={placeholder}
-          className="h-9 text-sm"
-          aria-describedby={helpText ? `${id}-help` : undefined}
-        />
-      )}
-      {helpText && (
-        <p id={`${id}-help`} className="mt-1 text-[11px] text-muted-foreground">
-          {helpText}
-        </p>
-      )}
     </div>
   );
 }

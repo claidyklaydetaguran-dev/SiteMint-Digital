@@ -14,28 +14,47 @@ interface BrowserTestPanelProps {
   elapsedSeconds: number;
   errorMessage: string | null;
   /**
-   * AR-001V.2: shown only for a failure whose copy cannot already tell the
-   * customer what to do. Opaque and random — never an identifier.
+   * Shown only for a failure whose copy cannot already tell the customer what
+   * to do. Opaque and random — never an identifier.
    */
   supportReference?: string | null;
   onEnd: () => void;
   onDismiss: () => void;
   /**
-   * AR-001V.3 controlled recovery. Provided only when the last failure was the
-   * provider REFUSING this assistant's stored credential — the one failure a
-   * fresh, identically scoped token can actually fix. Absent for a microphone
-   * or network failure, where offering a new credential would be misleading.
+   * Provided only when the last failure was the provider REFUSING this
+   * assistant's stored credential — the one failure a fresh, identically
+   * scoped token can actually fix. Absent for a microphone or network failure,
+   * where offering a new credential would be misleading.
    */
   onRetryWithNewCredential?: (() => void) | undefined;
   retryingCredential?: boolean;
 }
 
+const ROW = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "var(--sd-space-3, .75rem)",
+  minWidth: 0,
+};
+
+const NOTE = {
+  margin: "var(--sd-space-2, .5rem) 0 0",
+  fontSize: "var(--sd-text-small, .8125rem)",
+  lineHeight: 1.5,
+  color: "var(--sd-text-muted, #3b5265)",
+};
+
 /**
- * Milestone 1 / Checkpoint F1: the persistent builder panel shown while a
- * browser test is preparing, connecting, connected, ending, or has reached
- * a terminal (ended/permission_denied/error) state. Only ever displays
- * safe, static information — never a provider assistant id, provider call
- * id, request metadata, or a raw provider event/error.
+ * The panel shown while a browser test is preparing, connecting, connected,
+ * ending, or has reached a terminal state.
+ *
+ * It only ever displays safe, static information — never a provider assistant
+ * id, provider call id, request metadata, or a raw provider event. It also
+ * never describes the session as a telephone call, because it is not one.
+ *
+ * Presentation only in this pass: `--sd-*` tokens instead of utility classes.
  */
 export function BrowserTestPanel({
   state,
@@ -64,65 +83,94 @@ export function BrowserTestPanel({
     <div
       role="region"
       aria-label="Browser voice test"
-      className="rounded-lg border border-border bg-card px-4 py-3"
+      style={{
+        padding: "var(--sd-space-4, 1rem) var(--sd-space-5, 1.25rem)",
+        border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
+        borderRadius: "var(--sd-radius-card, 10px)",
+        background: "var(--sd-surface, #fff)",
+        minWidth: 0,
+      }}
     >
-      <div aria-live="polite" className="sr-only">
+      <div aria-live="polite" className="sd-sr">
         {announcement[state]}
       </div>
 
       {(state === "preparing" || state === "connecting") && (
         <>
-          <div className="flex items-center gap-2 text-sm text-info">
+          <p style={{ margin: 0, display: "flex", alignItems: "center", gap: "var(--sd-space-2, .5rem)", fontSize: "var(--sd-text-body, .875rem)" }}>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            <span>{state === "preparing" ? "Preparing browser voice test…" : "Connecting to browser voice test…"}</span>
-          </div>
-          {/* AR-001V.2: a test always runs the configuration the provider last
-              confirmed, never the unsaved or unpublished draft in the builder.
-              Saying so here removes the only reasonable misreading of a test
-              result — that it exercised the changes on screen. */}
-          <p className="mt-2 text-[11px] text-muted-foreground">
+            {state === "preparing" ? "Preparing browser voice test…" : "Connecting to browser voice test…"}
+          </p>
+          {/* A test always runs the configuration the provider last confirmed,
+              never the unsaved or unpublished draft in the builder. Saying so
+              here removes the only reasonable misreading of the result. */}
+          <p style={NOTE}>
             This tests the configuration last sent to the voice provider — not unpublished changes.
           </p>
         </>
       )}
 
       {state === "connected" && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2 text-sm text-success">
-            <CircleCheck className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            <span className="font-medium">Browser voice test connected</span>
-            <span className="truncate text-muted-foreground">— {assistantName}</span>
+        <>
+          <div style={ROW}>
+            <p
+              style={{
+                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--sd-space-2, .5rem)",
+                minWidth: 0,
+                fontSize: "var(--sd-text-body, .875rem)",
+                fontWeight: 600,
+                color: "var(--sd-text, #051824)",
+              }}
+            >
+              <CircleCheck className="h-4 w-4" aria-hidden="true" style={{ color: "var(--sd-accent-ink, #051824)" }} />
+              Browser voice test connected
+              <span style={{ fontWeight: 400, color: "var(--sd-text-muted, #3b5265)", overflowWrap: "anywhere" }}>
+                — {assistantName}
+              </span>
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--sd-space-3, .75rem)" }}>
+              <span
+                aria-label={`Elapsed time ${formatElapsed(elapsedSeconds)}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "var(--sd-space-1, .25rem)",
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  fontVariantNumeric: "tabular-nums",
+                  color: "var(--sd-text-muted, #3b5265)",
+                }}
+              >
+                <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+                <span aria-hidden="true">{formatElapsed(elapsedSeconds)}</span>
+              </span>
+              <Button onClick={onEnd} variant="outline" size="sm">
+                End test
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label={`Elapsed time ${formatElapsed(elapsedSeconds)}`}>
-              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-              <span aria-hidden="true">{formatElapsed(elapsedSeconds)}</span>
-            </span>
-            <Button onClick={onEnd} variant="outline" size="sm" className="min-h-11 md:min-h-8">
-              End Test
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {state === "connected" && (
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Your browser's microphone is in use for this test. Audio is being sent to the configured voice
-          provider.
-        </p>
+          <p style={NOTE}>
+            Your browser&rsquo;s microphone is in use for this test. Audio is being sent to the configured voice
+            provider.
+          </p>
+        </>
       )}
 
       {state === "ending" && (
-        <div className="flex items-center gap-2 text-sm text-info">
+        <p style={{ margin: 0, display: "flex", alignItems: "center", gap: "var(--sd-space-2, .5rem)", fontSize: "var(--sd-text-body, .875rem)" }}>
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          <span>Ending browser voice test…</span>
-        </div>
+          Ending browser voice test…
+        </p>
       )}
 
       {state === "ended" && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">Browser voice test ended.</p>
-          <Button onClick={onDismiss} variant="outline" size="sm" className="min-h-11 gap-1.5 md:min-h-8">
+        <div style={ROW}>
+          <p style={{ margin: 0, fontSize: "var(--sd-text-body, .875rem)", color: "var(--sd-text-muted, #3b5265)" }}>
+            Browser voice test ended.
+          </p>
+          <Button onClick={onDismiss} variant="outline" size="sm">
             <X className="h-3.5 w-3.5" aria-hidden="true" />
             Close
           </Button>
@@ -130,12 +178,22 @@ export function BrowserTestPanel({
       )}
 
       {state === "permission_denied" && (
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="flex items-start gap-2 text-sm text-warning-foreground dark:text-warning">
-            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
+        <div style={ROW}>
+          <p
+            style={{
+              margin: 0,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "var(--sd-space-2, .5rem)",
+              minWidth: 0,
+              fontSize: "var(--sd-text-body, .875rem)",
+              color: "var(--sd-warn, #8a5200)",
+            }}
+          >
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" style={{ flex: "0 0 auto", marginTop: 2 }} />
             Microphone permission was denied. Allow microphone access in your browser settings and try again.
           </p>
-          <Button onClick={onDismiss} variant="outline" size="sm" className="min-h-11 gap-1.5 md:min-h-8">
+          <Button onClick={onDismiss} variant="outline" size="sm">
             <X className="h-3.5 w-3.5" aria-hidden="true" />
             Close
           </Button>
@@ -143,36 +201,44 @@ export function BrowserTestPanel({
       )}
 
       {state === "error" && (
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="flex items-start gap-2 text-sm text-destructive">
-            <CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            {errorMessage ?? "Something went wrong with the browser voice test. Please try again."}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {onRetryWithNewCredential && (
-              <Button
-                onClick={onRetryWithNewCredential}
-                variant="default"
-                size="sm"
-                disabled={retryingCredential}
-                className="min-h-11 gap-1.5 md:min-h-8"
-              >
-                {retryingCredential ? "Getting a new key…" : "Get a new key and retry"}
+        <>
+          <div style={ROW}>
+            <p
+              style={{
+                margin: 0,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "var(--sd-space-2, .5rem)",
+                minWidth: 0,
+                fontSize: "var(--sd-text-body, .875rem)",
+                color: "var(--sd-danger, #9c2233)",
+              }}
+            >
+              <CircleAlert className="h-4 w-4" aria-hidden="true" style={{ flex: "0 0 auto", marginTop: 2 }} />
+              {errorMessage ?? "Something went wrong with the browser voice test. Please try again."}
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+              {onRetryWithNewCredential && (
+                <Button onClick={onRetryWithNewCredential} size="sm" disabled={retryingCredential}>
+                  {retryingCredential ? "Getting a new key…" : "Get a new key and retry"}
+                </Button>
+              )}
+              <Button onClick={onDismiss} variant="outline" size="sm">
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                Close
               </Button>
-            )}
-            <Button onClick={onDismiss} variant="outline" size="sm" className="min-h-11 gap-1.5 md:min-h-8">
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-              Close
-            </Button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {state === "error" && supportReference && (
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          If this keeps happening, quote reference{" "}
-          <span className="font-mono font-medium">{supportReference}</span> to SiteMint support.
-        </p>
+          {supportReference && (
+            <p style={NOTE}>
+              If this keeps happening, quote reference{" "}
+              <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", fontWeight: 600 }}>
+                {supportReference}
+              </span>{" "}
+              to SiteMint support.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

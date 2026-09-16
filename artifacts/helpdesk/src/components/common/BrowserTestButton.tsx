@@ -1,60 +1,48 @@
 import { forwardRef, useId, type KeyboardEvent, type MouseEvent } from "react";
 import { Loader2, PlayCircle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface BrowserTestButtonProps {
   /** True only when clicking should open the browser-test confirmation dialog. */
   eligible: boolean;
-  /** True while preparing/connecting/connected/ending — shows a busy label and disables the control. */
+  /** True while preparing/connecting/connected/ending. */
   active: boolean;
-  /** Accessible explanation shown whenever the control is not eligible. Always present when `eligible` is false. */
+  /** Why testing is unavailable. Always present when `eligible` is false. */
   disabledReason?: string;
   onClick: () => void;
 }
 
 /**
- * Milestone 1 / Checkpoint F1: the header Test control for the persisted
- * assistant builder. Mirrors PublishButton's accessibility pattern —
- * `aria-disabled` + a guarded no-op instead of a native `disabled`
- * attribute so keyboard/screen-reader users can always discover the reason,
- * becoming a real actionable button only when `eligible` is true.
+ * The Test control for the persisted builder. Mirrors PublishButton: when it
+ * is not eligible it keeps `aria-disabled` and a guarded no-op rather than a
+ * native `disabled` attribute, and the reason is rendered as visible text
+ * rather than hidden in a tooltip.
  */
-/**
- * AR-001J final refinement: `forwardRef(...)` is a call expression at module
- * top level, so a bundler must assume it has side effects and keep it even
- * when nothing references the result. A build that renders no Test control
- * would still have shipped this component and its copy. The annotation states
- * what is already true of `forwardRef` and changes nothing at runtime.
- */
-export const BrowserTestButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, BrowserTestButtonProps>(function BrowserTestButton(
-  { eligible, active, disabledReason, onClick },
-  ref,
-) {
-  const descriptionId = useId();
+export const BrowserTestButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, BrowserTestButtonProps>(
+  function BrowserTestButton({ eligible, active, disabledReason, onClick }, ref) {
+    const descriptionId = useId();
 
-  if (!eligible || active) {
-    const reason = active ? "A browser test is already active." : (disabledReason ?? "Browser voice testing is not available right now.");
-    const guardedNoop = (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-    };
-    return (
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
-          <button
+    if (!eligible || active) {
+      const reason = active
+        ? "A browser test is already active."
+        : (disabledReason ?? "Browser voice testing is not available right now.");
+      const guardedNoop = (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+      };
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sd-space-2, .5rem)", minWidth: 0 }}>
+          <Button
             ref={ref}
             type="button"
+            variant="outline"
+            size="sm"
             aria-disabled="true"
             aria-describedby={descriptionId}
             onClick={guardedNoop}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") guardedNoop(e);
             }}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "min-h-11 cursor-not-allowed gap-1.5 opacity-50 md:min-h-8",
-            )}
+            style={{ cursor: "not-allowed", opacity: 0.65, alignSelf: "flex-start" }}
           >
             {active ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -62,27 +50,28 @@ export const BrowserTestButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, Bro
               <PlayCircle className="h-3.5 w-3.5" aria-hidden="true" />
             )}
             Test
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-52 text-xs">
-          {reason}
-        </TooltipContent>
-        <span id={descriptionId} className="sr-only">
-          Test — {reason}
-        </span>
-      </Tooltip>
-    );
-  }
+          </Button>
+          <p
+            id={descriptionId}
+            style={{
+              margin: 0,
+              maxWidth: "34rem",
+              fontSize: "var(--sd-text-small, .8125rem)",
+              lineHeight: 1.5,
+              color: "var(--sd-text-muted, #3b5265)",
+            }}
+          >
+            {reason}
+          </p>
+        </div>
+      );
+    }
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onClick}
-      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 gap-1.5 md:min-h-8")}
-    >
-      <PlayCircle className="h-3.5 w-3.5" aria-hidden="true" />
-      Test
-    </button>
-  );
-});
+    return (
+      <Button ref={ref} type="button" variant="outline" size="sm" onClick={onClick}>
+        <PlayCircle className="h-3.5 w-3.5" aria-hidden="true" />
+        Test
+      </Button>
+    );
+  },
+);

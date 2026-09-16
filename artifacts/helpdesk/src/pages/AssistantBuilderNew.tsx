@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "wouter";
-import { Bot, Save, Loader2 } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/common/EmptyState";
 import { BuilderNotice } from "@/components/common/BuilderNotice";
 import { PublishButton } from "@/components/common/PublishButton";
 import { useToast } from "@/hooks/use-toast";
@@ -12,37 +11,38 @@ import { AssistantApiRequestError } from "@/lib/assistantsApi";
 import { serializeDraftToConfig, findTemplateByKey, isValidTemplateKey } from "@/lib/assistantConfig";
 import { useLocalAssistantDraft } from "@/hooks/useAssistantDrafts";
 import { BuilderShell, resolveBuilderTab, type BuilderTabKey } from "@/pages/assistant-builder/BuilderShell";
-import { DEFAULT_BUILDER_TAB } from "@/pages/assistants/assistantsContract";
+import { DEFAULT_BUILDER_TAB, SAVE } from "@/pages/assistants/assistantsContract";
 import { voicePlatformEnabled, voicePublishEnabled } from "@/lib/featureFlags";
+import "@/styles/v2-dashboard.css";
 
 /**
- * AR-001J final refinement, owner decision B: a build that cannot publish
- * renders no Publish control here either -- not a disabled one explaining a
- * capability this build does not have. Foldable, so the control and its copy
- * leave the build with it. When publishing is on, the control is exactly the
- * one AR-001I shipped: never eligible on an unsaved assistant, and saying so.
+ * A build that cannot publish renders no Publish control here either — not a
+ * disabled one explaining a capability this build does not have. Foldable, so
+ * the control and its copy leave the build with it. When publishing is on, the
+ * control is never eligible on an unsaved assistant, and says so.
  */
 const publishInBuild = voicePlatformEnabled && voicePublishEnabled;
 
 function ExpiredPreview() {
   return (
-    <div className="flex h-full flex-col bg-background">
-      <EmptyState
-        icon={Bot}
-        title="This builder preview has expired"
-        description="Configuration in the assistant builder isn't saved yet, so it doesn't survive a reload. Start again from a template."
-        action={
-          <Link href="/assistants/new">
-            <Button className="h-9 text-sm">Choose a template</Button>
+    <div className="sd-page sd-enter">
+      <div className="sd-empty">
+        <h1 className="sd-empty__title">This builder preview has expired</h1>
+        <p className="sd-empty__detail">
+          Nothing in the assistant builder is saved until you choose Save changes, so it doesn&rsquo;t survive a
+          reload. Start again from a template.
+        </p>
+        <p style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
+          <Link href="/assistants/new" className="sd-step__action">
+            Choose a template
           </Link>
-        }
-        className="flex-1"
-      />
+        </p>
+      </div>
     </div>
   );
 }
 
-/** Milestone 1 / Checkpoint E2: unsaved builder for a not-yet-persisted assistant. */
+/** The unsaved builder, for an assistant that has not been persisted yet. */
 export default function AssistantBuilderNew() {
   const params = useParams<{ tab?: string }>();
   const [searchParams] = useSearchParams();
@@ -105,7 +105,7 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
       tab={tab}
       onTabChange={goToTab}
       backHref="/assistants"
-      statusBadge={createMutation.isPending ? "Saving…" : "Not Saved"}
+      statusBadge={createMutation.isPending ? "Saving…" : "Not saved"}
       announcement={announcement}
       headerBanner={<BuilderNotice />}
       publishControl={
@@ -119,23 +119,58 @@ function NewAssistantBuilder({ templateKey, tabParam }: { templateKey: string; t
         ) : undefined
       }
       footerRight={
-        <div className="flex flex-col items-end gap-1.5">
-          {saveError && (
-            <p role="alert" className="max-w-xs text-right text-[11px] text-destructive">
-              {saveError}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--sd-space-3, .75rem)",
+            minWidth: 0,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "var(--sd-text-small, .8125rem)",
+                color: "var(--sd-text-muted, #3b5265)",
+              }}
+            >
+              {createMutation.isPending ? SAVE.saving : "Not saved yet"}
             </p>
-          )}
-          <Button
-            onClick={handleSave}
-            disabled={!isNameValid || createMutation.isPending}
-            className="h-9 gap-1.5 text-sm"
-          >
+            {!isNameValid && (
+              <p
+                style={{
+                  margin: "var(--sd-space-1, .25rem) 0 0",
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  color: "var(--sd-text-muted, #3b5265)",
+                }}
+              >
+                Give this assistant a name before saving it.
+              </p>
+            )}
+            {saveError && (
+              <p
+                role="alert"
+                style={{
+                  margin: "var(--sd-space-1, .25rem) 0 0",
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  lineHeight: 1.5,
+                  color: "var(--sd-danger, #9c2233)",
+                }}
+              >
+                <strong>{SAVE.failedTitle}</strong> {saveError}
+              </p>
+            )}
+          </div>
+          <Button onClick={handleSave} disabled={!isNameValid || createMutation.isPending}>
             {createMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <Save className="h-4 w-4" aria-hidden="true" />
             )}
-            {createMutation.isPending ? "Saving…" : "Save changes"}
+            {createMutation.isPending ? SAVE.saving : SAVE.save}
           </Button>
         </div>
       }

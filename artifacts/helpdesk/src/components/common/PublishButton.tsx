@@ -1,93 +1,95 @@
 import { forwardRef, useId, type KeyboardEvent, type MouseEvent } from "react";
 import { Loader2, Rocket } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface PublishButtonProps {
   /** True only when clicking should open the confirmation dialog. */
   eligible: boolean;
   /** True while the publish mutation is in flight. */
   pending: boolean;
-  /** Accessible explanation shown whenever the control is not eligible. Always present when `eligible` is false. */
+  /** Why publishing is unavailable. Always present when `eligible` is false. */
   disabledReason?: string;
   onClick: () => void;
 }
 
 /**
- * Milestone 1 / Checkpoint E3C: the single Publish control surface for the
- * persisted assistant builder. Mirrors UnavailableActionButton's
- * accessibility pattern (stays in the tab order, aria-disabled + guarded
- * no-op instead of a native `disabled` attribute, tooltip + sr-only text for
- * the explanation) whenever it isn't eligible, so keyboard and screen-reader
- * users can always discover why. Becomes a real actionable button only when
- * `eligible` is true. Forwards its ref to the underlying <button> so a
- * caller can restore focus here after the confirmation dialog closes.
+ * The single Publish control for the persisted builder.
+ *
+ * When it is not eligible it stays in the tab order with `aria-disabled` and a
+ * guarded no-op rather than a native `disabled` attribute, so the reason is
+ * always reachable. That reason is now rendered as visible text beneath the
+ * control instead of living only in a tooltip and a screen-reader-only span:
+ * publishing is the one irreversible action in this journey, and "why can't I
+ * press this?" should never require hovering.
+ *
+ * `forwardRef(...)` is a call expression at module top level, so a bundler must
+ * otherwise assume it has side effects and keep it even when nothing
+ * references the result. The annotation states what is already true and
+ * changes nothing at runtime.
  */
-/**
- * AR-001J final refinement: `forwardRef(...)` is a call expression at module
- * top level, so a bundler must assume it has side effects and keep it even
- * when nothing references the result. A build that renders no Publish control
- * would still have shipped this component and its copy. The annotation states
- * what is already true of `forwardRef` and changes nothing at runtime.
- */
-export const PublishButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, PublishButtonProps>(function PublishButton(
-  { eligible, pending, disabledReason, onClick },
-  ref,
-) {
-  const descriptionId = useId();
-  const label = pending ? "Publishing…" : "Publish";
+export const PublishButton = /*#__PURE__*/ forwardRef<HTMLButtonElement, PublishButtonProps>(
+  function PublishButton({ eligible, pending, disabledReason, onClick }, ref) {
+    const descriptionId = useId();
+    const label = pending ? "Publishing…" : "Publish";
 
-  if (!eligible) {
-    const reason = disabledReason ?? "Publishing is not available right now.";
-    const guardedNoop = (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-    };
-    return (
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
-          <button
+    if (!eligible) {
+      const reason = disabledReason ?? "Publishing is not available right now.";
+      const guardedNoop = (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+      };
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sd-space-2, .5rem)", minWidth: 0 }}>
+          <Button
             ref={ref}
             type="button"
+            variant="outline"
+            size="sm"
             aria-disabled="true"
             aria-describedby={descriptionId}
             onClick={guardedNoop}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") guardedNoop(e);
             }}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "min-h-11 cursor-not-allowed opacity-50 md:min-h-8",
-            )}
+            style={{ cursor: "not-allowed", opacity: 0.65, alignSelf: "flex-start" }}
           >
             <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
             Publish
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-52 text-xs">
-          {reason}
-        </TooltipContent>
-        <span id={descriptionId} className="sr-only">
-          Publish — {reason}
-        </span>
-      </Tooltip>
-    );
-  }
+          </Button>
+          <p
+            id={descriptionId}
+            style={{
+              margin: 0,
+              maxWidth: "34rem",
+              fontSize: "var(--sd-text-small, .8125rem)",
+              lineHeight: 1.5,
+              color: "var(--sd-text-muted, #3b5265)",
+            }}
+          >
+            {reason}
+          </p>
+        </div>
+      );
+    }
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={() => {
-        if (pending) return;
-        onClick();
-      }}
-      disabled={pending}
-      aria-busy={pending}
-      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 gap-1.5 md:min-h-8")}
-    >
-      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Rocket className="h-3.5 w-3.5" aria-hidden="true" />}
-      {label}
-    </button>
-  );
-});
+    return (
+      <Button
+        ref={ref}
+        type="button"
+        size="sm"
+        onClick={() => {
+          if (pending) return;
+          onClick();
+        }}
+        disabled={pending}
+        aria-busy={pending}
+      >
+        {pending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
+        {label}
+      </Button>
+    );
+  },
+);
