@@ -51,18 +51,18 @@ The denominator is 143 baseline criteria plus 7 added from the owner's brief aft
 - **recovery** — A failed request shows a real error state and the page recovers
 - **mobile** — At 375px no element is clipped or unreachable (content without a scrollable ancestor is measured, not page scroll)
 
-**144 / 312 page checks = 46.2%.** Pages passing all 6: 1. Pages passing none: 2.
+**154 / 312 page checks = 49.4%.** Pages passing all 6: 1. Pages passing none: 2.
 
-By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by decision 0.
+By status: Passed 154 · Built, not proven 156 · Not passed 2 · Deferred by decision 0.
 
 | Check | Pages passing |
 |---|---|
-| open | 41 / 52 (78.8%) |
-| action | 21 / 52 (40.4%) |
+| open | 43 / 52 (82.7%) |
+| action | 22 / 52 (42.3%) |
 | persist | 10 / 52 (19.2%) |
 | permission | 22 / 52 (42.3%) |
-| recovery | 2 / 52 (3.8%) |
-| mobile | 48 / 52 (92.3%) |
+| recovery | 8 / 52 (15.4%) |
+| mobile | 49 / 52 (94.2%) |
 
 | # | Route | Page | Passed / 6 | % | Verified in | Not passed yet |
 |---|---|---|---|---|---|---|
@@ -73,19 +73,19 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | 5 | `/admin/crm/dashboard` | Command Center | 3 / 6 | 50.0% | L | persist, permission, recovery |
 | 6 | `/admin/crm/leads/:id/dna` | Lead DNA | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 7 | `/admin/crm/leads/:id` | Contact record | 4 / 6 | 66.7% | L, T, R | persist, recovery |
-| 8 | `/admin/crm/leads` | Contacts | 4 / 6 | 66.7% | L, T | persist, recovery |
-| 9 | `/admin/crm/companies` | Companies | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
+| 8 | `/admin/crm/leads` | Contacts | 5 / 6 | 83.3% | L, T | persist |
+| 9 | `/admin/crm/companies` | Companies | 4 / 6 | 66.7% | L, T | action, persist |
 | 10 | `/admin/crm/companies/:id` | Company record | 1 / 6 | 16.7% | T | open, action, persist, recovery, mobile |
 | 11 | `/admin/crm/communications` | Communications | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 12 | `/admin/crm/intelligence/behavioral` | Behavioral intelligence | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
 | 13 | `/admin/crm/intelligence/automation-queue` | Automation queue | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 14 | `/admin/crm/inbox` | Inbox | 4 / 6 | 66.7% | L | permission, recovery |
-| 15 | `/admin/crm/tasks` | All tasks | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 15 | `/admin/crm/tasks` | All tasks | 3 / 6 | 50.0% | L | persist, permission, recovery |
 | 16 | `/admin/crm/calendar` | Calendar | 4 / 6 | 66.7% | L, R | permission, recovery |
-| 17 | `/admin/crm/deals` | Deals | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
+| 17 | `/admin/crm/deals` | Deals | 3 / 6 | 50.0% | L | action, persist, permission |
 | 18 | `/admin/crm/transactions` | Transactions | 3 / 6 | 50.0% | L | persist, permission, recovery |
-| 19 | `/admin/crm/projects` | Projects | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
-| 20 | `/admin/crm/documents` | Documents | 4 / 6 | 66.7% | L | permission, recovery |
+| 19 | `/admin/crm/projects` | Projects | 3 / 6 | 50.0% | L | action, persist, permission |
+| 20 | `/admin/crm/documents` | Documents | 5 / 6 | 83.3% | L | permission |
 | 21 | `/admin/crm/support` | Support | 5 / 6 | 83.3% | L, T | recovery |
 | 22 | `/admin/crm/pipeline` | Pipeline | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 23 | `/admin/crm/reporting` | Reporting | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
@@ -103,7 +103,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | 35 | `/admin/crm/settings` | Settings | 2 / 6 | 33.3% | L | action, persist, permission, recovery |
 | 36 | `/admin/crm/people` | People | 3 / 6 | 50.0% | L, T | action, persist, recovery |
 | 37 | `/admin/crm/account` | My account | 4 / 6 | 66.7% | L | permission, recovery |
-| 38 | `/admin/crm/operations` | Operations | 1 / 6 | 16.7% | L | open, action, persist, permission, recovery |
+| 38 | `/admin/crm/operations` | Operations | 3 / 6 | 50.0% | L | action, persist, permission |
 | 39 | `/admin/crm/my-day` | My Day | 5 / 6 | 83.3% | L | permission |
 | 40 | `/admin/ops/firms/:id` | Receptionist firm detail | 3 / 6 | 50.0% | L, T | action, persist, recovery |
 | 41 | `/admin/ops/firms` | Receptionist firms | 3 / 6 | 50.0% | L, T | action, persist, recovery |
@@ -464,19 +464,19 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Passed | L | Export sent exactly the 16 visible ids, and 9 when filtered to Client |
 | persist | Built, not proven | — | Not reloaded |
 | permission | Passed | T | Export requires data.export; a user without it is refused (crmContacts.test.ts) |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Counts withheld rather than rendered as 0. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/companies` — Companies
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Built in this change and not opened in a browser by its author: the list, the search, the owner filter, the archived toggle and the paging are exercised through the API by crmCompanies.test.ts, which cannot prove a page renders |
+| open | Passed | L | Opened in a browser on 2026-09-16 with a real staff session (fixture owner, form sign-in) against seeded data on crm_verify_0916; the companies record rendered with its linked contacts. No console error attributable to the page. |
 | action | Built, not proven | — | Adding a company and applying reviewed suggestions are proven at the API (22 cases in crmCompanies.test.ts, including that applying twice creates nothing the second time); performing them in a browser is the reviewer's step |
 | persist | Built, not proven | — | Every write is read back from the database in the API suite, never from a reloaded page |
 | permission | Passed | T | An operations manager with leads.write revoked is refused create, edit, archive and apply with 403 and the database is then checked unchanged; deleting a company needs leads.delete, which is owner-only and refused for an operations manager (crmCompanies.test.ts) |
-| recovery | Built, not proven | — | The page carries an error panel with Try again for the list, for the suggestions dialog and for each action, but no failed request was induced in a browser to watch it recover |
-| mobile | Built, not proven | — | Written as stacked cards below md with wrapping controls, and one horizontally scrollable table above it, but not measured at 375px with the clipped-content metric |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. |
+| mobile | Passed | L | Measured at 375x812 on 2026-09-16 by the rule that overflow:hidden is not a fix: every element in main was checked for extending past the viewport WITHOUT a scrollable ancestor. 0 unreachable; documentElement.scrollWidth equalled the 375 viewport. |
 
 ### `/admin/crm/companies/:id` — Company record
 
@@ -538,7 +538,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | Check | Status | Env | Evidence |
 |---|---|---|---|
 | open | Passed | L | Opened populated, deadline labels kind-aware (2026-09-15) |
-| action | Built, not proven | — | Not exercised on this page (tasks were created on My Day) |
+| action | Passed | L | Performed in a browser on 2026-09-16: the tab controls were operated and each bucket read back. Header figure and the tabs agree — 22 active, 22 reachable across five tabs (No date 20, Future 2) — where before the fix 22 were counted and 2 reachable. |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
 | recovery | Built, not proven | — | Not exercised |
@@ -563,7 +563,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | The edit dialog was opened but no change was saved in the browser |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Rendered "— Not available deals · — Not available total value" instead of "0 deals · $0". |
 | mobile | Passed | L | At 375px on a touch device the edit control was tapped and every dialog field was reachable |
 
 ### `/admin/crm/transactions` — Transactions
@@ -585,7 +585,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Built, not proven | — | Not exercised |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Rendered "— Not available projects across 14 stages". |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/documents` — Documents
@@ -596,7 +596,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | action | Passed | L | From the billing panel, INV-00001 was drafted from the accepted quote (POST 201, line items carried across) and issued (200). The due-date prompt was answered with its proposed default, because this browser cannot show native prompts |
 | persist | Passed | L | After a full reload and re-selecting the contact, INV-00001 was still issued with $4,200.00 outstanding, and Invoice-INV-00001.txt was listed in the contact's files |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. Rendered "Parts of this page could not be loaded"; share links no longer render "no links" for a refused read. |
 | mobile | Passed | L | Real 375×812 viewport, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/support` — Support
@@ -790,11 +790,11 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 
 | Check | Status | Env | Evidence |
 |---|---|---|---|
-| open | Built, not proven | — | Opened with a real session; its tabs showed empty states, so it has not been seen with data |
+| open | Passed | L | Opened in a browser on 2026-09-16 with a real staff session against seeded data; the delivery board rendered with five seeded records visible. |
 | action | Built, not proven | — | Retry and acknowledge on the Automation tab are proven by tests only |
 | persist | Built, not proven | — | Not exercised |
 | permission | Built, not proven | — | Not exercised |
-| recovery | Built, not proven | — | Not exercised |
+| recovery | Passed | L | Failure simulated in a browser on 2026-09-16 on the verification stack (API 8090 against crm_verify_0916, frontend 22066): window.fetch stubbed to answer 500 for /api/crm/* EXCEPT /api/crm/staff/me, so the session stayed valid and only this page's own data failed. The page stated the failure and claimed no zero. |
 | mobile | Passed | L | Real 375×812 viewport with live data, evening sweep of 2026-09-15 after the header fix: 0 elements clipped without a scrollable ancestor (validated metric) |
 
 ### `/admin/crm/my-day` — My Day
