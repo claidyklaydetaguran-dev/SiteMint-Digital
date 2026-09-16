@@ -225,15 +225,15 @@ function RowActions({
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
             ref={menuTriggerRef}
             type="button"
-            className="sd-error__action"
-            style={{ width: 44, padding: 0, justifyContent: "center" }}
+            variant="outline"
+            size="icon"
             aria-label={moreActionsAccessibleName(assistant.name)}
           >
-            <MoreVertical className="sd-navlink__icon" aria-hidden="true" />
-          </button>
+            <MoreVertical className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={onDuplicate} disabled={duplicatePending} className="gap-2">

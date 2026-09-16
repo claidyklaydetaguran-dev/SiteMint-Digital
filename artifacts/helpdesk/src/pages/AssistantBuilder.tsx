@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { Bot, Save, Loader2, RefreshCw } from "lucide-react";
+import { Save, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/common/EmptyState";
-import { InlineError } from "@/components/common/InlineError";
-import { SkeletonCard } from "@/components/common/Skeletons";
+import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { PublishButton } from "@/components/common/PublishButton";
 import { PublishConfirmDialog } from "@/components/common/PublishConfirmDialog";
 import { BrowserTestButton } from "@/components/common/BrowserTestButton";
@@ -32,6 +30,7 @@ import { browserTestDisabledReason, browserTestSyncWarning } from "@/lib/browser
 import {
   BUILDER,
   PRESET_RECOVERY,
+  SAVE,
   SYNC,
   SAVE_PROMPT_EITHER,
   SAVE_PROMPT_PUBLISH,
@@ -48,15 +47,90 @@ const ROUTE_ID_PATTERN = /^[1-9]\d*$/;
 const PUBLISHING_POLL_INTERVAL_MS = 4000;
 
 function BuilderDetailSkeleton() {
+  return <PageSkeleton label="Loading this assistant" list />;
+}
+
+const NOTICE_TONE = {
+  warn: {
+    border: "var(--sd-warn-border, rgba(138,82,0,.28))",
+    background: "var(--sd-warn-surface, #fdf6ec)",
+    text: "var(--sd-warn, #8a5200)",
+  },
+  danger: {
+    border: "var(--sd-danger-border, rgba(156,34,51,.28))",
+    background: "var(--sd-danger-surface, #fdf2f3)",
+    text: "var(--sd-danger, #9c2233)",
+  },
+  info: {
+    border: "var(--sd-border-strong, rgba(59,82,101,.24))",
+    background: "var(--sd-surface-alt, #f6fbfa)",
+    text: "var(--sd-text-muted, #3b5265)",
+  },
+} as const;
+
+/**
+ * One shape for every banner this page raises, built from the shell's own
+ * tokens. The tone is never the only signal: each notice carries its condition
+ * in words, and the caller decides whether it is announced as a status or an
+ * alert — `publish_uncertain` is the one that must interrupt.
+ */
+function Notice({
+  tone,
+  role,
+  title,
+  children,
+  action,
+}: {
+  tone: keyof typeof NOTICE_TONE;
+  role: "status" | "alert";
+  title?: string;
+  children?: ReactNode;
+  action?: ReactNode;
+}) {
+  const palette = NOTICE_TONE[tone];
   return (
-    <div className="flex h-full flex-col bg-background" aria-hidden="true">
-      <div className="flex-shrink-0 border-b border-border px-6 py-4">
-        <SkeletonCard className="h-4 w-24" />
-        <SkeletonCard className="mt-3 h-8 w-64" />
+    <div
+      role={role}
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: "var(--sd-space-3, .75rem)",
+        padding: "var(--sd-space-4, 1rem) var(--sd-space-5, 1.25rem)",
+        border: `1px solid ${palette.border}`,
+        borderLeftWidth: 3,
+        borderRadius: "var(--sd-radius-card, 10px)",
+        background: palette.background,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ flex: "1 1 16rem", minWidth: 0 }}>
+        {title && (
+          <span
+            style={{
+              display: "block",
+              fontSize: "var(--sd-text-body, .875rem)",
+              fontWeight: 600,
+              color: "var(--sd-text, #051824)",
+            }}
+          >
+            {title}
+          </span>
+        )}
+        <p
+          style={{
+            margin: title ? "2px 0 0" : 0,
+            fontSize: "var(--sd-text-small, .8125rem)",
+            lineHeight: 1.55,
+            color: palette.text,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {children}
+        </p>
       </div>
-      <div className="flex-1 p-6">
-        <SkeletonCard className="h-full" />
-      </div>
+      {action}
     </div>
   );
 }
@@ -667,18 +741,16 @@ export default function AssistantBuilder() {
 
   if (!isValidId) {
     return (
-      <div className="flex h-full flex-col bg-background">
-        <EmptyState
-          icon={Bot}
-          title="Invalid assistant link"
-          description="This assistant link isn't valid. Go back to your assistants list."
-          action={
-            <Link href="/assistants">
-              <Button className="h-9 text-sm">Back to Assistants</Button>
+      <div className="sd-page sd-enter">
+        <div className="sd-empty">
+          <h1 className="sd-empty__title">Invalid assistant link</h1>
+          <p className="sd-empty__detail">This assistant link isn&rsquo;t valid. Go back to your assistants list.</p>
+          <p style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
+            <Link href="/assistants" className="sd-step__action">
+              Back to Assistants
             </Link>
-          }
-          className="flex-1"
-        />
+          </p>
+        </div>
       </div>
     );
   }
@@ -691,30 +763,35 @@ export default function AssistantBuilder() {
     const status = error instanceof AssistantApiRequestError ? error.status : undefined;
     if (status === 404) {
       return (
-        <div className="flex h-full flex-col bg-background">
-          <EmptyState
-            icon={Bot}
-            title="Assistant not found"
-            description="This assistant doesn't exist, or you don't have access to it."
-            action={
-              <Link href="/assistants">
-                <Button className="h-9 text-sm">Back to Assistants</Button>
+        <div className="sd-page sd-enter">
+          <div className="sd-empty">
+            <h1 className="sd-empty__title">Assistant not found</h1>
+            <p className="sd-empty__detail">
+              This assistant doesn&rsquo;t exist, or you don&rsquo;t have access to it.
+            </p>
+            <p style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
+              <Link href="/assistants" className="sd-step__action">
+                Back to Assistants
               </Link>
-            }
-            className="flex-1"
-          />
+            </p>
+          </div>
         </div>
       );
     }
     const message = error instanceof AssistantApiRequestError ? error.message : undefined;
     return (
-      <div className="flex h-full flex-col bg-background">
-        <InlineError
-          title="Couldn't load this assistant"
-          description={message}
-          onRetry={() => refetch()}
-          className="flex-1"
-        />
+      <div className="sd-page sd-enter">
+        <section className="sd-error" role="alert">
+          <div className="sd-error__body">
+            <span className="sd-error__title">Couldn&rsquo;t load this assistant</span>
+            <p className="sd-error__detail">
+              {message ?? "The request failed. Nothing was lost — your settings are still saved."}
+            </p>
+          </div>
+          <button type="button" className="sd-error__action" onClick={() => refetch()}>
+            Try again
+          </button>
+        </section>
       </div>
     );
   }
@@ -837,69 +914,65 @@ export default function AssistantBuilder() {
           ) : undefined
         }
         headerBanner={
-          <>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sd-space-3, .75rem)" }}>
             {hydrationWarning && (
-              <div role="status" className="rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
-                This assistant's saved configuration couldn't be fully read, so defaults are shown here. Saving will
-                replace it with the values currently in the builder.
-              </div>
+              <Notice tone="warn" role="status" title="Some saved settings couldn't be read">
+                Defaults are shown where they could not be read. Saving replaces them with the values currently in
+                the builder.
+              </Notice>
             )}
             {!isSupportedVoicePreset(draft.voiceModel.preset) && (
-              <div
-                role="status"
-                className="mt-2 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning"
-              >
-                <span className="font-semibold">{PRESET_RECOVERY.title}.</span>{" "}
+              <Notice tone="warn" role="status" title={PRESET_RECOVERY.title}>
                 {PRESET_RECOVERY.detail}
-              </div>
+              </Notice>
             )}
             {assistant.status === "error" && assistant.syncError && (
-              <div role="status" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
-                <span className="font-semibold">Publish failed:</span> {safeSyncErrorMessage(assistant.syncError)}
-              </div>
+              <Notice tone="danger" role="status" title="Publish failed">
+                {safeSyncErrorMessage(assistant.syncError)}
+              </Notice>
             )}
             {assistant.status === "publish_uncertain" && (
-              <div
-                role="alert"
-                className="mt-2 rounded-lg border-2 border-warning bg-warning/15 px-3.5 py-2.5 text-xs font-medium text-warning-foreground dark:text-warning"
-              >
+              <Notice tone="danger" role="alert" title="Publishing could not be confirmed">
                 Publishing could not be confirmed. Do not publish again. Contact support before taking another action.
-              </div>
+              </Notice>
             )}
             {assistant.status === "publishing" && (
-              <div role="status" className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-info/30 bg-info/10 px-3.5 py-2.5 text-xs text-info">
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  Publishing is already in progress.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => refetch()}
-                  className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-info underline-offset-2 hover:underline"
-                >
-                  <RefreshCw className="h-3 w-3" aria-hidden="true" />
-                  Refresh status
-                </button>
-              </div>
+              <Notice
+                tone="info"
+                role="status"
+                action={
+                  <button type="button" className="sd-error__action" onClick={() => refetch()}>
+                    <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                    Refresh status
+                  </button>
+                }
+              >
+                <Loader2
+                  className="h-3.5 w-3.5 animate-spin"
+                  aria-hidden="true"
+                  style={{ display: "inline-block", verticalAlign: "-2px", marginRight: 6 }}
+                />
+                Publishing is already in progress.
+              </Notice>
             )}
             {publishBanner && assistant.status !== "error" && assistant.status !== "publish_uncertain" && (
-              <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+              <Notice tone="danger" role="alert" title="Publish failed">
                 {publishBanner}
-              </div>
+              </Notice>
             )}
             {browserTestInBuild && testSessionError && (
-              <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+              <Notice tone="danger" role="alert" title="The test couldn't start">
                 {testSessionError}
-              </div>
+              </Notice>
             )}
             {syncBanner && (
-              <div role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+              <Notice tone="danger" role="alert" title="The voice provider wasn't updated">
                 {syncBanner}
-              </div>
+              </Notice>
             )}
             {assistant.status === "published" && !isDirty && assistant.providerSyncState === "local_changes" && (
-              <div role="status" className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
-                <span className="font-semibold">{SYNC.localChangesTitle}.</span> {SYNC.localChangesDetail}
+              <Notice tone="warn" role="status" title={SYNC.localChangesTitle}>
+                {SYNC.localChangesDetail}
                 {/*
                   Without the sync capability there is no control on this page
                   that can close that gap — Publish is spent once an assistant
@@ -908,41 +981,72 @@ export default function AssistantBuilder() {
                   Folded out of a sync-enabled build, where the control exists.
                 */}
                 {!syncInBuild && <> {SYNC.unavailableDetail}</>}
-              </div>
+              </Notice>
             )}
             {assistant.status === "published" ? (
-              <p className="mt-2 text-[11px] text-muted-foreground">
+              <p className="sd-page__meta">
                 {BUILDER.linkedNote}
                 {syncedAtDisplay ? ` ${lastSyncedNote(syncedAtDisplay)}` : ""}
               </p>
             ) : (
-              !deletable && (
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  {BUILDER.notLinkedNote}
-                </p>
-              )
+              !deletable && <p className="sd-page__meta">{BUILDER.notLinkedNote}</p>
             )}
-          </>
+          </div>
         }
         footerRight={
-          <div className="flex flex-col items-end gap-1.5">
-            {saveError && (
-              <p role="alert" className="max-w-xs text-right text-[11px] text-destructive">
-                {saveError}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--sd-space-3, .75rem)",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "var(--sd-text-small, .8125rem)",
+                  fontWeight: isDirty ? 600 : 400,
+                  color: isDirty ? "var(--sd-text, #051824)" : "var(--sd-text-muted, #3b5265)",
+                }}
+              >
+                {updateMutation.isPending ? SAVE.saving : isDirty ? SAVE.dirty : SAVE.clean}
               </p>
-            )}
-            {unsavedChangesPrompt !== null && isDirty && assistant.status !== "publishing" && (
-              <p className="max-w-xs text-right text-[11px] text-muted-foreground">
-                {unsavedChangesPrompt}
-              </p>
-            )}
-            <Button onClick={handleSave} disabled={saveDisabled} className="h-9 gap-1.5 text-sm">
+              {unsavedChangesPrompt !== null && isDirty && assistant.status !== "publishing" && (
+                <p
+                  style={{
+                    margin: "var(--sd-space-1, .25rem) 0 0",
+                    fontSize: "var(--sd-text-small, .8125rem)",
+                    color: "var(--sd-text-muted, #3b5265)",
+                  }}
+                >
+                  {unsavedChangesPrompt}
+                </p>
+              )}
+              {saveError && (
+                <p
+                  role="alert"
+                  style={{
+                    margin: "var(--sd-space-1, .25rem) 0 0",
+                    fontSize: "var(--sd-text-small, .8125rem)",
+                    lineHeight: 1.5,
+                    color: "var(--sd-danger, #9c2233)",
+                  }}
+                >
+                  <strong>{SAVE.failedTitle}</strong> {saveError}
+                </p>
+              )}
+            </div>
+            <Button onClick={handleSave} disabled={saveDisabled}>
               {updateMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
                 <Save className="h-4 w-4" aria-hidden="true" />
               )}
-              {updateMutation.isPending ? "Saving…" : "Save changes"}
+              {updateMutation.isPending ? SAVE.saving : SAVE.save}
             </Button>
           </div>
         }
