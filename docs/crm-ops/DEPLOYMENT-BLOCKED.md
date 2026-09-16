@@ -116,14 +116,34 @@ Measured against the code, not assumed:
   permission in the CRM and on the operator routes is advisory for whoever holds
   that one password.
 
-  It is safe before the first owner exists, which was checked rather than
-  assumed: `GET /crm/staff/bootstrap-state` and `POST /crm/staff/bootstrap`
-  (crmStaff.ts:185, :194) carry no gate at all — the first is a bare count, and
-  the second throttles by IP, refuses once any staff row exists, and verifies
-  `ADMIN_PASSWORD` from the request body. The sign-in screen reads that ungated
-  count and shows the setup stage, then posts straight to bootstrap. Nothing in
-  that path consults the flag, so setting it first leaves no window in which
-  production is both public and maximally permissive.
+  It is safe to set before the first owner exists, and the reason recorded here
+  originally was incomplete. It rested on `GET /crm/staff/bootstrap-state` and
+  `POST /crm/staff/bootstrap` (crmStaff.ts:185, :194) carrying no gate at all —
+  the first a bare count, the second throttling by IP, refusing once any staff
+  row exists, and verifying `ADMIN_PASSWORD` from the request body. That is true
+  of the build in this repository, and it is why the sequence is safe once this
+  release is deployed.
+
+  It was **not** a sound argument about the site as it stands, because those
+  routes are not deployed. Measured against the apex on 2026-09-16:
+  `/api/crm/staff/bootstrap-state`, `/api/readyz` and `/api/health` all return
+  Express's "Cannot GET" — they are GET routes in source, so the 404 is real —
+  while `/api/crm/leads` and `/api/admin/submissions` return 401. The proxy
+  works and the deployed API answers; it simply predates every staff-session and
+  monitoring route.
+
+  The real reason the ordering is safe is stronger than the one it replaces.
+  `legacyBearerEnabled()` lives in `staffAuth.ts`, introduced 2026-09-11; the
+  voice foundation is 2026-07-28 and is an ancestor of it. Production lacks both
+  voice and bootstrap, so it predates the flag-reading code by about six weeks:
+  **the deployed build cannot read `CRM_LEGACY_BEARER_ENABLED` at all.** Setting
+  it early is inert on the live site, so there is no window in which production
+  is both public and maximally permissive, and no rollback that lands somewhere
+  with no way in.
+
+  Keep the distinction if this is revisited: the requirement and its ordering are
+  unchanged; only the justification was wrong, and it was wrong in the direction
+  of being weaker than the truth.
 
   **Caveat for whoever runs the bootstrap:** the screen currently treats "could
   not read the count" as "accounts exist" and shows the sign-in form. If the
