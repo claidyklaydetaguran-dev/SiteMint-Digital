@@ -1161,7 +1161,12 @@ check(
       builderShellCode,
     ) &&
     /const syncInBuild = voicePlatformEnabled && voiceSyncEnabled;/.test(builderShellCode) &&
-    /\{voicePlatformEnabled && \(/.test(builderShellCode),
+    // The row is dropped by an early return, which is what "drops the whole
+    // action row" means — the previous form only required SOME
+    // {voicePlatformEnabled && (...)} to exist in the file, and was satisfied
+    // for a long time by an unrelated header shortcut while the sections
+    // themselves rendered ungated.
+    /if \(!voicePlatformEnabled\) return null;/.test(builderShellCode),
 );
 
 check(
@@ -1223,16 +1228,28 @@ check(
 );
 
 check(
+  // V8 lifted the builder's wording into TEST_PUBLISH, so the literal labels and
+  // NOT_ENABLED_REASON no longer appear anywhere in src. The property is
+  // unchanged, and it is the property that is pinned here: each control sits
+  // INSIDE its build gate, and the else arm renders a disabled placeholder
+  // carrying the "not enabled" reason. Renaming a string can no longer fail
+  // this; moving a control outside its gate still does.
   "the standing Test call and Publish placeholders are inside that gate, not beside it — real control when the sub-flag is on, a disabled 'not enabled' placeholder when it is off",
   /\{browserTestInBuild \? \(\s*testControl \?\?/.test(builderShellCode) &&
     /\{publishInBuild \? \(\s*publishControl \?\?/.test(builderShellCode) &&
-    /label="Test call" availability=\{NOT_ENABLED_REASON\}/.test(builderShellCode) &&
-    /label="Publish" availability=\{NOT_ENABLED_REASON\}/.test(builderShellCode),
+    // One placeholder per control, and each inside its own gate's else arm.
+    (builderShellCode.match(/availability=\{TEST_PUBLISH\.notEnabled\}/g) ?? []).length === 2 &&
+    /\{browserTestInBuild \? \([\s\S]{0,600}?availability=\{TEST_PUBLISH\.notEnabled\}/.test(builderShellCode) &&
+    /\{publishInBuild \? \([\s\S]{0,600}?availability=\{TEST_PUBLISH\.notEnabled\}/.test(builderShellCode),
 );
 
 check(
+  // The wrapper moved from a Tailwind div onto the design system's section; the
+  // gate itself did not change. Pinned element-agnostically so restyling cannot
+  // fail it, while still requiring BOTH the build flag and a non-null panel —
+  // which is what stops an empty panel rendering.
   "the browser-test panel slot is gated too, so no empty panel is rendered",
-  /\{browserTestInBuild && testPanel && <div className="mt-3">\{testPanel\}<\/div>\}/.test(
+  /\{browserTestInBuild && testPanel && <[a-zA-Z]+ className="[^"]*">\{testPanel\}<\/[a-zA-Z]+>\}/.test(
     builderShellCode,
   ),
 );
@@ -1415,7 +1432,7 @@ const BROWSER_TEST_ONLY_COPY = [
   "Browser voice test connected",
   "Preparing browser voice test",
   "Ending browser voice test",
-  "End Test",
+  "End test",
   "Microphone permission was denied.",
   "Browser voice testing is not enabled in this environment.",
   "Browser voice integration is not connected yet.",
@@ -2145,7 +2162,7 @@ if (!existsSync(distDir)) {
         "and the builder itself — tabs, name, save — is untouched by either flag",
         // V5 PR-6: "Setup" -> "Configuration", "Voice & Model" -> "Voice",
         // "Save Draft" -> "Save changes".
-        ["Configuration", "Prompt", "Voice", "Save changes", "Assistant Builder"].every((s) =>
+        ["Configuration", "Prompt", "Voice", "Save changes", "Assistant builder"].every((s) =>
           everyAsset.includes(s),
         ),
       );

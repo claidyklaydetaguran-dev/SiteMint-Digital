@@ -363,6 +363,11 @@ function TestAndPublishPanel({
   publishControl?: ReactNode;
   syncControl?: ReactNode;
 }) {
+  // A build without the voice platform drops this row entirely, rather than
+  // rendering headed sections about features it does not contain. Returning
+  // null rather than gating inside the wrapper leaves no empty container.
+  if (!voicePlatformEnabled) return null;
+
   const detail = {
     margin: "var(--sd-space-1, .25rem) 0 var(--sd-space-3, .75rem)",
     fontSize: "var(--sd-text-small, .8125rem)",
