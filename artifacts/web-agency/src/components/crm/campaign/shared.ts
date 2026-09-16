@@ -130,8 +130,26 @@ export interface Results {
     clicks: number | null;
     openRate: number | null;
     clickRate: number | null;
+    /**
+     * Per metric, because open tracking and click tracking are separate
+     * settings on the sending domain: one can be measured while the other is
+     * not, and collapsing them into one flag hides a real figure or invents a
+     * missing one. Optional so this screen keeps working against a server that
+     * predates the split.
+     */
+    opensMeasured?: boolean;
+    clicksMeasured?: boolean;
+    uniqueOpens?: number | null;
+    uniqueClicks?: number | null;
+    /** The first instant anything was measured for this sending domain. */
+    measuredSince?: string | null;
+    sendingDomain?: string | null;
+    clickedLinks?: { url: string; clicks: number; recipients: number }[];
     /** The short reason they are absent, when they are. */
     unavailableReason?: string | null;
+    clicksUnavailableReason?: string | null;
+    /** What a recorded open does and does not prove. Shown with every figure. */
+    caveat?: string | null;
     why: string;
   };
   deliverySignal: {
@@ -142,6 +160,17 @@ export interface Results {
     /** How many "Try again" would reach — not delivered, and never an unknown outcome. */
     retryable?: number;
     unconfirmedNote?: string | null;
+    /**
+     * What the provider itself reported about the messages it accepted.
+     * Absent from a server that predates delivery events; `noReport` counts
+     * the accepted messages it has said nothing about yet.
+     */
+    provider?: {
+      sent: number; delayed: number; delivered: number; bounced: number;
+      complained: number; failed: number; suppressed: number; noReport: number;
+      messagesWithReports: number;
+    };
+    providerNote?: string | null;
   };
   definitions: Record<string, string>;
 }
