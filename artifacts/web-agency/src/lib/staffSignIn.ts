@@ -9,6 +9,7 @@
  */
 
 import { adminFetch, clearAdminToken, setCsrfToken } from "./adminFetch";
+import { type Load, readAdminResource } from "./adminLoad";
 
 /** The part of the signed-in person the sign-in surfaces need. */
 export interface SignedInStaff {
@@ -107,16 +108,24 @@ export async function createFirstOwner(args: {
   }
 }
 
-/** How many staff accounts exist, or null when the server could not say. */
-export async function staffAccountCount(): Promise<number | null> {
-  try {
-    const res = await adminFetch("/api/crm/staff/bootstrap-state");
-    if (!res.ok) return null;
-    const count = (await readJson(res))["staffCount"];
-    return typeof count === "number" ? count : null;
-  } catch {
-    return null;
-  }
+/**
+ * How many staff accounts exist.
+ *
+ * Three answers, never two. This used to return `number | null` and its one
+ * caller read null as "accounts exist", so a failed or slow probe showed the
+ * sign-in form — and on a fresh deployment, where nobody has been created yet,
+ * the first-run setup screen never appeared and the operator had no way
+ * forward, with nothing on screen saying the count could not be read.
+ *
+ * Guessing the other way would be worse: offering to create an owner on a
+ * system that may already have one. So a failure stays a failure, and the
+ * caller says so instead of picking a form.
+ */
+export function staffAccountCount(): Promise<Load<number>> {
+  return readAdminResource("/api/crm/staff/bootstrap-state", (body) => {
+    const count = body && typeof body === "object" ? (body as { staffCount?: unknown }).staffCount : undefined;
+    return typeof count === "number" ? count : undefined;
+  });
 }
 
 /**
