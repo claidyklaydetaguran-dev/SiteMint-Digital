@@ -34,15 +34,55 @@ check("at least one push packet is committed", packets.length > 0);
 for (const file of packets) {
   const { statements, refused } = parsePacket(readFileSync(resolve(packetsDir, file), "utf8"));
   check(`${file}: every statement is additive and idempotent`, refused.length === 0, refused.join(" | "));
-  check(`${file}: nothing is dropped, altered, truncated or deleted`, !statements.some((s) => /\b(DROP|ALTER|TRUNCATE|DELETE|UPDATE)\b/i.test(s)));
+  const destructive = statements.filter((s) =>
+    /\b(DROP|RENAME|TRUNCATE|DELETE|UPDATE)\b|\bALTER\s+COLUMN\b/i.test(
+      s.replace(/'[^']*'/g, "''").replace(/\bON\s+(DELETE|UPDATE)\s+(CASCADE|RESTRICT|NO\s+ACTION|SET\s+NULL|SET\s+DEFAULT)\b/gi, ""),
+    ),
+  );
+  check(`${file}: nothing is dropped, renamed, truncated, deleted or altered in place`, destructive.length === 0, destructive.join(" | ").slice(0, 200));
+  const alters = statements.filter((s) => /^ALTER\b/i.test(s));
+  check(
+    `${file}: every ALTER only adds a column (IF NOT EXISTS) or a constraint`,
+    alters.every((s) => /^ALTER\s+TABLE\s+"[^"]+"\s+ADD\s+(COLUMN\s+IF\s+NOT\s+EXISTS|CONSTRAINT)\s/i.test(s)),
+  );
 }
 
 // The parser is the only guard between a packet and a deployment database.
 const hostile = parsePacket(`CREATE TABLE IF NOT EXISTS "a" ("id" serial);\nDROP TABLE "crm_leads";\n-- DROP in a comment is fine\nALTER TABLE "x" ADD COLUMN "y" text;`);
 check("the parser refuses a DROP hidden among allowed statements", hostile.refused.some((s) => /^DROP/i.test(s)));
-check("the parser refuses an ALTER", hostile.refused.some((s) => /^ALTER/i.test(s)));
+check("the parser refuses an ADD COLUMN without IF NOT EXISTS", hostile.refused.some((s) => /^ALTER/i.test(s)));
 check("a comment mentioning DROP is not treated as a statement", hostile.statements.length === 3);
 check("a CREATE without IF NOT EXISTS is refused", parsePacket(`CREATE TABLE "a" ("id" serial);`).refused.length === 1);
+check(
+  "a re-runnable column addition is allowed",
+  parsePacket(`ALTER TABLE "crm_tasks" ADD COLUMN IF NOT EXISTS "priority" text;`).refused.length === 0,
+);
+check(
+  "a foreign key with ON DELETE / ON UPDATE actions is allowed",
+  parsePacket(`ALTER TABLE "a" ADD CONSTRAINT "a_b_fk" FOREIGN KEY ("b") REFERENCES "public"."b"("id") ON DELETE cascade ON UPDATE no action;`).refused.length === 0,
+);
+check(
+  "a destructive clause behind an allowed prefix is refused",
+  parsePacket(`ALTER TABLE "a" ADD COLUMN IF NOT EXISTS "y" text, DROP COLUMN "z";`).refused.length === 1,
+);
+check("an in-place column alteration is refused", parsePacket(`ALTER TABLE "a" ALTER COLUMN "tags" SET DEFAULT '{}';`).refused.length === 1);
+check("a rename is refused", parsePacket(`ALTER TABLE "a" RENAME TO "b";`).refused.length === 1);
+check(
+  "a destructive word inside a string literal is data, not a statement",
+  parsePacket(`ALTER TABLE "a" ADD CONSTRAINT "ck" CHECK ("a"."s" IN ('drop', 'delete'));`).refused.length === 0,
+);
+
+// 0002: the 11cf649 push-managed release, reviewed. Its generator excluded the
+// only non-additive statements in the push diff; pin that they stay out.
+const p2 = readFileSync(resolve(packetsDir, "0002_crm_release_2026_09_17.sql"), "utf8");
+const p2s = parsePacket(p2).statements;
+check("0002 has the reviewed statement count", p2s.length === 231, String(p2s.length));
+check("0002 creates the 55 new push-managed tables", p2s.filter((s) => /^CREATE TABLE IF NOT EXISTS/.test(s)).length === 55);
+for (const table of ["crm_staff", "crm_staff_sessions", "crm_conversations", "crm_companies"]) {
+  check(`0002 creates ${table}`, p2s.some((s) => s.startsWith(`CREATE TABLE IF NOT EXISTS "${table}"`)));
+}
+check("0002 documents the six foreign keys it deliberately does not re-create", (p2.match(/^--\s{7}\S+/gm) ?? []).length === 6);
+check("0002 leaves the Discovery duplicate-link key untouched", !p2s.some((s) => /discovery_submissions_duplicate_of_submission_id/.test(s)));
 
 // 0001 must mirror the schema file: every column and index push would create.
 const p1 = readFileSync(resolve(packetsDir, "0001_crm_admin_sessions.sql"), "utf8");
