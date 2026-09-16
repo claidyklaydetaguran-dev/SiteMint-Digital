@@ -40,6 +40,7 @@ import {
   healthTimestamp,
   lastCheckedLabel,
   type ConnectFailure,
+  HEALTH_UNREADABLE,
 } from "@/pages/calendar/calendarContract";
 import "@/styles/v2-dashboard.css";
 
@@ -88,7 +89,11 @@ export default function CalendarPage() {
   if (!me) return null;
 
   const health = healthQuery.data?.health;
-  const summary = healthSummary(health);
+  // An unread health check is not a verdict on the connection. Until it
+  // arrives, the page says so rather than reporting "No calendar connected",
+  // which is what healthSummary answers for missing data.
+  const healthSettled = !healthQuery.isLoading && !healthQuery.isError;
+  const summary = healthSettled ? healthSummary(health) : HEALTH_UNREADABLE;
 
   const view = calendarViewState({
     statusLoading: statusQuery.isLoading,
@@ -230,7 +235,9 @@ export default function CalendarPage() {
               </div>
             )}
             <div className="sd-figure">
-              <span className="sd-figure__value">{calendarDisplayName(health?.calendarId ?? null)}</span>
+              <span className="sd-figure__value">
+                {healthSettled ? calendarDisplayName(health?.calendarId ?? null) : "—"}
+              </span>
               <span className="sd-figure__label">{HEALTH_FIELDS.calendarLabel}</span>
             </div>
             <div className="sd-figure">
@@ -242,7 +249,11 @@ export default function CalendarPage() {
                 no way to earn.
               */}
               <span className="sd-figure__value">
-                {health?.lastSuccessAt != null ? healthTimestamp(health.lastSuccessAt) : HEALTH_FIELDS.lastSuccessNever}
+                {!healthSettled
+                  ? "—"
+                  : health?.lastSuccessAt != null
+                    ? healthTimestamp(health.lastSuccessAt)
+                    : HEALTH_FIELDS.lastSuccessNever}
               </span>
               <span className="sd-figure__label">{HEALTH_FIELDS.lastSuccessLabel}</span>
             </div>

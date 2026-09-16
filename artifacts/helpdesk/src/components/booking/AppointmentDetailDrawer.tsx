@@ -335,6 +335,10 @@ function ReschedulePicker({
         <div className="mt-2">
           {slotsQuery.isLoading ? (
             <p className="sa-status" role="status">Loading times…</p>
+          ) : slotsQuery.isError ? (
+            <div className="sa-notice" data-tone="error" role="alert">
+              <p className="sa-notice__title">{DETAIL.rescheduleSlotsFailed}</p>
+            </div>
           ) : (slotsQuery.data?.slots.length ?? 0) === 0 ? (
             <p className="sa-times__hint">{DETAIL.rescheduleSlotsEmpty}</p>
           ) : (

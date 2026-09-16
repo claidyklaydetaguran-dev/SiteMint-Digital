@@ -113,8 +113,12 @@ export default function Inquiries() {
     }
   };
 
-  const tabCount = (key: InquiryStatus | "all"): number =>
-    key === "all" ? counts.new + counts.in_progress + counts.resolved : counts[key];
+  // These count customer messages. The list below already refuses to render on
+  // a failed read; the counts beside it used to keep saying 0.
+  const tabCount = (key: InquiryStatus | "all"): string => {
+    if (inquiriesQuery.isError) return "—";
+    return String(key === "all" ? counts.new + counts.in_progress + counts.resolved : counts[key]);
+  };
 
   return (
     <div className="sd-page sd-enter">
@@ -303,7 +307,11 @@ export default function Inquiries() {
       <section className="mt-8">
         <h2 className="text-lg font-semibold text-foreground">{COPY.notificationsTitle}</h2>
         <p className="mb-3 text-sm text-muted-foreground">{COPY.notificationsDetail}</p>
-        {notifications.length === 0 ? (
+        {notificationsQuery.isError ? (
+          <p className="text-sm text-muted-foreground" role="alert">
+            {COPY.notificationsFailed}
+          </p>
+        ) : notifications.length === 0 ? (
           <p className="text-sm text-muted-foreground">{COPY.notificationsEmpty}</p>
         ) : (
           <ul className="flex flex-col gap-2">

@@ -268,6 +268,10 @@ export const DETAIL = {
   rescheduleFailedTitle: "This appointment wasn't rescheduled",
   reschedulePickDay: "Select an open day",
   rescheduleSlotsEmpty: "No times left on this day.",
+  // Never "no times left" — a failed read says nothing about the day. Telling
+  // an owner a day is full while they have a customer on the phone loses the
+  // appointment.
+  rescheduleSlotsFailed: "Those times couldn't be loaded, so we can't tell you what's free. Try again shortly.",
   rescheduleCancel: "Cancel",
 
   cancelLabel: "Cancel appointment",

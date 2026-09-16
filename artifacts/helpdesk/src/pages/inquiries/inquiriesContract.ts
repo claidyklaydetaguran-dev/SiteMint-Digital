@@ -208,6 +208,9 @@ export const COPY = {
   notificationsDetail:
     "What SiteMint sent you about each call. “Accepted” means your email provider took the message — it is not proof it reached your inbox. Where the provider later told us what happened, that is shown too.",
   notificationsEmpty: "No notification emails yet.",
+  // Never "no emails were sent" — this list failing to load says nothing about
+  // whether the business was told about its leads.
+  notificationsFailed: "We couldn't load this list just now. It doesn't tell you whether emails were sent — try again in a moment.",
   notificationRecipientLabel: "Sent to",
   notificationAttemptsLabel: "Attempts",
   notificationErrorLabel: "Last error",

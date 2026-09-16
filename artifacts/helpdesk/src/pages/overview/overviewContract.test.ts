@@ -340,16 +340,26 @@ section("authentication contracts");
 
 check(
   "the dashboard route is still protected — the shell gates on the session query",
-  shellSrc.includes("useSession()") && shellSrc.includes("if (isError || !me) return null;"),
+  shellSrc.includes("useSession()") &&
+    shellSrc.includes("useSessionAccess()") &&
+    shellSrc.includes("if (!me) {"),
 );
 check(
   "authenticated content is never painted before authorisation resolves",
   shellSrc.includes("if (isLoading)") &&
-    shellSrc.indexOf("if (isLoading)") < shellSrc.indexOf("if (isError || !me) return null;"),
+    shellSrc.indexOf("if (isLoading)") < shellSrc.indexOf('if (sessionAccess === "denied") return null;') &&
+    shellSrc.indexOf("if (isLoading)") < shellSrc.indexOf("if (!me) {"),
 );
 check(
   "an unauthenticated visitor is still sent to the verified sign-in route",
-  shellSrc.includes('if (!isLoading && isError) navigate("/login")'),
+  shellSrc.includes('if (sessionAccess === "denied") navigate("/login")'),
+);
+// Added with the unreachable-server fix. Only a refusal ends a session: a
+// request that never completed must leave the page alone rather than navigate
+// away and discard what was on screen. The old shell navigated on any error.
+check(
+  "a server that cannot be reached does not sign anybody out",
+  !shellSrc.includes("isError) navigate") && shellSrc.includes("Can&apos;t reach the server"),
 );
 eq("the sign-in route is unchanged", /login:\s*"([^"]+)"/.exec(routesSrc)?.[1], "/login");
 eq("the dashboard overview route is unchanged", /overview:\s*"([^"]+)"/.exec(routesSrc)?.[1], "/");

@@ -59,7 +59,12 @@ export interface RealCallLite {
  * Read twice over — here for the recent-calls list, and by `setupApi` for the
  * test-call signal — but fetched once, under one key.
  */
-export function useRecentCalls(): { items: RealCallLite[]; isError: boolean; isLoading: boolean } {
+export function useRecentCalls(): {
+  items: RealCallLite[];
+  isError: boolean;
+  isLoading: boolean;
+  refetch: () => void;
+} {
   const firmId = useAuthenticatedFirmId();
   const query = useQuery({
     queryKey: firmId !== undefined ? [ROOT, "calls", firmId] : [ROOT, "calls", "unresolved"],
@@ -68,9 +73,12 @@ export function useRecentCalls(): { items: RealCallLite[]; isError: boolean; isL
     retry: 1,
   });
   return {
+    // Callers must consult isError before reading items: on a failed request
+    // this is an empty array, and "no calls" is not what that means.
     items: query.data?.items ?? [],
     isError: query.isError,
     isLoading: query.isLoading,
+    refetch: () => void query.refetch(),
   };
 }
 

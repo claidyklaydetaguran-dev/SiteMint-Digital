@@ -166,8 +166,14 @@ export default function Overview() {
   const recent = recentConversations(convs);
   const usage = buildUsage(session);
 
+  // A count is a claim about the business, so it may only be shown once the
+  // data behind it actually arrived. On a failed read this figure shows an em
+  // dash rather than "None yet".
+  const callsSettled = !recentCallsQuery.isLoading && !recentCallsQuery.isError;
+
   const todayFigures = buildTodayFigures({
-    callsToday: countCallsToday(recentCallsQuery.items),
+    callsToday: callsSettled ? countCallsToday(recentCallsQuery.items) : null,
+    callsUnavailable: !callsSettled,
     conversationsToday: countToday(convs),
     pendingAppointmentRequests: pendingRequests,
   });
@@ -254,8 +260,12 @@ export default function Overview() {
                   data-emphasis={figure.emphasis ? "true" : "false"}
                   data-nonzero={figure.value ? "true" : "false"}
                 >
-                  <span className="sd-figure__value" data-empty={figure.value === null ? "true" : "false"}>
-                    {figure.value === null ? "None yet" : figure.value}
+                  <span
+                    className="sd-figure__value"
+                    data-empty={figure.value === null && !figure.unavailable ? "true" : "false"}
+                    data-unavailable={figure.unavailable ? "true" : "false"}
+                  >
+                    {figure.unavailable ? "—" : figure.value === null ? "None yet" : figure.value}
                   </span>
                   <span className="sd-figure__label">{figure.label}</span>
                 </Link>
@@ -276,8 +286,12 @@ export default function Overview() {
                   data-emphasis={figure.emphasis ? "true" : "false"}
                   data-nonzero={figure.value ? "true" : "false"}
                 >
-                  <span className="sd-figure__value" data-empty={figure.value === null ? "true" : "false"}>
-                    {figure.value === null ? "None yet" : figure.value}
+                  <span
+                    className="sd-figure__value"
+                    data-empty={figure.value === null && !figure.unavailable ? "true" : "false"}
+                    data-unavailable={figure.unavailable ? "true" : "false"}
+                  >
+                    {figure.unavailable ? "—" : figure.value === null ? "None yet" : figure.value}
                   </span>
                   <span className="sd-figure__label">{figure.label}</span>
                 </Link>
@@ -298,7 +312,20 @@ export default function Overview() {
                   </Link>
                 )}
               </div>
-              {recentVoiceCalls.length === 0 ? (
+              {recentCallsQuery.isError ? (
+                <section className="sd-error" role="alert">
+                  <div className="sd-error__body">
+                    <span className="sd-error__title">We couldn&rsquo;t load your calls</span>
+                    <p className="sd-error__detail">
+                      This doesn&rsquo;t mean nobody called. We couldn&rsquo;t reach the server just now — nothing
+                      has been lost.
+                    </p>
+                  </div>
+                  <button type="button" className="sd-error__action" onClick={() => recentCallsQuery.refetch()}>
+                    Try again
+                  </button>
+                </section>
+              ) : recentVoiceCalls.length === 0 ? (
                 <div className="sd-empty">
                   <h3 className="sd-empty__title">No calls yet</h3>
                   <p className="sd-empty__detail">Calls to your assigned number will appear here.</p>

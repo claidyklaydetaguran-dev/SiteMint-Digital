@@ -150,6 +150,22 @@ export function healthSummary(health: CalendarHealth | undefined): { title: stri
   return HEALTH[health?.state ?? "not_connected"];
 }
 
+/**
+ * Shown when the health check itself could not be read.
+ *
+ * `healthSummary(undefined)` answers "No calendar connected", which is the
+ * right reading for a business that never connected one and the wrong reading
+ * for a request that failed. Telling somebody their calendar is disconnected
+ * when we simply could not ask is how a working connection gets torn down and
+ * rebuilt for no reason.
+ */
+export const HEALTH_UNREADABLE = {
+  title: "We couldn't check this connection",
+  detail:
+    "This doesn't mean it stopped working — we couldn't reach the server just now. Nothing has changed. Try again in a moment.",
+  tone: "neutral",
+} as const;
+
 /** Never invent a calendar name: "primary" is a provider default, not a label the business chose. */
 export function calendarDisplayName(calendarId: string | null): string {
   if (calendarId === null || calendarId.trim() === "") return HEALTH_FIELDS.none;

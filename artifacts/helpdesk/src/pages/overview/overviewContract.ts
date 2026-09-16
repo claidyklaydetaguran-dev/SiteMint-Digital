@@ -114,6 +114,13 @@ export interface ActivityFigure {
   key: string;
   /** The number, or null when there is nothing to count yet. */
   value: number | null;
+  /**
+   * True when the figure could not be read at all — a failed or pending
+   * request. Rendered as an em dash, never as "None yet": "no calls today" is
+   * a claim about the business, and a request that did not arrive cannot
+   * support it.
+   */
+  unavailable?: boolean;
   label: string;
   /** Where this figure's rows can actually be read. */
   href: string;
@@ -155,11 +162,13 @@ export interface TodayActivityInput {
   callsToday: number | null;
   conversationsToday: number | null;
   pendingAppointmentRequests: number | null;
+  /** True when the calls request failed or has not arrived. */
+  callsUnavailable?: boolean;
 }
 
 export function buildTodayFigures(input: TodayActivityInput): ActivityFigure[] {
   return [
-    { key: "calls-today", value: input.callsToday, label: "Calls today", href: "/activity/calls", emphasis: false },
+    { key: "calls-today", value: input.callsToday, label: "Calls today", href: "/activity/calls", emphasis: false, unavailable: input.callsUnavailable === true },
     { key: "conversations-today", value: input.conversationsToday, label: "Conversations today", href: "/activity/conversations", emphasis: false },
     { key: "requests-pending", value: input.pendingAppointmentRequests, label: "Appointment requests pending", href: "/scheduling/appointments", emphasis: true },
   ];
