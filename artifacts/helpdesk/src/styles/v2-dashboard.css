@@ -1138,6 +1138,43 @@
 
 /* ── Empty, loading and error ──────────────────────────────────────────────*/
 
+/* ── Subsections, notes and muted text ──────────────────────────────────
+   These were in use on Support and the calendar picker with no definition
+   anywhere, so they styled nothing: a subsection heading sat flush against
+   the text below it, and a "note" block was indistinguishable from the
+   prose around it. Defined here against the same tokens the rest of the
+   dashboard already uses. */
+.sd-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+  margin-top: var(--sd-space-6);
+}
+.sd-subsection__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sd-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-muted-surface, var(--sd-surface));
+  padding: var(--sd-space-3) var(--sd-space-4);
+}
+.sd-note > p {
+  margin: 0;
+}
+.sd-muted {
+  margin: 0;
+  color: var(--sd-muted-text);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
 .sd-empty {
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-card);

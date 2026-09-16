@@ -216,19 +216,40 @@ const INITIALIZED_DATABASE = {
 //                 suggestions grouped by that text and by work email domain.
 //                 Reviewed DDL: docs/crm-ops/schema/M7-companies.sql.
 //
+// 84: one more, additive, with no existing table altered.
+//
+//   email (1): crm_email_provider_events — every verified delivery and
+//              engagement event the mail provider sends about mail the CRM
+//              SENT, stored before it is interpreted. One row per svix-id, so
+//              a provider retry or a dashboard replay cannot double-count an
+//              open; delivery state and engagement are DERIVED from these rows
+//              rather than materialised beside them, so an event arriving out
+//              of order cannot leave a stale summary behind. Reviewed DDL:
+//              docs/crm-ops/schema/M6-email-provider-events.sql.
+//              It references nothing and nothing references it: records carry
+//              the provider's message id, or the crm_ref tag the send put on
+//              the message, and are matched on either.
+//
 // This number is a guard, not bookkeeping: it is what makes a table added
 // without review visible. Raise it only alongside the list above, so the
 // arithmetic can be checked rather than taken on trust.
-check("the shared barrel derives 83 base tables", BARREL.length === 83, `${BARREL.length}`);
+check("the shared barrel derives 84 base tables", BARREL.length === 84, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
 // 34: voice 0010 (+voice_messages, +voice_notifications), scheduling 0002
 // (+scheduling_date_exceptions), voice 0011 (+voice_business_profiles).
-check("the committed migrations derive 34 domain tables", DOMAIN.length === 34, `${DOMAIN.length}`);
+// 36: voice 0013 (+voice_support_requests, +voice_support_messages).
+check("the committed migrations derive 36 domain tables", DOMAIN.length === 36, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 117 public tables", // 34 domain + 83 barrel
-  APPLICATION.length === 117,
+  // 84 barrel + 36 domain. Both sides of the merge that produced this line were
+  // wrong about it, each being right only about its own half: the CRM line
+  // raised the barrel to 84 (crm_email_provider_events) while still reading 34
+  // domain, and the receptionist line raised the domain to 36 (voice 0013) while
+  // still reading 83 barrel. Summing the two claims is what this pin exists to
+  // prevent, so this number is taken from running the contract, not from adding.
+  "the application owns exactly 120 public tables",
+  APPLICATION.length === 120,
   `${APPLICATION.length}`,
 );
 check(

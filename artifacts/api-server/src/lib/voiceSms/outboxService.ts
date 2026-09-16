@@ -206,6 +206,46 @@ export async function sendQueuedVoiceSms(limit = 10, deps: SendBatchDeps = {}): 
   return summary;
 }
 
+// ── worker ───────────────────────────────────────────────────────────────────
+
+/** How often the sender looks for queued messages. */
+export const VOICE_SMS_WORKER_TICK_MS = 30_000;
+
+let smsWorkerStarted = false;
+
+/**
+ * Starts the sender.
+ *
+ * Until this existed, `sendQueuedVoiceSms` had no caller anywhere: a booking
+ * confirmation the caller had consented to was written to the outbox and then
+ * sat there for ever, which is worse than not offering it — the caller was told
+ * a text was coming.
+ *
+ * It is safe to start unconditionally, and deliberately is: the batch function
+ * returns immediately while `VOICE_SMS_ENABLED` is not "true" or the credential
+ * set is incomplete, so an idle tick is one indexed SELECT and nothing can be
+ * sent by accident. Starting it always is also what makes turning the flag on
+ * deliver the backlog rather than requiring a restart — the same reasoning as
+ * the post-call notification worker.
+ */
+export function startVoiceSmsWorker(log: {
+  info: (o: object, m: string) => void;
+  error: (o: object, m: string) => void;
+}): void {
+  if (smsWorkerStarted) return;
+  smsWorkerStarted = true;
+  const tick = async () => {
+    try {
+      const summary = await sendQueuedVoiceSms();
+      if (summary.claimed > 0) log.info({ ...summary }, "[voice-sms] batch processed");
+    } catch (err) {
+      log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[voice-sms] tick failed");
+    }
+  };
+  setInterval(tick, VOICE_SMS_WORKER_TICK_MS).unref?.();
+  void tick();
+}
+
 /** Delivery-status callback: updates the row owning this provider sid. Unknown sids are ignored (never an error path an attacker can probe). */
 export async function recordDeliveryStatus(providerMessageSid: string, deliveryStatus: string): Promise<void> {
   await db

@@ -44,7 +44,17 @@ import { calendarSyncDeps } from "../lib/calendar/calendarSyncDeps.js";
 
 const router = Router();
 
-const DASHBOARD_SETTINGS_PATH = "/ai-receptionist/dashboard/settings";
+/**
+ * Where the OAuth callback returns the browser.
+ *
+ * This used to be the dashboard's Settings screen, which renders no calendar
+ * banner at all, and the SPA's legacy `/settings` redirect dropped the query
+ * string on the way through — so `?calendar=connected` and `?calendar=error`
+ * reached nothing that could read them and neither outcome was ever reported
+ * to the customer. The return now lands on the Calendar screen itself, whose
+ * `CalendarReturnBanner` exists precisely to read that parameter.
+ */
+const DASHBOARD_CALENDAR_PATH = "/ai-receptionist/dashboard/scheduling/calendar";
 
 function featureUnavailable(res: Response): void {
   res.status(503).json({ error: "Calendar connection is not currently available." });
@@ -92,21 +102,21 @@ router.get("/receptionist/calendar/google/callback", requireReceptionistAuth, as
   const code = typeof req.query.code === "string" ? req.query.code : undefined;
   const state = typeof req.query.state === "string" ? req.query.state : undefined;
   if (!code || !state) {
-    res.redirect(`${DASHBOARD_SETTINGS_PATH}?calendar=error`);
+    res.redirect(`${DASHBOARD_CALENDAR_PATH}?calendar=error`);
     return;
   }
   try {
     const stored = await consumeOauthState(req.firmId!, hashOauthState(state));
     if (!stored) {
       req.log.warn({ firmId: req.firmId }, "[calendar] callback with unknown or reused state");
-      res.redirect(`${DASHBOARD_SETTINGS_PATH}?calendar=error`);
+      res.redirect(`${DASHBOARD_CALENDAR_PATH}?calendar=error`);
       return;
     }
     const verifier = decryptToken(stored.codeVerifierEnc, prerequisites.key);
     const exchanged = await exchangeAuthorizationCode(prerequisites.config, code, verifier);
     if (!exchanged.ok || !exchanged.refreshToken) {
       req.log.warn({ firmId: req.firmId, ok: exchanged.ok }, "[calendar] code exchange failed or returned no refresh token");
-      res.redirect(`${DASHBOARD_SETTINGS_PATH}?calendar=error`);
+      res.redirect(`${DASHBOARD_CALENDAR_PATH}?calendar=error`);
       return;
     }
     await upsertConnection({
@@ -116,10 +126,10 @@ router.get("/receptionist/calendar/google/callback", requireReceptionistAuth, as
       accessTokenExpiresAt: new Date(Date.now() + exchanged.expiresInSec * 1000),
       scope: exchanged.scope ?? "",
     });
-    res.redirect(`${DASHBOARD_SETTINGS_PATH}?calendar=connected`);
+    res.redirect(`${DASHBOARD_CALENDAR_PATH}?calendar=connected`);
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[calendar] callback failed");
-    res.redirect(`${DASHBOARD_SETTINGS_PATH}?calendar=error`);
+    res.redirect(`${DASHBOARD_CALENDAR_PATH}?calendar=error`);
   }
 });
 

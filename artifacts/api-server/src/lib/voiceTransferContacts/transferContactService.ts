@@ -17,7 +17,7 @@
 //     number, not for a row.
 //   - Saving never dials. Testing is a separate, explicit action.
 
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, ne } from "drizzle-orm";
 
 export const CONTACT_ROLES = ["owner", "manager", "receptionist", "support", "sales", "other", "custom"] as const;
 export type ContactRole = (typeof CONTACT_ROLES)[number];
@@ -263,6 +263,93 @@ export async function listTransferContacts(firmId: number) {
     .from(table)
     .where(eq(table.firmId, firmId))
     .orderBy(asc(table.priority), asc(table.id));
+}
+
+/**
+ * How many contacts this business could actually be transferred to: ACTIVE and
+ * with the recorded authorization that the person agreed to receive calls.
+ *
+ * Deliberately the same two gates the in-call resolver applies before it dials
+ * (numberService.resolveTransferDestination), so capability readiness and the
+ * live answer cannot disagree. Hours are not counted — a contact with a morning
+ * window is configured, not unready, and whether now is inside it is a per-call
+ * question.
+ */
+export async function countDialableTransferDestinations(firmId: number): Promise<number> {
+  const { db, table } = await wdb();
+  const rows = await db
+    .select({ id: table.id })
+    .from(table)
+    .where(and(eq(table.firmId, firmId), eq(table.active, true), isNotNull(table.consentConfirmedAt)));
+  return rows.length;
+}
+
+// ── what the business is told about transfers ────────────────────────────────
+
+/**
+ * The Transfer Contacts banner, composed from the server's OWN capability
+ * verdict.
+ *
+ * Before V9 this said a caller "can be handed to a transfer contact" whenever a
+ * phone number was assigned. That was untrue in the most important case: no
+ * assistant carried a transfer tool at all, so every business with a number was
+ * told a thing none of them could do. An assigned number is a NECESSARY
+ * condition, never a sufficient one — the capability has to be switched on by
+ * SiteMint, and the business has to have somebody it is allowed to dial.
+ *
+ * Pure, so the wording can be tested against every state without a database or
+ * an HTTP request.
+ */
+export type TransferBlockReason =
+  | "platform_disabled"
+  | "not_authorized"
+  | "needs_transfer_contact"
+  | "needs_appointment_type"
+  | "needs_opening_hours"
+  | "needs_timezone";
+
+export interface TransferCapabilityBanner {
+  state: "active" | "blocked";
+  blockedBy: TransferBlockReason | null;
+  telephoneTransferAvailable: boolean;
+  browserTransferAvailable: boolean;
+  explanation: string;
+}
+
+/** Stated everywhere, because a demo is where this is discovered otherwise. */
+const BROWSER_NOTE = "Browser test calls stay in the browser and cannot be handed over.";
+
+export function describeTransferCapability(
+  blockedBy: TransferBlockReason | null,
+  numberAssigned: boolean,
+): TransferCapabilityBanner {
+  const active = blockedBy === null;
+  const explanation = ((): string => {
+    if (blockedBy === "not_authorized" || blockedBy === "platform_disabled") {
+      // Named as SiteMint's to switch on, so nobody hunts their own settings
+      // for a control that is not there.
+      return `Putting callers through is not switched on by SiteMint for your workspace yet. You can set contacts up now, and contact SiteMint to have transfers enabled. ${BROWSER_NOTE}`;
+    }
+    if (blockedBy === "needs_transfer_contact") {
+      return `Your assistant cannot put callers through yet. Add a contact and confirm that they agreed to receive transferred calls — nobody is dialled without that. ${BROWSER_NOTE}`;
+    }
+    if (blockedBy !== null) {
+      return `Putting callers through is not available yet. ${BROWSER_NOTE}`;
+    }
+    if (!numberAssigned) {
+      return `Transfers need a phone number for this business. Your contacts are ready; handing a caller over becomes available once your number is live. ${BROWSER_NOTE}`;
+    }
+    return `A caller on your phone number can be handed to a transfer contact who is available at the time. ${BROWSER_NOTE}`;
+  })();
+
+  return {
+    state: active ? "active" : "blocked",
+    blockedBy,
+    // Both halves, and never the number alone.
+    telephoneTransferAvailable: active && numberAssigned,
+    browserTransferAvailable: false,
+    explanation,
+  };
 }
 
 /** Clears any other default for this firm, so the partial unique index holds. */

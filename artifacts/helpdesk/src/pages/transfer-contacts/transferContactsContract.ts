@@ -114,6 +114,13 @@ export const COPY = {
 
   // Capability
   capabilityTitle: "What transfers can do today",
+  /**
+   * The server's verdict, said in the first few words rather than buried in a
+   * sentence. A business that cannot put callers through needs to know that
+   * before it reads about how transfers work.
+   */
+  capabilityStateActive: "Putting callers through is switched on.",
+  capabilityStateBlocked: "Putting callers through is not available yet.",
   browserVsPhoneNote:
     "A browser test call happens entirely in this browser, so it has no phone line to hand over — transfers only complete on a real phone call.",
   lastTestNever: "Not yet tested on a real call",

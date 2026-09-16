@@ -28,10 +28,11 @@ import {
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
-import { browserTestDisabledReason } from "@/lib/browserVoice/eligibility";
+import { browserTestDisabledReason, browserTestSyncWarning } from "@/lib/browserVoice/eligibility";
 import {
   BUILDER,
   PRESET_RECOVERY,
+  SYNC,
   SAVE_PROMPT_EITHER,
   SAVE_PROMPT_PUBLISH,
   SAVE_PROMPT_TEST,
@@ -898,8 +899,15 @@ export default function AssistantBuilder() {
             )}
             {assistant.status === "published" && !isDirty && assistant.providerSyncState === "local_changes" && (
               <div role="status" className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-xs text-warning-foreground dark:text-warning">
-                This configuration is saved here but has not been sent to the voice provider. The provider is still
-                running the last configuration it confirmed.
+                <span className="font-semibold">{SYNC.localChangesTitle}.</span> {SYNC.localChangesDetail}
+                {/*
+                  Without the sync capability there is no control on this page
+                  that can close that gap — Publish is spent once an assistant
+                  is published. Naming the dependency is the honest answer; a
+                  disabled button would imply the owner could fix it here.
+                  Folded out of a sync-enabled build, where the control exists.
+                */}
+                {!syncInBuild && <> {SYNC.unavailableDetail}</>}
               </div>
             )}
             {assistant.status === "published" ? (
@@ -961,6 +969,7 @@ export default function AssistantBuilder() {
         <BrowserTestConfirmDialog
           open={testDialogOpen}
           assistantName={draft.setup.assistantName || "Untitled assistant"}
+          syncWarning={browserTestSyncWarning(assistant)}
           onCancel={cancelTestDialog}
           onConfirm={confirmTest}
         />

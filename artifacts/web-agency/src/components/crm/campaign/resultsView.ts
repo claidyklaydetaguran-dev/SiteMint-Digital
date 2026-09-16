@@ -95,9 +95,17 @@ export interface EngagementView {
 }
 
 export function engagementView(engagement: Results["engagement"]): EngagementView {
-  const measured = engagement.tracked === true
-    && typeof engagement.opens === "number" && typeof engagement.clicks === "number";
-  if (!measured) {
+  // Per metric. Open tracking and click tracking are separate settings on the
+  // sending domain, so one can be measured while the other is not — and a
+  // single flag would either hide a real figure or invent a missing one. A
+  // server that predates the split sends neither field, and its single flag is
+  // used for both.
+  const measuredOpens = (engagement.opensMeasured ?? engagement.tracked === true)
+    && typeof engagement.opens === "number";
+  const measuredClicks = (engagement.clicksMeasured ?? engagement.tracked === true)
+    && typeof engagement.clicks === "number";
+
+  if (!measuredOpens && !measuredClicks) {
     return {
       headline: "Not tracked",
       detail: engagement.unavailableReason ?? engagement.why,
@@ -107,12 +115,55 @@ export function engagementView(engagement: Results["engagement"]): EngagementVie
       ],
     };
   }
+
+  const people = (value: number | null | undefined, rate: number | null) =>
+    typeof value === "number"
+      ? `${value}${typeof rate === "number" ? ` · ${rate}%` : ""}`
+      : "—";
+
   return {
     headline: "Recorded by the mail provider",
-    detail: "An open only means an image was loaded. Privacy features and security scanners load images automatically, so an open is never proof that a person read the email.",
+    detail: engagement.caveat
+      ?? "An open only means an image was loaded. Privacy features and security scanners load images automatically, so an open is never proof that a person read the email.",
     figures: [
-      { label: "Opens recorded", value: String(engagement.opens) },
-      { label: "Clicks recorded", value: String(engagement.clicks) },
+      { label: "Opens recorded", value: measuredOpens ? String(engagement.opens) : "Not measured" },
+      // Named for what it is: people, not events. One contact opening four
+      // times is one person who opened it, which is what the rate divides.
+      { label: "People who opened", value: measuredOpens ? people(engagement.uniqueOpens, engagement.openRate) : "Not measured" },
+      { label: "Clicks recorded", value: measuredClicks ? String(engagement.clicks) : "Not measured" },
+      { label: "People who clicked", value: measuredClicks ? people(engagement.uniqueClicks, engagement.clickRate) : "Not measured" },
     ],
   };
+}
+
+export interface DeliveryReportRow {
+  key: string;
+  label: string;
+  count: number;
+  /** True for the states that mean nothing arrived. */
+  attention: boolean;
+}
+
+/**
+ * What the provider reported about the messages it accepted.
+ *
+ * Only states that actually occurred are listed: a row of zeroes reads as a
+ * measurement of nothing, and the count that matters most — the accepted
+ * messages with no report at all — is stated in its own words instead of being
+ * shown as a zero somewhere else.
+ */
+export function deliveryReport(results: Results): DeliveryReportRow[] {
+  const provider = results.deliverySignal.provider;
+  if (!provider) return [];
+  const rows: DeliveryReportRow[] = [
+    { key: "delivered", label: "Delivered", count: provider.delivered, attention: false },
+    { key: "delayed", label: "Delayed", count: provider.delayed, attention: false },
+    { key: "sent", label: "Accepted, no delivery report yet", count: provider.sent, attention: false },
+    { key: "bounced", label: "Bounced", count: provider.bounced, attention: true },
+    { key: "complained", label: "Marked as spam", count: provider.complained, attention: true },
+    { key: "failed", label: "Failed at the provider", count: provider.failed, attention: true },
+    { key: "suppressed", label: "Blocked by the provider", count: provider.suppressed, attention: true },
+    { key: "noReport", label: "No report from the provider", count: provider.noReport, attention: false },
+  ];
+  return rows.filter((row) => row.count > 0);
 }

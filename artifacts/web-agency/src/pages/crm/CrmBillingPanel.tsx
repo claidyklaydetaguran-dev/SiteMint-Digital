@@ -5,6 +5,8 @@ import {
 import { adminFetch } from "@/lib/adminFetch";
 import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
 import { Figure, LoadFailure, countOf, dataOf } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { addDaysToDateKey, dueDateIso, localDateKey } from "@/components/crm/confirmDialogModel";
 
 // ── M5: quotes and invoices, on the record you are already looking at ───────
 //
@@ -254,6 +256,7 @@ export default function CrmBillingPanel({
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("manual_transfer");
   const [payDeal, setPayDeal] = useState("");
+  const confirmation = useConfirmDialog();
 
   // A different contact must never be shown the previous one's money while
   // their own is still in flight.
@@ -381,17 +384,40 @@ export default function CrmBillingPanel({
     resetForm();
   }
 
-  async function invoiceFromQuote(quote: Quote) {
-    const due = window.prompt(
-      `Invoice ${quote.reference} for ${money(quote.total, quote.currency)}.\n\n`
-      + "Due date (YYYY-MM-DD). An issued invoice needs one so it can be chased.",
-      new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10),
-    );
-    if (!due) return;
-    await act("/api/crm/invoices", {
-      method: "POST",
-      payload: { quoteId: quote.id, dueDate: new Date(`${due}T17:00:00`).toISOString() },
-    }, "Invoice drafted from the accepted quote, with its line items carried across.");
+  function invoiceFromQuote(quote: Quote) {
+    const today = localDateKey();
+    void confirmation.ask({
+      title: `Draft an invoice from ${quote.reference}?`,
+      description: `It is for ${money(quote.total, quote.currency)}, with the quote's line items and discount carried across.`,
+      consequences: ["Nothing goes to the client until you issue it."],
+      field: {
+        kind: "date",
+        label: "Due date",
+        min: today,
+        defaultValue: addDaysToDateKey(today, 14),
+        helper: "An issued invoice needs one so it can be chased. It falls due at 5pm on that day.",
+      },
+      confirmLabel: "Draft invoice",
+      busyLabel: "Drafting…",
+      cancelLabel: "Not now",
+      action: async ({ value }) => {
+        // The prompt this replaces validated nothing: "next friday" went
+        // straight into `new Date(...).toISOString()` as an uncaught
+        // RangeError, and an empty answer silently did nothing.
+        const dueDate = dueDateIso(value);
+        if (!dueDate) throw new Error("That due date could not be read. Pick it again.");
+        const res = await adminFetch("/api/crm/invoices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quoteId: quote.id, dueDate }),
+        });
+        const data = await body(res);
+        if (!res.ok) throw new Error(data.error || `That was refused (${res.status}).`);
+        setError(null);
+        setNotice("Invoice drafted from the accepted quote, with its line items carried across.");
+        await load();
+      },
+    });
   }
 
   async function recordPayment() {
@@ -419,6 +445,8 @@ export default function CrmBillingPanel({
 
   return (
     <div className="bg-background border border-border rounded-xl overflow-hidden">
+      {confirmation.element}
+
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border">
         <h2 className="text-sm font-bold text-foreground truncate flex items-center gap-2">
           <Receipt className="w-4 h-4 text-teal-600" /> Quotes &amp; invoices

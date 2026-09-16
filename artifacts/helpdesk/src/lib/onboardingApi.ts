@@ -45,10 +45,27 @@ export interface OnboardingResponse {
   state: OnboardingState;
 }
 
-export interface OnboardingUpdateInput {
-  currentStep?: OnboardingStepKey;
-  steps?: Partial<Record<OnboardingStepKey, { status: OnboardingStepStatus }>>;
-  completedAt?: string | null;
+/**
+ * One step, one status — the shape `PUT /api/receptionist/onboarding` actually
+ * accepts.
+ *
+ * This client used to send `{ steps: { business: { status: "done" } } }`, a
+ * shape the route never read: it takes `body.step` and `body.status` as two
+ * top-level scalars (`routes/receptionistOnboarding.ts`) and answers
+ * `400 invalid_step` when `step` is absent. Every write this module made was
+ * therefore rejected, and because the caller fired it with `void` the rejection
+ * was invisible — the Setup hub re-derived the same "newly done" steps on every
+ * visit and re-sent the same rejected request forever, so no progress was ever
+ * recorded.
+ *
+ * The route writes exactly one step per call, so a caller with several steps to
+ * record issues several calls (see `useSyncInferredSteps`). Sending them one at
+ * a time is also what makes a partial failure reportable per step rather than
+ * collapsing into one opaque failure.
+ */
+export interface OnboardingStepUpdate {
+  step: OnboardingStepKey;
+  status: OnboardingStepStatus;
 }
 
 const EMPTY_STATE: OnboardingState = {
@@ -75,14 +92,19 @@ export async function fetchOnboardingState(): Promise<OnboardingState> {
 }
 
 /**
- * Writes progress back. Idempotent by contract: the Setup hub calls this to
- * persist inferred "done" states, so calling it twice with the same input
- * must be harmless — that is a backend guarantee this client relies on but
- * does not re-implement.
+ * Writes one step's progress back. Idempotent by contract: the Setup hub calls
+ * this to persist inferred "done" states, so calling it twice with the same
+ * input must be harmless — that is a backend guarantee this client relies on
+ * but does not re-implement.
+ *
+ * Rejections are deliberately allowed to propagate. A caller that swallows
+ * them cannot tell "saved" from "refused", which is precisely how the
+ * `{ steps: … }` defect above survived: the request 400'd on every visit and
+ * the page reported success regardless.
  */
-export function updateOnboardingState(input: OnboardingUpdateInput): Promise<OnboardingState> {
+export function updateOnboardingState(update: OnboardingStepUpdate): Promise<OnboardingState> {
   return apiFetch<OnboardingResponse>("/receptionist/onboarding", {
     method: "PUT",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ step: update.step, status: update.status }),
   }).then((res) => res.state ?? EMPTY_STATE);
 }

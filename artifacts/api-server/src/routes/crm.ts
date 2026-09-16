@@ -13,20 +13,42 @@ import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
 import { getResend } from "../lib/email.js";
+// Every CRM send goes through this seam. It is what keeps a test run out of a
+// real mailbox — while CRM_EMAIL_TEST_MODE is anything but the exact string
+// "false", nothing is handed to the provider at all — and it is what classifies
+// an outcome honestly, including the unknown one that must never be retried.
+import { staffMailBlockedReason, trySendStaffMail } from "../lib/staffMail.js";
+import { emailRef, emailRefTags } from "../lib/emailRefs.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
 import { getSchedulerStatus, processScheduledMessages } from "../lib/campaignScheduler.js";
-import { stampReplyAndStop } from "../lib/sequenceReply.js";
 import { getUncachableStripeClient } from "../lib/stripeClient.js";
 
 const router: IRouter = Router();
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-// M1 cutover: the CRM gate now accepts a per-person staff session first and
-// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
-// is not "false". Keeping the name leaves every route below unchanged, and
-// the route-security manifest still reads "admin" for them.
-const requireAdmin = requireCrmAuth();
+// Every route below names the permission it needs — `requireCrmAuth("…")` —
+// rather than sharing one gate that asked only "is this a staff session".
+//
+// It used to share one. `const requireAdmin = requireCrmAuth()` guarded 56
+// routes here, and holding a session was the whole test. Measured in a browser
+// on 2026-09-16 with `leads.read` revoked on the signed-in account, GET
+// /crm/leads still returned every contact; so did /crm/deals. The unguarded set
+// also included /crm/campaigns/:id/test-send, /crm/campaigns/queue/:id/send-now,
+// /crm/campaigns/scheduler/run and /crm/deals/:id/transactions/stripe-checkout —
+// bulk customer contact and money, reachable by anyone who could sign in.
+//
+// The permission names follow what the newer files already decided: money is
+// deals.read / deals.write (crmBilling.ts treats quotes, invoices and payments
+// that way), automation is settings.*, customer contact is communications.*,
+// and reading the team's task queue is tasks.read.team. `campaigns.send` is the
+// line the operations_manager role deliberately does not cross.
+//
+// `requireCrmAuth` still accepts a per-person staff session first and falls back
+// to the legacy shared bearer while CRM_LEGACY_BEARER_ENABLED is not "false";
+// the route-security manifest still classes these routes "admin", because that
+// records WHICH credential may reach them, not what it may then do.
+// Held by routes/crmPermissionEnforcement.test.ts, which crosses each line.
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 /**
@@ -81,7 +103,7 @@ function violatesForeignKey(err: unknown, constraint: string): boolean {
 // Read-only truth for the Settings page. Email test mode lives only in the
 // CRM_EMAIL_TEST_MODE env var (every send path checks it directly); the UI
 // must display the server's value, never a client-side toggle.
-router.get("/crm/settings/status", requireAdmin, (_req: Request, res: Response) => {
+router.get("/crm/settings/status", requireCrmAuth("settings.read"), (_req: Request, res: Response) => {
   res.json({ emailTestMode: process.env.CRM_EMAIL_TEST_MODE !== "false" });
 });
 
@@ -136,7 +158,7 @@ router.get("/crm/receptionist-signup-jobs", requireCrmAuth("settings.read"), asy
 });
 
 // ── Dashboard Stats ───────────────────────────────────────────────────────────
-router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/stats", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -184,7 +206,7 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
 // only supplies its inputs; step computation happens client-side via the
 // existing pure computeWorkflowSteps(). Static route — must stay above the
 // "/crm/leads/:id" route group.
-router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/intelligence/automation-queue", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db
       .select({
@@ -244,7 +266,7 @@ router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Reque
 });
 
 // ── Leads list ────────────────────────────────────────────────────────────────
-router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const { search, status, priority, source, companyId } = req.query as Record<string, string>;
     // A contact that has been merged into another one is not part of the book
@@ -303,7 +325,7 @@ router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Create lead ───────────────────────────────────────────────────────────────
-router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const data = req.body as Record<string, unknown>;
     if (!data.name || !data.email) { res.status(400).json({ error: "Name and email are required" }); return; }
@@ -343,7 +365,7 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Get lead ──────────────────────────────────────────────────────────────────
-router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -388,7 +410,7 @@ router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) =
 });
 
 // ── Update lead ───────────────────────────────────────────────────────────────
-router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -532,7 +554,7 @@ router.delete("/crm/leads/:id", requireCrmAuth("leads.delete"), async (req: Requ
 });
 
 // ── Add note ──────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/notes", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -554,7 +576,7 @@ router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Resp
 });
 
 // ── Activities (manual creation) ──────────────────────────────────────────────
-router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/activities", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -583,7 +605,7 @@ router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res:
 });
 
 // ── Tasks ──────────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/tasks", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -630,7 +652,7 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
   }
 });
 
-router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/tasks/:id", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -680,7 +702,7 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.delete("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/tasks/:id", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -694,7 +716,7 @@ router.delete("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response
 });
 
 // ── All tasks (for tasks page) ────────────────────────────────────────────────
-router.get("/crm/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/tasks", requireCrmAuth("tasks.read.team"), async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const tasks = await db.select({
@@ -797,44 +819,86 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
     // trusting the sender header.
     const replyTo = conversation ? await replyToAddress(conversation.id) : null;
 
-    const isTestMode = testMode !== false && process.env.CRM_EMAIL_TEST_MODE !== "false";
-    let providerMessageId: string | null = null;
+    // Test mode is the SERVER's decision, not the caller's.
+    //
+    // The old rule was `testMode !== false && CRM_EMAIL_TEST_MODE !== "false"`,
+    // so a request that simply said `testMode: false` reached a real mailbox on
+    // a server whose test mode was still on. `trySendStaffMail` hands nothing
+    // to the provider while test mode is on, whatever the body asks for, and
+    // `testMode` in the request is now ignored rather than obeyed.
+    void testMode;
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
 
-    if (!isTestMode) {
-      const resend = getResend();
-      const sent = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [lead.email],
-        ...(ccList.length ? { cc: ccList } : {}),
-        ...(bccList.length ? { bcc: bccList } : {}),
-        ...(replyTo ? { replyTo } : {}),
-        subject,
-        html: body.replace(/\n/g, "<br>"),
-      });
-      providerMessageId = sent?.data?.id ?? null;
+    // The message row is written BEFORE the send and settled after it. Two
+    // reasons, and the second is the important one: a process that dies
+    // mid-send leaves a visible "Sending" rather than no record at all, and the
+    // send can carry a tag naming this row — which is what lets a later
+    // delivery event reach it even when the outcome is never learned here.
+    const who = actorLabel(req);
+    const [recorded] = conversation
+      ? await db.insert(crmMessages).values({
+          leadId: lead.id,
+          conversationId: conversation.id,
+          direction: "outbound",
+          channel: "email",
+          subject,
+          body,
+          fromNumber: process.env.RESEND_FROM_EMAIL ?? null,
+          toNumber: lead.email,
+          sentByStaffId: req.staffAuth?.staff.id ?? null,
+          sentByLabel: req.staffAuth?.staff ? who : null,
+          origin: req.staffAuth?.staff ? "staff" : "legacy",
+          status: "sending",
+          metadata: { cc: ccList, bcc: bccList, replyTo },
+        }).returning()
+      : [undefined];
+
+    const outcome = await trySendStaffMail({
+      to: lead.email,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+      ...(ccList.length ? { cc: ccList } : {}),
+      ...(bccList.length ? { bcc: bccList } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      ...(recorded ? { tags: emailRefTags(emailRef("message", recorded.id)) } : {}),
+    });
+
+    // `uncertain` is its own state and is never written as a failure: the
+    // message may be in their inbox, and a thread that says "not sent" is how a
+    // second copy gets sent.
+    const messageStatus = outcome.sent ? "sent"
+      : outcome.failure === "not_configured" ? (simulating ? "test_mode" : "not_sent")
+      : outcome.failure === "uncertain" ? "uncertain"
+      : "failed";
+
+    if (recorded && conversation) {
+      await db.update(crmMessages).set({
+        status: messageStatus,
+        providerMessageId: outcome.sent ? outcome.providerId : null,
+        metadata: {
+          cc: ccList, bcc: bccList, replyTo,
+          testMode: simulating,
+          ...(outcome.sent ? {} : { failure: outcome.failure, reason: outcome.reason.slice(0, 300) }),
+        },
+      }).where(eq(crmMessages.id, recorded.id));
+      await refreshConversationRollups(conversation.id);
     }
 
-    // Recorded as a message on the thread, not only as an activity. The
-    // activity timeline says an email happened; this is the email.
-    if (conversation) {
-      const who = actorLabel(req);
-      await db.insert(crmMessages).values({
-        leadId: lead.id,
-        conversationId: conversation.id,
-        direction: "outbound",
-        channel: "email",
-        subject,
-        body,
-        fromNumber: process.env.RESEND_FROM_EMAIL ?? null,
-        toNumber: lead.email,
-        providerMessageId,
-        sentByStaffId: req.staffAuth?.staff.id ?? null,
-        sentByLabel: req.staffAuth?.staff ? who : null,
-        origin: req.staffAuth?.staff ? "staff" : "legacy",
-        status: isTestMode ? "test_mode" : "sent",
-        metadata: { testMode: isTestMode, cc: ccList, bcc: bccList, replyTo },
+    if (!outcome.sent && !simulating) {
+      // Not sent, and which of the two reasons it was decides what the sender
+      // should do next — so it is said rather than flattened into one 500.
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false,
+        error: outcome.failure === "uncertain"
+          ? "The mail provider never confirmed this message, so whether it arrived is genuinely unknown. Check with them before sending it again — a second attempt may put a second copy in their inbox."
+          : outcome.reason,
+        failure: outcome.failure,
+        uncertain: outcome.failure === "uncertain",
+        messageId: recorded?.id ?? null,
       });
-      await refreshConversationRollups(conversation.id);
+      return;
     }
 
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
@@ -842,9 +906,9 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
     // an email happened but never what it said. Keep it with the entry.
     await logActivity(
       req, id, "email_sent", `Email sent: ${subject}`,
-      isTestMode ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`,
+      simulating ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`,
       {
-        subject, body, testMode: isTestMode,
+        subject, body, testMode: simulating,
         to: lead.email,
         // BCC is recorded internally because the team needs to know who was
         // copied; it is never echoed to a recipient.
@@ -853,7 +917,7 @@ router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async
       },
     );
 
-    res.json({ ok: true, testMode: isTestMode, cc: ccList, bcc: bccList });
+    res.json({ ok: true, testMode: simulating, cc: ccList, bcc: bccList, messageId: recorded?.id ?? null });
   } catch (err) {
     req.log.error({ err }, "Error sending email");
     res.status(500).json({ error: "Failed to send email" });
@@ -950,7 +1014,7 @@ router.get("/crm/communications/email-activity", requireCrmAuth("communications.
 
 // ── Campaign CRUD ─────────────────────────────────────────────────────────────
 
-router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const list = await db.select().from(crmCampaigns).orderBy(desc(crmCampaigns.updatedAt));
     // Attach recipient counts
@@ -967,7 +1031,7 @@ router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) =
   }
 });
 
-router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const { name, subject, body, status, type, objective, toneProfile, description, stopOnReply, autoSend } = req.body as Record<string, unknown>;
     if (!name || !subject || !body) {
@@ -997,11 +1061,11 @@ router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) 
 
 // ── Scheduler status & manual trigger (static — before /:id) ─────────────────
 
-router.get("/crm/campaigns/scheduler/status", requireAdmin, (_req: Request, res: Response) => {
+router.get("/crm/campaigns/scheduler/status", requireCrmAuth("campaigns.read"), (_req: Request, res: Response) => {
   res.json(getSchedulerStatus());
 });
 
-router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, res: Response) => {
+router.post("/crm/campaigns/scheduler/run", requireCrmAuth("campaigns.send"), async (_req: Request, res: Response) => {
   try {
     const result = await processScheduledMessages();
     res.json({ ok: true, ...result });
@@ -1012,7 +1076,7 @@ router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, 
 
 // ── Campaign Scheduled Message Queue (static routes — must come before /:id) ──
 
-router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/queue", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const { status, campaignId } = req.query as Record<string, string>;
     const conditions = [];
@@ -1049,7 +1113,7 @@ router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1064,6 +1128,23 @@ router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reques
       updates.status = status;
     }
     if (!Object.keys(updates).length) { res.status(400).json({ error: "No fields to update" }); return; }
+
+    // Releasing a HELD message is a person deciding to send something the
+    // scheduler deliberately stopped — a backlog too old to go out on its own.
+    // The decision is stamped, so the next tick sends it instead of holding it
+    // again, which would make the release appear to do nothing.
+    const [current] = await db.select().from(crmCampaignScheduledMessages)
+      .where(eq(crmCampaignScheduledMessages.id, messageId));
+    if (!current) { res.status(404).json({ error: "Message not found" }); return; }
+    if (current.status === "held" && (status === "scheduled" || status === "queued")) {
+      updates.metadata = {
+        ...(current.metadata ?? {}),
+        releasedFromHoldAt: new Date().toISOString(),
+        releasedBy: actorLabel(req),
+      };
+      updates.lastError = null;
+    }
+
     const [msg] = await db.update(crmCampaignScheduledMessages)
       .set(updates)
       .where(eq(crmCampaignScheduledMessages.id, messageId))
@@ -1076,7 +1157,7 @@ router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reques
   }
 });
 
-router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/queue/:messageId/send-now", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1085,7 +1166,9 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req
       .from(crmCampaignScheduledMessages)
       .where(eq(crmCampaignScheduledMessages.id, messageId));
     if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
-    if (!["scheduled","queued"].includes(msg.status)) {
+    // `held` is sendable from here on purpose: a person pressing Send Now on a
+    // message the scheduler held IS the review the hold was asking for.
+    if (!["scheduled","queued","held"].includes(msg.status)) {
       res.status(400).json({ error: "Message is not in a sendable state" }); return;
     }
     if (msg.channel !== "email") {
@@ -1101,29 +1184,58 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req
         .where(eq(crmCampaignScheduledMessages.id, messageId));
       res.status(400).json({ error: "No valid email address" }); return;
     }
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    let resendId: string | null = null;
-    if (!isTestMode) {
-      const resend = getResend();
-      const { data } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [lead.email],
-        subject: msg.subject ?? "(no subject)",
-        html: (msg.body ?? "").replace(/\n/g, "<br>"),
-      });
-      resendId = data?.id ?? null;
+    // Claim it first. Without this, the scheduler tick can pick up the same
+    // due message while this request is sending it, and the recipient gets two.
+    const claimed = await db.update(crmCampaignScheduledMessages)
+      .set({ status: "sending" })
+      .where(and(
+        eq(crmCampaignScheduledMessages.id, messageId),
+        inArray(crmCampaignScheduledMessages.status, ["scheduled", "queued", "held"]),
+      ))
+      .returning({ id: crmCampaignScheduledMessages.id });
+    if (claimed.length === 0) {
+      res.status(409).json({ error: "This message is already being sent." });
+      return;
     }
+
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to: lead.email,
+      subject: msg.subject ?? "(no subject)",
+      text: msg.body ?? "",
+      html: (msg.body ?? "").replace(/\n/g, "<br>"),
+      tags: emailRefTags(emailRef("sequence_message", msg.id)),
+    });
+
+    if (outcome.sent || simulating) {
+      await db.update(crmCampaignScheduledMessages)
+        .set({
+          status: "sent", sentAt: new Date(), lastError: null,
+          resendEmailId: outcome.sent ? outcome.providerId : null,
+        })
+        .where(eq(crmCampaignScheduledMessages.id, messageId));
+      res.json({ ok: true, testMode: simulating });
+      return;
+    }
+
+    // Recorded under the class the answer actually supports. An `uncertain:`
+    // prefix is what stops anybody re-queuing a message that may already have
+    // arrived, and it is what a later `delivered` event upgrades.
     await db.update(crmCampaignScheduledMessages)
-      .set({ status: "sent", sentAt: new Date(), resendEmailId: resendId })
+      .set({ status: "failed", lastError: `${outcome.failure}: ${outcome.reason}`.slice(0, 500) })
       .where(eq(crmCampaignScheduledMessages.id, messageId));
-    res.json({ ok: true, testMode: isTestMode });
+    res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+      ok: false, error: outcome.reason, failure: outcome.failure,
+      uncertain: outcome.failure === "uncertain",
+    });
   } catch (err) {
     req.log.error({ err }, "Error sending scheduled message");
     res.status(500).json({ error: "Failed to send message" });
   }
 });
 
-router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1139,7 +1251,7 @@ router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reque
 
 // ── Bulk reschedule: shift all scheduled/queued messages for a lead ───────────
 // Static path (/leads/:leadId/reschedule) — placed before /:id group per rule #8
-router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/leads/:leadId/reschedule", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const leadId = Number(req.params.leadId);
     if (isNaN(leadId)) { res.status(400).json({ error: "Invalid leadId" }); return; }
@@ -1184,7 +1296,7 @@ router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req:
 
 // ── Campaign CRUD (parameterized routes) ──────────────────────────────────────
 
-router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1213,7 +1325,7 @@ router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respons
   }
 });
 
-router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1240,7 +1352,7 @@ router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/:id", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1253,7 +1365,7 @@ router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Resp
 });
 
 // Replace all recipients for a campaign (upsert pattern)
-router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/recipients", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1292,7 +1404,7 @@ router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, 
 });
 
 // Per-campaign test send (uses persisted campaign data)
-router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/test-send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1304,19 +1416,25 @@ router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, r
     const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
     if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [to],
-        subject: `[TEST] ${campaign.subject}`,
-        html: campaign.body.replace(/\n/g, "<br>"),
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to,
+      subject: `[TEST] ${campaign.subject}`,
+      text: campaign.body,
+      html: campaign.body.replace(/\n/g, "<br>"),
+    });
+
+    if (!outcome.sent && !simulating) {
+      req.log.warn({ to, campaignId: id, failure: outcome.failure }, "Campaign test email not sent");
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false, error: outcome.reason, failure: outcome.failure, to,
       });
+      return;
     }
 
-    req.log.info({ to, campaignId: id, testMode: isTestMode }, "Campaign test email dispatched");
-    res.json({ ok: true, testMode: isTestMode, to });
+    req.log.info({ to, campaignId: id, testMode: simulating }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: simulating, to });
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
@@ -1325,7 +1443,7 @@ router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, r
 
 // ── Campaign Test Send ────────────────────────────────────────────────────────
 // Sends a single test email to a manually specified address — NOT to leads.
-router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/test-send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const { to, subject, body } = req.body as { to?: string; subject?: string; body?: string };
     if (!to || !subject || !body) {
@@ -1336,19 +1454,25 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
       res.status(400).json({ error: "Invalid test email address" }); return;
     }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [to],
-        subject: `[TEST] ${subject}`,
-        html: body.replace(/\n/g, "<br>"),
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to,
+      subject: `[TEST] ${subject}`,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+    });
+
+    if (!outcome.sent && !simulating) {
+      req.log.warn({ to, failure: outcome.failure }, "Campaign test email not sent");
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false, error: outcome.reason, failure: outcome.failure, to,
       });
+      return;
     }
 
-    req.log.info({ to, testMode: isTestMode }, "Campaign test email dispatched");
-    res.json({ ok: true, testMode: isTestMode, to });
+    req.log.info({ to, testMode: simulating }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: simulating, to });
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
@@ -1356,7 +1480,7 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
 });
 
 // ── Campaign Analytics ────────────────────────────────────────────────────────
-router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/analytics", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1491,7 +1615,7 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
 // ── Campaign Sequence Funnel ──────────────────────────────────────────────────
 // Per-step delivery funnel for nurture/drip campaigns.
 // Works for broadcast too (returns empty steps array).
-router.get("/crm/campaigns/:id/funnel", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/funnel", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1608,7 +1732,10 @@ router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (
       res.status(400).json({ error: "No recipients saved for this campaign" }); return;
     }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    // Decided by the seam, not by this route: while CRM_EMAIL_TEST_MODE is
+    // anything other than the exact string "false", nothing is handed over.
+    const isTestMode = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
     const results: Array<{ recipientId: number; leadId: number; email: string; status: string; error?: string }> = [];
     let sent = 0, failed = 0, skipped = 0;
 
@@ -1632,33 +1759,39 @@ router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (
       const subject = r.personalizedSubject ?? campaign.subject;
       const body    = r.personalizedBody   ?? campaign.body;
 
-      let resendEmailId: string | null = null;
-      try {
-        if (!isTestMode) {
-          const resend = getResend();
-          const { data } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-            to: [r.leadEmail],
-            subject,
-            html: body.replace(/\n/g, "<br>"),
-          });
-          // 200 ms rate-limit guard between live sends
-          await new Promise(resolve => setTimeout(resolve, 200));
-          resendEmailId = data?.id ?? null;
-        }
+      const outcome = await trySendStaffMail({
+        to: r.leadEmail,
+        subject,
+        text: body,
+        html: body.replace(/\n/g, "<br>"),
+        tags: emailRefTags(emailRef("campaign_recipient", r.id)),
+      });
+      // The same 200 ms gap between live sends as before: the provider rate
+      // limits, and a burst is what trips it.
+      if (outcome.sent) await new Promise(resolve => setTimeout(resolve, 200));
+
+      if (outcome.sent || isTestMode) {
         await db.update(crmCampaignRecipients)
-          .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId })
+          .set({
+            status: "sent", sentAt: new Date(), lastError: null,
+            resendEmailId: outcome.sent ? outcome.providerId : null,
+          })
           .where(eq(crmCampaignRecipients.id, r.id));
         results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "sent" });
         sent++;
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : "Unknown send error";
-        await db.update(crmCampaignRecipients)
-          .set({ status: "failed", lastError: errMsg })
-          .where(eq(crmCampaignRecipients.id, r.id));
-        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: errMsg });
-        failed++;
+        continue;
       }
+
+      // Stored under the class the answer actually supports. An `uncertain:`
+      // outcome may already be in somebody's inbox, so it is never described
+      // as not sent, and nothing re-queues it by itself — a later `delivered`
+      // event is what resolves it.
+      const recordedError = `${outcome.failure}: ${outcome.reason}`.slice(0, 500);
+      await db.update(crmCampaignRecipients)
+        .set({ status: "failed", lastError: recordedError })
+        .where(eq(crmCampaignRecipients.id, r.id));
+      results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: recordedError });
+      failed++;
     }
 
     // Mark campaign as archived if fully sent
@@ -1675,7 +1808,7 @@ router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (
 });
 
 // Resend to a single failed or skipped recipient
-router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id          = Number(req.params.id);
     const recipientId = Number(req.params.recipientId);
@@ -1706,197 +1839,40 @@ router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, a
 
     const subject = r.personalizedSubject ?? campaign.subject;
     const body    = r.personalizedBody   ?? campaign.body;
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const isTestMode = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
 
-    let resendEmailIdSingle: string | null = null;
-    try {
-      if (!isTestMode) {
-        const resend = getResend();
-        const { data } = await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-          to: [r.leadEmail],
-          subject,
-          html: body.replace(/\n/g, "<br>"),
-        });
-        resendEmailIdSingle = data?.id ?? null;
-      }
+    const outcome = await trySendStaffMail({
+      to: r.leadEmail,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+      tags: emailRefTags(emailRef("campaign_recipient", r.id)),
+    });
+
+    if (outcome.sent || isTestMode) {
       await db.update(crmCampaignRecipients)
-        .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId: resendEmailIdSingle })
+        .set({
+          status: "sent", sentAt: new Date(), lastError: null,
+          resendEmailId: outcome.sent ? outcome.providerId : null,
+        })
         .where(eq(crmCampaignRecipients.id, recipientId));
       req.log.info({ campaignId: id, recipientId, testMode: isTestMode }, "Recipient resent");
       res.json({ ok: true, status: "sent", testMode: isTestMode, email: r.leadEmail });
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : "Unknown send error";
-      await db.update(crmCampaignRecipients)
-        .set({ status: "failed", lastError: errMsg })
-        .where(eq(crmCampaignRecipients.id, recipientId));
-      res.status(500).json({ ok: false, status: "failed", error: errMsg });
+      return;
     }
+
+    const recordedError = `${outcome.failure}: ${outcome.reason}`.slice(0, 500);
+    await db.update(crmCampaignRecipients)
+      .set({ status: "failed", lastError: recordedError })
+      .where(eq(crmCampaignRecipients.id, recipientId));
+    res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+      ok: false, status: "failed", error: outcome.reason, failure: outcome.failure,
+      uncertain: outcome.failure === "uncertain",
+    });
   } catch (err) {
     req.log.error({ err }, "Error resending to recipient");
     res.status(500).json({ error: "Failed to resend" });
-  }
-});
-
-// ── Resend Webhook ────────────────────────────────────────────────────────────
-// Public endpoint — no admin auth. Signature verified via svix (RESEND_WEBHOOK_SECRET).
-router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
-  try {
-    const secret = process.env.RESEND_WEBHOOK_SECRET;
-    if (!secret) {
-      req.log.warn("RESEND_WEBHOOK_SECRET not set — webhook endpoint disabled");
-      res.status(500).json({ error: "Webhook not configured — RESEND_WEBHOOK_SECRET is missing" });
-      return;
-    }
-
-    // req.body is a Buffer thanks to express.raw() mounted in app.ts for this path
-    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body);
-
-    // Verify Resend webhook signature using svix
-    let payload: Record<string, unknown>;
-    try {
-      const { Webhook } = await import("svix");
-      const wh = new Webhook(secret);
-      payload = wh.verify(rawBody, {
-        "svix-id":        req.headers["svix-id"] as string,
-        "svix-timestamp": req.headers["svix-timestamp"] as string,
-        "svix-signature": req.headers["svix-signature"] as string,
-      }) as Record<string, unknown>;
-    } catch (verifyErr) {
-      req.log.warn({ err: verifyErr }, "Resend webhook signature verification failed");
-      res.status(400).json({ error: "Invalid webhook signature" });
-      return;
-    }
-
-    // Delivery evidence for a receptionist post-call email lands on its
-    // notification row, matched by the message id Resend returned when it
-    // accepted the send. Checked first because `email.delivered` is not a
-    // campaign event and would otherwise be dropped as unknown below. A bounce
-    // or complaint still continues into the suppression step, so a dead
-    // business inbox is suppressed exactly as a CRM recipient's would be.
-    {
-      const voiceData = (payload.data as Record<string, unknown> | undefined) ?? {};
-      const voiceEmailId = typeof voiceData.email_id === "string" ? voiceData.email_id : null;
-      const voiceType = typeof payload.type === "string" ? payload.type : "";
-      if (voiceEmailId) {
-        const { recordVoiceNotificationDeliveryEvent } = await import("../lib/voiceNotifications/deliveryEvents.js");
-        const occurred = typeof voiceData.created_at === "string" && Number.isFinite(Date.parse(voiceData.created_at))
-          ? new Date(voiceData.created_at)
-          : new Date();
-        const voiceOutcome = await recordVoiceNotificationDeliveryEvent(voiceType, voiceEmailId, occurred);
-        if (voiceOutcome === "recorded" || voiceOutcome === "unchanged") {
-          if (voiceType !== "email.bounced" && voiceType !== "email.complained") {
-            res.json({ ok: true, voiceNotification: voiceOutcome });
-            return;
-          }
-        }
-      }
-    }
-
-    // Map Resend event type → internal event_type
-    const RESEND_EVENT_MAP: Record<string, string> = {
-      "email.opened":          "opened",
-      "email.clicked":         "clicked",
-      "email.bounced":         "bounced",
-      "email.delivery_failed": "failed",
-      "email.complained":      "complained",
-    };
-    const resendEventType = (payload.type as string) ?? "";
-    const eventType = RESEND_EVENT_MAP[resendEventType];
-    if (!eventType) {
-      // Unknown event type — ack but ignore
-      res.json({ ok: true, ignored: true, reason: "unknown_event_type" });
-      return;
-    }
-
-    // Extract Resend email id from payload data
-    const data = (payload.data as Record<string, unknown>) ?? {};
-    const resendEmailId = (data.email_id as string) ?? null;
-    if (!resendEmailId) {
-      res.json({ ok: true, ignored: true, reason: "no_email_id" });
-      return;
-    }
-
-    // Suppression is mirrored for EVERY bounce and complaint, before the
-    // campaign lookup below. It used to happen only for campaign recipients,
-    // so a hard bounce on a one-off email to a client suppressed nothing and
-    // the CRM would cheerfully keep writing to a dead mailbox — and a spam
-    // complaint from a non-campaign send was discarded entirely, which is the
-    // one that damages deliverability for every other client.
-    if (eventType === "bounced" || eventType === "complained") {
-      const { suppressAddress } = await import("../lib/inboundEmail.js");
-      const recipients = Array.isArray(data.to) ? (data.to as string[])
-        : typeof data.to === "string" ? [data.to] : [];
-      const bounce = (data.bounce as Record<string, unknown> | undefined) ?? {};
-      for (const address of recipients) {
-        await suppressAddress({
-          address,
-          reason: eventType === "complained" ? "complaint" : "bounce",
-          // Only a permanent bounce suppresses; a full mailbox empties again.
-          bounceType: typeof bounce.type === "string" ? bounce.type : "Permanent",
-          detail: typeof bounce.subType === "string" ? bounce.subType : null,
-        });
-      }
-    }
-
-    // Find matching recipient (include leadId so we can do sequence reply logic)
-    const [recipient] = await db
-      .select({ id: crmCampaignRecipients.id, campaignId: crmCampaignRecipients.campaignId, leadId: crmCampaignRecipients.leadId })
-      .from(crmCampaignRecipients)
-      .where(eq(crmCampaignRecipients.resendEmailId, resendEmailId))
-      .limit(1);
-
-    if (!recipient) {
-      res.json({ ok: true, ignored: true, reason: "no_matching_recipient" });
-      return;
-    }
-
-    // Determine occurred_at from payload if available
-    const occurredAt = data.created_at ? new Date(data.created_at as string) : new Date();
-
-    // Application-level dedup for opened/clicked — Resend retries can send duplicates
-    const errorReason = (data.reason as string) ?? (data.error as string) ?? null;
-    if (eventType === "opened" || eventType === "clicked") {
-      const [existing] = await db
-        .select({ id: crmCampaignEvents.id })
-        .from(crmCampaignEvents)
-        .where(and(
-          eq(crmCampaignEvents.campaignRecipientId, recipient.id),
-          eq(crmCampaignEvents.eventType, eventType),
-        ))
-        .limit(1);
-      if (existing) {
-        req.log.info({ recipientId: recipient.id, eventType }, "Duplicate webhook event skipped");
-        res.json({ ok: true, eventType, recipientId: recipient.id, deduplicated: true });
-        return;
-      }
-    }
-
-    await db.insert(crmCampaignEvents).values({
-      campaignRecipientId: recipient.id,
-      eventType,
-      occurredAt,
-      metadata: { resendEventType, resendEmailId, raw: data },
-    });
-
-    // For bounce / failure / complaint: update recipient status
-    if (eventType === "bounced" || eventType === "failed" || eventType === "complained") {
-      await db.update(crmCampaignRecipients)
-        .set({ status: "failed", lastError: errorReason ?? `${resendEventType} via webhook` })
-        .where(eq(crmCampaignRecipients.id, recipient.id));
-    }
-
-    // For complaint (spam report): also stop all active sequences for this lead immediately
-    if (eventType === "complained" && recipient.leadId) {
-      await stampReplyAndStop(recipient.leadId, "email", { resendEventType, resendEmailId });
-      req.log.info({ leadId: recipient.leadId }, "Sequences stopped due to spam complaint");
-    }
-
-    req.log.info({ recipientId: recipient.id, eventType, resendEmailId }, "Resend webhook event recorded");
-    res.json({ ok: true, eventType, recipientId: recipient.id });
-  } catch (err) {
-    req.log.error({ err }, "Error processing Resend webhook");
-    res.status(500).json({ error: "Internal error processing webhook" });
   }
 });
 
@@ -1998,7 +1974,7 @@ router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, r
 });
 
 // ── Import from discovery submissions ─────────────────────────────────────────
-router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import-discovery", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const submissions = await db.select().from(discoverySubmissions);
     let imported = 0, skipped = 0;
@@ -2039,7 +2015,7 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
 });
 
 // ── Single submission import ───────────────────────────────────────────────────
-router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import-discovery/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const subId = Number(req.params.id);
     if (!subId) { res.status(400).json({ error: "Invalid submission id" }); return; }
@@ -2104,7 +2080,7 @@ router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res:
 });
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
-router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals/stats", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const deals = await db.select().from(crmDeals);
     const wonDeals = deals.filter(d => d.stage === "Won");
@@ -2153,7 +2129,7 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const deals = await db.select().from(crmDeals).orderBy(desc(crmDeals.createdAt));
     const leadsMap = new Map<number, string>();
@@ -2170,7 +2146,7 @@ router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number>;
     if (!name) { res.status(400).json({ error: "Name is required" }); return; }
@@ -2189,7 +2165,7 @@ router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/deals/:id", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number | null>;
@@ -2291,7 +2267,7 @@ router.get("/crm/transactions", requireCrmAuth("deals.read"), async (req: Reques
 
 const MANUAL_METHODS = TRANSACTION_METHODS.filter(m => m !== "stripe");
 
-router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals/:id/transactions/manual", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
@@ -2321,7 +2297,7 @@ router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Requ
   }
 });
 
-router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals/:id/transactions/stripe-checkout", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
@@ -2368,7 +2344,7 @@ router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (
   }
 });
 
-router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals/:id/transactions", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const transactions = await db.select().from(crmTransactions)
@@ -2382,7 +2358,7 @@ router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res
 });
 
 // ── Pipeline (same as leads but grouped by status) ────────────────────────────
-router.get("/crm/pipeline", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/pipeline", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db.select().from(crmLeads).orderBy(desc(crmLeads.updatedAt));
     const pipeline = Object.fromEntries(CRM_STATUSES.map(s => [s, leads.filter(l => l.status === s)]));
@@ -2447,7 +2423,7 @@ function crmLeadToSubmission(lead: CrmLead): DiscoverySubmission {
 
 // ── Sales Workspace: Proposal ─────────────────────────────────────────────────
 
-router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/proposal/generate", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2473,7 +2449,7 @@ router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Reques
   }
 });
 
-router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/proposal", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2491,7 +2467,7 @@ router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: 
 
 // ── Sales Workspace: Scope of Work ────────────────────────────────────────────
 
-router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/sow/generate", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2517,7 +2493,7 @@ router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, re
   }
 });
 
-router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/sow", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2539,7 +2515,7 @@ router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Respo
 // Org-wide feed of recent behavioral events across all leads, for the
 // Behavioral Intelligence dashboard. Static route — must stay above
 // the "/crm/leads/:id/behavioral-events" route group.
-router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/behavioral-events", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 1000, 2000);
     const events = await db
@@ -2565,7 +2541,7 @@ router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Res
 
 // GET /crm/leads/:id/behavioral-events
 // Returns all behavioral events for a lead, newest first.
-router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id/behavioral-events", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2588,7 +2564,7 @@ router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request
 // Body: { eventType, label?, dClientIntent?, dUrgency?, dTrust?,
 //         dProjectReadiness?, dBudgetConfidence?, dCommunicationScore?,
 //         dReferralProbability?, metadata?, occurredAt? }
-router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/behavioral-events", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2631,7 +2607,7 @@ router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Reques
 
 // DELETE /crm/leads/:id/behavioral-events/:eventId
 // Removes a single behavioral event (manual correction).
-router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/leads/:id/behavioral-events/:eventId", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const leadId  = Number(req.params.id);
     const eventId = Number(req.params.eventId);
@@ -2648,7 +2624,7 @@ router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (
 
 // ── Campaign Steps CRUD ───────────────────────────────────────────────────────
 
-router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/steps", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2664,7 +2640,7 @@ router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: R
   }
 });
 
-router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/steps", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2706,7 +2682,7 @@ router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: 
   }
 });
 
-router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id/steps/:stepId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
@@ -2746,7 +2722,7 @@ router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Reque
   }
 });
 
-router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/:id/steps/:stepId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
@@ -2762,7 +2738,7 @@ router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Requ
 
 // ── Campaign Sequence Enrollment ──────────────────────────────────────────────
 
-router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/enroll", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2842,7 +2818,7 @@ router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res:
 
 // ── Campaign Recipient Enrollment Status ──────────────────────────────────────
 
-router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id/recipients/:rid/status", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id  = Number(req.params.id);
     const rid = Number(req.params.rid);
@@ -2876,7 +2852,7 @@ router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (r
 
 // ── Campaign Activity Feed ────────────────────────────────────────────────────
 
-router.get("/crm/campaigns/:id/activity", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/activity", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }

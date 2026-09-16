@@ -454,6 +454,16 @@ export function supportIdempotencyProtected(row: CrmSupportMessage, now = Date.n
   return now - new Date(started).getTime() < RESEND_IDEMPOTENCY_WINDOW_MS;
 }
 
+/** What the mail provider itself said about this reply, when it has said anything. */
+export type SupportProviderDelivery = {
+  state: string;
+  label: string;
+  tone: "waiting" | "working" | "accepted" | "attention";
+  explanation: string;
+  at: string | null;
+  detail: string | null;
+};
+
 export type SupportDeliveryView = {
   state: string;
   /** The words a screen may use. Deliberately never "Sent". */
@@ -472,6 +482,16 @@ export type SupportDeliveryView = {
   resolutionNote: string | null;
   availableActions: CrmSupportDeliveryAction[];
   retryCouldDuplicate: boolean;
+  /**
+   * The provider's own report, where one has arrived.
+   *
+   * Kept BESIDE the local state rather than merged into it. They answer
+   * different questions — "what did this server manage to hand over" and "what
+   * happened to the message afterwards" — and the recovery actions offered are
+   * decided by the first. A reply this server recorded as accepted and the
+   * provider later bounced needs somebody, and this is what says so.
+   */
+  provider?: SupportProviderDelivery | null;
 };
 
 /**
@@ -487,7 +507,7 @@ export type SupportDeliveryView = {
  * described.
  */
 export function supportDeliveryView(
-  row: CrmSupportMessage, now = Date.now(),
+  row: CrmSupportMessage, now = Date.now(), provider: SupportProviderDelivery | null = null,
 ): SupportDeliveryView | null {
   if (!row.deliveryState) {
     if (row.visibility === "internal" || row.origin === "customer") return null;
@@ -505,6 +525,9 @@ export function supportDeliveryView(
       resolvedAt: null, resolution: null, resolutionNote: null,
       availableActions: [],
       retryCouldDuplicate: false,
+      // Nothing was ever handed over, so there is nothing for the provider to
+      // have reported on.
+      provider: null,
     };
   }
 
@@ -520,6 +543,7 @@ export function supportDeliveryView(
     resolution: row.deliveryResolution,
     resolutionNote: row.deliveryResolutionNote,
     retryCouldDuplicate: !supportIdempotencyProtected(row, now),
+    provider,
   };
 
   switch (row.deliveryState) {

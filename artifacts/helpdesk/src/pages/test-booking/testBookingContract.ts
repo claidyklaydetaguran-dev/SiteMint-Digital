@@ -27,6 +27,10 @@ export const PAGE = {
 } as const;
 
 export const PREVIEW = {
+  // A month whose availability could not be read is not a month with nothing
+  // free. Every day falling back to "closed" is a confident answer we did not
+  // earn.
+  daysFailed: "We couldn't check this month's availability. These days aren't necessarily busy — try again shortly.",
   noTypesTitle: "No appointment types yet",
   noTypesDetail: "Clients can't request a time until at least one appointment type exists. Add one under Availability.",
   readFailed: "Availability couldn't be loaded. Try again shortly.",

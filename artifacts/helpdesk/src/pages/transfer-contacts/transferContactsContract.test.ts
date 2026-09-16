@@ -152,6 +152,44 @@ section("what the check tells a business before it authorises a transfer");
   );
 }
 
+section("the banner states the real capability, not just an assigned number");
+
+{
+  const routeSrc = read("artifacts/api-server/src/routes/receptionistTransferContacts.ts");
+  const serviceSrc = read("artifacts/api-server/src/lib/voiceTransferContacts/transferContactService.ts");
+  const transferPageSrc = read("artifacts/helpdesk/src/pages/TransferContacts.tsx");
+
+  // The defect: the banner said a caller "can be handed to a transfer contact"
+  // whenever a number was assigned — at a time when no assistant carried a
+  // transfer tool at all, so it was true for nobody.
+  check(
+    "the banner comes from the server's own capability resolution",
+    routeSrc.includes("resolveEffectiveCapabilities") && routeSrc.includes("describeTransferCapability"),
+  );
+  check(
+    "and an assigned number alone is never enough to claim it",
+    /telephoneTransferAvailable: active && numberAssigned/.test(serviceSrc),
+  );
+  check(
+    "a workspace it is not switched on for is told SiteMint has to do that",
+    /not switched on by SiteMint/i.test(serviceSrc),
+  );
+  check(
+    "a business with no authorised contact is told to add one and confirm consent",
+    /add a contact and confirm/i.test(serviceSrc) && /agreed to receive transferred calls/i.test(serviceSrc),
+  );
+  check(
+    "the page states the verdict before the explanation",
+    transferPageSrc.includes("COPY.capabilityStateActive") &&
+      transferPageSrc.includes("COPY.capabilityStateBlocked") &&
+      transferPageSrc.includes("capability.state"),
+  );
+  check(
+    "and the blocked wording does not imply transfers work",
+    /not available yet/i.test(COPY.capabilityStateBlocked) && !/available\./i.test(COPY.capabilityStateBlocked),
+  );
+}
+
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {
   for (const f of failures) console.log(`  - ${f}`);

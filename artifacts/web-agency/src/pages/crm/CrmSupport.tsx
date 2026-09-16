@@ -107,6 +107,21 @@ interface DeliveryView {
   resolutionNote?: string | null;
   availableActions: Array<"retry" | "resend" | "acknowledge">;
   retryCouldDuplicate: boolean;
+  /**
+   * What the mail provider said afterwards, where it has said anything.
+   *
+   * Beside the state above, never instead of it: one is what this server
+   * managed to hand over, the other is what became of the message. A reply
+   * recorded as accepted and then bounced is exactly the case worth seeing.
+   */
+  provider?: {
+    state: string;
+    label: string;
+    tone: "waiting" | "working" | "accepted" | "attention";
+    explanation: string;
+    at?: string | null;
+    detail?: string | null;
+  } | null;
 }
 
 interface DeliveryStatus {
@@ -247,13 +262,28 @@ const DELIVERY_ICON: Record<DeliveryView["tone"], typeof Check> = {
 /** The one-line state of a message, in the server's own words. */
 function DeliveryBadge({ delivery }: { delivery: DeliveryView }) {
   const Icon = DELIVERY_ICON[delivery.tone];
+  const provider = delivery.provider;
+  const ProviderIcon = provider ? DELIVERY_ICON[provider.tone] : null;
   return (
-    <span
-      title={delivery.explanation}
-      className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[delivery.tone]}`}>
-      <Icon className={`w-3 h-3 shrink-0 ${delivery.tone === "working" ? "animate-spin" : ""}`} />
-      {delivery.label}
-    </span>
+    <>
+      <span
+        title={delivery.explanation}
+        className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[delivery.tone]}`}>
+        <Icon className={`w-3 h-3 shrink-0 ${delivery.tone === "working" ? "animate-spin" : ""}`} />
+        {delivery.label}
+      </span>
+      {/* The provider's own word. Shown as a second badge rather than folded
+          into the first, because "we handed it over" and "it bounced" are both
+          true and only one of them needs somebody. */}
+      {provider && ProviderIcon && (
+        <span
+          title={provider.explanation}
+          className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${DELIVERY_TONE[provider.tone]}`}>
+          <ProviderIcon className={`w-3 h-3 shrink-0 ${provider.tone === "working" ? "animate-spin" : ""}`} />
+          {provider.label}
+        </span>
+      )}
+    </>
   );
 }
 

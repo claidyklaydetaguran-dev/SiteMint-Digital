@@ -93,6 +93,14 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/crm/email/suppressions/release": "admin",
   "POST /api/crm/email/inbound/events/:id/retry": "admin",
 
+  // ── Delivery and engagement events (routes/crmEmailEvents.ts) ───────────
+  // The webhook carries its own credential: a Svix signature over the raw
+  // body, verified before a row is written (lib/svixSignature.ts). Re-running
+  // the interpretation of an already-verified event is an operator action and
+  // is permission-gated — it can change a record's delivery state, so it is
+  // `settings.write` rather than a read.
+  "POST /api/crm/email/events/:id/retry": "admin",
+
   // ── The sales chain ─────────────────────────────────────────────────────
   // Closing and converting a deal both change what the business believes it
   // has sold, so both are permission-gated and audited. Conversion is
@@ -577,6 +585,16 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/receptionist/voice/transfer-contacts": "session",
   "POST /api/receptionist/voice/transfer-contacts/:id/test": "session",
   "POST /api/receptionist/voice/issues/:id/resolve": "session",
+  // Support requests: a business writes to SiteMint and follows up. Every one
+  // is firm-scoped from the session — another business's request reads as
+  // missing — and nothing here emails the customer. The operator side
+  // (adminSupport.ts) is requireOperator with support.read / support.write and
+  // is the only place these rows are read across firms.
+  "POST /api/admin/voice/support/requests/:id/messages": "admin",
+  "POST /api/admin/voice/support/requests/:id/in-progress": "admin",
+  "POST /api/receptionist/support/requests": "session",
+  "POST /api/receptionist/support/requests/:id/messages": "session",
+  "POST /api/receptionist/support/requests/:id/close": "session",
   "POST /api/receptionist/voice/numbers/:id/assign": "session",
   "POST /api/receptionist/voice/numbers/:id/pause": "session",
   "POST /api/receptionist/voice/numbers/:id/unpause": "session",

@@ -5,6 +5,8 @@ import { Plus, Edit2, Trash2, Mail, X } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
 import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
 import { Figure, LoadFailure } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 interface Template { id:number; name:string; type:string; subject:string; body:string; }
 
@@ -42,6 +44,7 @@ export default function CrmEmailTemplates() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [seeding, setSeeding] = useState(false);
+  const confirmation = useConfirmDialog();
 
   // What actually loaded, or null. Never an empty array standing in for a
   // request nobody managed to complete.
@@ -82,18 +85,26 @@ export default function CrmEmailTemplates() {
     }
   };
 
-  // A delete that failed must not take the card off the page: the template is
-  // still there, and the next reload would bring it back with no explanation.
-  const deleteTemplate = async (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    setActionNotice("");
-    try {
-      const res = await adminFetch(`/api/crm/email-templates/${id}`, { method: "DELETE" });
-      if (!res.ok) { setActionNotice(`Template not deleted. ${await responseFailureReason(res)}`); return; }
-      load();
-    } catch {
-      setActionNotice(`Template not deleted. ${failureReason(null)}`);
-    }
+  // Both meanings kept: the dialog says what disappears, and `refusalMessage`
+  // means a delete the server refused never looks like one that worked.
+  const deleteTemplate = (template: Template) => {
+    void confirmation.ask({
+      title: `Delete the template "${template.name}"?`,
+      description: "It is removed for everyone, and this cannot be undone.",
+      consequences: [
+        "It disappears from this list, and from the template picker used when composing an email.",
+        "Emails already sent using it are not affected.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete template",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep template",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/email-templates/${template.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That template could not be deleted."));
+        await load();
+      },
+    });
   };
 
   // Seeding is only ever offered when the library loaded AND came back empty.
@@ -204,7 +215,7 @@ export default function CrmEmailTemplates() {
                     <button onClick={() => openEdit(t)} className="p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => deleteTemplate(t.id)} className="p-1.5 text-muted-foreground/60 hover:text-red-500 transition-colors rounded">
+                    <button onClick={() => deleteTemplate(t)} aria-label={`Delete ${t.name}`} className="p-1.5 text-muted-foreground/60 hover:text-red-500 transition-colors rounded">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -259,6 +270,8 @@ export default function CrmEmailTemplates() {
           </div>
         </div>
       )}
+
+      {confirmation.element}
     </CrmLayout>
   );
 }

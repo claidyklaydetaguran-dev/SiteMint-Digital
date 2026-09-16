@@ -347,6 +347,12 @@ export function PublicBookingCalendar({ slug }: { slug: string }) {
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase text-muted-foreground">
               {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}
             </div>
+            {daysQuery.isError && (
+              <p className="mt-2 text-sm text-destructive" role="alert">
+                We couldn&apos;t check this month&apos;s availability. These days aren&apos;t necessarily busy — try
+                again shortly.
+              </p>
+            )}
             <div className="mt-1 grid grid-cols-7 gap-1">
               {Array.from({ length: firstWeekdayOfMonth(viewYear, viewMonth) }).map((_, i) => <div key={`pad-${i}`} />)}
               {Array.from({ length: daysInMonth(viewYear, viewMonth) }, (_, i) => i + 1).map((day) => {
@@ -360,10 +366,14 @@ export function PublicBookingCalendar({ slug }: { slug: string }) {
                   <button
                     key={day}
                     type="button"
-                    disabled={reason !== "open" || isLoadingDay}
+                    disabled={reason !== "open" || isLoadingDay || daysQuery.isError}
                     onClick={() => selectDay(dateKey, reason)}
                     title={DAY_LABELS[reason]}
-                    aria-label={`${dateKey}: ${DAY_LABELS[reason]}`}
+                    aria-label={
+                      daysQuery.isError
+                        ? `${dateKey}: availability couldn't be checked`
+                        : `${dateKey}: ${DAY_LABELS[reason]}`
+                    }
                     aria-pressed={isSelected}
                     className={`flex aspect-square min-h-11 items-center justify-center rounded-lg border text-sm transition-colors ${
                       isSelected

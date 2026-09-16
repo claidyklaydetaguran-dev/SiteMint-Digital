@@ -6,6 +6,8 @@ import { PROJECT_STAGES, PROJECT_STAGE_STYLES, PROJECT_TYPES, type ProjectStage 
 import { adminFetch } from "@/lib/adminFetch";
 import { type Load, readAdminResource, responseFailureReason, failureReason } from "@/lib/adminLoad";
 import { Figure, LoadFailure, PageLoadFailures, countOf, dataOf, failedParts } from "@/components/crm/LoadState";
+import { useConfirmDialog, type Confirmation } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 function fmt(n: number | string | null | undefined) {
   if (n == null || n === "") return null;
@@ -87,6 +89,28 @@ function pickDetail(body: unknown): ProjectDetail | undefined {
   return { project: project as Project, tasks: tasks as Task[] };
 }
 
+/**
+ * A deep link may name the project to open.
+ *
+ * Discovery's "project created" notice links straight to the project it just
+ * made, rather than leaving somebody to find one card among forty.
+ */
+function projectIdFromLocation(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("project");
+  return raw && /^[1-9]\d*$/.test(raw) ? Number(raw) : null;
+}
+
+function forgetProjectParam(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("project")) return;
+  url.searchParams.delete("project");
+  // Without this, reloading after closing the drawer — or after deleting the
+  // project — reopens a drawer for something that may no longer exist.
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function ProjectCard({ project, onDragStart, onOpen }: {
   project: Project;
   onDragStart: (id: number) => void;
@@ -154,8 +178,9 @@ export default function CrmProjectsPage() {
   const [formError, setFormError] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<ProjectStage | null>(null);
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(() => projectIdFromLocation());
   const savingRef = useRef(false);
+  const confirmation = useConfirmDialog();
 
   // Each part keeps what it last showed until its own new answer arrives, so a
   // retry never flashes the board back to empty — and a part that failed stays
@@ -492,14 +517,24 @@ export default function CrmProjectsPage() {
       )}
 
       {detailId !== null && (
-        <ProjectDetailDrawer projectId={detailId} onClose={() => setDetailId(null)} onChanged={load} />
+        <ProjectDetailDrawer
+          projectId={detailId}
+          onClose={() => { setDetailId(null); forgetProjectParam(); }}
+          onChanged={load}
+          askConfirm={confirmation.ask}
+        />
       )}
+
+      {/* Outside the drawer on purpose: it outlives the drawer that opens it,
+          so the dialog can close cleanly after deleting the project. */}
+      {confirmation.element}
     </CrmLayout>
   );
 }
 
-function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
+function ProjectDetailDrawer({ projectId, onClose, onChanged, askConfirm }: {
   projectId: number; onClose: () => void; onChanged: () => void;
+  askConfirm: Confirmation["ask"];
 }) {
   const [detail, setDetail] = useState<Load<ProjectDetail>>({ status: "loading" });
   const [reloading, setReloading] = useState(false);
@@ -592,16 +627,30 @@ function ProjectDetailDrawer({ projectId, onClose, onChanged }: {
     await patchProject({ launchChecklist: list });
   };
 
+  // Both meanings kept: the dialog counts the tasks that go with it, and the
+  // drawer still closes only on a delete that actually happened — closing on a
+  // refused one would say it is gone when it is not.
   const deleteProject = async () => {
-    if (!confirm("Delete this project and its tasks?")) return;
-    let ok = false;
-    try {
-      ok = (await adminFetch(`/api/crm/projects/${projectId}`, { method: "DELETE" })).ok;
-    } catch { ok = false; }
-    onChanged();
-    // Closing on a refused delete would say it is gone. It is not.
-    if (ok) onClose();
-    else await load();
+    const taskCount = tasks.length;
+    const deleted = await askConfirm({
+      title: `Delete the project "${project?.name ?? "this project"}"?`,
+      description: "This cannot be undone.",
+      consequences: [
+        taskCount === 1 ? "Its 1 task is deleted with it." : `Its ${taskCount} tasks are deleted with it.`,
+        "Its launch checklist, notes and maintenance plan go with it.",
+        "Files and support tickets linked to it are kept.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete project",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep project",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/projects/${projectId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That project could not be deleted."));
+        onChanged();
+      },
+    });
+    if (deleted) onClose();
   };
 
   const project = detail.status === "ready" ? detail.data.project : null;

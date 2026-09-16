@@ -316,7 +316,10 @@ function ConversationListPane({
               onClick={() => onStatusFilter(filter.key)}
             >
               {filter.label}
-              <span className="sc-filter__count">{counts[filter.key]}</span>
+              {/* A filter count is a claim about the business. The list below
+                  already refuses to render on a failed read; these counts used
+                  to keep saying 0 next to it. */}
+              <span className="sc-filter__count">{isLoading || isError ? "—" : counts[filter.key]}</span>
             </button>
           ))}
         </div>

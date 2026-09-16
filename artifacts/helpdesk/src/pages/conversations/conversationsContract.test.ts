@@ -143,8 +143,14 @@ check(
     /GET \/api\/receptionist\/auth\/me|useSession/.test(appShellSrc),
 );
 check(
-  "AppShell still redirects to /login when the session query errors",
-  /if \(!isLoading && isError\) navigate\("\/login"\)/.test(appShellSrc),
+  // Rewritten with the unreachable-server fix. The old assertion pinned the
+  // defect itself: it REQUIRED the shell to navigate away on any session
+  // error, so a restarting instance or a dropped connection discarded whatever
+  // the customer had on screen. Only a refusal signs somebody out now, and
+  // this checks both halves of that.
+  "AppShell redirects to /login when the session is refused, and only then",
+  /if \(sessionAccess === "denied"\) navigate\("\/login"\)/.test(appShellSrc) &&
+    !/isError\) navigate/.test(appShellSrc),
 );
 check(
   "the shell wrapping the route is unchanged (still AppShell + route error boundary)",

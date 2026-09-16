@@ -776,11 +776,15 @@ suite("marketing: audience, exclusions, sending, and honest numbers (real DB)", 
     for (const b of buckets) expect(b.contacts).toHaveLength(b.count);
     expect(new Set(buckets.flatMap((b) => b.contacts.map((c: any) => c.leadId))).size).toBe(counts.excluded);
 
-    // Nothing tracks opens or clicks, so nothing claims to.
+    // No open or click has ever been recorded for this sending domain, so
+    // nothing claims one. Availability is EVIDENCE rather than configuration:
+    // the figures are absent and the reason says what is missing.
     expect(results.json["engagement"].tracked).toBe(false);
     expect(results.json["engagement"].opens).toBeNull();
+    expect(results.json["engagement"].clicks).toBeNull();
     expect(results.json["engagement"].openRate).toBeNull();
-    expect(String(results.json["engagement"].why)).toMatch(/no evidence/i);
+    expect(results.json["engagement"].opensMeasured).toBe(false);
+    expect(String(results.json["engagement"].why)).toMatch(/not measured/i);
 
     // "Sent" is stated as what it is.
     expect(String(results.json["deliverySignal"].meaning)).toMatch(/not a delivery confirmation/i);

@@ -62,7 +62,7 @@ function message(overrides: Partial<PostCallMessageFacts> = {}): PostCallMessage
 
 const BASE = {
   businessName: "Northgate Electrical",
-  dashboardUrl: "https://example.test/ai-receptionist/dashboard/calls/call_abc_123",
+  dashboardUrl: "https://example.test/ai-receptionist/dashboard/activity/calls/call_abc_123",
   timeZone: "America/New_York",
 };
 
@@ -194,11 +194,16 @@ describe("notification identity and retry shape", () => {
     expect(delays.at(-1)).toBeLessThanOrEqual(30 * 60_000);
   });
 
+  // The path has to be the one the dashboard actually routes
+  // (`/activity/calls/:id`). The previous `/calls/:id` shape matched no route,
+  // so every post-call email sent the business to a 404.
   it("builds a dashboard link from configuration, and a relative one without it", () => {
     expect(dashboardCallUrl("call_abc_123", { VOICE_DASHBOARD_BASE_URL: "https://x.test/" })).toBe(
-      "https://x.test/ai-receptionist/dashboard/calls/call_abc_123",
+      "https://x.test/ai-receptionist/dashboard/activity/calls/call_abc_123",
     );
-    expect(dashboardCallUrl("call_abc_123", {})).toBe("/ai-receptionist/dashboard/calls/call_abc_123");
+    expect(dashboardCallUrl("call_abc_123", {})).toBe(
+      "/ai-receptionist/dashboard/activity/calls/call_abc_123",
+    );
   });
 });
 

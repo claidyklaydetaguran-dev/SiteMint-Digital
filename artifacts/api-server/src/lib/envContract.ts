@@ -69,9 +69,12 @@ const SECRETS: Array<[string, string, string]> = [
   ["RESEND_RECEIVING_API_KEY", "M6", "Full-access Resend key used ONLY to fetch received mail (the inbound webhook carries metadata only). Resend has no narrower scope that can read received mail, so it is kept apart from the sending key"],
   ["CRM_INBOUND_EMAIL_DOMAIN", "M3", "Reply subdomain replies come back to, e.g. reply.sitemintdigital.com — without it a reply address cannot be minted and an MX record has nowhere to point"],
   ["RESEND_INBOUND_WEBHOOK_SECRET", "M3", "Endpoint-specific signing secret for the inbound webhook. Falls back to RESEND_WEBHOOK_SECRET, but a separate endpoint in Resend gets its own secret and the sending one will not verify"],
+  ["RESEND_WEBHOOK_SECRET", "M6", "Signing secret for the DELIVERY and ENGAGEMENT webhook endpoint (POST /api/crm/webhooks/resend). Unset means the endpoint answers 503, no delivery state is ever recorded, and open/click figures report as not measured rather than as zero"],
   ["VOICE_METRICS_TOKEN", "P7", "Bearer for /api/metricz (unset = endpoint does not exist)"],
   ["VOICE_BILLING_WEBHOOK_SECRET", "P8", "Stripe signature secret for the voice billing webhook (unset = 503)"],
   ["ADMIN_PASSWORD", "core", "Admin login (unset = admin login 503s)"],
+  ["STRIPE_SECRET_KEY", "core", "Stripe secret key. Checked before the Replit connector, so billing is exercisable off Replit"],
+  ["STRIPE_WEBHOOK_SECRET", "core", "Stripe webhook signing secret, paired with STRIPE_SECRET_KEY"],
 ];
 
 const CONFIGS: Array<[string, string, string]> = [
@@ -80,7 +83,7 @@ const CONFIGS: Array<[string, string, string]> = [
   ["VOICE_SERVER_URL", "P2", "Webhook URL sent to the provider when attachment is enabled"],
   ["VAPI_WEBHOOK_CREDENTIAL_ID", "P2", "Id of the Vapi HMAC Custom Credential attached to published assistants (identifier, not a secret)"],
   ["VOICE_CALL_POLICY_JSON", "P6", "Call behavior: silence/max-duration/end/voicemail lines"],
-  ["VOICE_TOOLS_CAPABILITIES", "V7", "Which tool capabilities may attach: messages | scheduling (comma-separated). Required when VOICE_TOOLS_ATTACH_ENABLED=true — there is no default, so no capability attaches unless it is named"],
+  ["VOICE_TOOLS_CAPABILITIES", "V7", "Which tool capabilities may attach: messages | scheduling | transfer (comma-separated). Required when VOICE_TOOLS_ATTACH_ENABLED=true — there is no default, so no capability attaches unless it is named. 'transfer' attaches the provider-native transfer tool with no destinations in it; the destination is resolved per call by this server"],
   ["VOICE_DASHBOARD_BASE_URL", "V7", "Public https origin (e.g. https://sitemintdigital.com) used to build dashboard links in customer-facing email: the post-call link, and the one-click verify-email and password-reset links (unset = the call link is relative, and account emails carry only a code)"],
   ["VOICE_USAGE_INCLUDED_MINUTES", "P7", "Flat included-minutes cap (metering-only when unset)"],
   ["VOICE_ALERTS_FROM", "P7", "Alert sender address"],

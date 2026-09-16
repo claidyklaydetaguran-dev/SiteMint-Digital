@@ -30,6 +30,7 @@ import { ACTIONS, capabilityForAction } from "@/pages/assistants/assistantsContr
 /** Where a customer goes to clear each blocker, when they can clear it themselves. */
 const BLOCKER_LINK: Record<string, { href: string; label: string } | undefined> = {
   needs_appointment_type: { href: ROUTES.appointmentTypes, label: "Add an appointment type" },
+  needs_transfer_contact: { href: ROUTES.transferContacts, label: "Add a transfer contact" },
 };
 
 function CapabilityCard({ capability }: { capability: AssistantCapability }) {

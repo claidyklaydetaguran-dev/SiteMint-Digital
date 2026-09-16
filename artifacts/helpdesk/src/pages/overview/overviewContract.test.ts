@@ -135,12 +135,33 @@ const session = (over: Partial<OverviewSession["firm"]> = {}, count = 7): Overvi
 
 section("receptionist state (D-1 status chip)");
 
-eq("a brand-new firm is not set up", deriveReceptionistState({ setupComplete: false, anyStepDone: false, numberAssigned: false, assistantPublished: false }), "not_set_up");
-eq("progress with an unfinished checklist is in progress", deriveReceptionistState({ setupComplete: false, anyStepDone: true, numberAssigned: false, assistantPublished: false }), "setup_in_progress");
-eq("a complete checklist without a live number/assistant is ready for activation", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: false, assistantPublished: false }), "ready_for_activation");
-eq("a number alone, without a published assistant, is not live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: false }), "ready_for_activation");
-eq("a published assistant alone, without a number, is not live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: false, assistantPublished: true }), "ready_for_activation");
-eq("only both a number and a published assistant read as live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: true }), "live");
+eq("a brand-new firm is not set up", deriveReceptionistState({ setupComplete: false, anyStepDone: false, numberAssigned: false, assistantPublished: false, assistantSynchronized: false }), "not_set_up");
+eq("progress with an unfinished checklist is in progress", deriveReceptionistState({ setupComplete: false, anyStepDone: true, numberAssigned: false, assistantPublished: false, assistantSynchronized: false }), "setup_in_progress");
+eq("a complete checklist without a live number/assistant is ready for activation", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: false, assistantPublished: false, assistantSynchronized: false }), "ready_for_activation");
+eq("a number alone, without a published assistant, is not live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: false, assistantSynchronized: false }), "ready_for_activation");
+eq("a published assistant alone, without a number, is not live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: false, assistantPublished: true, assistantSynchronized: true }), "ready_for_activation");
+eq("a number and a published, in-sync assistant read as live", deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: true, assistantSynchronized: true }), "live");
+
+// The condition that was missing. A published assistant whose saved edits have
+// not reached the provider is answering callers with an older configuration —
+// the provider keeps serving the last payload it confirmed — so "Live" would
+// tell a business its current setup is in use when it demonstrably is not.
+eq(
+  "a published assistant the provider is NOT running is not live",
+  deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: true, assistantPublished: true, assistantSynchronized: false }),
+  "ready_for_activation",
+);
+check(
+  "live requires all three — number, published, and in sync",
+  [
+    [true, true, true],
+    [true, true, false],
+    [true, false, true],
+    [false, true, true],
+  ].map(([n, p, s]) =>
+    deriveReceptionistState({ setupComplete: true, anyStepDone: true, numberAssigned: n!, assistantPublished: p!, assistantSynchronized: s! }) === "live",
+  ).join(",") === "true,false,false,false",
+);
 check("every state has a plain-text label — status is never colour-only", Object.values(RECEPTIONIST_STATE_LABEL).every((l) => l.length > 0));
 
 // ─── 2. No fabricated metric ever renders ──────────────────────────────────
@@ -319,16 +340,26 @@ section("authentication contracts");
 
 check(
   "the dashboard route is still protected — the shell gates on the session query",
-  shellSrc.includes("useSession()") && shellSrc.includes("if (isError || !me) return null;"),
+  shellSrc.includes("useSession()") &&
+    shellSrc.includes("useSessionAccess()") &&
+    shellSrc.includes("if (!me) {"),
 );
 check(
   "authenticated content is never painted before authorisation resolves",
   shellSrc.includes("if (isLoading)") &&
-    shellSrc.indexOf("if (isLoading)") < shellSrc.indexOf("if (isError || !me) return null;"),
+    shellSrc.indexOf("if (isLoading)") < shellSrc.indexOf('if (sessionAccess === "denied") return null;') &&
+    shellSrc.indexOf("if (isLoading)") < shellSrc.indexOf("if (!me) {"),
 );
 check(
   "an unauthenticated visitor is still sent to the verified sign-in route",
-  shellSrc.includes('if (!isLoading && isError) navigate("/login")'),
+  shellSrc.includes('if (sessionAccess === "denied") navigate("/login")'),
+);
+// Added with the unreachable-server fix. Only a refusal ends a session: a
+// request that never completed must leave the page alone rather than navigate
+// away and discard what was on screen. The old shell navigated on any error.
+check(
+  "a server that cannot be reached does not sign anybody out",
+  !shellSrc.includes("isError) navigate") && shellSrc.includes("Can&apos;t reach the server"),
 );
 eq("the sign-in route is unchanged", /login:\s*"([^"]+)"/.exec(routesSrc)?.[1], "/login");
 eq("the dashboard overview route is unchanged", /overview:\s*"([^"]+)"/.exec(routesSrc)?.[1], "/");
@@ -354,14 +385,29 @@ check(
 
 section("API surface");
 
+// Readiness moved to the shared Setup module, so the number/calendar/assistant
+// reads moved with it — this page's own module keeps the counts it owns.
+const setupApiSrc = read("artifacts/helpdesk/src/pages/setup/setupApi.ts");
 check(
-  "the conversations, session and voice-numbers/onboarding/calendar-status/issues/calls sources this page reads are all real, documented endpoints",
+  "the conversations, session, issues and calls sources this page reads are all real, documented endpoints",
   conversationsSrc.includes('"/receptionist/conversations"') &&
     sessionSrc.includes('"/receptionist/auth/me"') &&
-    overviewApiSrc.includes('"/receptionist/voice/numbers"') &&
-    overviewApiSrc.includes('"/receptionist/availability/calendar-status"') &&
     overviewApiSrc.includes('"/receptionist/voice/issues"') &&
     overviewApiSrc.includes('"/receptionist/voice/calls"'),
+);
+check(
+  "the shared readiness module reads the number and assistant endpoints, and the honest calendar-health one",
+  setupApiSrc.includes('"/receptionist/voice/numbers"') &&
+    setupApiSrc.includes('"/receptionist/voice/assistants"') &&
+    setupApiSrc.includes("useCalendarHealth"),
+);
+check(
+  "Overview derives its status from the same function the Setup hub renders",
+  pageSrc.includes("useSetupData") && pageSrc.includes("deriveStepStatuses"),
+);
+check(
+  "and no longer keeps a second, tick-only readiness derivation of its own",
+  !overviewApiSrc.includes("useOnboardingProgress") && !overviewApiSrc.includes("useAssistantPublished"),
 );
 check("the API base and credentials mode are unchanged", apiSrc.includes('const API_BASE = "/api"') && apiSrc.includes('credentials: "include"'));
 check(

@@ -11,6 +11,8 @@ import { type Load, failureReason, readAdminResource, responseFailureReason } fr
 import { Figure, LoadFailure, countOf, dataOf } from "@/components/crm/LoadState";
 import { ConversationInbox } from "@/components/crm/ConversationInbox";
 import { normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,9 @@ const DEFAULT_TEMPLATES: Omit<Template, "id">[] = [
 
 const EMPTY_FORM = { name: "", type: "Other", subject: "", body: "" };
 
+/** The cadence <ConversationInbox> itself polls on, so the badge agrees with the list. */
+const UNREAD_POLL_MS = 30_000;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CrmCommunications() {
@@ -72,6 +77,8 @@ export default function CrmCommunications() {
   const [tab, setTab] = useState<CommTab>("conversations");
   /** A completed action, or one the server refused — never the same shape twice. */
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [unread, setUnread] = useState<number | null>(null);
+  const confirmation = useConfirmDialog();
 
   // Conversations live entirely in the shared <ConversationInbox>. The
   // thirty-odd pieces of state that used to sit here — threads, selection,
@@ -104,6 +111,35 @@ export default function CrmCommunications() {
     // A refusal is worth reading; a confirmation is not worth re-reading.
     setTimeout(() => setToast(null), ok ? 3500 : 8000);
   }, []);
+
+  // ── Unread count for the Conversations tab ────────────────────────────────
+  //
+  // The badge was hard-coded to `0 || undefined`, so it could never appear.
+  // The inbox summary already counts this — conversations carrying an inbound
+  // message newer than the last time THIS person opened them — so the badge
+  // now says that, or says nothing.
+
+  const loadUnread = useCallback(async () => {
+    try {
+      const r = await adminFetch("/api/crm/inbox/summary");
+      if (!r.ok) return;
+      const d = await r.json() as { unreadConversations?: number; readStateAvailable?: boolean };
+      // A legacy shared sign-in has no person behind it, so "unread for you"
+      // has no meaning and no badge is the honest answer.
+      setUnread(d.readStateAvailable === false ? null : Number(d.unreadConversations ?? 0));
+    } catch {
+      // A badge must not shout: the inbox itself reports its own failures.
+    }
+  }, []);
+
+  useEffect(() => { void loadUnread(); }, [loadUnread, tab]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void loadUnread();
+    }, UNREAD_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [loadUnread]);
 
   // ── Email Activity logic ──────────────────────────────────────────────────
 
@@ -163,15 +199,26 @@ export default function CrmCommunications() {
     }
   };
 
-  const deleteTemplate = async (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    try {
-      const r = await adminFetch(`/api/crm/email-templates/${id}`, { method: "DELETE" });
-      if (!r.ok) { showToast(`Template not deleted. ${await responseFailureReason(r)}`, false); return; }
-      void loadTemplates();
-    } catch {
-      showToast(`Template not deleted. ${failureReason(null)}`, false);
-    }
+  // The dialog says what will happen; `refusalMessage` keeps a refused delete
+  // from ever looking like a successful one. Both halves are needed.
+  const deleteTemplate = (template: Template) => {
+    void confirmation.ask({
+      title: `Delete the template "${template.name}"?`,
+      description: "It is removed for everyone, and this cannot be undone.",
+      consequences: [
+        "It disappears from this list, and from the template picker used when composing an email.",
+        "Emails already sent using it are not affected.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete template",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep template",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/email-templates/${template.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That template could not be deleted."));
+        await loadTemplates();
+      },
+    });
   };
 
   /**
@@ -214,7 +261,7 @@ export default function CrmCommunications() {
   // ── Tab config ────────────────────────────────────────────────────────────
 
   const TABS: { id: CommTab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: "conversations", label: "Conversations", icon: MessageSquare, badge: 0 || undefined },
+    { id: "conversations", label: "Conversations", icon: MessageSquare, badge: unread !== null && unread > 0 ? unread : undefined },
     { id: "email",         label: "Email Activity", icon: Mail },
     { id: "templates",    label: "Templates",      icon: FileText },
   ];
@@ -223,6 +270,8 @@ export default function CrmCommunications() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       {/* Toast */}
       {toast && (
         <div
@@ -266,7 +315,8 @@ export default function CrmCommunications() {
                 {t.label}
                 {t.badge != null && (
                   <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                    {t.badge > 99 ? "99+" : t.badge}
+                    <span aria-hidden="true">{t.badge > 99 ? "99+" : t.badge}</span>
+                    <span className="sr-only">{`${t.badge} unread`}</span>
                   </span>
                 )}
               </button>
@@ -521,7 +571,8 @@ export default function CrmCommunications() {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => deleteTemplate(t.id)}
+                            onClick={() => deleteTemplate(t)}
+                            aria-label={`Delete ${t.name}`}
                             className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                             title="Delete"
                           >

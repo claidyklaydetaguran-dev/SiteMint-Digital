@@ -25,11 +25,15 @@ import {
   parseToolCapabilities,
   toolNamesForCapabilities,
   TOOL_CAPABILITIES,
+  type VoiceToolCapability,
 } from "../voice/tools/toolCapabilities.js";
 import { PublishFoundationError } from "./errors.js";
 import type { VoiceServerConfig } from "./serverConfig.js";
 
 export const VOICE_TOOLS_ATTACH_ENABLED_ENV_VAR = "VOICE_TOOLS_ATTACH_ENABLED";
+
+/** The provider-native tool type that hands a live call to another number. */
+export const TRANSFER_TOOL_TYPE = "transferCall";
 
 export function isVoiceToolsAttachEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env[VOICE_TOOLS_ATTACH_ENABLED_ENV_VAR] === "true";
@@ -49,6 +53,69 @@ export function buildVoiceToolDefinitions(
     },
     server: { url: serverConfig.url, credentialId: serverConfig.credentialId },
   }));
+}
+
+/**
+ * The transfer tool, as the provider receives it.
+ *
+ * TWO fields, and the absence of a third is the entire design.
+ *
+ * There are no `destinations`. A destination list in an assistant config would
+ * put a business's private telephone numbers into a provider-stored record,
+ * freeze them at publish time, and route a call without ever consulting
+ * consent, the contact's own hours, or whether the contact is still active.
+ * Omitting them makes the provider ask US, on the call, every time: it sends a
+ * `transfer-destination-request` to the server URL below, and
+ * receptionistVoiceWebhook.ts answers it firm-scoped, after re-checking that
+ * this business may still transfer at all.
+ *
+ * So no caller phone number, no business number, and no destination of any
+ * kind ever leaves this server inside an assistant payload.
+ */
+export function buildVoiceTransferToolDefinition(serverConfig: VoiceServerConfig): JsonObject {
+  return {
+    type: TRANSFER_TOOL_TYPE,
+    server: { url: serverConfig.url, credentialId: serverConfig.credentialId },
+  };
+}
+
+/** Does this payload carry the provider-native transfer tool? */
+export function hasTransferTool(tools: readonly JsonObject[] | null): boolean {
+  return (tools ?? []).some((tool) => tool.type === TRANSFER_TOOL_TYPE);
+}
+
+/**
+ * The one sentence that tells the model when to reach for the transfer tool.
+ *
+ * Server-owned and fixed. A business's own instructions are its own; this is
+ * the operating rule for a capability SiteMint attached, and it is appended
+ * only when the tool is actually on the payload — see
+ * `withTransferInstruction`.
+ *
+ * It names the fallback deliberately. Without it, a refused transfer leaves the
+ * model improvising: the failure a caller hears would be invented rather than
+ * the truthful "I can't put you through, but I can take a message".
+ */
+export const TRANSFER_TOOL_INSTRUCTION =
+  "If the caller asks to speak with a person, use the transferCall tool. " +
+  "If the transfer cannot be made, say so plainly and offer to take a message with save_message.";
+
+/**
+ * Appends the transfer instruction when — and only when — the payload carries
+ * the transfer tool.
+ *
+ * Derived from the payload rather than from the environment on purpose: publish,
+ * sync and the digest comparison each build the same tools array and then call
+ * this, so all three produce byte-identical instructions. An instruction that
+ * was appended on one path and not another would move the digest and report a
+ * freshly published assistant as out of sync forever — the 88df967 defect, in a
+ * new field.
+ */
+export function withTransferInstruction(
+  systemInstructions: string,
+  tools: readonly JsonObject[] | null,
+): string {
+  return hasTransferTool(tools) ? `${systemInstructions}\n\n${TRANSFER_TOOL_INSTRUCTION}` : systemInstructions;
 }
 
 /**
@@ -79,6 +146,17 @@ export function loadVoiceToolsConfigFromEnv(
    * about what "up to date" means.
    */
   firmToolNames?: readonly VoiceToolName[],
+  /**
+   * V9: the business's effective CAPABILITIES, from the same shared resolution.
+   *
+   * Needed alongside `firmToolNames` because a provider-native capability
+   * contributes no tool name — narrowing by names alone would drop the transfer
+   * tool from every payload, or (worse) keep it for a business whose readiness
+   * has lapsed. Undefined means "not firm-scoped" (the env-contract boot probe),
+   * exactly as for `firmToolNames`, and can only ever narrow the operator
+   * allowlist, never widen it.
+   */
+  firmCapabilities?: readonly VoiceToolCapability[],
 ): JsonObject[] | null {
   if (!isVoiceToolsAttachEnabled(env)) return null;
   if (serverConfig === null) {
@@ -104,5 +182,15 @@ export function loadVoiceToolsConfigFromEnv(
       ? authorized
       : authorized.filter((name) => firmToolNames.includes(name));
 
-  return buildVoiceToolDefinitions(serverConfig, effective);
+  const effectiveCapabilities =
+    firmCapabilities === undefined
+      ? parsed.capabilities
+      : parsed.capabilities.filter((capability) => firmCapabilities.includes(capability));
+
+  // Function tools first, then the provider-native one. A fixed order keeps the
+  // payload — and therefore its digest — stable across builds.
+  return [
+    ...buildVoiceToolDefinitions(serverConfig, effective),
+    ...(effectiveCapabilities.includes("transfer") ? [buildVoiceTransferToolDefinition(serverConfig)] : []),
+  ];
 }

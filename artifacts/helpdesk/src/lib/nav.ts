@@ -323,9 +323,13 @@ export function navGroupsWith(voice: VoiceNavSlots): NavGroup[] {
       items: [
         ...voice.channels,
         {
-          key: "sms", label: "SMS", href: "/channels/sms", icon: Smartphone,
+          key: "sms", label: "SMS Replies", href: "/channels/sms", icon: Smartphone,
           state: "live", voiceGated: false,
-          description: "The SMS channel that texts with your clients.",
+          // What this destination actually is: the editor for the SMS
+          // receptionist's own wording. It connects nothing, which the
+          // sentence now says rather than implying a working client channel.
+          description:
+            "Write what the SMS receptionist replies. Texting clients needs an SMS number SiteMint connects for you.",
         },
       ],
     },

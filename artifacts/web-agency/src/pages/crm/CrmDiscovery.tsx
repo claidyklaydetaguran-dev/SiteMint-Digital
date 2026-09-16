@@ -5,10 +5,13 @@ import {
   ChevronDown, ExternalLink, Zap, Clock, DollarSign, User,
   CheckCircle, AlertCircle, Eye, FolderOpen, Download,
 } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/adminFetch";
 import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
 import { Figure, LoadFailure } from "@/components/crm/LoadState";
+import { useConfirmDialog, type Confirmation } from "@/components/crm/ConfirmDialog";
+import { describeActionFailure, refusalMessage } from "@/components/crm/confirmDialogModel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,6 +89,9 @@ const COMPLEXITY_COLORS: Record<string, string> = {
 };
 const CRM_STATUSES = ["New", "Reviewed", "Proposal Generated", "Archived"];
 
+/** The link in the "project created" notice, so focus can be sent to it. */
+const CONVERTED_LINK_ID = "discovery-converted-project-link";
+
 function ScoreDot({ score }: { score: number }) {
   const color = score >= 8 ? "bg-green-500" : score >= 5 ? "bg-yellow-400" : "bg-red-400";
   return (
@@ -120,10 +126,14 @@ function DiscoveryDrawer({
   sub,
   onClose,
   onRefresh,
+  onConverted,
+  askConfirm,
 }: {
   sub: Submission;
   onClose: () => void;
   onRefresh: (updated: Submission) => void;
+  onConverted: (submission: Submission, projectId: number) => void;
+  askConfirm: Confirmation["ask"];
 }) {
   const [generatingProposal, setGeneratingProposal] = useState(false);
   const [convertingProject, setConvertingProject] = useState(false);
@@ -158,13 +168,44 @@ function DiscoveryDrawer({
     }
   };
 
+  /** Creates the project and tells the page, or throws with the server's words. */
+  const createProject = async (force: boolean) => {
+    const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}/convert-to-project`, {
+      method: "POST",
+      body: JSON.stringify({ force }),
+    });
+    const data = await r.json().catch(() => ({})) as {
+      project?: { id: number }; error?: string; message?: string;
+    };
+    if (!r.ok || !data.project) {
+      throw new Error(data.message || data.error || `The project could not be created (${r.status}).`);
+    }
+    onConverted(sub, data.project.id);
+  };
+
   const convertToProject = async () => {
     if (sub.convertedProjectId) {
-      if (!window.confirm("This submission was already converted to a project. Create another one?")) return;
+      await askConfirm({
+        title: "Create a second project from this submission?",
+        description: `It was already converted to project #${sub.convertedProjectId}.`,
+        consequences: [
+          "A separate new project is created, with its own starter tasks.",
+          `Project #${sub.convertedProjectId} is not changed or replaced.`,
+        ],
+        confirmLabel: "Create another project",
+        busyLabel: "Creating…",
+        cancelLabel: "Don't create",
+        action: () => createProject(true),
+        focusAfterSuccess: () => document.getElementById(CONVERTED_LINK_ID),
+      });
+      return;
     }
     setConvertingProject(true);
     setError("");
     try {
+      // The confirmation dialog above is kept; this is the body it calls, so
+      // it does the request itself. (The incoming side called createProject
+      // from inside createProject, which would have recursed for ever.)
       const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}/convert-to-project`, {
         method: "POST",
         body: JSON.stringify({ force: !!sub.convertedProjectId }),
@@ -443,6 +484,8 @@ export default function CrmDiscovery() {
   const [timelineFilter, setTimelineFilter] = useState("");
   const [selected, setSelected] = useState<Submission | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [converted, setConverted] = useState<{ projectId: number; companyName: string } | null>(null);
+  const confirmation = useConfirmDialog();
 
   const load = useCallback(async () => {
     setSubsLoad({ status: "loading" });
@@ -467,26 +510,36 @@ export default function CrmDiscovery() {
   const updatePage = (fn: (prev: SubmissionPage) => SubmissionPage) =>
     setSubsLoad(prev => (prev.status === "ready" ? { status: "ready", data: fn(prev.data) } : prev));
 
-  // A delete that failed must not take the row off the table: the submission is
-  // still there, and the next refresh would bring it back with no explanation.
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Delete this discovery submission?")) return;
-    setDeletingId(id);
-    setRowNotice("");
-    try {
-      const r = await adminFetch(`/api/crm/discovery-submissions/${id}`, {
-        method: "DELETE",
-      });
-      if (!r.ok) { setRowNotice(`Submission not deleted. ${await responseFailureReason(r)}`); return; }
-      updatePage(prev => ({
-        submissions: prev.submissions.filter(s => s.id !== id),
-        total: Math.max(0, prev.total - 1),
-      }));
-    } catch {
-      setRowNotice(`Submission not deleted. ${failureReason(null)}`);
-    } finally {
-      setDeletingId(null);
-    }
+  // Both meanings kept: the dialog names what goes with the submission, and
+  // `refusalMessage` means a refused delete never looks like one that worked.
+  // The row comes out through `updatePage`, so the total stays truthful.
+  const handleDelete = (submission: Submission) => {
+    void confirmation.ask({
+      title: `Delete ${submission.companyName}'s discovery submission?`,
+      description: "This cannot be undone.",
+      consequences: [
+        "Its answers, and the proposal and SOW stored on it, go with it.",
+        "The contact it belongs to, and any project already created from it, are kept.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete submission",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep submission",
+      action: async () => {
+        setDeletingId(submission.id);
+        try {
+          const res = await adminFetch(`/api/crm/discovery-submissions/${submission.id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error(await refusalMessage(res, "That submission could not be deleted."));
+          updatePage(prev => ({
+            submissions: prev.submissions.filter(s => s.id !== submission.id),
+            total: Math.max(0, prev.total - 1),
+          }));
+          if (selected?.id === submission.id) setSelected(null);
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   const handleRefresh = (updated: Submission) => {
@@ -497,6 +550,24 @@ export default function CrmDiscovery() {
     setSelected(updated);
   };
 
+  const handleConverted = (submission: Submission, projectId: number) => {
+    // The list has to learn about it: the row's "converted" tick and the
+    // drawer's own button label are both read from this, and before this the
+    // list was told nothing at all.
+    updatePage(prev => ({
+      ...prev,
+      submissions: prev.submissions.map(s => (s.id === submission.id ? { ...s, convertedProjectId: projectId } : s)),
+    }));
+    setConverted({ projectId, companyName: submission.companyName });
+    setSelected(null);
+  };
+
+  // The drawer holding the button has just closed, so focus goes to the one
+  // thing worth doing next rather than to the top of the document.
+  useEffect(() => {
+    if (converted) document.getElementById(CONVERTED_LINK_ID)?.focus();
+  }, [converted]);
+
   return (
     <CrmLayout>
       {selected && (
@@ -504,10 +575,42 @@ export default function CrmDiscovery() {
           sub={selected}
           onClose={() => setSelected(null)}
           onRefresh={handleRefresh}
+          onConverted={handleConverted}
+          askConfirm={confirmation.ask}
         />
       )}
 
+      {confirmation.element}
+
       <div className="flex flex-col h-full">
+        {/* What used to be an alert() saying "navigate to Projects to see it". */}
+        {converted && (
+          <div
+            role="status"
+            className="mx-6 mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"
+          >
+            <CheckCircle className="w-4 h-4 shrink-0 text-teal-700" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              Project #{converted.projectId} was created from {converted.companyName}'s submission, with its starter tasks.
+            </span>
+            <Link
+              id={CONVERTED_LINK_ID}
+              href={`/admin/crm/projects?project=${converted.projectId}`}
+              className="font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Open the project
+            </Link>
+            <button
+              type="button"
+              onClick={() => setConverted(null)}
+              aria-label="Dismiss"
+              className="text-teal-700 hover:text-teal-900"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Page header */}
         <div className="px-6 py-4 border-b border-border/60 flex items-center gap-4 flex-wrap">
           <div>
@@ -680,8 +783,9 @@ export default function CrmDiscovery() {
                           </span>
                         )}
                         <button
-                          onClick={() => handleDelete(sub.id)}
+                          onClick={() => handleDelete(sub)}
                           disabled={deletingId === sub.id}
+                          aria-label={`Delete ${sub.companyName}'s submission`}
                           className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
                           title="Delete"
                         >

@@ -98,8 +98,17 @@ section("Rail indicator labels");
 
 eq("unlimited minutes label", railMinutesLabel({ period: "2026-09", callCount: 1, totalSeconds: 120, includedMinutes: null }), "2 min used");
 eq("capped minutes label", railMinutesLabel({ period: "2026-09", callCount: 1, totalSeconds: 120, includedMinutes: 60 }), "2 / 60 min");
-eq("SMS label with a trial limit", railSmsLabel(3, 10), "3 / 10 conversations");
-eq("SMS label with no trial limit", railSmsLabel(3, 0), "3 conversations");
+// The rail's SMS half counts text-message intake conversations for the life of
+// the account. Beside a minutes figure the bare word "conversations" read as
+// calls this period; it is neither, so both labels now say which and how long.
+eq("SMS label with a trial limit", railSmsLabel(3, 10), "3 / 10 SMS conversations, all time");
+eq("SMS label with no trial limit", railSmsLabel(3, 0), "3 SMS conversations, all time");
+check(
+  "neither SMS label can be read as calls, or as a per-period figure",
+  [railSmsLabel(3, 10), railSmsLabel(3, 0)].every(
+    (l) => /SMS/.test(l) && /all time/.test(l) && !/\bcalls?\b|this period|minute/i.test(l),
+  ),
+);
 
 section("String surface");
 

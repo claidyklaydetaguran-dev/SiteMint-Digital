@@ -241,7 +241,12 @@ export default function TransferContacts() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             {COPY.capabilityTitle}
           </h2>
-          <p className="mt-1 text-sm text-foreground">{capability.explanation}</p>
+          <p className="mt-1 text-sm text-foreground">
+            <span className="font-medium">
+              {capability.state === "active" ? COPY.capabilityStateActive : COPY.capabilityStateBlocked}
+            </span>{" "}
+            {capability.explanation}
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">{COPY.browserVsPhoneNote}</p>
         </section>
       )}

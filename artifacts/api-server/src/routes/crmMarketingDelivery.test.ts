@@ -840,11 +840,22 @@ suite("marketing delivery: one eligibility rule, and never a second copy (real D
       notDelivered: r["deliverySignal"].notDelivered,
     });
 
-    // Nothing tracks opens or clicks, so nothing reports a number for them.
-    expect(r["engagement"]).toMatchObject({ tracked: false, opens: null, clicks: null, openRate: null, clickRate: null });
-    expect(String(r["engagement"].unavailableReason)).toMatch(/tracking domain/i);
-    expect(String(r["engagement"].why)).toMatch(/no custom tracking domain/i);
-    expect(String(r["engagement"].why)).toMatch(/never proof that a person read/i);
+    // No open or click has ever been recorded for this sending domain, so no
+    // number is reported for either, and the reason names what is missing
+    // rather than asserting how the domain is configured.
+    expect(r["engagement"]).toMatchObject({
+      tracked: false, opens: null, clicks: null, openRate: null, clickRate: null,
+      opensMeasured: false, clicksMeasured: false,
+    });
+    expect(String(r["engagement"].unavailableReason)).toMatch(/not measured/i);
+    expect(String(r["engagement"].unavailableReason)).toMatch(/sending domain/i);
+    expect(String(r["engagement"].why)).toMatch(/not measured/i);
+
+    // The provider has reported nothing about these messages — the mail seam
+    // is mocked here and no webhook has ever fired — and that is said in words
+    // rather than shown as "0 delivered", which would be a different claim.
+    expect(r["deliverySignal"].provider).toMatchObject({ delivered: 0, bounced: 0, messagesWithReports: 0 });
+    expect(String(r["deliverySignal"].providerNote)).toMatch(/no delivery report/i);
     expect(String(r["deliverySignal"].meaning)).toMatch(/not a delivery confirmation/i);
   }, 120_000);
 });

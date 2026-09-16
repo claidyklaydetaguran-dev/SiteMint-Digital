@@ -6,6 +6,7 @@ import { startScheduler } from "./lib/campaignScheduler.js";
 import { startCrmScheduler } from "./lib/crmScheduler.js";
 import { startSignupJobWorker } from "./lib/signupPipeline/pipeline.js";
 import { startVoiceNotificationWorker } from "./lib/voiceNotifications/notificationOutbox.js";
+import { startVoiceSmsWorker } from "./lib/voiceSms/outboxService.js";
 import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
 import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
 import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
@@ -80,6 +81,16 @@ function startBackgroundWorkers(): void {
   // email delivery is off, so a row queued while VOICE_ALERTS_ENABLED was false
   // is delivered once it is turned on rather than silently discarded.
   startVoiceNotificationWorker({
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
+  });
+
+  // P5: the voice-number SMS sender (30-second tick). It had no caller at all,
+  // so a booking confirmation the caller had agreed to was queued and never
+  // sent. Inert while VOICE_SMS_ENABLED is not "true" or the credential set is
+  // incomplete: the batch returns before claiming anything, so an idle tick is
+  // one indexed SELECT and nothing is sent by accident.
+  startVoiceSmsWorker({
     info: (o, m) => logger.info(o, m),
     error: (o, m) => logger.error(o, m),
   });

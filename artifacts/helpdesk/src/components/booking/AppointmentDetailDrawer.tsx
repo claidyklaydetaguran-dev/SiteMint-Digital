@@ -196,7 +196,11 @@ export function AppointmentDetailDrawer({
                   <dt className="text-muted-foreground">{DETAIL.typeLabel}</dt>
                   <dd>{typeName(config, request.appointmentTypeId)}</dd>
                   <dt className="text-muted-foreground">{DETAIL.whenLabel}</dt>
-                  <dd>{slotDateTime(request.startUtc, config?.timezone ?? "UTC")}</dd>
+                  <dd>
+                    {config?.timezone !== undefined
+                      ? slotDateTime(request.startUtc, config.timezone)
+                      : `${slotDateTime(request.startUtc, "UTC")} UTC`}
+                  </dd>
                   <dt className="text-muted-foreground">{DETAIL.sourceLabel}</dt>
                   <dd>{sourceLabel(request.source)}</dd>
                   <dt className="text-muted-foreground">Status</dt>
@@ -335,6 +339,10 @@ function ReschedulePicker({
         <div className="mt-2">
           {slotsQuery.isLoading ? (
             <p className="sa-status" role="status">Loading times…</p>
+          ) : slotsQuery.isError ? (
+            <div className="sa-notice" data-tone="error" role="alert">
+              <p className="sa-notice__title">{DETAIL.rescheduleSlotsFailed}</p>
+            </div>
           ) : (slotsQuery.data?.slots.length ?? 0) === 0 ? (
             <p className="sa-times__hint">{DETAIL.rescheduleSlotsEmpty}</p>
           ) : (

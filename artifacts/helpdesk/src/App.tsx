@@ -79,17 +79,51 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient();
 
+/**
+ * The query string a legacy path arrived with, or "".
+ *
+ * These redirects used to drop it, which silently broke every flow that
+ * returns to the dashboard with a result in the URL — the Google Calendar
+ * callback's `?calendar=connected` among them, which landed on `/settings` and
+ * was discarded before any component could read it.
+ */
+function currentSearch(): string {
+  return typeof window === "undefined" ? "" : window.location.search;
+}
+
+function withSearch(to: string): string {
+  const search = currentSearch();
+  // A destination that carries its own query wins — it was written
+  // deliberately, and merging two query strings is not this helper's job.
+  return search !== "" && !to.includes("?") ? `${to}${search}` : to;
+}
+
 function InSpaRedirect({ to }: { to: string }) {
   const [, navigate] = useLocation();
-  useEffect(() => { navigate(to, { replace: true }); }, []);
+  useEffect(() => { navigate(withSearch(to), { replace: true }); }, []);
   return null;
 }
 
-/** Preserves the `:id` param across a legacy-path redirect. */
+/** Preserves the `:id` param — and the query string — across a legacy-path redirect. */
 function InSpaRedirectToId({ base }: { base: string }) {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  useEffect(() => { navigate(`${base}/${params.id}`, { replace: true }); }, []);
+  useEffect(() => { navigate(withSearch(`${base}/${params.id}`), { replace: true }); }, []);
+  return null;
+}
+
+/**
+ * The same, but carrying any `?query` the incoming link held. Email links can
+ * arrive with tracking or campaign parameters appended, and dropping them
+ * silently changes the address the reader actually opened.
+ */
+function InSpaRedirectToIdKeepingQuery({ base }: { base: string }) {
+  const params = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    navigate(`${base}/${params.id}${search}`, { replace: true });
+  }, []);
   return null;
 }
 
@@ -212,6 +246,9 @@ function Router() {
             <Route path="/appointments">{() => <InSpaRedirect to={ROUTES.appointments} />}</Route>
             <Route path="/logs">{() => <InSpaRedirect to={ROUTES.calls} />}</Route>
             <Route path="/logs/:id">{() => <InSpaRedirectToId base={ROUTES.calls} />}</Route>
+            {/* Post-call emails sent before the link was corrected point at
+                `/calls/:id`, which matched no route. They keep working. */}
+            <Route path="/calls/:id">{() => <InSpaRedirectToIdKeepingQuery base={ROUTES.calls} />}</Route>
 
             {/* R1 capability states: when the voice platform is NOT enabled, the
                 live voice paths render a neutral capability state instead of

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/adminFetch";
 import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
 import { Figure, LoadFailure } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 const TXN_METHODS = [
   { value: "manual_cash", label: "Cash" },
@@ -350,21 +352,32 @@ export default function CrmDealsPage() {
     }
   };
 
-  // A delete that failed must not take the card off the board: the deal is
-  // still there, and the next reload would bring it back with no explanation.
-  const deleteDeal = async (id: number) => {
-    if (!confirm("Delete this deal?")) return;
-    setBoardNotice("");
-    try {
-      const res = await adminFetch(`/api/crm/deals/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        setBoardNotice(`Deal not deleted. ${await responseFailureReason(res)}`);
-        return;
-      }
-      updateDeals(d => d.filter(x => x.id !== id));
-    } catch {
-      setBoardNotice(`Deal not deleted. ${failureReason(null)}`);
-    }
+  const confirmation = useConfirmDialog();
+
+  // Both meanings kept: the dialog says what will be lost, and `refusalMessage`
+  // means a delete the server refused never looks like one that worked. The
+  // board list is a Load now, so the row is removed through `updateDeals`.
+  const deleteDeal = (id: number) => {
+    const deal = deals?.find(d => d.id === id);
+    if (!deal) return;
+    void confirmation.ask({
+      title: `Delete the deal "${deal.name}"?`,
+      description: `It comes off the board and out of every pipeline total, including the ${fmt(deal.value)} it carries. This cannot be undone.`,
+      consequences: [
+        "Payments, quotes and invoices recorded against it are not deleted.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete deal",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep deal",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/deals/${id}`, { method: "DELETE" });
+        // The old path removed the card whatever the server answered, so a
+        // refused delete looked exactly like a successful one until a reload.
+        if (!res.ok) throw new Error(await refusalMessage(res, "That deal could not be deleted."));
+        updateDeals(d => d.filter(x => x.id !== id));
+      },
+    });
   };
 
   // The card moves at once, but a refused move is put back where it was and
@@ -400,6 +413,7 @@ export default function CrmDealsPage() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
       <div className="flex flex-col h-[calc(100vh-48px)]">
         {/* Header */}
         <div className="bg-white border-b border-border px-6 py-3.5 flex items-center gap-3 shrink-0">

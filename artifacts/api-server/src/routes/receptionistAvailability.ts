@@ -233,6 +233,23 @@ function validateAvailabilitySettingsInput(body: unknown): AvailabilitySettingsI
     }
   }
 
+  // One date cannot be both shut and given special hours. The two are opposite
+  // instructions stored in different places, so nothing downstream reconciles
+  // them — whichever the availability engine consults first silently wins, and
+  // a business that marked a date closed could still have it offered to
+  // callers. Rejected here, naming the date, instead of being saved and
+  // resolved by accident.
+  {
+    const blocked = new Set(parsedBlockedDates);
+    for (const exception of parsedDateExceptions) {
+      if (blocked.has(exception.dateKey)) {
+        throw new ValidationError(
+          `dateExceptions: ${exception.dateKey} is also listed in blockedDates. A date can be blocked or given different hours, not both.`,
+        );
+      }
+    }
+  }
+
   return {
     timezone: timezone.trim(),
     weeklyHours: parsedWeeklyHours,
