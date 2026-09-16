@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -37,6 +39,29 @@ interface Submission {
   leadId?: number;
   convertedProjectId?: number;
   preferredContactMethod?: string;
+}
+
+/** One page of submissions and the server's count of them. */
+interface SubmissionPage {
+  submissions: Submission[];
+  total: number;
+}
+
+/**
+ * A body that is not the shape this page expects is a failure too.
+ *
+ * The old version read `data.submissions` from any 2xx body and rendered the
+ * result; anything else — including a request that never succeeded — left the
+ * list empty and the header saying "0 submissions".
+ */
+function pickSubmissions(body: unknown): SubmissionPage | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const { submissions, total } = body as { submissions?: unknown; total?: unknown };
+  if (!Array.isArray(submissions)) return undefined;
+  return {
+    submissions: submissions as Submission[],
+    total: typeof total === "number" ? total : submissions.length,
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,6 +134,8 @@ function DiscoveryDrawer({
   const [savingNotes, setSavingNotes] = useState(false);
   const [status, setStatus] = useState(sub.crmStatus);
 
+  // The words for a refusal come from the response, not from `String(e)` — a
+  // thrown `Error: Failed` told the operator nothing about what to do next.
   const generateProposal = async () => {
     setGeneratingProposal(true);
     setError("");
@@ -116,12 +143,16 @@ function DiscoveryDrawer({
       const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}/generate-proposal`, {
         method: "POST",
       });
-      if (!r.ok) throw new Error((await r.json() as { error?: string }).error || "Failed");
-      const { submission } = await r.json() as { submission: Submission };
-      onRefresh(submission);
+      if (!r.ok) { setError(`Proposal not generated. ${await responseFailureReason(r)}`); return; }
+      const body = await r.json().catch(() => null) as { submission?: Submission } | null;
+      if (!body?.submission) {
+        setError("Proposal not generated. The server's answer was not in the expected shape.");
+        return;
+      }
+      onRefresh(body.submission);
       setStatus("Proposal Generated");
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      setError(`Proposal not generated. ${failureReason(null)}`);
     } finally {
       setGeneratingProposal(false);
     }
@@ -138,41 +169,56 @@ function DiscoveryDrawer({
         method: "POST",
         body: JSON.stringify({ force: !!sub.convertedProjectId }),
       });
-      if (!r.ok) throw new Error((await r.json() as { error?: string }).error || "Failed");
-      const data = await r.json() as { project: { id: number } };
+      if (!r.ok) { setError(`Project not created. ${await responseFailureReason(r)}`); return; }
+      const data = await r.json().catch(() => null) as { project?: { id: number } } | null;
+      if (!data?.project) {
+        setError("Project not created. The server's answer was not in the expected shape.");
+        return;
+      }
       alert(`Project #${data.project.id} created! Navigate to Projects to see it.`);
       onClose();
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      setError(`Project not created. ${failureReason(null)}`);
     } finally {
       setConvertingProject(false);
     }
   };
 
+  // A refused status change used to do nothing at all: the pill stayed where it
+  // was with no explanation, which reads as "that click did not register"
+  // rather than "the server said no".
   const patchStatus = async (newStatus: string) => {
     setUpdatingStatus(true);
+    setError("");
     try {
       const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}`, {
         method: "PATCH",
         body: JSON.stringify({ crmStatus: newStatus }),
       });
-      if (r.ok) {
-        const { submission } = await r.json() as { submission: Submission };
-        onRefresh(submission);
-        setStatus(newStatus);
-      }
+      if (!r.ok) { setError(`Status not changed. ${await responseFailureReason(r)}`); return; }
+      const body = await r.json().catch(() => null) as { submission?: Submission } | null;
+      if (body?.submission) onRefresh(body.submission);
+      setStatus(newStatus);
+    } catch {
+      setError(`Status not changed. ${failureReason(null)}`);
     } finally {
       setUpdatingStatus(false);
     }
   };
 
+  // The response was thrown away entirely, so notes that were refused looked
+  // exactly like notes that were saved.
   const saveNotes = async () => {
     setSavingNotes(true);
+    setError("");
     try {
-      await adminFetch(`/api/crm/discovery-submissions/${sub.id}`, {
+      const r = await adminFetch(`/api/crm/discovery-submissions/${sub.id}`, {
         method: "PATCH",
         body: JSON.stringify({ internalNotes: notes }),
       });
+      if (!r.ok) setError(`Notes not saved. ${await responseFailureReason(r)}`);
+    } catch {
+      setError(`Notes not saved. ${failureReason(null)}`);
     } finally {
       setSavingNotes(false);
     }
@@ -230,8 +276,9 @@ function DiscoveryDrawer({
           {/* Status + Actions */}
           <div className="px-6 py-4 border-b border-border/60 space-y-3">
             {error && (
-              <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+              <div role="alert" className="flex items-start gap-2 text-xs text-muted-foreground bg-destructive/5 border border-destructive/30 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-destructive" />
+                <span className="min-w-0 break-words">{error}</span>
               </div>
             )}
 
@@ -382,9 +429,14 @@ function DiscoveryDrawer({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function CrmDiscovery() {
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // The submissions and the server's count are one answer, and that answer is
+  // either data or a stated failure. Before this the request was read with
+  // `if (r.ok) {…}` and nothing else: a refusal, a 500 or an unreachable server
+  // all left the list empty, so the page said "0 submissions" over "No
+  // discovery submissions found." and the Refresh button reported nothing.
+  const [subsLoad, setSubsLoad] = useState<Load<SubmissionPage>>({ status: "loading" });
+  /** A row action the server refused. */
+  const [rowNotice, setRowNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [budgetFilter, setBudgetFilter] = useState("");
@@ -393,39 +445,55 @@ export default function CrmDiscovery() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      if (budgetFilter) params.set("budget", budgetFilter);
-      if (timelineFilter) params.set("timeline", timelineFilter);
-      params.set("limit", "200");
-      const r = await adminFetch(`/api/crm/discovery-submissions?${params}`);
-      if (r.ok) {
-        const data = await r.json() as { submissions: Submission[]; total: number };
-        setSubmissions(data.submissions);
-        setTotal(data.total);
-      }
-    } finally {
-      setLoading(false);
-    }
+    setSubsLoad({ status: "loading" });
+    setRowNotice("");
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    if (budgetFilter) params.set("budget", budgetFilter);
+    if (timelineFilter) params.set("timeline", timelineFilter);
+    params.set("limit", "200");
+    setSubsLoad(await readAdminResource(`/api/crm/discovery-submissions?${params}`, pickSubmissions));
   }, [search, statusFilter, budgetFilter, timelineFilter]);
 
   useEffect(() => { load(); }, [load]);
 
+  /** What actually loaded, or null. Never an empty list standing in for a failure. */
+  const page = subsLoad.status === "ready" ? subsLoad.data : null;
+  const submissions = page?.submissions ?? null;
+  const loading = subsLoad.status === "loading";
+
+  /** Apply a local change, only when there is a loaded list to change. */
+  const updatePage = (fn: (prev: SubmissionPage) => SubmissionPage) =>
+    setSubsLoad(prev => (prev.status === "ready" ? { status: "ready", data: fn(prev.data) } : prev));
+
+  // A delete that failed must not take the row off the table: the submission is
+  // still there, and the next refresh would bring it back with no explanation.
   const handleDelete = async (id: number) => {
     if (!window.confirm("Delete this discovery submission?")) return;
     setDeletingId(id);
-    await adminFetch(`/api/crm/discovery-submissions/${id}`, {
-      method: "DELETE",
-    });
-    setDeletingId(null);
-    setSubmissions(prev => prev.filter(s => s.id !== id));
+    setRowNotice("");
+    try {
+      const r = await adminFetch(`/api/crm/discovery-submissions/${id}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) { setRowNotice(`Submission not deleted. ${await responseFailureReason(r)}`); return; }
+      updatePage(prev => ({
+        submissions: prev.submissions.filter(s => s.id !== id),
+        total: Math.max(0, prev.total - 1),
+      }));
+    } catch {
+      setRowNotice(`Submission not deleted. ${failureReason(null)}`);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleRefresh = (updated: Submission) => {
-    setSubmissions(prev => prev.map(s => s.id === updated.id ? updated : s));
+    updatePage(prev => ({
+      ...prev,
+      submissions: prev.submissions.map(s => s.id === updated.id ? updated : s),
+    }));
     setSelected(updated);
   };
 
@@ -444,8 +512,17 @@ export default function CrmDiscovery() {
         <div className="px-6 py-4 border-b border-border/60 flex items-center gap-4 flex-wrap">
           <div>
             <h1 className="text-lg font-semibold text-foreground">Discovery CRM</h1>
+            {/*
+              The figure exists only when the list behind it loaded. This line
+              is where the page used to say "0 submissions" about a request
+              that had failed.
+            */}
             <p className="text-xs text-muted-foreground">
-              {loading ? "Loading…" : `${total} submission${total !== 1 ? "s" : ""}`}
+              {loading
+                ? "Loading…"
+                : page
+                  ? `${page.total} submission${page.total !== 1 ? "s" : ""}`
+                  : <><Figure value={null} /> submissions</>}
             </p>
           </div>
 
@@ -486,17 +563,45 @@ export default function CrmDiscovery() {
               <option value="">All Timelines</option>
               {Object.entries(TIMELINE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
-            <Button size="sm" variant="outline" onClick={load} className="gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            <Button size="sm" variant="outline" onClick={load} disabled={loading} className="gap-1.5">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Refreshing…" : "Refresh"}
             </Button>
           </div>
         </div>
+
+        {/* A row action the server refused. */}
+        {rowNotice && (
+          <p role="alert" className="shrink-0 mx-5 mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-muted-foreground">
+            <span className="min-w-0 break-words">{rowNotice}</span>
+          </p>
+        )}
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+            </div>
+          ) : submissions === null ? (
+            /*
+              Deliberately NOT the "No discovery submissions found" panel
+              below: the person has to be able to tell "nobody has submitted
+              the form" from "we could not ask". The words come from the
+              response, so a refusal names the missing permission and an
+              unreachable server says so.
+            */
+            <div className="p-4 sm:p-5">
+              <LoadFailure
+                what="Discovery submissions"
+                reason={subsLoad.status === "error" ? subsLoad.reason : ""}
+                onRetry={() => { void load(); }}
+                retrying={loading}
+              >
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No submission count is shown while this is unavailable — there may well be enquiries waiting here.
+                </p>
+              </LoadFailure>
             </div>
           ) : submissions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">

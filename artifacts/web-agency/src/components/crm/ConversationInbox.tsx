@@ -5,6 +5,8 @@ import {
   MessageSquare, Phone, RefreshCw, Search, Send, UserCheck, Users, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure, dataOf, reasonOf } from "@/components/crm/LoadState";
 import { getSmsStatusInfo } from "@/lib/smsStatus";
 
 // ── The one inbox ────────────────────────────────────────────────────────────
@@ -111,29 +113,97 @@ function initials(name: string): string {
   return name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase();
 }
 
+// ── What a request has to produce to count as an answer ──────────────────────
+//
+// A body that is not the shape this component expects is a failure too, not a
+// reason to render an empty inbox.
+
+/** One page of the list, with the cursor and read-state flags that came with it. */
+interface InboxPage {
+  conversations: Conversation[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  readStateAvailable: boolean;
+  readStateReason: string | null;
+}
+
+/** One opened conversation: its messages, and the draft reply held for it. */
+interface Thread {
+  conversation: Conversation | null;
+  messages: Message[];
+  draftBody: string | null;
+  draftUpdatedAt: string | null;
+}
+
+function pickInboxPage(body: unknown): InboxPage | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as {
+    conversations?: unknown; nextCursor?: unknown; hasMore?: unknown;
+    readStateAvailable?: unknown; readStateReason?: unknown;
+  };
+  if (!Array.isArray(b.conversations)) return undefined;
+  return {
+    conversations: b.conversations as Conversation[],
+    nextCursor: typeof b.nextCursor === "string" ? b.nextCursor : null,
+    hasMore: b.hasMore === true,
+    readStateAvailable: b.readStateAvailable !== false,
+    readStateReason: typeof b.readStateReason === "string" ? b.readStateReason : null,
+  };
+}
+
+function pickThread(body: unknown): Thread | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { conversation?: unknown; messages?: unknown; draft?: unknown };
+  if (!Array.isArray(b.messages)) return undefined;
+  const draft = b.draft && typeof b.draft === "object"
+    ? b.draft as { body?: unknown; updatedAt?: unknown }
+    : null;
+  return {
+    conversation: (b.conversation ?? null) as Conversation | null,
+    messages: b.messages as Message[],
+    draftBody: typeof draft?.body === "string" ? draft.body : null,
+    draftUpdatedAt: typeof draft?.updatedAt === "string" ? draft.updatedAt : null,
+  };
+}
+
+function pickStaff(body: unknown): StaffOption[] | undefined {
+  const list = body && typeof body === "object" ? (body as { staff?: unknown }).staff : undefined;
+  if (!Array.isArray(list)) return undefined;
+  return (list as StaffOption[]).filter(s => s.status !== "disabled");
+}
+
 export function ConversationInbox({ compact = false }: { compact?: boolean }) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  // The list, its cursor and its read-state flags are one answer, and that
+  // answer is either data or a stated failure. `conversations.length` on a
+  // failed load is 0, and "0 shown" over "No conversations in this view" was a
+  // claim about the customer's messages that nobody had checked.
+  const [listLoad, setListLoad] = useState<Load<InboxPage>>({ status: "loading" });
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [selected, setSelected] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loadingThread, setLoadingThread] = useState(false);
+  // The opened thread is its own answer too: "No messages yet." must never
+  // stand in for a thread that could not be read.
+  const [threadLoad, setThreadLoad] = useState<Load<Thread>>({ status: "loading" });
 
-  const [staff, setStaff] = useState<StaffOption[]>([]);
-  const [readStateAvailable, setReadStateAvailable] = useState(true);
-  const [readStateReason, setReadStateReason] = useState<string | null>(null);
+  // The picker's options. An empty picker with no explanation says "there is
+  // nobody to hand this to", which is a different thing from "we could not ask
+  // who there is".
+  const [staffLoad, setStaffLoad] = useState<Load<StaffOption[]>>({ status: "loading" });
 
   const [status, setStatus] = useState<StatusFilter>("open");
   const [assignee, setAssignee] = useState<"all" | "me" | "unassigned">("all");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  /** What actually loaded, or null. Never an empty list standing in for a failure. */
+  const page = dataOf(listLoad);
+  const conversations = page?.conversations ?? null;
+  const messages = threadLoad.status === "ready" ? threadLoad.data.messages : null;
+  const staff = dataOf(staffLoad) ?? [];
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
@@ -162,108 +232,109 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
 
   const loadList = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
-    try {
-      const res = await adminFetch(listUrl());
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `The inbox could not be loaded (${res.status}).`);
-      }
-      const data = await res.json();
-      setConversations(data.conversations ?? []);
-      setNextCursor(data.nextCursor ?? null);
-      setHasMore(!!data.hasMore);
-      setReadStateAvailable(data.readStateAvailable !== false);
-      setReadStateReason(data.readStateReason ?? null);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "The inbox could not be loaded.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    const next = await readAdminResource(listUrl(), pickInboxPage);
+    setRefreshing(false);
+    if (next.status === "ready") { setListLoad(next); setError(null); return; }
+    // A background refresh that failed must not wipe a list that is on screen
+    // and known to be real — but it must not pass for a quiet success either.
+    setListLoad(prev => (silent && prev.status === "ready" ? prev : next));
+    if (silent) setError(`The list could not be refreshed. ${reasonOf(next) ?? ""}`);
   }, [listUrl]);
 
   /**
    * Loads the next page and appends it. This is the whole reason the list is
    * keyset-paginated: an older conversation is further down, never absent.
+   *
+   * A refused page used to `return` in silence, which read as "there are no
+   * older conversations" — the exact opposite of what had happened.
    */
   const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
+    const current = listLoad.status === "ready" ? listLoad.data : null;
+    if (!current?.nextCursor || loadingMore) return;
     setLoadingMore(true);
-    try {
-      const res = await adminFetch(listUrl(nextCursor));
-      if (!res.ok) return;
-      const data = await res.json();
-      setConversations(prev => {
-        const seen = new Set(prev.map(c => c.id));
-        return [...prev, ...(data.conversations ?? []).filter((c: Conversation) => !seen.has(c.id))];
-      });
-      setNextCursor(data.nextCursor ?? null);
-      setHasMore(!!data.hasMore);
-    } finally {
-      setLoadingMore(false);
+    const next = await readAdminResource(listUrl(current.nextCursor), pickInboxPage);
+    setLoadingMore(false);
+    if (next.status !== "ready") {
+      setError(`Older conversations were not loaded. ${reasonOf(next) ?? ""}`);
+      return;
     }
-  }, [nextCursor, loadingMore, listUrl]);
+    const older = next.data;
+    setListLoad(prev => {
+      if (prev.status !== "ready") return prev;
+      const seen = new Set(prev.data.conversations.map(c => c.id));
+      return {
+        status: "ready",
+        data: {
+          ...older,
+          conversations: [...prev.data.conversations, ...older.conversations.filter(c => !seen.has(c.id))],
+        },
+      };
+    });
+  }, [listLoad, loadingMore, listUrl]);
 
   const openConversation = useCallback(async (c: Conversation) => {
     setSelected(c);
     selectedRef.current = c;
-    setLoadingThread(true);
+    setThreadLoad({ status: "loading" });
     setReply("");
     setDraftSavedAt(null);
-    try {
-      const res = await adminFetch(`/api/crm/inbox/conversations/${c.id}`);
-      if (!res.ok) { setError("That conversation could not be opened."); return; }
-      const data = await res.json();
-      setMessages(data.messages ?? []);
-      setSelected(data.conversation ?? c);
-      selectedRef.current = data.conversation ?? c;
-      if (data.draft?.body) {
-        setReply(data.draft.body);
-        setDraftSavedAt(data.draft.updatedAt ?? null);
-      }
-      setTimeout(() => threadRef.current?.scrollTo({ top: 99999 }), 60);
-
-      // Reading is recorded on the server, so it survives a reload and stays
-      // this person's own. It deliberately does not assign or resolve.
-      await adminFetch(`/api/crm/inbox/conversations/${c.id}/read`, { method: "POST" });
-      setConversations(prev => prev.map(x => x.id === c.id ? { ...x, unread: 0 } : x));
-    } finally {
-      setLoadingThread(false);
+    const next = await readAdminResource(`/api/crm/inbox/conversations/${c.id}`, pickThread);
+    setThreadLoad(next);
+    if (next.status !== "ready") return;
+    if (next.data.conversation) {
+      setSelected(next.data.conversation);
+      selectedRef.current = next.data.conversation;
     }
+    if (next.data.draftBody) {
+      setReply(next.data.draftBody);
+      setDraftSavedAt(next.data.draftUpdatedAt);
+    }
+    setTimeout(() => threadRef.current?.scrollTo({ top: 99999 }), 60);
+
+    // Reading is recorded on the server, so it survives a reload and stays
+    // this person's own. It deliberately does not assign or resolve.
+    await adminFetch(`/api/crm/inbox/conversations/${c.id}/read`, { method: "POST" });
+    setListLoad(prev => (prev.status === "ready"
+      ? {
+          status: "ready",
+          data: {
+            ...prev.data,
+            conversations: prev.data.conversations.map(x => x.id === c.id ? { ...x, unread: 0 } : x),
+          },
+        }
+      : prev));
   }, []);
 
   useEffect(() => { void loadList(); }, [loadList]);
 
   // The staff list drives the assignment picker. It needs staff.read, which a
-  // legacy-token session does not have, so failure is quiet rather than fatal.
+  // legacy-token session does not have — so it is not fatal to the inbox, but
+  // it is said out loud rather than shown as "nobody works here".
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const res = await adminFetch("/api/crm/staff").catch(() => null);
-      if (cancelled || !res?.ok) return;
-      const data = await res.json().catch(() => ({}));
-      setStaff((data.staff ?? []).filter((s: StaffOption) => s.status !== "disabled"));
-    })();
+    void readAdminResource("/api/crm/staff", pickStaff).then(next => {
+      if (!cancelled) setStaffLoad(next);
+    });
     return () => { cancelled = true; };
   }, []);
 
   // Polling keeps the list live without wiping what is on screen.
   useEffect(() => {
-    if (loading) return;
+    if (listLoad.status === "loading") return;
     const t = setInterval(() => {
       if (document.hidden) return;
       void loadList(true);
       const current = selectedRef.current;
       if (current) {
-        void adminFetch(`/api/crm/inbox/conversations/${current.id}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(d => { if (d?.messages) setMessages(d.messages); })
-          .catch(() => { /* the next tick retries */ });
+        // A poll that fails leaves the messages already on screen exactly as
+        // they are — they are real — and the next tick retries.
+        void readAdminResource(`/api/crm/inbox/conversations/${current.id}`, pickThread).then(next => {
+          if (next.status === "ready" && selectedRef.current?.id === current.id) setThreadLoad(next);
+        });
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(t);
-  }, [loading, loadList]);
+  }, [listLoad.status, loadList]);
 
   // ── Writes ─────────────────────────────────────────────────────────────────
 
@@ -294,15 +365,17 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: reply.trim() }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error || `The message was not sent (${res.status}).`); return; }
+      // This route keeps its own bearer-only guard (TRANSITIONAL_FOREIGN_AUTH
+      // in adminFetch), so its 401 opens no session dialog — the refusal has
+      // to be stated right here or it is stated nowhere.
+      if (!res.ok) { setError(`The message was not sent. ${await responseFailureReason(res)}`); return; }
       setReply("");
       await adminFetch(`/api/crm/inbox/conversations/${current.id}/draft`, { method: "DELETE" });
       setDraftSavedAt(null);
       await openConversation(current);
       await loadList(true);
     } catch {
-      setError("The message could not be sent. Check your connection and try again.");
+      setError(`The message was not sent. ${failureReason(null)}`);
     } finally {
       setSending(false);
     }
@@ -315,12 +388,11 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
       body: JSON.stringify({ status: next }),
     });
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "That change was refused.");
+      setError(`That change was not saved. ${await responseFailureReason(res)}`);
       return;
     }
-    const data = await res.json();
-    setSelected(prev => prev && prev.id === c.id ? { ...prev, ...data.conversation } : prev);
+    const data = await res.json().catch(() => ({})) as { conversation?: Conversation };
+    setSelected(prev => prev && prev.id === c.id ? { ...prev, ...(data.conversation ?? {}) } : prev);
     setNotice(next === "resolved" ? "Marked done." : `Moved to “${STATUS_LABEL[next] ?? next}”.`);
     await loadList(true);
   }
@@ -332,22 +404,23 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
       body: JSON.stringify({ staffId }),
     });
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "That assignment was refused.");
+      setError(`That assignment was not saved. ${await responseFailureReason(res)}`);
       return;
     }
-    const data = await res.json();
-    setSelected(prev => prev && prev.id === c.id ? { ...prev, ...data.conversation } : prev);
+    const data = await res.json().catch(() => ({})) as { conversation?: Conversation };
+    setSelected(prev => prev && prev.id === c.id ? { ...prev, ...(data.conversation ?? {}) } : prev);
     setNotice(staffId ? "Assigned." : "Put back as unassigned.");
     await loadList(true);
   }
 
+  // Null, not 0, when the list never arrived: an unread badge reading 0 — or
+  // no badge at all — is a claim that nothing is waiting.
   const totalUnread = useMemo(
-    () => conversations.reduce((sum, c) => sum + (c.unread ?? 0), 0),
+    () => (conversations === null ? null : conversations.reduce((sum, c) => sum + (c.unread ?? 0), 0)),
     [conversations],
   );
 
-  if (loading) {
+  if (listLoad.status === "loading") {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -395,10 +468,10 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 mx-3 sm:mx-4 mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-700 flex-1">{error}</p>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800"><X className="w-3.5 h-3.5" /></button>
+        <div role="alert" className="flex items-start gap-2 mx-3 sm:mx-4 mt-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+          <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+          <p className="min-w-0 flex-1 break-words text-xs text-muted-foreground">{error}</p>
+          <button onClick={() => setError(null)} aria-label="Dismiss" className="shrink-0 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
       {notice && (
@@ -408,9 +481,20 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
           <button onClick={() => setNotice(null)} className="text-teal-700 hover:text-teal-900"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
-      {readStateReason && (
-        <p className="mx-3 sm:mx-4 mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-          {readStateReason}
+      {page?.readStateReason && (
+        <p className="mx-3 sm:mx-4 mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 break-words">
+          {page.readStateReason}
+        </p>
+      )}
+      {/*
+        Name the part that is unavailable rather than showing a picker with
+        nobody in it. The assignment control still works — "Unassigned" is a
+        real choice — but it cannot offer people it could not read.
+      */}
+      {staffLoad.status === "error" && (
+        <p role="alert" className="mx-3 sm:mx-4 mt-2 min-w-0 break-words rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+          <span className="font-medium text-foreground">The staff list is unavailable,</span>{" "}
+          so nobody can be picked to handle a conversation. {staffLoad.reason}
         </p>
       )}
 
@@ -419,10 +503,13 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
         {/* ── List ───────────────────────────────────────────────────────── */}
         <div className={`${selected ? "hidden md:flex" : "flex"} w-full ${compact ? "md:w-72" : "md:w-80"} border-r border-border flex-col shrink-0 min-h-0`}>
           <div className="px-3 py-2 border-b border-border/60 flex items-center gap-2">
+            {/* The count exists only when the list behind it loaded. */}
             <span className="text-xs font-semibold text-foreground">
-              {conversations.length} shown
+              {conversations
+                ? `${conversations.length} shown`
+                : <><Figure value={null} /> shown</>}
             </span>
-            {readStateAvailable && totalUnread > 0 && (
+            {page?.readStateAvailable && totalUnread !== null && totalUnread > 0 && (
               <span title="Messages that arrived since you last opened the conversation. Yours, not the team's."
                 className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {totalUnread > 99 ? "99+" : totalUnread}
@@ -431,13 +518,32 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-border/50">
-            {conversations.length === 0 && (
+            {conversations === null ? (
+              /*
+                Deliberately NOT the "No conversations in this view" line
+                below: an empty view is a fact about the business, this is a
+                fact about the request, and a customer waiting for a reply is
+                exactly what would be hidden by confusing the two.
+              */
+              <div className="p-3">
+                <LoadFailure
+                  what="Conversations"
+                  reason={reasonOf(listLoad) ?? ""}
+                  onRetry={() => { void loadList(); }}
+                  retrying={refreshing}
+                >
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No count and no unread badge are shown while this is unavailable — there may well be messages waiting.
+                  </p>
+                </LoadFailure>
+              </div>
+            ) : conversations.length === 0 ? (
               <p className="px-4 py-10 text-center text-xs text-muted-foreground">
                 {debouncedQuery ? "Nothing matches that search." : "No conversations in this view."}
               </p>
-            )}
+            ) : null}
 
-            {conversations.map(c => {
+            {(conversations ?? []).map(c => {
               const name = titleOf(c);
               const isSel = selected?.id === c.id;
               return (
@@ -481,13 +587,14 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
               );
             })}
 
-            {hasMore && (
+            {page?.hasMore && (
               <button onClick={() => void loadMore()} disabled={loadingMore}
                 className="w-full px-4 py-3 text-xs text-teal-700 hover:bg-accent transition-colors disabled:opacity-50">
                 {loadingMore ? "Loading…" : "Load older conversations"}
               </button>
             )}
-            {!hasMore && conversations.length > 0 && (
+            {/* "That is every conversation" is a promise only a loaded list can make. */}
+            {page && !page.hasMore && conversations !== null && conversations.length > 0 && (
               <p className="px-4 py-3 text-center text-[10px] text-muted-foreground">
                 That is every conversation in this view.
               </p>
@@ -553,10 +660,21 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
 
               {/* Messages */}
               <div ref={threadRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-2.5">
-                {loadingThread && messages.length === 0 && (
+                {threadLoad.status === "loading" && (
                   <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
                 )}
-                {messages.map(m => {
+                {threadLoad.status === "error" && (
+                  <LoadFailure
+                    what="This conversation"
+                    reason={threadLoad.reason}
+                    onRetry={() => { if (selected) void openConversation(selected); }}
+                  >
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      This is not an empty conversation — it is one that could not be read.
+                    </p>
+                  </LoadFailure>
+                )}
+                {(messages ?? []).map(m => {
                   const mine = m.direction === "outbound";
                   const statusInfo = m.status ? getSmsStatusInfo(m.status, m.errorCode ?? undefined) : null;
                   return (
@@ -587,7 +705,7 @@ export function ConversationInbox({ compact = false }: { compact?: boolean }) {
                     </div>
                   );
                 })}
-                {!loadingThread && messages.length === 0 && (
+                {messages !== null && messages.length === 0 && (
                   <p className="text-center text-xs text-muted-foreground py-8">No messages yet.</p>
                 )}
               </div>

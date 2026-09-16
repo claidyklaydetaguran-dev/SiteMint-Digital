@@ -14,6 +14,7 @@ import {
   RefreshCw, TrendingUp, UserPlus, Wallet, X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { responseFailureReason } from "@/lib/adminLoad";
 
 // ── M4: the Command Center ───────────────────────────────────────────────────
 //
@@ -491,7 +492,9 @@ function panelLink(key: string, row: PanelRow): { href: string; label: string } 
 
 export default function CrmExecutiveDashboard() {
   const [data, setData] = useState<CommandCenterPayload | null>(null);
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  // null means the feed never arrived. An empty array is the server saying
+  // "nothing has been logged"; the two must not render alike.
+  const [activity, setActivity] = useState<ActivityItem[] | null>(null);
   const [activityError, setActivityError] = useState("");
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -544,11 +547,19 @@ export default function CrmExecutiveDashboard() {
       }
 
       if (actRes.ok) {
-        const body = await actRes.json() as { activity?: ActivityItem[] };
-        setActivity(body.activity ?? []);
-        setActivityError("");
+        const body = await actRes.json().catch(() => undefined) as { activity?: unknown } | undefined;
+        const list = body?.activity;
+        if (Array.isArray(list)) {
+          setActivity(list as ActivityItem[]);
+          setActivityError("");
+        } else {
+          // An answer we could not read is not an empty feed.
+          setActivity(null);
+          setActivityError("The server's answer was not in the expected shape.");
+        }
       } else {
-        setActivityError("The activity feed could not be loaded.");
+        setActivity(null);
+        setActivityError(await responseFailureReason(actRes));
       }
     } catch {
       setError("Couldn't reach the server. The figures below may be out of date.");
@@ -1014,7 +1025,7 @@ export default function CrmExecutiveDashboard() {
                 <Activity className="w-4 h-4 text-teal-700 shrink-0" />
                 <h2 className="text-sm font-semibold text-foreground">Recent activity</h2>
                 <span className="tabular-nums text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                  {countText(activity.length)}
+                  {countText(activity === null ? null : activity.length)}
                 </span>
               </div>
 
@@ -1024,7 +1035,14 @@ export default function CrmExecutiveDashboard() {
                 </div>
               )}
 
-              {activity.length === 0 ? (
+              {activity === null ? (
+                /* The feed never arrived, so this panel says nothing about what
+                   has happened. It used to read "0" over "Nothing has been
+                   logged against a record yet" beside its own error banner. */
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground break-words">
+                  Recent activity could not be loaded, so none is listed here. Use Retry above.
+                </p>
+              ) : activity.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                   Nothing has been logged against a record yet.
                 </p>

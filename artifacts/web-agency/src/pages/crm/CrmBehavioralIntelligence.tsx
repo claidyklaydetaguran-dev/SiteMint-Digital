@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import {
@@ -10,7 +10,8 @@ import {
   BotMessageSquare, TrendingUp, TrendingDown, Flame, RefreshCw, ChevronRight,
 } from "lucide-react";
 
-import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure, dataOf } from "@/components/crm/LoadState";
 
 interface LeadLite {
   id: number;
@@ -26,7 +27,27 @@ interface LeadSignal {
   recentEventCount7d: number;
 }
 
+/** The two lists the route answers with, together. */
+interface BehavioralPayload {
+  events: BehavioralEvent[];
+  leads: LeadLite[];
+}
+
 const HOT_SPIKE_THRESHOLD = 3; // 3+ signal events in the last 7 days
+
+/**
+ * A body that is not the shape this page expects is a failure too.
+ *
+ * The route always sends both lists. A body missing either one is not "no
+ * signals" — it is an answer we did not understand, and the panels must not
+ * count it as zero.
+ */
+function pickBehavioral(body: unknown): BehavioralPayload | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const { events, leads } = body as { events?: unknown; leads?: unknown };
+  if (!Array.isArray(events) || !Array.isArray(leads)) return undefined;
+  return { events: events as BehavioralEvent[], leads: leads as LeadLite[] };
+}
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "never";
@@ -79,9 +100,18 @@ function SignalRow({ signal, onOpen }: { signal: LeadSignal; onOpen: (id: number
   );
 }
 
-function Panel({ title, icon: Icon, tone, signals, onOpen, emptyText }: {
+/**
+ * One panel of leads.
+ *
+ * `signals` is null when the read behind it never arrived. That is the whole
+ * point of the prop: `(signals ?? []).length` was 0 on a failed request, so all
+ * three headers read 0 and all three bodies said there were no leads to act on
+ * — beside the page's own error message.
+ */
+function Panel({ title, icon: Icon, tone, signals, onOpen, emptyText, loading }: {
   title: string; icon: React.ElementType; tone: string;
-  signals: LeadSignal[]; onOpen: (id: number) => void; emptyText: string;
+  signals: LeadSignal[] | null; onOpen: (id: number) => void; emptyText: string;
+  loading: boolean;
 }) {
   return (
     <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm overflow-hidden">
@@ -89,9 +119,22 @@ function Panel({ title, icon: Icon, tone, signals, onOpen, emptyText }: {
         <Icon className={`w-4 h-4 ${tone}`} />
         <span className="crm-insight-dot" />
         <h3 className="font-semibold text-sm text-foreground">{title}</h3>
-        <span className="text-xs text-muted-foreground ml-auto">{signals.length}</span>
+        <span className="text-xs text-muted-foreground ml-auto">
+          <Figure value={signals === null ? null : signals.length} loading={loading} />
+        </span>
       </div>
-      {signals.length === 0 ? (
+      {signals === null ? (
+        /* Deliberately not the empty state: "none right now" is a fact about
+           the leads, this is a fact about the request. */
+        <div className="px-4 py-6 min-w-0">
+          <p className="text-sm font-medium text-foreground break-words">
+            {title} could not be loaded, so no leads are listed here.
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground break-words">
+            The reason is stated above. Use Try again there.
+          </p>
+        </div>
+      ) : signals.length === 0 ? (
         <p className="text-sm text-muted-foreground px-4 py-6 text-center">{emptyText}</p>
       ) : (
         <div>
@@ -104,57 +147,67 @@ function Panel({ title, icon: Icon, tone, signals, onOpen, emptyText }: {
 
 export default function CrmBehavioralIntelligence() {
   const [, setLoc] = useLocation();
-  const [signals, setSignals] = useState<LeadSignal[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [signalsLoad, setSignalsLoad] = useState<Load<BehavioralPayload>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await adminFetch("/api/crm/behavioral-events?limit=2000");
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json() as { events: BehavioralEvent[]; leads: LeadLite[] };
+  // The panels keep whatever they last showed until a new answer lands, so a
+  // failed Refresh never blanks a screen that was already right.
+  const refresh = useCallback(async () => {
+    setReloading(true);
+    setSignalsLoad(await readAdminResource("/api/crm/behavioral-events?limit=2000", pickBehavioral));
+    setReloading(false);
+  }, []);
 
-      const leadsById = new Map(data.leads.map(l => [l.id, l]));
-      const byLead = new Map<number, BehavioralEvent[]>();
-      for (const ev of data.events) {
-        const bucket = byLead.get(ev.leadId) ?? [];
-        bucket.push(ev);
-        byLead.set(ev.leadId, bucket);
-      }
+  useEffect(() => { void refresh(); }, [refresh]);
 
-      const cutoff7d = Date.now() - 7 * 86_400_000;
-      const computed: LeadSignal[] = [];
-      for (const [leadId, events] of byLead) {
-        const lead = leadsById.get(leadId);
-        if (!lead) continue;
-        const sorted = [...events].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
-        const dna = computeLeadDna(sorted);
-        const trend = computeIntentTrend(sorted);
-        const recentEventCount7d = sorted.filter(e => new Date(e.occurredAt).getTime() > cutoff7d).length;
-        computed.push({ lead, dna, trend, recentEventCount7d });
-      }
-      computed.sort((a, b) => (new Date(b.dna.lastEventAt ?? 0).getTime()) - (new Date(a.dna.lastEventAt ?? 0).getTime()));
-      setSignals(computed);
-    } catch {
-      setError("Failed to load behavioral intelligence.");
-    } finally {
-      setLoading(false);
+  // The signals, or null. Never an empty list standing in for a request that
+  // nobody managed to complete.
+  const signals = useMemo<LeadSignal[] | null>(() => {
+    const data = dataOf(signalsLoad);
+    if (!data) return null;
+
+    const leadsById = new Map(data.leads.map(l => [l.id, l]));
+    const byLead = new Map<number, BehavioralEvent[]>();
+    for (const ev of data.events) {
+      const bucket = byLead.get(ev.leadId) ?? [];
+      bucket.push(ev);
+      byLead.set(ev.leadId, bucket);
     }
-  };
 
-  useEffect(() => { load(); }, []);
+    const cutoff7d = Date.now() - 7 * 86_400_000;
+    const computed: LeadSignal[] = [];
+    for (const [leadId, events] of byLead) {
+      const lead = leadsById.get(leadId);
+      if (!lead) continue;
+      const sorted = [...events].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+      const dna = computeLeadDna(sorted);
+      const trend = computeIntentTrend(sorted);
+      const recentEventCount7d = sorted.filter(e => new Date(e.occurredAt).getTime() > cutoff7d).length;
+      computed.push({ lead, dna, trend, recentEventCount7d });
+    }
+    computed.sort((a, b) => (new Date(b.dna.lastEventAt ?? 0).getTime()) - (new Date(a.dna.lastEventAt ?? 0).getTime()));
+    return computed;
+  }, [signalsLoad]);
 
-  const rising = useMemo(() => (signals ?? []).filter(s => s.trend.direction === "rising"), [signals]);
-  const goingCold = useMemo(() => (signals ?? []).filter(s =>
-    s.trend.direction === "falling" || s.dna.intentStage === "Dormant" || s.dna.intentStage === "At Risk"
-  ), [signals]);
-  const hotSpikes = useMemo(() => (signals ?? [])
-    .filter(s => s.recentEventCount7d >= HOT_SPIKE_THRESHOLD)
-    .sort((a, b) => b.recentEventCount7d - a.recentEventCount7d), [signals]);
+  const rising = useMemo(
+    () => signals && signals.filter(s => s.trend.direction === "rising"),
+    [signals],
+  );
+  const goingCold = useMemo(
+    () => signals && signals.filter(s =>
+      s.trend.direction === "falling" || s.dna.intentStage === "Dormant" || s.dna.intentStage === "At Risk"
+    ),
+    [signals],
+  );
+  const hotSpikes = useMemo(
+    () => signals && signals
+      .filter(s => s.recentEventCount7d >= HOT_SPIKE_THRESHOLD)
+      .sort((a, b) => b.recentEventCount7d - a.recentEventCount7d),
+    [signals],
+  );
 
   const openLead = (id: number) => setLoc(`/admin/crm/leads/${id}?tab=behavior`);
+  const busy = reloading || signalsLoad.status === "loading";
 
   return (
     <CrmLayout>
@@ -165,22 +218,34 @@ export default function CrmBehavioralIntelligence() {
             <h1 className="text-xl font-semibold text-foreground">Behavioral Intelligence</h1>
           </div>
           <button
-            onClick={load}
-            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors"
+            onClick={() => { void refresh(); }}
+            disabled={busy}
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-accent transition-colors disabled:opacity-60"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} /> Refresh
           </button>
         </div>
         <p className="text-sm text-muted-foreground">
           Org-wide behavioral signals across all leads. Click a row to open that lead's full Behavior timeline.
         </p>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>
+        {/* The words come from the response — a 401, a 403 naming the missing
+            grant, a 404, a 5xx and an unreachable server each read differently. */}
+        {signalsLoad.status === "error" && (
+          <LoadFailure
+            what="Behavioral signals"
+            reason={signalsLoad.reason}
+            onRetry={() => { void refresh(); }}
+            retrying={reloading}
+          >
+            <p className="mt-2 min-w-0 break-words text-sm text-muted-foreground">
+              No lead count is shown below while this is unavailable — leads may well be heating up.
+            </p>
+          </LoadFailure>
         )}
 
-        {loading && !signals ? (
-          <div className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
+        {signalsLoad.status === "loading" ? (
+          <div className="bg-white rounded-xl border border-border p-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
             Loading behavioral signals…
           </div>
         ) : (
@@ -192,6 +257,7 @@ export default function CrmBehavioralIntelligence() {
               signals={rising}
               onOpen={openLead}
               emptyText="No leads with rising intent right now."
+              loading={busy}
             />
             <Panel
               title="Going Cold"
@@ -200,6 +266,7 @@ export default function CrmBehavioralIntelligence() {
               signals={goingCold}
               onOpen={openLead}
               emptyText="No leads going cold right now."
+              loading={busy}
             />
             <Panel
               title="Hot Signal Spikes"
@@ -208,6 +275,7 @@ export default function CrmBehavioralIntelligence() {
               signals={hotSpikes}
               onOpen={openLead}
               emptyText="No leads with a burst of recent activity."
+              loading={busy}
             />
           </div>
         )}

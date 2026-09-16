@@ -37,6 +37,8 @@ import {
   INTENT_STAGE_COLOR, EVENT_TYPE_LABELS,
 } from "@/lib/behavioralIntelligence";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure, dataOf } from "@/components/crm/LoadState";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -916,20 +918,41 @@ function WorkflowTab({ lead, activities, tasks }: {
 
 // ── Communications Tab ────────────────────────────────────────────────────────
 
+/** A body that is not a message list is a failure, not an empty thread. */
+function pickCiMessages(body: unknown): CiMessage[] | undefined {
+  const list = body && typeof body === "object" ? (body as { messages?: unknown }).messages : undefined;
+  return Array.isArray(list) ? list as CiMessage[] : undefined;
+}
+
 function CommunicationsTab({ lead, activities }: {
   lead: WorkspaceLead;
   activities: WorkspaceActivity[];
 }) {
-  const [msgs, setMsgs] = useState<CiMessage[]>([]);
-  const [fetching, setFetching] = useState(true);
+  /**
+   * The message log every figure on this tab is counted from.
+   *
+   * `.then(r => r.ok ? r.json() : { messages: [] })` fed an empty array into
+   * `computeCommunicationStats`, which dutifully returned an engagement
+   * score, a "0%" response rate and "0 reply · 0 sent" — figures manufactured
+   * out of an absence of data, which is the worst form of this defect: they
+   * look like findings. `/api/crm/leads/:id/messages` is also one of the
+   * `TRANSITIONAL_FOREIGN_AUTH` routes (lib/adminFetch.ts), so its 401 raises
+   * no "your session has ended" dialog either — this tab has to state its own
+   * failure or nothing states it at all.
+   */
+  const [msgsLoad, setMsgsLoad] = useState<Load<CiMessage[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
 
-  useEffect(() => {
-    adminFetch(`/api/crm/leads/${lead.id}/messages`)
-      .then(r => r.ok ? r.json() : { messages: [] })
-      .then((d: { messages?: CiMessage[] }) => setMsgs(d.messages ?? []))
-      .catch(() => {})
-      .finally(() => setFetching(false));
+  const loadMessages = useCallback(async () => {
+    setReloading(true);
+    setMsgsLoad(await readAdminResource(`/api/crm/leads/${lead.id}/messages`, pickCiMessages));
+    setReloading(false);
   }, [lead.id]);
+
+  useEffect(() => { void loadMessages(); }, [loadMessages]);
+
+  /** The messages, or null — never [] standing in for a request that failed. */
+  const msgs = dataOf(msgsLoad);
 
   const ciLead: CiLead = {
     id: lead.id,
@@ -939,13 +962,15 @@ function CommunicationsTab({ lead, activities }: {
     proposalStatus: lead.proposalStatus,
   };
 
+  // No message log, no computed figures. A score derived from an empty array
+  // is not a smaller truth than the real one — it is a different claim.
   const stats = useMemo(
-    () => computeCommunicationStats(ciLead, activities, msgs),
+    () => (msgs === null ? null : computeCommunicationStats(ciLead, activities, msgs)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lead.id, activities, msgs],
   );
-  const recs: CommunicationRecommendation[] = useMemo(
-    () => computeCommunicationRecommendations(ciLead, activities, msgs),
+  const recs: CommunicationRecommendation[] | null = useMemo(
+    () => (msgs === null ? null : computeCommunicationRecommendations(ciLead, activities, msgs)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lead.id, activities, msgs],
   );
@@ -967,7 +992,7 @@ function CommunicationsTab({ lead, activities }: {
 
     const items: TItem[] = [];
 
-    for (const m of msgs) {
+    for (const m of msgs ?? []) {
       const isCall = m.channel === "call";
       items.push({
         key: `msg-${m.id}`,
@@ -1002,8 +1027,6 @@ function CommunicationsTab({ lead, activities }: {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [msgs, activities]);
 
-  const { engagementScore: es, responseRate: rr, preferredChannel, replyRisk, status } = stats;
-
   const riskBadge: Record<string, string> = {
     Low:    "text-green-700  bg-green-50  border-green-200",
     Medium: "text-yellow-700 bg-yellow-50 border-yellow-200",
@@ -1022,6 +1045,30 @@ function CommunicationsTab({ lead, activities }: {
     <div className="p-5 space-y-5">
 
       {/* ── Summary card ─────────────────────────────────────────────────── */}
+      {msgsLoad.status === "loading" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground"
+        >
+          Loading this contact's communication history…
+        </div>
+      ) : stats === null ? (
+        /* Where the engagement score, the "0%" response rate and the
+           "0 reply · 0 sent" line used to be computed from an empty array. */
+        <LoadFailure
+          what="Communication intelligence"
+          reason={msgsLoad.status === "error" ? msgsLoad.reason : ""}
+          onRetry={() => { void loadMessages(); }}
+          retrying={reloading}
+        >
+          <p className="mt-2 text-sm text-muted-foreground">
+            No engagement score, response rate, preferred channel or reply risk is shown while the message log is unavailable — every one of them is counted from messages nobody was able to read.
+          </p>
+        </LoadFailure>
+      ) : (() => {
+        const { engagementScore: es, responseRate: rr, preferredChannel, replyRisk, status } = stats;
+        return (
       <div className={`rounded-xl border p-4 ${es.bgColor} ${es.borderColor}`}>
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="text-xs font-bold uppercase tracking-wide text-foreground/60">
@@ -1088,9 +1135,11 @@ function CommunicationsTab({ lead, activities }: {
           </div>
         )}
       </div>
+        );
+      })()}
 
       {/* ── Recommendations ──────────────────────────────────────────────── */}
-      {recs.length > 0 && (
+      {recs && recs.length > 0 && (
         <div>
           <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
             Recommendations
@@ -1115,13 +1164,32 @@ function CommunicationsTab({ lead, activities }: {
           <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Communication Timeline
           </h3>
-          {fetching && <Loader2 className="w-3 h-3 text-muted-foreground animate-spin ml-1" />}
+          {msgsLoad.status === "loading" && <Loader2 className="w-3 h-3 text-muted-foreground animate-spin ml-1" />}
         </div>
 
+        {/* Partial, and named as such: activity logged in the CRM is still
+            real when the phone system's own log is not available. */}
+        {msgsLoad.status === "error" && (
+          <LoadFailure
+            what="The message log"
+            reason={msgsLoad.reason}
+            variant="inline"
+            className="mb-2.5"
+            onRetry={() => { void loadMessages(); }}
+            retrying={reloading}
+          >
+            <p className="mt-1 text-xs text-muted-foreground">
+              Texts and calls recorded by the phone system are missing from this timeline. Activity logged in the CRM is still shown.
+            </p>
+          </LoadFailure>
+        )}
+
         {timeline.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            {fetching ? "Loading messages…" : "No communication history recorded yet."}
-          </div>
+          msgsLoad.status === "error" ? null : (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              {msgsLoad.status === "loading" ? "Loading messages…" : "No communication history recorded yet."}
+            </div>
+          )
         ) : (
           <div className="space-y-1.5">
             {timeline.map(item => (

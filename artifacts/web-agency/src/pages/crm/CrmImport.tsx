@@ -6,6 +6,8 @@ import {
   FileText, Users, GitBranch, RefreshCw, Download, X, Copy, Info,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure, dataOf } from "@/components/crm/LoadState";
 import { useCrmAssignees } from "@/lib/crmAssignees";
 import { OwnerMapControl, type OwnerMapResult } from "@/components/crm/UnmappedOwnersPanel";
 
@@ -67,6 +69,12 @@ interface CommitResult {
   rows: { rowNumber: number; outcome: string; leadId: number | null; detail: string }[];
 }
 
+/** A body that is not the shape this page expects is a failure, not a short list. */
+function pickFields(body: unknown): TargetField[] | undefined {
+  const list = body && typeof body === "object" ? (body as { fields?: unknown }).fields : undefined;
+  return Array.isArray(list) ? list as TargetField[] : undefined;
+}
+
 const SAMPLE_CSV = [
   "name,email,phone,company,status,priority,estimatedValue,serviceInterest,tags,notes",
   "Jane Smith,jane@acme.test,555-0100,Acme Corp,Qualified,High,5000,Website Design,\"seo,branding\",Full package inquiry",
@@ -100,9 +108,13 @@ export default function CrmImport() {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [csv, setCsv] = useState("");
-  const [fields, setFields] = useState<TargetField[]>([]);
+  const [fieldsLoad, setFieldsLoad] = useState<Load<TargetField[]>>({ status: "loading" });
 
-  const [preview, setPreview] = useState<Preview | null>(null);
+  // The plan is either the server's answer or a stated failure. It used to be a
+  // plain `Preview | null`, and a null one still rendered the summary card:
+  // 0/0/0/0, "0 rows checked", and "Nothing in this file would change anything"
+  // about a file nobody had managed to check.
+  const [previewLoad, setPreviewLoad] = useState<Load<Preview>>({ status: "loading" });
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
   const [updateExisting, setUpdateExisting] = useState(false);
   const [updateMode, setUpdateMode] = useState<"fill_blanks" | "overwrite">("fill_blanks");
@@ -132,20 +144,32 @@ export default function CrmImport() {
         method: "POST",
         body: JSON.stringify({ csv: text, mapping: withMapping ?? undefined, options: withOptions }),
       });
-      if (res.status === 401) return;
-      const data = await res.json() as Preview & { error?: string; problems?: string[] };
+      const body = await res.json().catch(() => undefined) as
+        (Partial<Preview> & { problems?: unknown }) | undefined;
       if (!res.ok) {
-        setError(data.error ?? "That file could not be read.");
-        setProblems(data.problems ?? []);
-        setChecking(false);
+        // The per-row problems the server listed are kept; the reason itself is
+        // the response's own, so a 401, a 403 naming the missing grant, a 404, a
+        // 5xx and an unreachable server each read differently.
+        setProblems(Array.isArray(body?.problems) ? body.problems as string[] : []);
+        setPreviewLoad({ status: "error", httpStatus: res.status, reason: failureReason(res.status, body) });
         return;
       }
-      setPreview(data);
-      setMapping(data.mapping);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach the server.");
+      if (!body || !Array.isArray(body.rows) || !body.totals || !body.mapping) {
+        setPreviewLoad({
+          status: "error",
+          httpStatus: res.status,
+          reason: "The server's answer was not in the expected shape.",
+        });
+        return;
+      }
+      const plan = body as Preview;
+      setPreviewLoad({ status: "ready", data: plan });
+      setMapping(plan.mapping);
+    } catch {
+      setPreviewLoad({ status: "error", httpStatus: null, reason: failureReason(null) });
+    } finally {
+      setChecking(false);
     }
-    setChecking(false);
   }, []);
 
   const processFile = useCallback((file: File) => {
@@ -158,26 +182,24 @@ export default function CrmImport() {
     }
     setFileName(file.name);
     setResult(null); setError(null); setProblems([]); setShowAll(false);
+    setPreviewLoad({ status: "loading" });
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = String(e.target?.result ?? "");
       setCsv(text);
       // The field catalogue is what the mapping editor offers; it comes from
       // the server so the two can never disagree about what is importable.
-      try {
-        const res = await adminFetch("/api/crm/contacts/import/fields");
-        if (res.ok) {
-          const data = await res.json() as { fields: TargetField[] };
-          setFields(data.fields);
-        }
-      } catch { /* the mapping editor degrades to the server's suggestion */ }
+      // The mapping editor degrades to the server's own suggestion when this
+      // fails — and says so, rather than passing a short list off as the whole
+      // catalogue of what can be imported.
+      setFieldsLoad(await readAdminResource("/api/crm/contacts/import/fields", pickFields));
       void runPreview(text, null, { updateExisting: false, updateMode: "fill_blanks" });
     };
     reader.readAsText(file);
   }, [runPreview]);
 
   const reset = () => {
-    setFileName(null); setCsv(""); setPreview(null); setMapping({});
+    setFileName(null); setCsv(""); setPreviewLoad({ status: "loading" }); setMapping({});
     setResult(null); setError(null); setProblems([]); setShowMapping(false);
     setUpdateExisting(false); setUpdateMode("fill_blanks");
   };
@@ -195,27 +217,41 @@ export default function CrmImport() {
   };
 
   const runImport = async () => {
-    if (!preview) return;
+    const plan = dataOf(previewLoad);
+    if (!plan) return;
     setImporting(true); setError(null);
     try {
       const res = await adminFetch("/api/crm/contacts/import/commit", {
         method: "POST",
-        body: JSON.stringify({ csv, mapping, options, planHash: preview.planHash }),
+        body: JSON.stringify({ csv, mapping, options, planHash: plan.planHash }),
       });
-      if (res.status === 401) { setImporting(false); return; }
-      const data = await res.json() as CommitResult & { error?: string; totals?: Record<RowAction, number>; rows?: PlannedRow[] };
       if (res.status === 409) {
         // The file, or the contacts it matches, changed between the preview and
         // the button. Show the NEW plan rather than importing a different one.
-        setError(data.error ?? "This file no longer produces the import you approved.");
+        setError(`Nothing was imported. ${await responseFailureReason(res)}`);
         void runPreview(csv, mapping, options);
         setImporting(false);
         return;
       }
-      if (!res.ok) { setError(data.error ?? "The import could not be run."); setImporting(false); return; }
+      if (!res.ok) {
+        setError(`The import could not be run. ${await responseFailureReason(res)}`);
+        setImporting(false);
+        return;
+      }
+      const data = await res.json().catch(() => undefined) as CommitResult | undefined;
+      // An answer we cannot read must not become a row of zeros under "Import
+      // finished": the import may well have created a great many contacts.
+      if (!data || typeof data.created !== "number" || !Array.isArray(data.rows)) {
+        setError(
+          "The import was sent, but the server's answer was not in the expected shape, "
+          + "so what it did is not known. Check the contact list before importing this file again.",
+        );
+        setImporting(false);
+        return;
+      }
       setResult(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "The import could not be run.");
+    } catch {
+      setError(`The import could not be run. ${failureReason(null)}`);
     }
     setImporting(false);
   };
@@ -224,19 +260,33 @@ export default function CrmImport() {
     setDiscLoading(true); setDiscError(null); setDiscResult(null);
     try {
       const res = await adminFetch("/api/crm/import-discovery", { method: "POST" });
-      if (res.status === 401) { setDiscLoading(false); return; }
-      if (!res.ok) { const d = await res.json() as { error?: string }; throw new Error(d.error ?? "Server error"); }
-      setDiscResult(await res.json() as { imported: number; skipped: number });
-    } catch (e) {
-      setDiscError(e instanceof Error ? e.message : "Import failed");
+      if (!res.ok) {
+        setDiscError(`Nothing was imported. ${await responseFailureReason(res)}`);
+        setDiscLoading(false);
+        return;
+      }
+      const data = await res.json().catch(() => undefined) as { imported?: unknown; skipped?: unknown } | undefined;
+      // Two zeros would say "there was nothing to import". Say what happened.
+      if (typeof data?.imported !== "number" || typeof data?.skipped !== "number") {
+        setDiscError("The server's answer was not in the expected shape, so what it imported is not known.");
+        setDiscLoading(false);
+        return;
+      }
+      setDiscResult({ imported: data.imported, skipped: data.skipped });
+    } catch {
+      setDiscError(`Nothing was imported. ${failureReason(null)}`);
     }
     setDiscLoading(false);
   };
 
+  // The plan, or null — never an empty one standing in for a file that was
+  // never successfully checked.
+  const preview = dataOf(previewLoad);
+  const fieldList = dataOf(fieldsLoad) ?? [];
   const rows = preview?.rows ?? [];
   const displayRows = showAll ? rows : rows.slice(0, 20);
-  const totals = preview?.totals ?? { create: 0, update: 0, skip: 0, error: 0 };
-  const applicable = totals.create + totals.update;
+  const totals = preview?.totals ?? null;
+  const applicable = totals ? totals.create + totals.update : null;
 
   return (
     <CrmLayout>
@@ -350,13 +400,8 @@ export default function CrmImport() {
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
             <div className="flex items-start gap-2">
               <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>
-                <p>{error}</p>
-                {problems.length > 0 && (
-                  <ul className="mt-1.5 space-y-0.5 list-disc pl-4">
-                    {problems.map((p, i) => <li key={i} className="text-xs">{p}</li>)}
-                  </ul>
-                )}
+              <div className="min-w-0">
+                <p className="break-words">{error}</p>
               </div>
             </div>
           </div>
@@ -370,8 +415,13 @@ export default function CrmImport() {
                 <FileText className="w-4 h-4 text-teal-600 shrink-0" />
                 <div className="min-w-0">
                   <h2 className="font-semibold text-foreground truncate">{fileName}</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {checking ? "Checking…" : `${rows.length} row${rows.length === 1 ? "" : "s"} checked · nothing written yet`}
+                  {/* A row count is only claimed for a file that was checked. */}
+                  <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                    {checking
+                      ? "Checking…"
+                      : preview
+                        ? `${rows.length} row${rows.length === 1 ? "" : "s"} checked · nothing written yet`
+                        : "Not checked — nothing has been read from this file."}
                   </p>
                 </div>
               </div>
@@ -385,13 +435,39 @@ export default function CrmImport() {
             <div className="flex items-center gap-x-4 gap-y-2 px-4 sm:px-5 py-3 bg-muted/60 border-b border-border/60 flex-wrap">
               {(Object.keys(ACTION_STYLE) as RowAction[]).map(action => (
                 <div key={action} className="flex items-center gap-1.5">
+                  {/* A dash, not a zero: "0 to create" about an unchecked file
+                      is a claim nobody made. */}
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ACTION_STYLE[action].cls}`}>
-                    {totals[action]}
+                    <Figure value={totals ? totals[action] : null} loading={checking} />
                   </span>
                   <span className="text-xs font-medium text-muted-foreground">{ACTION_STYLE[action].label}</span>
                 </div>
               ))}
             </div>
+
+            {/* The check either produced a plan or it did not. The words are the
+                response's own, and the per-row problems the server listed stay
+                with them. */}
+            {previewLoad.status === "error" && (
+              <div className="px-4 sm:px-5 py-4 border-b border-border/60">
+                <LoadFailure
+                  what="This file's import plan"
+                  reason={previewLoad.reason}
+                  onRetry={() => { void runPreview(csv, mapping, options); }}
+                  retrying={checking}
+                >
+                  <p className="mt-2 min-w-0 break-words text-sm text-muted-foreground">
+                    No row count or total is shown above. Nothing in this file has been checked, so
+                    nothing here says what it would — or would not — change.
+                  </p>
+                  {problems.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 list-disc pl-4 text-sm text-muted-foreground">
+                      {problems.map((p, i) => <li key={i} className="break-words">{p}</li>)}
+                    </ul>
+                  )}
+                </LoadFailure>
+              </div>
+            )}
 
             {/* Options */}
             <div className="px-4 sm:px-5 py-3 border-b border-border/60 space-y-2">
@@ -507,8 +583,19 @@ export default function CrmImport() {
                       <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                       These are suggestions, not decisions. Change any of them and the check re-runs before anything is written.
                     </p>
+                    {fieldsLoad.status === "error" && (
+                      <LoadFailure
+                        variant="inline"
+                        what="The list of importable fields"
+                        reason={fieldsLoad.reason}
+                      >
+                        <p className="mt-1 min-w-0 break-words text-xs text-muted-foreground">
+                          Only the columns the check recognised are offered below — this is not the full list.
+                        </p>
+                      </LoadFailure>
+                    )}
                     <div className="grid sm:grid-cols-2 gap-2.5">
-                      {(fields.length ? fields : Object.keys(preview.mapping).map(k => ({ key: k, label: k, required: k === "name", note: "" }))).map(field => (
+                      {(fieldList.length ? fieldList : Object.keys(preview.mapping).map(k => ({ key: k, label: k, required: k === "name", note: "" }))).map(field => (
                         <div key={field.key} className="flex flex-col gap-1">
                           <label className="text-xs font-medium text-foreground" htmlFor={`map-${field.key}`}>
                             {field.label}
@@ -535,7 +622,10 @@ export default function CrmImport() {
               </div>
             )}
 
-            {/* Row-by-row plan */}
+            {/* Row-by-row plan. Hidden rather than drawn as an empty table when
+                there is no plan — headers over no rows read as "this file has
+                no rows in it". */}
+            {preview && (
             <div className="overflow-x-auto">
               <table className="w-full text-xs min-w-[640px]">
                 <thead>
@@ -579,6 +669,7 @@ export default function CrmImport() {
                 </tbody>
               </table>
             </div>
+            )}
 
             {rows.length > 20 && (
               <div className="px-5 py-3 border-t border-border/60 text-center">
@@ -590,18 +681,32 @@ export default function CrmImport() {
 
             {/* Commit */}
             <div className="px-4 sm:px-5 py-4 border-t border-border/60 bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-foreground font-medium">
-                  {applicable > 0
-                    ? `${totals.create} to create, ${totals.update} to update`
-                    : "Nothing in this file would change anything"}
-                </p>
-                {(totals.skip > 0 || totals.error > 0) && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {[
-                      totals.skip > 0 && `${totals.skip} skipped`,
-                      totals.error > 0 && `${totals.error} cannot be imported`,
-                    ].filter(Boolean).join(" · ")} — each row says why above.
+              <div className="min-w-0">
+                {/* "Nothing in this file would change anything" is a statement
+                    about the file, so it is only made about a file that was
+                    actually checked. Beside a failed check it would talk
+                    somebody out of an import nobody had looked at. */}
+                {preview ? (
+                  <>
+                    <p className="text-sm text-foreground font-medium break-words">
+                      {preview.totals.create + preview.totals.update > 0
+                        ? `${preview.totals.create} to create, ${preview.totals.update} to update`
+                        : "Nothing in this file would change anything"}
+                    </p>
+                    {(preview.totals.skip > 0 || preview.totals.error > 0) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                        {[
+                          preview.totals.skip > 0 && `${preview.totals.skip} skipped`,
+                          preview.totals.error > 0 && `${preview.totals.error} cannot be imported`,
+                        ].filter(Boolean).join(" · ")} — each row says why above.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-foreground font-medium break-words">
+                    {checking
+                      ? "Checking this file…"
+                      : "This file has not been checked, so nothing can be imported from it yet."}
                   </p>
                 )}
               </div>
@@ -612,12 +717,14 @@ export default function CrmImport() {
                 </button>
                 <button
                   onClick={runImport}
-                  disabled={importing || checking || applicable === 0}
+                  disabled={importing || checking || applicable === null || applicable === 0}
                   className="flex items-center gap-2 text-sm bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg transition-colors font-medium"
                 >
                   {importing
                     ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Importing…</>
-                    : <><Upload className="w-3.5 h-3.5" /> Import {applicable} row{applicable === 1 ? "" : "s"}</>}
+                    : applicable === null
+                      ? <><Upload className="w-3.5 h-3.5" /> Import</>
+                      : <><Upload className="w-3.5 h-3.5" /> Import {applicable} row{applicable === 1 ? "" : "s"}</>}
                 </button>
               </div>
             </div>

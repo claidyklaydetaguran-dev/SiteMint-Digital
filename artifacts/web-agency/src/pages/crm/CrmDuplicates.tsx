@@ -6,6 +6,7 @@ import {
   Users, ArrowRight, Info, Upload,
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
+import { failureReason, responseFailureReason } from "@/lib/adminLoad";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,13 +76,17 @@ export default function CrmDuplicates() {
     try {
       const res = await adminFetch("/api/crm/contacts/duplicates?limit=200");
       if (res.status === 401) return;
-      if (res.status === 403) { setLoadError("You do not have permission to review contacts."); setLoading(false); return; }
-      if (!res.ok) throw new Error(`Request failed (${res.status}).`);
+      // The refusal is worded by the shared helper, so a 403 names the grant
+      // the account is missing rather than guessing at "review contacts".
+      if (!res.ok) { setLoadError(await responseFailureReason(res)); return; }
       setScan(await res.json() as Scan);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Could not load the duplicate review.");
+    } catch {
+      setLoadError(failureReason(null));
+    } finally {
+      // The 401 `return` above used to skip this, so a signed-out session left
+      // the page on "Scanning the contact book…" for ever.
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
