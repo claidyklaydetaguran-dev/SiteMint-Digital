@@ -98,6 +98,30 @@
       }
     },
     {
+      "route": "/admin/crm/companies",
+      "title": "Companies",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Built in this change and not opened in a browser by its author: the list, the search, the owner filter, the archived toggle and the paging are exercised through the API by crmCompanies.test.ts, which cannot prove a page renders" },
+        "action": { "status": "unverified", "env": [], "evidence": "Adding a company and applying reviewed suggestions are proven at the API (22 cases in crmCompanies.test.ts, including that applying twice creates nothing the second time); performing them in a browser is the reviewer's step" },
+        "persist": { "status": "unverified", "env": [], "evidence": "Every write is read back from the database in the API suite, never from a reloaded page" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "An operations manager with leads.write revoked is refused create, edit, archive and apply with 403 and the database is then checked unchanged; deleting a company needs leads.delete, which is owner-only and refused for an operations manager (crmCompanies.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "The page carries an error panel with Try again for the list, for the suggestions dialog and for each action, but no failed request was induced in a browser to watch it recover" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Written as stacked cards below md with wrapping controls, and one horizontally scrollable table above it, but not measured at 375px with the clipped-content metric" }
+      }
+    },
+    {
+      "route": "/admin/crm/companies/:id",
+      "title": "Company record",
+      "checks": {
+        "open": { "status": "unverified", "env": [], "evidence": "Built in this change and not opened in a browser: the record, its people and the five derived summaries are asserted through the API, which cannot prove the page renders them" },
+        "action": { "status": "unverified", "env": [], "evidence": "Linking and unlinking a contact, editing, archiving, restoring and deleting are proven at the API; none was performed in a browser" },
+        "persist": { "status": "unverified", "env": [], "evidence": "The API suite re-reads each row after the write; no page was reloaded" },
+        "permission": { "status": "pass", "env": ["T"], "evidence": "Deleting is refused to an operations manager (owner-only leads.delete) and refused outright while a contact is still linked (409); a revoked leads.write is refused every edit (crmCompanies.test.ts)" },
+        "recovery": { "status": "unverified", "env": [], "evidence": "A failed load shows an error with Try again and a missing company shows its own panel, but neither was induced in a browser" },
+        "mobile": { "status": "unverified", "env": [], "evidence": "Single-column layout with wrapping action rows and no table; not measured at 375px" }
+      }
+    },
+    {
       "route": "/admin/crm/communications",
       "title": "Communications",
       "checks": {

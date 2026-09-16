@@ -38,6 +38,7 @@ import { useCrmAssignees } from "@/lib/crmAssignees";
 import CustomerTimeline from "@/components/crm/CustomerTimeline";
 import CustomerPortalPanel from "@/components/crm/CustomerPortalPanel";
 import { OwnerPicker, type OwnerChoice } from "@/components/crm/OwnerPicker";
+import { LinkCompanyDialog } from "@/components/crm/companies/LinkCompanyDialog";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ const activityIcon: Record<string,string> = {
   call_initiated:"📞",call_received:"📲",sms_opt_out:"🚫",sms_opt_in:"✅",
   call_outcome:"📞",call_missed:"📵",
   email_logged:"📧",meeting_logged:"🤝",follow_up_logged:"⏰",
+  company_linked:"🏢",company_unlinked:"🏢",
 };
 
 const CALL_DISPOSITIONS = [
@@ -120,8 +122,15 @@ function Modal({
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/** M7: the company record this contact is linked to, when somebody has linked it. */
+interface LinkedCompany {
+  id:number; name:string; domain:string|null; website:string|null; archivedAt:string|null;
+}
+
 interface Lead {
   id:number; name:string; company?:string; phone?:string; email:string; website?:string;
+  /** The link itself, and the company's name — `company` above stays the text as recorded. */
+  companyId?:number|null; companyName?:string|null;
   source:string; serviceInterest?:string; status:string; priority:string; assignedTo?:string;
   /** M6: the staff member this contact belongs to; null when no person is resolved. */
   assignedToStaffId?:number|null;
@@ -159,6 +168,8 @@ export default function CrmLeadDetail() {
   const params = useParams<{id:string}>();
   const [, navigate] = useLocation();
   const [lead, setLead] = useState<Lead|null>(null);
+  const [linkedCompany, setLinkedCompany] = useState<LinkedCompany|null>(null);
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -386,8 +397,9 @@ export default function CrmLeadDetail() {
     const r = await adminFetch(`/api/crm/leads/${params.id}`);
     if (r.status === 401) return;
     if (!r.ok) { navigate("/admin/crm/leads"); return; }
-    const d = await r.json() as { lead:Lead; activities:Activity[]; tasks:Task[] };
+    const d = await r.json() as { lead:Lead; activities:Activity[]; tasks:Task[]; linkedCompany?:LinkedCompany|null };
     setLead(d.lead);
+    setLinkedCompany(d.linkedCompany ?? null);
     setActivities(d.activities || []);
     setTasks(d.tasks || []);
     setEditStatus(d.lead.status);
@@ -865,11 +877,38 @@ export default function CrmLeadDetail() {
                 </>
               )}
             </div>
-            {lead.company && (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-                <Building className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-words">{lead.company}</span>
-              </p>
-            )}
+            {/* M7: the company RECORD when this contact is linked to one, and the
+                text somebody typed when it is not — never one dressed as the other. */}
+            <div className="flex items-start gap-2 text-sm text-muted-foreground min-w-0">
+              <Building className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                {linkedCompany ? (
+                  <Link href={`/admin/crm/companies/${linkedCompany.id}`}>
+                    <span className="text-primary hover:underline cursor-pointer break-words">{linkedCompany.name}</span>
+                  </Link>
+                ) : lead.company ? (
+                  <span className="break-words">Company on file: {lead.company}</span>
+                ) : (
+                  <span className="text-muted-foreground/70">No company</span>
+                )}
+                {linkedCompany?.archivedAt && (
+                  <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">Archived</span>
+                )}
+                <button
+                  onClick={() => setShowCompanyDialog(true)}
+                  className="ml-2 text-[10px] px-1.5 py-0.5 border border-border rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  {linkedCompany ? "Change company" : "Link to a company"}
+                </button>
+              </div>
+            </div>
+            <LinkCompanyDialog
+              open={showCompanyDialog}
+              contact={{ id: lead.id, name: lead.name, companyText: lead.company ?? null }}
+              currentCompany={linkedCompany ? { id: linkedCompany.id, name: linkedCompany.name } : null}
+              onClose={() => setShowCompanyDialog(false)}
+              onChanged={(message) => { showToast(message); load(); }}
+            />
             {lead.website && (
               <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
                 <Globe className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.website}</span>

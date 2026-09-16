@@ -15,7 +15,7 @@ weight.
 | Source | Reviewed? | What it gives us |
 |---|---|---|
 | `https://tutorial101.blogspot.com/2026/08/crm-customer-relationship-management_0720438368.html` | **Yes — the written article, fetched 2026-09-12.** | A numbered list of 14 feature areas with one-line descriptions. |
-| `https://www.youtube.com/watch?v=74qo2kJsTAM` | **No.** | Nothing is claimed from it. No part of this document rests on it. |
+| `https://www.youtube.com/watch?v=74qo2kJsTAM` | **Partly — 32 sampled frames, 2026-09-16.** See "What was sampled in the video" below. | Scene-level confirmation that the reference is a Django-admin-style CRM: sign-in, dashboard shell, record tables, modal forms, a confirmation dialog, a calendar, invoice/payment tables, a bar-chart report, user management, notifications. **No text-level detail**, so no requirement in this document rests on it. |
 
 Two limits on how far the article can be used:
 
@@ -30,6 +30,43 @@ Two limits on how far the article can be used:
    Express and PostgreSQL with Drizzle. Nothing from the reference changes the
    stack, the schema conventions or the branding; the mapping is of *intent*
    only.
+
+### What was sampled in the video, and what that is worth
+
+Reviewed 2026-09-16. Duration 51:29 (3,089 s), channel Cairocoders, published
+2026-08-27. **The player exposed no caption track**, so nothing below rests on a
+transcript, and there are no chapter markers. Frames were sampled by driving the
+player's own `seekTo` while it played — a paused background tab does not repaint,
+so every paused capture returns a stale frame, which is a trap worth recording.
+
+**The limit that matters:** the only capture surface that reliably rendered live
+frames is ~350 px wide, so these are **scene-level observations**. Body text was
+not legible except where quoted. A larger browser tab was tried and never
+repainted the video surface; capturing the frame to a canvas at full resolution
+works but the page's content policy blocks sending it anywhere.
+
+Sampled: 0:01, 1:00, 2:00, 2:03, 3:00, 4:00, 4:02, 5:00, 6:02, 8:02, 10:02,
+12:02, 14:02, 16:02, 18:02, 20:02, 22:02, 24:02, 26:02, 28:02, 30:02, 32:02,
+34:02, 36:02, 38:02, 40:02, 42:02, 44:02, 46:02, 48:02, 50:02, 51:02 — 32 frames.
+Everything between those points, about 49 of the 51 minutes, was **not** inspected.
+
+| Range | What the sampled frames showed |
+|---|---|
+| 0:01–3:00 | Sign-in card, then admin-style list pages with status chips and filters |
+| 4:00–12:02 | Code-along in VS Code: editor, file tree, terminal, autocomplete |
+| 14:02–16:02 | Sign-in card again, then the application shell (sidebar, header, primary action) |
+| 18:02–26:02 | Record tables (rows, badges, per-row actions) and a two-column modal create/edit form |
+| 28:02 | Month calendar grid ("October 2026" legible) |
+| 30:02–34:02 | Report layout with a summary panel; tables of numbered records with amounts |
+| 36:02–38:02 | Warning overlay, and a confirmation dialog ("Are you sure?" legible) |
+| 40:02–46:02 | Settings/profile form, a success toast, an edit modal, a bar-chart report |
+| 48:02–51:02 | User-management table with role/status chips, a notifications list, a create form |
+
+**What this changes here: nothing.** It confirms the article's feature list is a
+fair description of the reference's own screens, at the level of "these screens
+exist". It demonstrates nothing about field-level behaviour, permissions,
+delivery, concurrency or data model, so every row in the mapping still moves only
+on SiteMint's own evidence.
 
 **The reference lists 14 areas. SiteMint's brief is 18, and 18 is the scope.**
 The table below carries all 18, numbered to match `COVERAGE-MATRIX.md`, so

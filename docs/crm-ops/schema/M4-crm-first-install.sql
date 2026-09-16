@@ -42,7 +42,9 @@
 --     * M6-automation-recovery.sql  crm_automation_recovery_actions
 --     * M6-lead-assignee.sql        crm_lead_owner_mappings, and
 --                                   crm_leads.assigned_to_staff_id
---   Until they are folded in, this artifact is 60 tables and the schema is 69.
+--     * M7-companies.sql            crm_companies, and
+--                                   crm_leads.company_id
+--   Until they are folded in, this artifact is 60 tables and the schema is 70.
 --
 -- WHEN TO USE THIS FILE
 --   * First installation → this file alone. It already contains every column

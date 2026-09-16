@@ -1,6 +1,7 @@
 export * from "./submissions";
 export * from "./formSubmissions";
 export * from "./crmLeads";
+export * from "./crmCompanies";
 export * from "./crmContactDedupe";
 export * from "./crmActivities";
 export * from "./crmTasks";
