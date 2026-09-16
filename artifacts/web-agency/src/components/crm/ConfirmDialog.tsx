@@ -281,6 +281,11 @@ function ConfirmDialog({
         <AlertDialogPrimitive.Content
           data-testid="crm-confirm-dialog"
           data-tone={tone}
+          // Stated rather than assumed: measured in a browser on 2026-09-16,
+          // the rendered dialog carried no `aria-modal`, so a screen reader's
+          // virtual cursor could still wander into the page behind it even
+          // though Tab could not. Focus trapping is not the same guarantee.
+          aria-modal="true"
           aria-busy={working || undefined}
           onOpenAutoFocus={(event) => {
             event.preventDefault();
