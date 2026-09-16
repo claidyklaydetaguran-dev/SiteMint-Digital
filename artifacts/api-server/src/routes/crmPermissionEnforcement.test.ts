@@ -176,6 +176,30 @@ suite("CRM routes enforce their permission, not just a session (real DB)", () =>
     }
   });
 
+  it("the legacy shared credential walks through every permission until it is retired", async () => {
+    // Stated rather than implied, because production depends on it: the shared
+    // admin credential carries no identity, so `requireCrmAuth`'s fallback has
+    // no permissions to check and calls through. While CRM_LEGACY_BEARER_ENABLED
+    // allows it, the permission model above is advisory for anyone holding that
+    // one password. Retiring it is what makes the model binding — so the
+    // retirement itself is pinned here.
+    const { getSessionToken } = await import("../lib/admin-session.js");
+    const legacy = { Authorization: `Bearer ${getSessionToken()}` };
+
+    const during = await fetch(`${base}/api/crm/leads`, { headers: legacy });
+    expect(during.status).toBe(200);
+
+    process.env.CRM_LEGACY_BEARER_ENABLED = "false";
+    try {
+      const after = await fetch(`${base}/api/crm/leads`, { headers: legacy });
+      expect(after.status).toBe(401);
+      // The per-person session is unaffected by the retirement.
+      expect((await manager.call("GET", "/api/crm/leads")).status).toBe(200);
+    } finally {
+      delete process.env.CRM_LEGACY_BEARER_ENABLED;
+    }
+  });
+
   it("an owner is refused none of it", async () => {
     for (const path of ["/api/crm/leads", "/api/crm/deals", "/api/crm/tasks", "/api/crm/pipeline"]) {
       const reply = await owner.call("GET", path);

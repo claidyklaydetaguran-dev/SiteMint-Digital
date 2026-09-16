@@ -109,6 +109,14 @@ Measured against the code, not assumed:
 - `VITE_VOICE_*` are **build-time** flags for the helpdesk bundle, not runtime.
 - `STRIPE_BOOT_SYNC_ENABLED=false`. `TRUSTED_PROXY_HOPS` is decided only after
   observing real forwarded headers in production.
+- **`CRM_LEGACY_BEARER_ENABLED=false`, set immediately after the first owner has
+  signed in with their own account — a requirement, not a preference.** Both
+  gates fall back to the legacy shared credential, and that path carries no
+  identity, so there are no permissions to check and it calls straight through.
+  Until the flag is `false`, every permission in the CRM and on the operator
+  routes is advisory for whoever holds that one password. Do not set it before
+  the first owner exists: bootstrap uses `ADMIN_PASSWORD`, and the shared
+  credential is the only way in until a person can sign in as themselves.
 
 ## 5. The schema upgrade
 
