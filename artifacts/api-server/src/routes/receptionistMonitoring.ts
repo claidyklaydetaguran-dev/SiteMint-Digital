@@ -13,7 +13,13 @@ import {
   resolveVoiceIssue,
 } from "../lib/voiceIssues/voiceIssueService.js";
 import { setCallReview, clearCallReview, listCallReviews } from "../lib/voiceReviews/reviewService.js";
-import { aggregateUsageForPeriod, computePeriodYm, loadUsageCapMinutesFromEnv } from "../lib/voiceUsage/usageService.js";
+import {
+  aggregateUsageByChannelForPeriod,
+  aggregateUsageForPeriod,
+  computePeriodYm,
+  resolveIncludedMinutesForFirmOrEnv,
+  type UsageChannelBreakdown,
+} from "../lib/voiceUsage/usageService.js";
 
 const router: IRouter = Router();
 
@@ -146,15 +152,26 @@ router.get("/receptionist/voice/usage", requireReceptionistAuth, async (req: Req
     const usage = await aggregateUsageForPeriod(req.firmId!, period);
     let capMinutes: number | null = null;
     try {
-      capMinutes = loadUsageCapMinutesFromEnv();
+      // Plan-resolved minutes when a plan catalog is configured; otherwise the
+      // flat VOICE_USAGE_INCLUDED_MINUTES value, exactly as before.
+      capMinutes = await resolveIncludedMinutesForFirmOrEnv(req.firmId!);
     } catch {
       capMinutes = null; // malformed cap config is an ops problem, not a customer-visible error
+    }
+    let channels: UsageChannelBreakdown | null = null;
+    try {
+      channels = await aggregateUsageByChannelForPeriod(req.firmId!, period);
+    } catch {
+      // The breakdown is additive. A firm must still get its usage total even
+      // if the per-channel read fails, so this never fails the request.
+      channels = null;
     }
     res.json({
       period,
       callCount: usage.callCount,
       totalSeconds: usage.totalSeconds,
       includedMinutes: capMinutes,
+      channels,
     });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[monitoring] usage read failed");

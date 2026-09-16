@@ -20,16 +20,41 @@ export const INTERNAL_CALL_STATES = [
 ] as const;
 export type InternalCallState = (typeof INTERNAL_CALL_STATES)[number];
 
+/** How the call reached the assistant, from the provider's own call type. */
+export const CALL_CHANNELS = ["telephone", "browser", "unknown"] as const;
+export type CallChannel = (typeof CALL_CHANNELS)[number];
+
+/**
+ * Levels of evidence about handing a caller to a person — not steps in a
+ * progress bar. `accepted` is an acknowledgement, never someone answering.
+ */
+export const TRANSFER_STATES = ["none", "requested", "accepted", "connected", "failed", "unknown"] as const;
+export type TransferState = (typeof TRANSFER_STATES)[number];
+
+export interface TransferOutcome {
+  state: TransferState;
+  evidence: string | null;
+  /** False for a blind transfer: nothing after the handover is observable. */
+  connectionKnowable: boolean;
+  destinationMasked: string | null;
+}
+
 export interface RealCallSummary {
   callId: string;
   source: "vapi_twilio";
+  channel: CallChannel;
+  /** A SiteMint QA event, never a real call. */
+  synthetic: boolean;
   state: InternalCallState;
   stateLabel: string;
   isFinal: boolean;
-  callerNumberDisplay: string;
+  /** Null unless a caller number was actually received. */
+  callerNumberDisplay: string | null;
   startedAt: string;
   endedAt: string | null;
+  /** The provider's own measurement. Null reads as "not available". */
   durationSec: number | null;
+  transferState: TransferState;
 }
 
 export const URGENCY_VALUES = ["low", "normal", "high"] as const;
@@ -96,13 +121,36 @@ export interface RealCallDetail extends RealCallSummary {
   summary: string | null;
   analysisAvailability: StructuredOutcomeAvailability;
   structuredOutcome: StructuredOutcome | null;
+  transfer: TransferOutcome;
+  /**
+   * The server-owned retention policy for this account, carried on the record
+   * itself so the page needs no second request to say what is kept. Optional
+   * so a dashboard deployed ahead of its backend degrades safely.
+   */
+  artifactPolicy?: ArtifactPolicy;
 }
+
+/**
+ * The server-owned artifact policy, reported by name. "unknown" is what an
+ * unset or unrecognised policy reports — it is never upgraded into a
+ * permissive answer, and anything other than an explicit retaining policy is
+ * treated as "nothing is kept".
+ */
+export const ARTIFACT_POLICIES = ["none", "transcript_only", "full", "unknown"] as const;
+export type ArtifactPolicy = (typeof ARTIFACT_POLICIES)[number];
 
 export interface VoiceProviderStatus {
   vapiApiKeyConfigured: boolean;
   vapiWebhookSecretConfigured: boolean;
   vapiPublicKeyConfigured: boolean;
   developmentPhoneNumberVerified: boolean;
+  /** Optional so a dashboard deployed ahead of its backend degrades safely. */
+  artifactPolicy?: ArtifactPolicy;
+}
+
+/** Only an explicitly retaining policy may display a transcript. Fail closed. */
+export function policyRetainsTranscript(policy: ArtifactPolicy | undefined): boolean {
+  return policy === "transcript_only" || policy === "full";
 }
 
 async function apiFetch<T>(path: string): Promise<T> {

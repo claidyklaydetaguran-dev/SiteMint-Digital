@@ -45,8 +45,31 @@ export interface InquiryList {
  * that it reached an inbox — nothing in this product can observe that, so no
  * label here says "delivered".
  */
-export const NOTIFICATION_STATES = ["queued", "sending", "accepted", "failed", "abandoned"] as const;
+export const NOTIFICATION_STATES = [
+  "queued",
+  "sending",
+  "accepted",
+  "failed",
+  "abandoned",
+  // Terminal and needs a person: the send may or may not have reached the
+  // provider, and a retry could email the business a second time.
+  "unconfirmed",
+] as const;
 export type NotificationState = (typeof NOTIFICATION_STATES)[number];
+
+/**
+ * Delivery evidence, which is a different question from acceptance: what the
+ * provider's own signed delivery events later said about an accepted message.
+ * Null means no event has arrived — NOT that the message failed to arrive.
+ */
+export const DELIVERY_STATUSES = [
+  "delivered",
+  "delivery_delayed",
+  "bounced",
+  "complained",
+  "failed",
+] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 export interface NotificationRecord {
   id: number;
@@ -59,6 +82,8 @@ export interface NotificationRecord {
   lastErrorCode: string | null;
   acceptedAt: string | null;
   nextAttemptAt: string;
+  deliveryStatus: DeliveryStatus | null;
+  deliveryEventAt: string | null;
   createdAt: string;
 }
 
@@ -74,6 +99,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export function fetchInquiries(status?: InquiryStatus): Promise<InquiryList> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return apiFetch<InquiryList>(`/receptionist/voice/messages${query}`);
+}
+
+/**
+ * The saved messages for ONE call. Firm scoping is the server's: the call id
+ * is matched on (firm_id, provider_call_id), so an id from another firm
+ * returns an empty list rather than someone else's messages.
+ */
+export function fetchInquiriesForCall(callId: string): Promise<InquiryList> {
+  return apiFetch<InquiryList>(`/receptionist/voice/messages?callId=${encodeURIComponent(callId)}`);
 }
 
 export function updateInquiryStatus(id: number, followUpStatus: InquiryStatus): Promise<{ message: Inquiry }> {

@@ -8,7 +8,7 @@
  * value the server asserted, and is labelled that way rather than as fact.
  */
 
-import type { UsagePeriod } from "@/lib/usageApi";
+import type { UsageChannelBucket, UsagePeriod } from "@/lib/usageApi";
 import { supportMailto } from "../support/supportContract";
 
 export const PAGE = {
@@ -34,6 +34,17 @@ export const COPY = {
 
   warningTitle: "Approaching your included minutes",
   warningDetail: "You've used most of your included minutes for this period.",
+
+  /* ── How the period's calls arrived ──────────────────────────────────────
+     Voice minutes and text-message conversations are separate allowances and
+     are never added together. This block describes the MINUTES only. */
+  channelsHeading: "How these calls arrived",
+  channelTelephone: "Phone calls",
+  channelBrowser: "Browser tests",
+  /* Both the explicit "unknown" channel and rows carrying none. Neither can
+     honestly be counted as a phone call or as a browser test. */
+  channelUnreported: "Call type not reported",
+  channelsUnavailable: "A breakdown by call type isn't available for this period.",
 
   pausedTitle: "Your receptionist is paused because the current usage limit was reached.",
   pausedAction: "Contact SiteMint to continue",
@@ -84,10 +95,41 @@ export function railMinutesLabel(usage: UsagePeriod): string {
   return usage.includedMinutes === null ? `${used} min used` : `${used} / ${usage.includedMinutes} min`;
 }
 
+/**
+ * The SMS half of the rail.
+ *
+ * This counter is NOT voice. It counts text-message (SMS) intake
+ * conversations, and it counts them for the life of the account — the trial
+ * allowance is all-time, not per billing period. It used to read simply
+ * "conversations" beside a minutes figure, which let a voice business read it
+ * as calls this month; it was neither.
+ */
 export function railSmsLabel(conversationCount: number, trialConversationsLimit: number): string {
   return trialConversationsLimit > 0
-    ? `${conversationCount} / ${trialConversationsLimit} conversations`
-    : `${conversationCount} conversations`;
+    ? `${conversationCount} / ${trialConversationsLimit} SMS conversations, all time`
+    : `${conversationCount} SMS conversations, all time`;
+}
+
+/** Whole minutes for one channel bucket. Seconds are floored, never rounded up. */
+export function channelMinutes(bucket: UsageChannelBucket | undefined): number {
+  if (!bucket) return 0;
+  return Math.floor(bucket.totalSeconds / 60);
+}
+
+/**
+ * The buckets in reading order, or null when the server produced no split.
+ * Null is not the same as a period with no calls, and the page says so.
+ */
+export function channelRows(
+  usage: Pick<UsagePeriod, "channels">,
+): ReadonlyArray<{ key: string; label: string; minutes: number; callCount: number }> | null {
+  const channels = usage.channels;
+  if (!channels) return null;
+  return [
+    { key: "telephone", label: COPY.channelTelephone, minutes: channelMinutes(channels.telephone), callCount: channels.telephone?.callCount ?? 0 },
+    { key: "browser", label: COPY.channelBrowser, minutes: channelMinutes(channels.browser), callCount: channels.browser?.callCount ?? 0 },
+    { key: "unreported", label: COPY.channelUnreported, minutes: channelMinutes(channels.unreported), callCount: channels.unreported?.callCount ?? 0 },
+  ];
 }
 
 export function everyRenderableString(): string[] {

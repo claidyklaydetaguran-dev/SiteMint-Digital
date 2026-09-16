@@ -4,6 +4,7 @@ import {
   deleteTransferContact,
   fetchAssistantCapabilities,
   fetchInquiries,
+  fetchInquiriesForCall,
   fetchNotifications,
   fetchTransferContacts,
   runTransferContactCheck,
@@ -41,6 +42,21 @@ export function useInquiries(status: InquiryStatus | "all") {
     queryKey: listKey(firmId, status) ?? UNRESOLVED_SESSION_KEY,
     queryFn: () => fetchInquiries(status === "all" ? undefined : status),
     enabled: firmId !== undefined,
+  });
+}
+
+/**
+ * The saved messages for one call, for the call record's linked-records panel.
+ * Keyed by firm AND call so one call's messages can never be served from
+ * another's cache entry.
+ */
+export function useInquiriesForCall(callId: string | undefined) {
+  const firmId = useAuthenticatedFirmId();
+  const resolved = firmId !== undefined && typeof callId === "string" && callId !== "";
+  return useQuery<InquiryList>({
+    queryKey: resolved ? [ROOT, "by-call", firmId, callId] : UNRESOLVED_SESSION_KEY,
+    queryFn: () => fetchInquiriesForCall(callId as string),
+    enabled: resolved,
   });
 }
 

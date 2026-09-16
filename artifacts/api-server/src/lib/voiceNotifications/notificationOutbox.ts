@@ -349,7 +349,10 @@ export interface PostCallSourceDeps {
 
 export function dashboardCallUrl(providerCallId: string, env: Record<string, string | undefined> = process.env): string {
   const base = (env["VOICE_DASHBOARD_BASE_URL"] ?? "").trim().replace(/\/+$/, "");
-  const path = `/ai-receptionist/dashboard/calls/${encodeURIComponent(providerCallId)}`;
+  // The dashboard mounts one call record at `/activity/calls/:id` (helpdesk
+  // lib/routes.ts `callDetail`). The old `/calls/:id` shape here matched no
+  // route, so every post-call email linked to a 404.
+  const path = `/ai-receptionist/dashboard/activity/calls/${encodeURIComponent(providerCallId)}`;
   return base.length > 0 ? `${base}${path}` : path;
 }
 

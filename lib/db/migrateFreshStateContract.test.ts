@@ -204,10 +204,22 @@ const INITIALIZED_DATABASE = {
 //                 Its companion `crm_leads.assigned_to_staff_id` is a COLUMN on
 //                 an existing table and is not in this count.
 //
+// 83: one more, additive, with no existing table altered.
+//
+//   contacts  (1): crm_companies — a company or account, modelled separately
+//                 from the people who work there (completeness criterion 1.7:
+//                 "a customer is still a lead with status Client"). A contact
+//                 points at one through the nullable `crm_leads.company_id`,
+//                 which is a COLUMN on an existing table and is not in this
+//                 count; the typed `crm_leads.company` text is kept exactly as
+//                 it was. Nothing is linked automatically — a person reviews
+//                 suggestions grouped by that text and by work email domain.
+//                 Reviewed DDL: docs/crm-ops/schema/M7-companies.sql.
+//
 // This number is a guard, not bookkeeping: it is what makes a table added
 // without review visible. Raise it only alongside the list above, so the
 // arithmetic can be checked rather than taken on trust.
-check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARREL.length}`);
+check("the shared barrel derives 83 base tables", BARREL.length === 83, `${BARREL.length}`);
 // Raised from 29 by voice migration 0008 (`voice_signup_jobs`), the registration
 // -> CRM -> email queue. The owning migration is committed and reviewed; this
 // pin is derived arithmetic over it, not an independent assertion.
@@ -216,8 +228,8 @@ check("the shared barrel derives 82 base tables", BARREL.length === 82, `${BARRE
 // 36: voice 0013 (+voice_support_requests, +voice_support_messages).
 check("the committed migrations derive 36 domain tables", DOMAIN.length === 36, `${DOMAIN.length}`);
 check(
-  "the application owns exactly 118 public tables", // 36 domain + 82 barrel
-  APPLICATION.length === 118,
+  "the application owns exactly 119 public tables", // 36 domain + 83 barrel
+  APPLICATION.length === 119,
   `${APPLICATION.length}`,
 );
 check(

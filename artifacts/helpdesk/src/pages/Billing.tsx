@@ -360,7 +360,7 @@ function UsageView({ model }: { model: UsageModel }) {
   return (
     <section className="sd-section" aria-labelledby="sb-usage-title">
       <div className="sd-section__head">
-        <h2 className="sd-h2" id="sb-usage-title">Conversation usage</h2>
+        <h2 className="sd-h2" id="sb-usage-title">SMS conversation usage</h2>
       </div>
 
       <div className="sb-usage" data-level={model.kind === "measured" ? model.level : "none"}>

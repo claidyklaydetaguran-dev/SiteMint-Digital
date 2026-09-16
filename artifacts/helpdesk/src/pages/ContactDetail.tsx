@@ -11,12 +11,15 @@ import { useSession } from "@/hooks/useSession";
 import { useContactDetail } from "@/hooks/useContacts";
 import { InlineError } from "@/components/common/InlineError";
 import { Badge } from "@/components/ui/badge";
+import { ROUTES } from "@/lib/routes";
 import {
   DETAIL,
+  INQUIRIES,
+  NAME_FROM_INQUIRY_NOTE,
   callSummaryLabel,
-  contactDisplayName,
   conversationSummaryLabel,
   dispositionLabel,
+  resolvedContactName,
   sourceLabel,
 } from "@/pages/contacts/contactsContract";
 import { relativeTime } from "@/lib/conversationUi";
@@ -78,6 +81,10 @@ export default function ContactDetail() {
   }
 
   const { contact, calls, conversations } = data;
+  // A contact with no stored name may still have given one on a call. That
+  // name is quoted from a saved message, never inferred, and is labelled.
+  const resolved = resolvedContactName(contact, data.callerNameFromInquiry);
+  const inquiries = data.inquiries ?? [];
 
   return (
     <div className="sd-page sd-enter">
@@ -86,8 +93,9 @@ export default function ContactDetail() {
       <div className="sd-page__head">
         <div>
           <span className="sd-eyebrow">ACTIVITY</span>
-          <h1 className="sd-page__title">{contactDisplayName(contact)}</h1>
+          <h1 className="sd-page__title">{resolved.name}</h1>
           <p className="sd-page__meta">{contact.phone}</p>
+          {resolved.fromInquiry && <p className="sd-page__meta">{NAME_FROM_INQUIRY_NOTE}</p>}
         </div>
         {contact.optedOut && <Badge variant="outline">{DETAIL.optedOutLabel}: {DETAIL.optedOutTrue}</Badge>}
       </div>
@@ -125,6 +133,25 @@ export default function ContactDetail() {
               <li className="sd-list__item" key={call.callId}>
                 <Link href={`/logs/${encodeURIComponent(call.callId)}`} className="sd-row">
                   <span className="sd-row__who">{callSummaryLabel(call)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Reached through this contact's own calls by foreign key — a saved
+          message matches on (firm, call id), never on a caller's name. */}
+      <section className="sd-section" aria-labelledby="contact-inquiries-h">
+        <h2 className="sd-h2" id="contact-inquiries-h">{INQUIRIES.heading}</h2>
+        {inquiries.length === 0 ? (
+          <p className="sd-empty__detail">{INQUIRIES.empty}</p>
+        ) : (
+          <ul className="sd-list">
+            {inquiries.map((inquiry) => (
+              <li className="sd-list__item" key={inquiry.id}>
+                <Link href={ROUTES.inquiries} className="sd-row">
+                  <span className="sd-row__who">{inquiry.topic}</span>
                 </Link>
               </li>
             ))}

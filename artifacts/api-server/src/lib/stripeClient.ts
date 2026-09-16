@@ -1,11 +1,39 @@
 import Stripe from "stripe";
 import { StripeSync } from "stripe-replit-sync";
 
+export const STRIPE_SECRET_KEY_ENV_VAR = "STRIPE_SECRET_KEY";
+export const STRIPE_WEBHOOK_SECRET_ENV_VAR = "STRIPE_WEBHOOK_SECRET";
+
 /**
- * Fetches Stripe credentials from the Replit connection API.
+ * Credentials from the environment, when they are there.
+ *
+ * The Replit connector is the production path and stays the default. This
+ * fallback exists because billing could not be exercised anywhere else: with no
+ * connector, creating a checkout session failed with a 500 that said nothing
+ * about configuration, so a test-mode run outside Replit was impossible. A
+ * plain test key in the environment now answers the same question.
+ *
+ * Only the presence of the key is ever reported; the value is never logged,
+ * returned to a caller, or included in an error message.
+ */
+export function readStripeCredentialsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): { secretKey: string; webhookSecret?: string } | null {
+  const secretKey = (env[STRIPE_SECRET_KEY_ENV_VAR] ?? "").trim();
+  if (secretKey.length === 0) return null;
+  const webhookSecret = (env[STRIPE_WEBHOOK_SECRET_ENV_VAR] ?? "").trim();
+  return webhookSecret.length > 0 ? { secretKey, webhookSecret } : { secretKey };
+}
+
+/**
+ * Fetches Stripe credentials: the environment first when it carries a key,
+ * otherwise the Replit connection API.
  * Not cached -- tokens can rotate, so fetch fresh each time.
  */
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
+  const fromEnv = readStripeCredentialsFromEnv();
+  if (fromEnv) return fromEnv;
+
   const hostname = process.env["REPLIT_CONNECTORS_HOSTNAME"];
   const xReplitToken = process.env["REPL_IDENTITY"]
     ? "repl " + process.env["REPL_IDENTITY"]
@@ -15,8 +43,9 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
 
   if (!hostname || !xReplitToken) {
     throw new Error(
-      "Missing Replit environment variables. " +
-        "Ensure the Stripe integration is connected via the Integrations tab.",
+      "Stripe is not configured: no STRIPE_SECRET_KEY in the environment, and " +
+        "no Replit connection is available. Either set the key or connect Stripe " +
+        "via the Integrations tab.",
     );
   }
 

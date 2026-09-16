@@ -56,6 +56,46 @@ rewriting their line endings locks every migration command out
 9. **Confirm the record.** `node apply-release-<tag>.mjs --verify-only` passes,
    and the ledger names the commit.
 
+## The production release (decided 2026-09-16)
+
+Production is the **Web Asset Builder** app, serving `sitemintdigital.com`
+through the SiteMint-Digital marketing proxy. It differs from staging in three
+ways that change the steps above:
+
+- **It has a git remote.** Steps 3–5 (package, transfer, apply) are not used
+  there: the workspace fetches the pushed commit. The packager stays the tool
+  for staging, which has no remote.
+- **It ships the CRM from the same api-server.** The release is therefore the
+  merge of both branches on `release/sitemint-production-2026-09-16`, and one
+  session holds the deploy lock (Secrets, schema upgrade, build, Publish) so two
+  sessions can never write to production at once.
+- **Its database has never held this schema.** The upgrade is generated from
+  production's real catalog and rehearsed on a restored copy before anything is
+  applied. The receptionist side needs voice `0000`–`0013` and scheduling
+  `0000`–`0003`; the discovery migration cannot be replayed there, because
+  production already has the 15 columns it adds, so its two missing tables and
+  its journal row are handled explicitly rather than by running it.
+
+Four things must be true before Publish, each recorded with its evidence in the
+ledger:
+
+1. `CORS_ALLOWED_ORIGINS` is set. It is the only value read at module load: the
+   API refuses to start in production without it.
+2. The schema upgrade has been applied. Start-up runs only Stripe's own
+   migration step, and the workers start immediately after.
+3. `ADMIN_PASSWORD` exists, or no first staff owner can be created.
+4. `CRM_EMAIL_TEST_MODE=false`, or production mail is only simulated.
+
+Everything else in the receptionist's configuration is read at the moment it is
+used, so a missing value is a clean refusal rather than a crash — but each
+GROUP must be set completely or left off: the webhook attachment
+(`VOICE_WEBHOOK_ATTACH_ENABLED`, `VOICE_SERVER_URL`, `VAPI_WEBHOOK_CREDENTIAL_ID`),
+the tools attachment (`VOICE_TOOLS_ATTACH_ENABLED`, `VOICE_TOOLS_CAPABILITIES`),
+and email (`VOICE_ALERTS_ENABLED`, `VOICE_ALERTS_FROM`, `VOICE_ALERTS_TO`,
+`RESEND_API_KEY`). Half a group fails at the first publish or the first email.
+`VOICE_ARTIFACT_POLICY=none` must be set before any assistant is published, and
+`VOICE_TOOLS_CAPABILITIES` keeps `transfer` out until a live call has proved it.
+
 ## Rollback
 
 Code: package a release `--from <current> --to <previous commit>` and apply it,

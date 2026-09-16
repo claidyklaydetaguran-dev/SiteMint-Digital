@@ -93,6 +93,33 @@ export const DETAIL = {
   openConversation: "Open conversation",
 } as const;
 
+/* ── Saved messages reached through this contact's calls ────────────────── */
+
+export const INQUIRIES = {
+  heading: "Saved messages",
+  empty: "No messages were saved from this contact's calls.",
+} as const;
+
+/**
+ * A name a CALLER gave on one of this contact's own calls, used only when the
+ * contact record carries none. It is a quoted value from a saved message, not
+ * an inference, and it is labelled as such so nobody reads it as the
+ * contact's stored name.
+ */
+export const NAME_FROM_INQUIRY_NOTE =
+  "Name taken from a message this caller left. It is not saved on the contact.";
+
+export function resolvedContactName(
+  contact: Pick<ContactSummary, "name">,
+  callerNameFromInquiry: string | null | undefined,
+): { name: string; fromInquiry: boolean } {
+  const own = typeof contact.name === "string" ? contact.name.trim() : "";
+  if (own !== "") return { name: own, fromInquiry: false };
+  const quoted = typeof callerNameFromInquiry === "string" ? callerNameFromInquiry.trim() : "";
+  if (quoted !== "") return { name: quoted, fromInquiry: true };
+  return { name: LIST.unnamed, fromInquiry: false };
+}
+
 export function callSummaryLabel(call: ContactCallRef): string {
   return `${new Date(call.startedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} — ${call.state}`;
 }
@@ -108,8 +135,11 @@ export function everyRenderableString(): string[] {
     ...Object.values(PAGE),
     ...Object.values(LIST).filter((v): v is string => typeof v === "string"),
     ...Object.values(DETAIL),
+    ...Object.values(INQUIRIES),
+    NAME_FROM_INQUIRY_NOTE,
     ...(["voice", "sms", "manual", "unknown"] as const).map((s) => sourceLabel(s)),
     dispositionLabel(null),
     contactDisplayName({ name: null }),
+    resolvedContactName({ name: null }, null).name,
   ];
 }

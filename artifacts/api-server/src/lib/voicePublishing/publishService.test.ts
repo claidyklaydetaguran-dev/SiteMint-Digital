@@ -699,7 +699,11 @@ describe("duplicate activation", () => {
     const d = deps({ repository, provider });
 
     void publishAssistant(FIRM_ID, ASSISTANT_ID, d);
-    await Promise.resolve();
+    // Wait for the provider call to actually begin rather than for a fixed
+    // number of microtasks: the publish path legitimately resolves this firm's
+    // own capabilities before it reaches the provider, and that is not a
+    // property this test is about.
+    await provider.createEntered;
     const second = await publishAssistant(FIRM_ID, ASSISTANT_ID, d);
 
     expect(provider.createCallCount).toBe(1);

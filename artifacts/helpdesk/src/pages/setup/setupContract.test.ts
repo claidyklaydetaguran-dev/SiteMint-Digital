@@ -299,8 +299,15 @@ console.log("\n--- progress is actually recorded (the client speaks the route's 
     /JSON\.stringify\(\{ step: update\.step, status: update\.status \}\)/.test(clientSrc),
   );
   check(
+    // What matters is what is SENT. The client still has a `steps` map in the
+    // shape it READS back (the saved state) and in its empty default, so the
+    // check looks inside the request bodies rather than anywhere in the file —
+    // an earlier version failed on that default and said nothing true about
+    // the defect.
     "and no longer sends a `steps` map the route cannot read",
-    !/steps:\s*\{/.test(clientSrc) && !/\{ steps: patch \}/.test(apiSrc),
+    !/body:\s*JSON\.stringify\(\{[^}]*steps/.test(clientSrc) &&
+      !/JSON\.stringify\(\{\s*steps/.test(clientSrc) &&
+      !/\{ steps: patch \}/.test(apiSrc),
   );
   check(
     "one request per step, so a partial failure is attributable",

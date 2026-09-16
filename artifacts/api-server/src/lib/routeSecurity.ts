@@ -68,6 +68,14 @@ const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
   // with the legacy admin_session cookie as a fallback for a request carrying
   // no live staff session. Same class, for the same reason.
   [/\brequireOperator\s*\(/, "admin"],
+  // `requireStaffSessionForCsrfReissue()` (lib/staffAuth.ts) — the gate on the
+  // one staff route that cannot demand a CSRF token, because issuing a fresh
+  // one to a live session is its whole job. It resolves the crm_staff_session
+  // cookie exactly as requireStaff does, and stands the custom-header, Origin
+  // and per-session limits of lib/csrfRecovery.ts where the token check would
+  // be. The token it returns grants nothing by itself: every other staff route
+  // still runs the full gate, MFA included.
+  [/\brequireStaffSessionForCsrfReissue\s*\(/, "staff"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
   // `requirePortalAuth()` — resolves the `crm_portal_session` cookie, enforces
@@ -75,6 +83,9 @@ const CHAIN_SIGNALS: Array<[RegExp, Protection]> = [
   // belongs to. Its own class because it is neither of the other two: it is not
   // a staff member with permissions, and it is not an intake_firms row.
   [/\brequirePortalAuth\s*\(/, "portal"],
+  // `requirePortalSessionForCsrfReissue()` (lib/portalAuth.ts) — the portal's
+  // counterpart: a live crm_portal_session and the same cross-site checks.
+  [/\brequirePortalSessionForCsrfReissue\s*\(/, "portal"],
   [/\bvalidateTwilioWebhook\b/, "signature"],
   [/\bvalidateIntakeTwilioSignature\b/, "signature"],
 ];
@@ -84,9 +95,11 @@ const BODY_SIGNALS: Array<[RegExp, Protection]> = [
   [/\brequireStaff\s*\(/, "staff"],
   [/\brequireCrmAuth\s*\(/, "admin"],
   [/\brequireOperator\s*\(/, "admin"],
+  [/\brequireStaffSessionForCsrfReissue\s*\(/, "staff"],
   [/\brequireAdmin\b/, "admin"],
   [/\brequireReceptionistAuth\b/, "session"],
   [/\brequirePortalAuth\s*\(/, "portal"],
+  [/\brequirePortalSessionForCsrfReissue\s*\(/, "portal"],
   [/\bauthenticateVapiWebhook\b/, "signature"],
   [/\bverifyTwilioSignature\b/, "signature"],
   [/\bverifyStripeSignature\b/, "signature"],

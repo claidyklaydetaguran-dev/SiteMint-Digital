@@ -1,13 +1,14 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms, isCrmTaskDueKind, crmContactMerges } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms, isCrmTaskDueKind, crmContactMerges, crmCompanies } from "@workspace/db";
 import { voiceSignupJobs } from "@workspace/db/schema/voice";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
-import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray, type SQL } from "drizzle-orm";
+import { eq, desc, and, gte, lte, lt, or, ilike, isNull, sql, inArray, getTableColumns, type SQL } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { loadOwnerCandidates, resolveAssignmentFields } from "../lib/leadAssignee.js";
 import { explainOwnerMatch, matchOwner, ownerKey, trimOwnerValue } from "../lib/leadOwnerRules.js";
+import { positiveId, readCompanyIdChange } from "../lib/companies.js";
 import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
@@ -57,6 +58,23 @@ async function logActivity(
   await db.insert(crmActivities).values({
     leadId, type, title, description, metadata, createdBy: actorLabel(req),
   });
+}
+
+/**
+ * True when a Postgres foreign-key violation names this constraint.
+ *
+ * Walks the `cause` chain because drizzle wraps the driver error in a
+ * `DrizzleQueryError` whose own message is the SQL, not the violation — the
+ * same shape `isUniqueViolation` in crmMarketing.ts handles.
+ */
+function violatesForeignKey(err: unknown, constraint: string): boolean {
+  let cursor: unknown = err;
+  for (let depth = 0; cursor && typeof cursor === "object" && depth < 6; depth += 1) {
+    const e = cursor as { code?: unknown; constraint?: unknown; message?: unknown; cause?: unknown };
+    if (e.code === "23503" && (e.constraint === constraint || String(e.message ?? "").includes(constraint))) return true;
+    cursor = e.cause;
+  }
+  return false;
 }
 
 // ── Settings status ───────────────────────────────────────────────────────────
@@ -228,7 +246,7 @@ router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Reque
 // ── Leads list ────────────────────────────────────────────────────────────────
 router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { search, status, priority, source } = req.query as Record<string, string>;
+    const { search, status, priority, source, companyId } = req.query as Record<string, string>;
     // A contact that has been merged into another one is not part of the book
     // any more. It is RETAINED rather than deleted (destroying a contact needs
     // `leads.delete`, which is owner-only), so the list has to exclude it here
@@ -243,13 +261,38 @@ router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
         ilike(crmLeads.email, `%${search}%`),
         ilike(crmLeads.company, `%${search}%`),
         ilike(crmLeads.phone, `%${search}%`),
+        // M7: a contact whose own company text is blank is still findable by
+        // the company they are linked to.
+        ilike(crmCompanies.name, `%${search}%`),
       )!);
     }
     if (status) conditions.push(eq(crmLeads.status, status));
     if (priority) conditions.push(eq(crmLeads.priority, priority));
     if (source) conditions.push(eq(crmLeads.source, source));
+    // M7: "who works at this company", and its negation. A value that is
+    // neither an id nor "none" is refused rather than ignored — silently
+    // returning the whole book for a bad filter is how a list lies.
+    if (companyId !== undefined && companyId !== "") {
+      if (companyId === "none") {
+        conditions.push(isNull(crmLeads.companyId));
+      } else {
+        const linkedTo = positiveId(companyId);
+        if (linkedTo === null) {
+          res.status(400).json({ error: "companyId must be a company's id, or \"none\" for contacts with no company." });
+          return;
+        }
+        conditions.push(eq(crmLeads.companyId, linkedTo));
+      }
+    }
 
-    const leads = await db.select().from(crmLeads)
+    // The company's NAME travels with every contact, so the list can show the
+    // company record rather than only the typed text.
+    const leads = await db.select({
+      ...getTableColumns(crmLeads),
+      companyName: crmCompanies.name,
+      companyArchivedAt: crmCompanies.archivedAt,
+    }).from(crmLeads)
+      .leftJoin(crmCompanies, eq(crmCompanies.id, crmLeads.companyId))
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(crmLeads.createdAt));
     res.json({ leads });
@@ -304,8 +347,26 @@ router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) =
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
-    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+    // M7: the linked company travels with the contact, so the record shows the
+    // company as a link rather than an id. `companyName` is the same field the
+    // contact list carries, so both surfaces read it the same way.
+    const [row] = await db.select({
+      ...getTableColumns(crmLeads),
+      companyName: crmCompanies.name,
+      companyDomain: crmCompanies.domain,
+      companyWebsite: crmCompanies.website,
+      companyArchivedAt: crmCompanies.archivedAt,
+    }).from(crmLeads)
+      .leftJoin(crmCompanies, eq(crmCompanies.id, crmLeads.companyId))
+      .where(eq(crmLeads.id, id));
+    if (!row) { res.status(404).json({ error: "Lead not found" }); return; }
+    const { companyDomain, companyWebsite, ...lead } = row;
+    const linkedCompany = lead.companyId != null
+      ? {
+        id: lead.companyId, name: lead.companyName, domain: companyDomain,
+        website: companyWebsite, archivedAt: lead.companyArchivedAt,
+      }
+      : null;
 
     const [activities, tasks, mergedInto] = await Promise.all([
       db.select().from(crmActivities).where(eq(crmActivities.leadId, id)).orderBy(desc(crmActivities.createdAt)),
@@ -319,7 +380,7 @@ router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) =
         .from(crmContactMerges).where(eq(crmContactMerges.mergedLeadId, id)).limit(1),
     ]);
 
-    res.json({ lead, activities, tasks, mergedInto: mergedInto[0] ?? null });
+    res.json({ lead, activities, tasks, mergedInto: mergedInto[0] ?? null, linkedCompany });
   } catch (err) {
     req.log.error({ err }, "Error fetching lead");
     res.status(500).json({ error: "Failed to fetch lead" });
@@ -341,6 +402,50 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
       "discoveryFormStatus","proposalStatus","sowStatus"];
     for (const f of fields) {
       if (data[f] !== undefined) updates[f] = data[f];
+    }
+
+    // ── M7: the company link ────────────────────────────────────────────────
+    //
+    // Decided and validated before anything is written. `leads.write` is
+    // asserted here rather than on the route, because this route's legacy gate
+    // is signed-in-only and every other field keeps that behaviour; the legacy
+    // shared bearer carries no grants to check and keeps the access it had.
+    // `company` (the typed text) is untouched by this: a contact can be linked
+    // to "Acme Ltd" while its text still says whatever was recorded.
+    const companyChange = readCompanyIdChange(data);
+    if (companyChange.kind === "invalid") {
+      res.status(400).json({ error: companyChange.error, field: "companyId" });
+      return;
+    }
+    const companyChanging = companyChange.kind === "set" && companyChange.companyId !== existing.companyId;
+    let nextCompany: { id: number; name: string } | null = null;
+    let previousCompanyName: string | null = null;
+    if (companyChanging && companyChange.kind === "set") {
+      if (req.staffAuth && !req.staffAuth.permissions.has("leads.write")) {
+        res.status(403).json({ error: "You do not have permission to change contacts.", permission: "leads.write" });
+        return;
+      }
+      if (companyChange.companyId !== null) {
+        const [target] = await db.select({
+          id: crmCompanies.id, name: crmCompanies.name, archivedAt: crmCompanies.archivedAt,
+        }).from(crmCompanies).where(eq(crmCompanies.id, companyChange.companyId)).limit(1);
+        if (!target) { res.status(400).json({ error: "That company does not exist.", field: "companyId" }); return; }
+        if (target.archivedAt) {
+          res.status(409).json({
+            code: "company_archived",
+            error: `${target.name} is archived. Restore it before linking people to it.`,
+            field: "companyId",
+          });
+          return;
+        }
+        nextCompany = { id: target.id, name: target.name };
+      }
+      if (existing.companyId !== null) {
+        const [before] = await db.select({ name: crmCompanies.name })
+          .from(crmCompanies).where(eq(crmCompanies.id, existing.companyId)).limit(1);
+        previousCompanyName = before?.name ?? null;
+      }
+      updates["companyId"] = companyChange.companyId;
     }
     // M6: the owner is never copied from the body as a bare column. Both owner
     // columns come from one decision — the picker's staff id, or a name resolved
@@ -372,8 +477,37 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
     }
 
     const [updated] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
+
+    // M7: linking somebody to their employer is a change worth seeing on the
+    // contact's own timeline and in the audit trail — it is how the company
+    // record came to have the people it has.
+    if (companyChanging) {
+      const linked = nextCompany !== null;
+      await logActivity(
+        req, id,
+        linked ? "company_linked" : "company_unlinked",
+        linked ? `Linked to ${nextCompany!.name}` : `Unlinked from ${previousCompanyName ?? `company #${existing.companyId}`}`,
+        linked && previousCompanyName ? `Previously linked to ${previousCompanyName}.` : undefined,
+        { companyId: nextCompany?.id ?? null, previousCompanyId: existing.companyId },
+      );
+      await auditAction(
+        req,
+        linked ? "contact.company.linked" : "contact.company.unlinked",
+        `lead:${id} company:${linked ? nextCompany!.id : existing.companyId}`,
+      );
+    }
+
     res.json({ lead: updated });
   } catch (err) {
+    // The company was deleted between the check above and this write. It is a
+    // stale screen, not a server fault, and it says which.
+    if (violatesForeignKey(err, "crm_leads_company_id_crm_companies_id_fk")) {
+      res.status(409).json({
+        code: "company_gone",
+        error: "That company was deleted while you were editing this contact. Reload and choose another.",
+      });
+      return;
+    }
     req.log.error({ err }, "Error updating lead");
     res.status(500).json({ error: "Failed to update lead" });
   }
