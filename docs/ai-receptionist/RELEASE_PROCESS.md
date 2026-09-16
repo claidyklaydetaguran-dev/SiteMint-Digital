@@ -56,6 +56,28 @@ rewriting their line endings locks every migration command out
 9. **Confirm the record.** `node apply-release-<tag>.mjs --verify-only` passes,
    and the ledger names the commit.
 
+## Snapshot releases (staging, 2026-09-16)
+
+The repository stores files with CRLF and the staging workspace holds LF copies,
+so a `git diff` patch can be refused even when every file is right.
+`scripts/release/package-site.mjs` ships a snapshot instead, for two sets:
+`--set release` (the API, dashboard and database package above) and
+`--set site` (the marketing site and signup pages, which the patch release never shipped).
+
+1. `node scripts/release/package-site.mjs probe --set <set> --to <commit>` → upload and run
+   the probe from `~/workspace`. It is read-only and prints the indices of files that differ.
+2. Confirm the list: compute the same indices locally and compare a sha256 of the list,
+   rather than transcribing hundreds of numbers from a terminal.
+3. `node scripts/release/package-site.mjs pack --set <set> --to <commit> --need <indices>` →
+   upload and run `apply-<set>-<tag>.mjs <payload>`. It writes only the differing files,
+   removes stale source files, verifies every file, and records `.release/SOURCE.json`
+   (release) or `.release/SITE.json` (site).
+
+Content is compared with carriage returns ignored. Migration SQL keeps repository bytes and
+is written only when missing: the applier refuses to rewrite an existing migration file,
+because its bytes are what the journal hashed. `.replitignore` excludes `backups/` and
+`.relstage/`, so database dumps and release payloads never ship in a deployment image.
+
 ## The production release (decided 2026-09-16)
 
 Production is the **Web Asset Builder** app, serving `sitemintdigital.com`
