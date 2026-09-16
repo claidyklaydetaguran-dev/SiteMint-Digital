@@ -1,6 +1,6 @@
 # Verified completeness
 
-> **Generated** from `docs/crm-ops/completeness/criteria.json` and `pages.json` by `render.ts` — do not edit by hand. As of 2026-09-15.
+> **Generated** from `docs/crm-ops/completeness/criteria.json` and `pages.json` by `render.ts` — do not edit by hand. As of 2026-09-16.
 
 ## Method
 
@@ -13,15 +13,15 @@
 
 ## Table 1 — the 18 core feature areas
 
-**131 / 150 criteria = 87.3% verified.** At the real provider: 8. In production: **0**.
+**132 / 150 criteria = 88.0% verified.** At the real provider: 8. In production: **0**.
 
-By status: Passed 131 · Built, not proven 1 · Not passed 17 · Deferred by decision 1.
+By status: Passed 132 · Built, not proven 1 · Not passed 16 · Deferred by decision 1.
 
 The denominator is 143 baseline criteria plus 7 added from the owner's brief after the baseline was set; each is listed under "Criteria added after the baseline" with its reason.
 
 | # | Area | Passed / total | % | Verified in | In production | What is not passed |
 |---|---|---|---|---|---|---|
-| 1 | Contact management | 6 / 7 | **85.7%** | L, T | 0 | 1.7 Companies/accounts are modelled separately from the people who work there |
+| 1 | Contact management | 7 / 7 | **100.0%** | L, T | 0 | — |
 | 2 | Lead management | 6 / 6 | **100.0%** | L, T | 0 | — |
 | 3 | Sales pipeline | 7 / 7 | **100.0%** | L, T | 0 | — |
 | 4 | Customer communication | 7 / 9 | **77.8%** | L, T, R | 0 | 4.8 Inbound replies arrive through the real provider; 4.9 Delivery events from the real provider update message state |
@@ -147,7 +147,7 @@ By status: Passed 144 · Built, not proven 166 · Not passed 2 · Deferred by de
 | 1.4 | CSV import previews before committing, maps columns explicitly, reports per-row errors and does not duplicate on re-import | Passed | L, T | crmContacts.test.ts (25 tests, 7 deliberate mutations caught); browser walk: 2 created / 2 failed with reasons |
 | 1.5 | CSV export respects the current selection and is permission-gated | Passed | L, T | Export gated on data.export; formula-injection neutralised; crmContacts.test.ts |
 | 1.6 | Likely duplicates are found and merged without losing history, with durable dismissal | Passed | L, T | /admin/crm/duplicates found 10 real pairs; merge repoints 12 history sources and deletes nothing |
-| 1.7 | Companies/accounts are modelled separately from the people who work there | Not passed | — | Not built: a customer is still a lead with status Client |
+| 1.7 | Companies/accounts are modelled separately from the people who work there | Passed | T | Companies are their own records: crm_companies with contacts linked through company_id, not a lead status. routes/crmCompanies.test.ts 22/22 and lib/companies.test.ts 26/26 on 9eeb441, against a real database — covering creation with domain normalisation, duplicate warning, linking and unlinking a contact, counts that exclude a merged-away person, deals/projects/tickets/quotes/invoices derived through its people, archive, refusal to delete a company that still has people, and the company link carried through a contact merge. Not yet measured in a browser. |
 
 ### 2. Lead management
 
