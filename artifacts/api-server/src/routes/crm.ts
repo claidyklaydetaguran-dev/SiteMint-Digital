@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, intakeFirms, isCrmTaskDueKind, crmContactMerges, crmCompanies } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, CRM_PRIORITIES, CRM_SOURCES, intakeFirms, isCrmTaskDueKind, crmContactMerges, crmCompanies } from "@workspace/db";
 import { voiceSignupJobs } from "@workspace/db/schema/voice";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
@@ -9,6 +9,7 @@ import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { loadOwnerCandidates, resolveAssignmentFields } from "../lib/leadAssignee.js";
 import { explainOwnerMatch, matchOwner, ownerKey, trimOwnerValue } from "../lib/leadOwnerRules.js";
 import { positiveId, readCompanyIdChange } from "../lib/companies.js";
+import { coerceEnum, LEGACY_STATUS } from "../lib/contactImport.js";
 import { fireAutomation } from "../lib/automationTriggers.js";
 import { syncTaskReminder } from "../lib/crmScheduler.js";
 import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
@@ -324,11 +325,65 @@ router.get("/crm/leads", requireCrmAuth("leads.read"), async (req: Request, res:
   }
 });
 
+// ── The lead vocabularies, decided at the door ────────────────────────────────
+//
+// `status`, `priority` and `source` are enumerations, and all three were written
+// with `String(data.x)` and no check at all. Measured 2026-09-16: a POST with
+// status "not-a-real-status" returned 201 and STORED it verbatim, and the lead
+// then appeared in NO pipeline column — the board groups by CRM_STATUSES, so a
+// value outside that set is filed nowhere and reachable nowhere. Priority and
+// source stored their nonsense the same way.
+//
+// The update door was the worse of the two: it also wrote a "status_changed"
+// activity naming the bad value and fired `lead_status_changed` carrying it, so
+// a single bad write propagated into the contact's history and into automation
+// rules rather than merely sitting mis-filed.
+//
+// Legacy spellings are MAPPED, not refused, because they are real: the locked
+// `leadScore.ts` engine still branches on "Contacted", "Negotiating" and
+// "Nurture", and older exports carry them. The map is the CSV importer's own
+// (`lib/contactImport.ts`), reused rather than copied — the vocabulary already
+// had three copies, and a fourth is how they drift apart.
+//
+// Anything else is refused, naming the values that are accepted. A CSV row is a
+// bulk action where filing it and reporting the substitution is kinder; a single
+// API write is one caller making one mistake, and saying so is the honest answer.
+const LEAD_ENUMS = [
+  { field: "status", valid: new Set<string>(CRM_STATUSES), legacy: LEGACY_STATUS, all: CRM_STATUSES as readonly string[] },
+  { field: "priority", valid: new Set<string>(CRM_PRIORITIES), legacy: null, all: CRM_PRIORITIES as readonly string[] },
+  { field: "source", valid: new Set<string>(CRM_SOURCES), legacy: null, all: CRM_SOURCES as readonly string[] },
+] as const;
+
+type LeadEnumResult =
+  | { kind: "ok"; values: Record<string, string> }
+  | { kind: "error"; field: string; error: string };
+
+function readLeadEnums(data: Record<string, unknown>): LeadEnumResult {
+  const values: Record<string, string> = {};
+  for (const spec of LEAD_ENUMS) {
+    const raw = data[spec.field];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const { value } = coerceEnum(String(raw), spec.valid, spec.legacy);
+    if (value === null) {
+      return {
+        kind: "error",
+        field: spec.field,
+        error: `"${String(raw)}" is not a ${spec.field} this CRM uses. One of: ${spec.all.join(" · ")}.`,
+      };
+    }
+    values[spec.field] = value;
+  }
+  return { kind: "ok", values };
+}
+
 // ── Create lead ───────────────────────────────────────────────────────────────
 router.post("/crm/leads", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const data = req.body as Record<string, unknown>;
     if (!data.name || !data.email) { res.status(400).json({ error: "Name and email are required" }); return; }
+
+    const enums = readLeadEnums(data);
+    if (enums.kind === "error") { res.status(400).json({ error: enums.error, field: enums.field }); return; }
 
     // M6: the owner is written as both columns, decided in one place — the
     // picker's staff id, or a name resolved once through the matching rules.
@@ -341,10 +396,10 @@ router.post("/crm/leads", requireCrmAuth("leads.write"), async (req: Request, re
       company: data.company ? String(data.company) : undefined,
       phone: data.phone ? String(data.phone) : undefined,
       website: data.website ? String(data.website) : undefined,
-      source: data.source ? String(data.source) : "Manual Entry",
+      source: enums.values["source"] ?? "Manual Entry",
       serviceInterest: data.serviceInterest ? String(data.serviceInterest) : undefined,
-      status: data.status ? String(data.status) : "New Inquiry",
-      priority: data.priority ? String(data.priority) : "Medium",
+      status: enums.values["status"] ?? "New Inquiry",
+      priority: enums.values["priority"] ?? "Medium",
       assignedTo: owner.kind === "set" ? owner.assignedTo : undefined,
       assignedToStaffId: owner.kind === "set" ? owner.assignedToStaffId : undefined,
       tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
@@ -419,8 +474,16 @@ router.patch("/crm/leads/:id", requireCrmAuth("leads.write"), async (req: Reques
 
     const data = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    const fields = ["name","company","email","website","source","serviceInterest",
-      "priority","notes","estimatedValue","packageType",
+
+    // The three enumerations are decided before anything else is copied, so a
+    // refused value stops the write instead of reaching the row, the activity
+    // log and the automation rules.
+    const enums = readLeadEnums(data);
+    if (enums.kind === "error") { res.status(400).json({ error: enums.error, field: enums.field }); return; }
+    for (const [f, v] of Object.entries(enums.values)) updates[f] = v;
+
+    const fields = ["name","company","email","website","serviceInterest",
+      "notes","estimatedValue","packageType",
       "discoveryFormStatus","proposalStatus","sowStatus"];
     for (const f of fields) {
       if (data[f] !== undefined) updates[f] = data[f];
@@ -489,10 +552,11 @@ router.patch("/crm/leads/:id", requireCrmAuth("leads.write"), async (req: Reques
     if (data.lastContactedAt !== undefined) updates.lastContactedAt = data.lastContactedAt ? new Date(String(data.lastContactedAt)) : null;
 
     const prevStatus = existing.status;
-    if (data.status !== undefined && data.status !== prevStatus) {
-      updates.status = data.status;
-      await logActivity(req, id, "status_changed", `Status changed to ${data.status}`, `From: ${prevStatus} → To: ${data.status}`, { from: prevStatus, to: data.status });
-      fireAutomation({ trigger: "lead_status_changed", payload: { recordId: id, from: prevStatus ?? null, to: String(data.status) } });
+    const nextStatus = enums.values["status"];
+    if (nextStatus !== undefined && nextStatus !== prevStatus) {
+      updates.status = nextStatus;
+      await logActivity(req, id, "status_changed", `Status changed to ${nextStatus}`, `From: ${prevStatus} → To: ${nextStatus}`, { from: prevStatus, to: nextStatus });
+      fireAutomation({ trigger: "lead_status_changed", payload: { recordId: id, from: prevStatus ?? null, to: nextStatus } });
     }
     if (data.nextFollowUpAt !== undefined && String(data.nextFollowUpAt) !== String(existing.nextFollowUpAt)) {
       await logActivity(req, id, "follow_up_changed", `Follow-up set for ${new Date(String(data.nextFollowUpAt)).toLocaleDateString()}`);
