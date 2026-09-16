@@ -42,20 +42,52 @@ suite("a real call saves information (real DB)", () => {
     repo = await import("./realCallsRepository.js");
 
     // provider_webhook_events and voice_assistants come from voice migration
-    // 0000. drizzle-kit push does not apply versioned migrations, so a
-    // push-built database lacks them and every test below would die on its
-    // first insert with a raw driver error naming neither cause nor fix.
+    // 0000. Two different faults land here and they have different fixes: the
+    // table is absent (a push-built database — drizzle-kit push does not apply
+    // versioned migrations), or the table is present but lacks a column a later
+    // migration added, since drizzle selects every column the schema declares.
     //
-    // This throws rather than skipping, deliberately: a skip would also swallow
-    // a genuinely missing table, and a suite that ran nothing is not a pass.
-    try {
-      await db.select().from(voice.providerWebhookEvents).limit(1);
-      await db.select().from(voice.voiceAssistants).limit(1);
-    } catch {
-      throw new Error(
-        "provider_webhook_events / voice_assistants are missing from CRM_TEST_DATABASE_URL. They come from voice migration 0000, which drizzle-kit push does not apply, so this database looks push-built. Build it with migrate:fresh, or run the voice migrations against it, and re-run.",
-      );
-    }
+    // Probing `id` — present since 0000 — before the full select is what tells
+    // those apart. The first version of this guard caught both, and everything
+    // else, and reported "missing" for all of them while discarding the real
+    // error unbound, so it confidently named the wrong cause on a database whose
+    // tables were in fact present. A true observation with an assumed cause
+    // attached to it is worse than no guard: it sends the reader somewhere else.
+    //
+    // It still throws rather than skipping, deliberately: a skip would also
+    // swallow a genuinely missing table, and a suite that ran nothing is not a
+    // pass.
+    const requireTable = async (
+      name: string,
+      probeId: () => Promise<unknown>,
+      probeAllColumns: () => Promise<unknown>,
+    ) => {
+      try {
+        await probeId();
+      } catch (error) {
+        throw new Error(
+          `${name} could not be read from CRM_TEST_DATABASE_URL at all, so it is most likely absent. It comes from voice migration 0000, which drizzle-kit push does not apply — a push-built database will not have it. Rebuild with migrate:fresh, or apply the voice migrations, and re-run. The database's own error was: ${String(error)}`,
+        );
+      }
+      try {
+        await probeAllColumns();
+      } catch (error) {
+        throw new Error(
+          `${name} EXISTS in CRM_TEST_DATABASE_URL but is missing at least one column this code declares — that database is behind the schema, not lacking the table. Apply the outstanding voice migrations to it, or rebuild it with migrate:fresh, and re-run. The database's own error was: ${String(error)}`,
+        );
+      }
+    };
+
+    await requireTable(
+      "provider_webhook_events",
+      () => db.select({ id: voice.providerWebhookEvents.id }).from(voice.providerWebhookEvents).limit(1),
+      () => db.select().from(voice.providerWebhookEvents).limit(1),
+    );
+    await requireTable(
+      "voice_assistants",
+      () => db.select({ id: voice.voiceAssistants.id }).from(voice.voiceAssistants).limit(1),
+      () => db.select().from(voice.voiceAssistants).limit(1),
+    );
 
     // intake_firms still carries the original law-firm columns as NOT NULL, so
     // a test row has to fill them even though the receptionist never reads them.
