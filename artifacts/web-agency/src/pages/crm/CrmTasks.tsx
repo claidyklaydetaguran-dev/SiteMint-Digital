@@ -11,22 +11,19 @@ interface Task {
   leadName?:string; leadCompany?:string;
 }
 
-/**
- * What the deadline means, from the task's own `dueKind` — never guessed from
- * its clock time. Anything but the word "time" is a day, matching the server's
- * fallback for rows written before the column existed.
- */
-const isTimedDue = (t: Task) => t.dueKind === "time";
-
-const tabFilters = ["due-today","overdue","upcoming","completed"] as const;
-type TabFilter = typeof tabFilters[number];
-
-const tabLabels: Record<TabFilter, string> = {
-  "due-today": "Today's Tasks",
-  "overdue": "Overdue",
-  "upcoming": "Future",
-  "completed": "Completed",
-};
+// The bucketing lives in lib/taskBuckets.ts so it can be tested: this page used
+// to count every task that was not completed while its tabs could only show
+// dated ones, so twenty undated tasks were counted here and openable nowhere.
+import {
+  TASK_TABS,
+  TASK_TAB_LABELS,
+  activeTaskCount,
+  bucketCounts,
+  isLate as isTaskLate,
+  isTimedDue,
+  tasksInTab,
+  type TaskTab,
+} from "@/lib/taskBuckets";
 
 const taskTypeIcon: Record<string,string> = {
   Call:"📞",Email:"📧","Send Proposal":"📄","Follow Up":"🔔",
@@ -36,7 +33,7 @@ const taskTypeIcon: Record<string,string> = {
 export default function CrmTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabFilter>("due-today");
+  const [tab, setTab] = useState<TaskTab>("due-today");
   const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
@@ -66,8 +63,6 @@ export default function CrmTasks() {
   };
 
   const now = new Date();
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   /**
    * Late by the task's own kind: a moment is late once it has passed, a day is
@@ -76,28 +71,9 @@ export default function CrmTasks() {
    * every deadline to this instant called a task due "today" overdue at 00:01.
    * Neither is a guess any more.
    */
-  const isLate = (t: Task) => {
-    const due = t.dueDate ? new Date(t.dueDate) : null;
-    if (!due || t.status === "completed") return false;
-    return isTimedDue(t) ? due < now : due < todayStart;
-  };
-
-  const filtered = tasks.filter(t => {
-    const due = t.dueDate ? new Date(t.dueDate) : null;
-    if (tab === "due-today") return t.status !== "completed" && due && due >= todayStart && due < todayEnd;
-    if (tab === "upcoming") return t.status !== "completed" && due && due >= todayEnd;
-    if (tab === "overdue") return t.status === "overdue" || isLate(t);
-    if (tab === "completed") return t.status === "completed";
-    return true;
-  });
-
-  const counts = {
-    all: tasks.length,
-    "due-today": tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status !== "completed" && d && d >= todayStart && d < todayEnd; }).length,
-    upcoming: tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status !== "completed" && d && d >= todayEnd; }).length,
-    overdue: tasks.filter(t => t.status === "overdue" || isLate(t)).length,
-    completed: tasks.filter(t => t.status === "completed").length,
-  };
+  const isLate = (t: Task) => isTaskLate(t, now);
+  const filtered = tasksInTab(tasks, tab, now);
+  const counts = bucketCounts(tasks, now);
 
   if (loading) return (
     <CrmLayout>
@@ -122,7 +98,9 @@ export default function CrmTasks() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-2xl font-serif font-bold text-foreground">Tasks</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">{tasks.filter(t=>t.status!=="completed").length} active tasks</p>
+            {/* The figure is what the tabs can reach between them, so it cannot
+                drift from them again. */}
+            <p className="text-muted-foreground text-sm mt-0.5">{activeTaskCount(tasks, now)} active tasks</p>
           </div>
           <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -131,7 +109,7 @@ export default function CrmTasks() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-muted p-1 rounded-xl mb-5">
-          {tabFilters.map(f => (
+          {TASK_TABS.map(f => (
             <button
               key={f}
               onClick={() => setTab(f)}
@@ -139,7 +117,7 @@ export default function CrmTasks() {
                 tab === f ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tabLabels[f]}
+              {TASK_TAB_LABELS[f]}
               {counts[f] > 0 && (
                 <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
                   f === "overdue" ? "bg-red-100 text-red-700" : f === "due-today" ? "bg-yellow-100 text-yellow-700" : "bg-muted text-muted-foreground"
