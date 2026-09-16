@@ -8,7 +8,7 @@
  * tell the person what they can do about it.
  */
 
-import { AdminApiError, adminFetch, describeRefusal } from "./adminFetch";
+import { AdminApiError, adminFetch, describeRefusal, isCsrfTokenRefusalBody } from "./adminFetch";
 
 export type Load<T> =
   | { status: "loading" }
@@ -26,6 +26,16 @@ export function failureReason(httpStatus: number | null, body?: unknown): string
   if (httpStatus === null) return "The server could not be reached. Check your connection and try again.";
   if (httpStatus === 401 || httpStatus === 403) {
     const refusal = describeRefusal(new AdminApiError(httpStatus, serverError(body) ?? "The request was refused.", body));
+    // A plain 403 — no grant named, not the security token — is a permission
+    // refusal, and has to say so. "This request was refused." left the person
+    // guessing, and the pages that turned that answer into 0 told them they
+    // had no deals and no money instead.
+    if (httpStatus === 403 && refusal && !refusal.permission && !isCsrfTokenRefusalBody(body)) {
+      const detail = serverError(body);
+      return detail
+        ? `You do not have permission to see this: ${detail}.`
+        : "You do not have permission to see this. Ask an owner if you need access.";
+    }
     if (refusal) return `${refusal.title} ${refusal.detail}`;
   }
   if (httpStatus === 404) return "It was not found.";
