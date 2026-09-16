@@ -72,6 +72,8 @@ const SECRETS: Array<[string, string, string]> = [
   ["VOICE_METRICS_TOKEN", "P7", "Bearer for /api/metricz (unset = endpoint does not exist)"],
   ["VOICE_BILLING_WEBHOOK_SECRET", "P8", "Stripe signature secret for the voice billing webhook (unset = 503)"],
   ["ADMIN_PASSWORD", "core", "Admin login (unset = admin login 503s)"],
+  ["STRIPE_SECRET_KEY", "core", "Stripe secret key. Checked before the Replit connector, so billing is exercisable off Replit"],
+  ["STRIPE_WEBHOOK_SECRET", "core", "Stripe webhook signing secret, paired with STRIPE_SECRET_KEY"],
 ];
 
 const CONFIGS: Array<[string, string, string]> = [

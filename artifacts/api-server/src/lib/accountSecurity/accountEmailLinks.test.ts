@@ -126,8 +126,10 @@ describe("the link itself", () => {
     const routes = read("artifacts/helpdesk/src/lib/routes.ts");
     expect(routes).toContain(`verifyEmail: "${ACCOUNT_LINK_PATHS.verifyEmail}"`);
     expect(routes).toContain(`passwordResetComplete: "${ACCOUNT_LINK_PATHS.passwordResetComplete}"`);
-    // Same prefix the post-call email's dashboard link already uses.
-    expect(read("artifacts/api-server/src/lib/voiceNotifications/notificationOutbox.ts")).toContain(`${DASHBOARD_MOUNT_PATH}/calls/`);
+    // Same prefix the post-call email's dashboard link already uses. That link
+    // points at /activity/calls/:id, the route the dashboard actually mounts;
+    // the older /calls/:id shape matched no route at all.
+    expect(read("artifacts/api-server/src/lib/voiceNotifications/notificationOutbox.ts")).toContain(`${DASHBOARD_MOUNT_PATH}/activity/calls/`);
     // And both pages actually read ?token=.
     expect(read("artifacts/helpdesk/src/pages/PasswordResetComplete.tsx")).toContain('searchParams.get("token")');
     expect(read("artifacts/helpdesk/src/pages/VerifyEmail.tsx")).toContain('searchParams.get("token")');
