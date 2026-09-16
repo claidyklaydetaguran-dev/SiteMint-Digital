@@ -106,11 +106,18 @@ nslookup -type=MX sitemintdigital.com 8.8.8.8
 `https://<host>/api/crm/webhooks/resend/inbound` subscribed to **`email.received`**.
 Copy the signing secret that endpoint is given.
 
-> A webhook endpoint gets **its own** signing secret. If the existing
-> `RESEND_WEBHOOK_SECRET` (used for sending events) is reused here, every
-> inbound request fails verification. The code reads
-> `RESEND_INBOUND_WEBHOOK_SECRET` first and only falls back to the sending
-> secret, so set the inbound-specific one.
+> A webhook endpoint gets **its own** signing secret, and this deployment has
+> **two endpoints**:
+>
+> | Endpoint | Subscribed to | Secret it verifies with |
+> |---|---|---|
+> | `POST /api/crm/webhooks/resend/inbound` | `email.received` | `RESEND_INBOUND_WEBHOOK_SECRET`, falling back to `RESEND_WEBHOOK_SECRET` |
+> | `POST /api/crm/webhooks/resend` | delivery and engagement events | `RESEND_WEBHOOK_SECRET` only — no fallback |
+>
+> So if the delivery endpoint's `RESEND_WEBHOOK_SECRET` is reused here without
+> subscribing `email.received` on that same endpoint, every inbound request
+> fails verification. Set the inbound-specific one. The delivery endpoint is
+> covered by its own document: `docs/crm-ops/EMAIL-EVENTS-ACTIVATION.md`.
 
 **5. Set three variables** in the deployed environment's secret store — never in
 a file, never in the frontend build, never in chat:
@@ -119,7 +126,26 @@ a file, never in the frontend build, never in chat:
 |---|---|
 | `CRM_INBOUND_EMAIL_DOMAIN` | `reply.sitemintdigital.com` |
 | `RESEND_INBOUND_WEBHOOK_SECRET` | the secret from step 4 |
-| `RESEND_API_KEY` | the existing Resend key (already required for outbound) |
+| `RESEND_RECEIVING_API_KEY` | a **full-access** Resend key, used only to read received mail |
+
+**The receiving key is not the sending key, and this is the correction that
+matters most here.** An earlier version of this document named `RESEND_API_KEY`
+for this step. That is wrong in a way that fails silently at the worst moment:
+the `email.received` webhook carries metadata only, so the body is fetched with
+`GET /emails/receiving/:id`, which is a READ. Resend has exactly two API-key
+scopes — `sending_access` ("can only send emails") and `full_access` — so a
+sending-only key is refused with 401/403 on every fetch, and every client reply
+lands in the CRM with no words in it.
+
+`lib/inboundEmail.ts` therefore reads `RESEND_RECEIVING_API_KEY` with
+**deliberately no fallback** to `RESEND_API_KEY`: a fallback would report
+inbound as configured whenever a sending key exists, which is precisely the
+state in which every fetch fails. Keeping the full-access key out of the
+sending path is the second reason — the key that mails customers can stay
+sending-only, so a leak of it cannot delete a domain or rotate keys.
+
+`RESEND_API_KEY` is still required, for OUTBOUND mail. It is simply not what
+reads the inbox.
 
 Restart, then check the application's own readiness report:
 
