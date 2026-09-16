@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { adminFetch } from "@/lib/adminFetch";
 import CrmBillingPanel from "./CrmBillingPanel";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 // ── M3: Documents ────────────────────────────────────────────────────────────
 //
@@ -314,23 +316,28 @@ export default function CrmDocuments() {
     URL.revokeObjectURL(url);
   }
 
-  async function remove(doc: DocumentRow) {
-    if (!window.confirm(
-      `Delete "${doc.filename}"?\n\nIt disappears from this record. Earlier versions of the same file are not affected.`,
-    )) return;
-    setBusy(true);
-    try {
-      const res = await adminFetch(`/api/crm/documents/${doc.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || `That file could not be deleted (${res.status}).`);
-        return;
-      }
-      setNotice(`"${doc.filename}" was deleted.`);
-      await refresh(true);
-    } finally {
-      setBusy(false);
-    }
+  const confirmation = useConfirmDialog();
+
+  function remove(doc: DocumentRow) {
+    void confirmation.ask({
+      title: `Delete "${doc.filename}"?`,
+      description: "This cannot be undone.",
+      consequences: [
+        "It disappears from this record, and the stored file is erased.",
+        "Any share links for it stop working straight away.",
+        "Earlier versions of the same file are not affected.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete file",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep file",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/documents/${doc.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That file could not be deleted."));
+        setNotice(`"${doc.filename}" was deleted.`);
+        await refresh(true);
+      },
+    });
   }
 
   async function ask() {
@@ -414,19 +421,33 @@ export default function CrmDocuments() {
     setShares(res.ok ? (await res.json()).shares ?? [] : []);
   }
 
-  async function revokeShare(share: ShareRow) {
-    if (!shareFor) return;
-    if (!window.confirm("Revoke this link?\n\nAnyone holding it stops being able to download the file.")) return;
-    setBusy(true);
-    try {
-      const res = await adminFetch(`/api/crm/documents/shares/${share.id}/revoke`, { method: "POST" });
-      if (!res.ok) { setError("That link could not be revoked."); return; }
-      setNotice("Link revoked.");
-      if (freshLink) setFreshLink(null);
-      await openSharesList(shareFor.id);
-    } finally {
-      setBusy(false);
-    }
+  function revokeShare(share: ShareRow) {
+    const attachment = shareFor;
+    if (!attachment) return;
+    void confirmation.ask({
+      title: share.sharedWithLabel
+        ? `Revoke the link shared with ${share.sharedWithLabel}?`
+        : "Revoke this share link?",
+      description: "It stops working straight away.",
+      consequences: [
+        `Anyone holding it can no longer download "${attachment.filename}".`,
+        share.downloadCount > 0
+          ? `It has already been downloaded ${share.downloadCount} time${share.downloadCount === 1 ? "" : "s"}; revoking cannot undo that.`
+          : "It has not been downloaded yet.",
+        "The file itself is untouched, and you can create a new link for it.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Revoke link",
+      busyLabel: "Revoking…",
+      cancelLabel: "Keep link",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/documents/shares/${share.id}/revoke`, { method: "POST" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That link could not be revoked."));
+        setNotice("Link revoked.");
+        if (freshLink) setFreshLink(null);
+        await openSharesList(attachment.id);
+      },
+    });
   }
 
   if (loading) {
@@ -441,6 +462,8 @@ export default function CrmDocuments() {
 
   return (
     <CrmLayout>
+      {confirmation.element}
+
       <div className="p-4 sm:p-6 space-y-4">
 
         {/* Header */}
