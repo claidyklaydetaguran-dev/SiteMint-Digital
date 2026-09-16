@@ -163,6 +163,19 @@ export interface StaffMailAttachment {
   contentType?: string;
 }
 
+/** Does this answer mean "that key was used before, with a different message"? */
+function isIdempotencyPayloadMismatch(
+  error: { name?: string | null; message?: string | null } | null | undefined,
+): boolean {
+  const text = `${error?.name ?? ""} ${error?.message ?? ""}`.toLowerCase();
+  return text.includes("invalid_idempotent_request");
+}
+
+/** Resend answers a refusal in the response body rather than by throwing. */
+function readError(result: unknown): { message?: string; name?: string; statusCode?: number } | null {
+  return (result as { error?: { message?: string; name?: string; statusCode?: number } | null })?.error ?? null;
+}
+
 /**
  * Attempts a send. Never throws: a mail failure must not fail the action that
  * triggered it, and must never be mistaken for success.
@@ -172,6 +185,24 @@ export async function trySendStaffMail(args: {
   subject: string;
   text: string;
   html?: string;
+  /** Copies. Recorded internally; `bcc` is never echoed to a recipient. */
+  cc?: string[];
+  bcc?: string[];
+  /**
+   * Where a reply should go — the address carrying a conversation's reply
+   * token, so an answer comes back to the right thread without trusting the
+   * sender header.
+   */
+  replyTo?: string;
+  /**
+   * Tags the provider echoes back on every event about this message.
+   *
+   * `lib/emailRefs.ts` builds the one this CRM sets (`crm_ref`), and it is the
+   * only way an event can reach a record whose send outcome was UNCERTAIN:
+   * those sends never learned a provider id, and a `delivered` event for one of
+   * them is the evidence that resolves it.
+   */
+  tags?: Array<{ name: string; value: string }>;
   /**
    * Stable across retries of the SAME logical message, so Resend collapses a
    * repeat into the original send.
@@ -194,19 +225,39 @@ export async function trySendStaffMail(args: {
 
   try {
     const resend = getResend();
-    const result = await resend.emails.send(
-      {
-        from: FROM(), to: args.to, subject: args.subject,
-        text: args.text, ...(args.html ? { html: args.html } : {}),
-        ...(args.attachments?.length ? { attachments: args.attachments } : {}),
-      },
-      args.idempotencyKey ? { idempotencyKey: args.idempotencyKey } : undefined,
-    );
+    type SendPayload = Parameters<typeof resend.emails.send>[0];
+    const payload: SendPayload = {
+      from: FROM(), to: args.to, subject: args.subject,
+      text: args.text, ...(args.html ? { html: args.html } : {}),
+      ...(args.cc?.length ? { cc: args.cc } : {}),
+      ...(args.bcc?.length ? { bcc: args.bcc } : {}),
+      ...(args.replyTo ? { replyTo: args.replyTo } : {}),
+      ...(args.attachments?.length ? { attachments: args.attachments } : {}),
+      ...(args.tags?.length ? { tags: args.tags } : {}),
+    };
+    const options = args.idempotencyKey ? { idempotencyKey: args.idempotencyKey } : undefined;
+
+    let result = await resend.emails.send(payload, options);
+    let error = readError(result);
+
+    // The one retry this layer performs, and it cannot duplicate.
+    //
+    // An idempotency key reused with a DIFFERENT payload is refused outright —
+    // nothing is sent — and the first message to carry `tags` after tagging
+    // shipped is exactly that: the same key as an attempt made before it, plus
+    // a tag. Sending once more WITHOUT the tags restores the original payload,
+    // so the provider either collapses it into the earlier send or delivers it
+    // if the earlier one never arrived. Without this, an unknown outcome
+    // retried inside the 24-hour window after a deploy would be recorded as
+    // REFUSED — turning "we do not know whether it arrived" into "it did not",
+    // which is the one reading `docs/crm-ops/DELIVERY-GUARANTEE.md` forbids.
+    if (error && args.tags?.length && isIdempotencyPayloadMismatch(error)) {
+      const { tags: _untagged, ...withoutTags } = payload;
+      result = await resend.emails.send(withoutTags, options);
+      error = readError(result);
+    }
+
     const providerId = (result as { data?: { id?: string } | null })?.data?.id ?? null;
-    // Resend reports a rejection in the body rather than by throwing.
-    const error = (result as {
-      error?: { message?: string; name?: string; statusCode?: number } | null;
-    })?.error;
     if (error) {
       return {
         sent: false,
