@@ -252,18 +252,24 @@ suite("a real call saves information (real DB)", () => {
     const eventKey = buildVapiEventKey(message);
 
     await repo.storeVapiWebhookEvent(firmA, message);
-    expect(await repo.readStoredToolCallResults(eventKey)).toBeUndefined();
+    expect(await repo.readStoredToolCallResults(firmA, eventKey)).toEqual({ state: "pending" });
 
     const results = [{ toolCallId: `tc-${STAMP}`, result: "Booked for Tuesday at 10." }];
     await repo.storeToolCallResults(firmA, eventKey, results);
 
     // A redelivery of the same batch is answered from storage, so the booking
     // is never made a second time.
-    expect(await repo.readStoredToolCallResults(eventKey)).toEqual({ results });
+    expect(await repo.readStoredToolCallResults(firmA, eventKey)).toEqual({ state: "stored", results });
 
     // Writing results is firm-scoped: another business cannot overwrite them.
     await repo.storeToolCallResults(firmB, eventKey, [{ toolCallId: `tc-${STAMP}`, result: "overwritten" }]);
-    expect(await repo.readStoredToolCallResults(eventKey)).toEqual({ results });
+    expect(await repo.readStoredToolCallResults(firmA, eventKey)).toEqual({ state: "stored", results });
+
+    // Reading is firm-scoped too. Knowing the key is not authorization: another
+    // business presenting the exact key learns nothing, and neither does an
+    // unknown key.
+    expect(await repo.readStoredToolCallResults(firmB, eventKey)).toEqual({ state: "not_this_firm" });
+    expect(await repo.readStoredToolCallResults(firmA, `${eventKey}-unknown`)).toEqual({ state: "not_this_firm" });
 
     // The stored event itself survives having results merged onto it.
     const record = await repo.getRealCallForFirm(firmA, callId);

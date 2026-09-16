@@ -224,20 +224,31 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
     try {
       const eventKey = buildVapiEventKey(message);
       const { inserted } = await storeVapiWebhookEvent(firmId, message);
+      const calls = (message.toolCallList ?? []).map((t) => ({ toolCallId: t.id, name: t.name, args: t.arguments }));
       if (!inserted) {
-        const replay = await readStoredToolCallResults(eventKey);
-        if (replay) {
+        const stored = await readStoredToolCallResults(firmId, eventKey);
+        if (stored.state === "stored") {
           req.log.info(
-            { firmId, callId: message.call.id, count: replay.results.length, authMode: auth.mode },
+            { firmId, callId: message.call.id, count: stored.results.length, authMode: auth.mode },
             "[voice webhook] tool-calls replayed from stored results",
           );
-          res.status(200).json({ results: replay.results });
+          res.status(200).json({ results: stored.results });
           return;
         }
-        // Stored event without results: the first attempt crashed between
-        // store and respond — executing now is the correct completion.
+        if (stored.state === "not_this_firm") {
+          // The key is already held by a different business. Neither replay
+          // its results nor execute anything under a ledger row this business
+          // does not own.
+          req.log.warn({ firmId, callId: message.call.id }, "[voice webhook] tool-calls key owned by another business; refused");
+          res.status(200).json({
+            results: calls.map((c) => ({ toolCallId: c.toolCallId, result: "That action could not be completed." })),
+          });
+          return;
+        }
+        // Stored event for this business without results: the first attempt
+        // crashed between store and respond — executing now is the correct
+        // completion.
       }
-      const calls = (message.toolCallList ?? []).map((t) => ({ toolCallId: t.id, name: t.name, args: t.arguments }));
       const results = await dispatchToolCalls(firmId, calls, {
         provider: "vapi",
         providerCallId: message.call.id,

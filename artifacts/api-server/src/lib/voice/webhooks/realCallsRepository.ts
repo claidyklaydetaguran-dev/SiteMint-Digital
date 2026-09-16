@@ -140,16 +140,29 @@ function isStoredResults(value: unknown): value is StoredToolCallResults {
   );
 }
 
-/** Reads previously stored results for one (provider, eventKey), if any. */
-export async function readStoredToolCallResults(eventKey: string): Promise<StoredToolCallResults | undefined> {
+export type StoredToolCallLookup =
+  /** The stored event belongs to this business and carries results to replay. */
+  | { state: "stored"; results: StoredToolCallResults["results"] }
+  /** The stored event belongs to this business but its first attempt never finished. */
+  | { state: "pending" }
+  /** No stored event for this business. Never replay and never execute. */
+  | { state: "not_this_firm" };
+
+/**
+ * Reads previously stored results for one (provider, eventKey), for one
+ * business only. The ledger's uniqueness is per provider, so an event key is
+ * not by itself proof of ownership — an unguessable identifier is not
+ * authorization. A row owned by another business reads as `not_this_firm`.
+ */
+export async function readStoredToolCallResults(firmId: number, eventKey: string): Promise<StoredToolCallLookup> {
   const [row] = await db
-    .select({ payload: providerWebhookEvents.payload })
+    .select({ firmId: providerWebhookEvents.firmId, payload: providerWebhookEvents.payload })
     .from(providerWebhookEvents)
     .where(and(eq(providerWebhookEvents.provider, VAPI_PROVIDER_NAME), eq(providerWebhookEvents.eventKey, eventKey)))
     .limit(1);
-  if (!row) return undefined;
+  if (!row || row.firmId !== firmId) return { state: "not_this_firm" };
   const stored = (row.payload as Record<string, unknown>)["siteMintToolResults"];
-  return isStoredResults(stored) ? stored : undefined;
+  return isStoredResults(stored) ? { state: "stored", results: stored.results } : { state: "pending" };
 }
 
 /** Writes execution results onto the stored event row (merge, never replace the event payload). */
