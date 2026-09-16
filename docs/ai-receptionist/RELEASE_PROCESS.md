@@ -76,7 +76,7 @@ ways that change the steps above:
   production already has the 15 columns it adds, so its two missing tables and
   its journal row are handled explicitly rather than by running it.
 
-Four things must be true before Publish, each recorded with its evidence in the
+Five things must be true before Publish, each recorded with its evidence in the
 ledger:
 
 1. `CORS_ALLOWED_ORIGINS` is set. It is the only value read at module load: the
@@ -85,6 +85,22 @@ ledger:
    migration step, and the workers start immediately after.
 3. `ADMIN_PASSWORD` exists, or no first staff owner can be created.
 4. `CRM_EMAIL_TEST_MODE=false`, or production mail is only simulated.
+5. `CRM_LEGACY_BEARER_ENABLED=false`. While it is set to anything else, the
+   legacy shared admin credential passes every permissioned operator and CRM
+   route with the permission never consulted — `orLegacyAdminSession` and
+   `requireCrmAuth` both call `next()` on it before the permission check is
+   reached. That covers phone-number assignment, a firm's billing and invite
+   creation here, and bulk customer contact and Stripe checkout on the CRM
+   side. A permission system that a single shared password walks through is
+   not a permission system.
+
+   This can be set **before** Publish, so production need never accept the
+   shared credential at all. The first owner is created by
+   `POST /crm/staff/bootstrap`, which carries no gate handler but requires
+   that no `crm_staff` row exists yet and that `ADMIN_PASSWORD` is supplied in
+   the request body; it never reads this flag. Verify after publishing by
+   confirming the shared credential is refused `401` on a permissioned route
+   while the owner's own session still succeeds.
 
 Everything else in the receptionist's configuration is read at the moment it is
 used, so a missing value is a clean refusal rather than a crash — but each
