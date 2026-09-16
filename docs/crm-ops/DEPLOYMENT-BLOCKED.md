@@ -1,153 +1,204 @@
-# Deploying the CRM to production — verified state and plan
+# Deploying to production — the verified plan
 
-Updated 2026-09-15. **This replaces the earlier version of this file, which
-said the Web Asset Builder workspace container would not boot. That diagnosis
-was wrong.** The workspace was healthy: a Replit workspace opened in a
-background browser tab defers its container connection while
-`document.hidden` is true, which produces exactly the symptom recorded then
-("Loading project…", zero terminals). Overriding `document.hidden` in the page
-brought up two live terminals within seconds. The check that would have caught
-it was already in the project notes and was skipped.
+Updated 2026-09-16. This supersedes the earlier version. **The workspace is
+healthy** (the "container will not boot" diagnosis was a background-tab symptom
+and was wrong), and everything below was observed from inside the workspace,
+the Replit dashboard, or a live request. **Nothing in production has been
+changed.**
 
-Everything below was observed from inside the workspace or the Replit
-dashboard. Nothing in production has been changed.
+**What blocks the publish today: two Secrets only the owner can enter.**
+Checked by key name at 23:46 UTC on 2026-09-15: `SNAPSHOT_SOURCE` and
+`ADMIN_PASSWORD` are both absent from Web Asset Builder.
 
 ---
 
-## 1. Topology (confirmed from inside, not assumed)
+## 1. Topology, confirmed
 
 ```
 sitemintdigital.com (+ www) ─► Replit app "SiteMint-Digital"
-                               marketing server; NO database, NO secrets
-                               proxies /api etc. to ↓, forwarding the browser's
-                               Origin unchanged and setting X-Forwarded-Host
+                               marketing server; NO database, NO secrets.
+                               Proxies /api, /admin, /app, /ai-toolkit,
+                               /ai-receptionist/dashboard — and now /portal —
+                               to ↓, forwarding Origin and X-Forwarded-Host.
 sitemintdigital.replit.app ─►  Replit app "Web Asset Builder"
-                               Autoscale, deploymentTarget = "autoscale",
-                               [deployment] router = "application"
-                               Production database (57.13 MB)
+                               Autoscale, [deployment] router = "application".
+                               The production database (57.13 MB) lives here.
 ```
 
-Web Asset Builder is the only app holding the production database and serving
-`/api`, so the CRM deploys there. The marketing app is not a substitute: a
-pending Replit Agent task on it proposes running the CRM on the marketing app,
-which is the topology change the owner ruled out.
+**`/portal` was missing from that list**, so every customer portal invitation
+link answered the marketing 404. Fixed in source (`fae2c8d`) and as the release
+artifact `release/marketing-dist-2026-09-16` @ `1912a3b`. **That app still needs
+a republish** — a separate, small drop from the CRM publish.
 
-### How a publish builds it — artifact mode
+**Artifact mode.** Publishing rebuilds the API only
+(`pnpm --filter @workspace/api-server run build`); `web-agency` and `helpdesk`
+are `serve = "static"` from `dist/public`, so **both frontends must be built in
+the workspace before Publish** or the old bundles ship.
 
-Every artifact has `.replit-artifact/artifact.toml`, so the application router
-starts one service per artifact:
+**DNS is editable inside Replit** (the domain is Replit-registered):
+SiteMint-Digital → Tools → Domains → sitemintdigital.com → Manage → DNS Records.
+name.com credentials are not needed. Baseline as of 2026-09-16: A `@`, TXT `@`
+(replit-verify), TXT `@` (google-site-verification), TXT `_dmarc`,
+TXT `resend._domainkey`, MX `send`, TXT `send` (SPF), TXT `www`, A `www`.
 
-| Artifact | Production build | Production run |
-|---|---|---|
-| api-server (`/api`, port 8080) | **`pnpm --filter @workspace/api-server run build`** | `node --enable-source-maps artifacts/api-server/dist/index.mjs`, health `/api/healthz` |
-| web-agency (`/`, port 22065) | **none** | `serve = "static"` from `artifacts/web-agency/dist/public` |
-| helpdesk (`/ai-receptionist/dashboard`) | **none** | `serve = "static"` from `artifacts/helpdesk/dist/public` |
+## 2. Production is far behind, and that is the whole risk
 
-So a publish **does** rebuild the API, but **does not** rebuild either
-frontend — it serves whatever `dist/public` was last built in the workspace.
-Both frontends must be built explicitly before publishing
-(`PORT` and `BASE_PATH` are required by their Vite configs).
+- **Database:** the original 27 tables with real, modest data — 3 leads,
+  40 tasks, 2 projects, 10 activities, 8 discovery submissions, 7 form
+  submissions, 23 landing-page views, 1 intake firm, 8 receptionist sessions,
+  2 toolkit purchases, 1 campaign. No `crm_staff`, no conversations, support,
+  billing, marketing, portal or automation tables, and **no voice or scheduling
+  tables**. The workspace's development database (`heliumdb`) is similarly old
+  (35 tables).
+- **The running API** answers only `/api/healthz`. `/api/readyz` and every
+  `/api/crm/*` route 404. A 200 from `/api/healthz` proves nothing here.
+- The candidate owns **117 application tables** (83 barrel + 34 domain), rising
+  to 119 when the receptionist's voice 0013 lands.
 
-### The workspace checkout
+## 3. Who does what
 
-The workspace is a full clone of the monorepo with a GitHub remote. It is on
-the receptionist branch (`feature/ai-receptionist-private-beta-readiness`) with
-**2 local commits never pushed** (2026-07-28 scheduling verification notes) —
-a backup ref for them was created before anything else was touched. The CRM
-release branch is already fetched there. The working tree is clean.
+The release is one api-server serving both products, so it is a joint release
+with the receptionist session. Agreed protocol:
 
----
+- `release/sitemint-production-2026-09-16` on origin is the **only** integration
+  branch. Neither side force-pushes or rewrites the other's files; each pushes
+  fast-forwards and sends the other the SHA to re-gate.
+- The CRM session holds the **deploy lock** for Web Asset Builder and for the
+  SiteMint-Digital `/portal` republish, on these conditions: the upgrade SQL and
+  the restore-rehearsal evidence go to the receptionist session first; only a
+  commit containing its receptionist commits and passing the DB-backed gates is
+  published; receptionist exposure stays dormant (invite-only signup, voice flags
+  exactly as it specifies); and it is told immediately before Publish.
 
-## 2. Production is much further behind than "a stale build"
+### Owner actions — CRM side (these are asked once, here)
 
-**Database** — 27 original tables with real, modest data: 3 leads, 40 tasks,
-2 projects, 10 activities, 8 discovery submissions, 7 form submissions,
-23 landing-page views, 1 intake firm, 8 receptionist sessions, 2 toolkit
-purchases, 1 campaign. **No `crm_staff`, no conversations, support, billing,
-marketing, portal or automation tables, and no voice or scheduling tables.**
+1. **`SNAPSHOT_SOURCE`** — the production database connection string, from
+   Database → Production Database → Settings → Connection string. Used only
+   inside the Replit shell, for the backup and the restore rehearsal.
+2. **`ADMIN_PASSWORD`** — a new strong value from a password manager, not a
+   personal password. Needed once to create the first production owner account,
+   and for break-glass recovery.
+3. After the API is live: a **Resend receiving key** (full access, stored as
+   `RESEND_RECEIVING_API_KEY`) and the **webhook signing secrets**
+   (`RESEND_WEBHOOK_SECRET` for delivery events, `RESEND_INBOUND_WEBHOOK_SECRET`
+   for the inbound endpoint — they are per endpoint and must not be shared).
+4. Enrol **MFA** and confirm the timezone at `/admin/crm/account`.
+5. The **real email addresses** for Shasta and Saisa. Until then their
+   onboarding stays pending; nothing else waits on it.
 
-The workspace's development database is similarly old (35 tables).
+The receptionist session separately owns: Google Cloud terms acceptance, the
+production OAuth client id/secret, `CALENDAR_TOKEN_KEY`, the Vapi HMAC
+credential id, the transfer recipient, privacy/terms approval, plan/SMS scope,
+and the spoken call test.
 
-**The running API** answers only `/api/healthz`. `/api/readyz`, every
-`/api/crm/*` route, `/api/receptionist/me` and `/api/discovery/v1/health` all
-return 404. A 200 from `/api/healthz` proves nothing here.
+## 4. Configuration, in the order the code actually reads it
 
----
+Measured against the code, not assumed:
 
-## 3. Hard blockers found before any publish
+- **Required before the first boot — one variable.** `CORS_ALLOWED_ORIGINS`
+  (`app.ts` resolves it at module load and throws in production):
+  `https://sitemintdigital.com,https://www.sitemintdigital.com,https://sitemintdigital.replit.app`.
+  Also set `CRM_EMAIL_TEST_MODE=false` before Publish so live mail is
+  deliberate, and `CRM_PUBLIC_BASE_URL=https://sitemintdigital.com`.
+- **Read at the moment of use**, so a missing value is a clean refusal rather
+  than a crash: `ADMIN_PASSWORD` (bootstrap/login), `VOICE_ARTIFACT_POLICY=none`
+  (assistant publish fails closed without it), the voice webhook and tools
+  groups (set each group complete or leave it off), the voice alert trio plus
+  `RESEND_API_KEY`, `VOICE_DASHBOARD_BASE_URL`, the calendar group, and
+  `CRM_EMAIL_TEST_MODE`.
+- `VITE_VOICE_*` are **build-time** flags for the helpdesk bundle, not runtime.
+- `STRIPE_BOOT_SYNC_ENABLED=false`. `TRUSTED_PROXY_HOPS` is decided only after
+  observing real forwarded headers in production.
 
-Each of these would break production if the release were simply published.
+## 5. The schema upgrade
 
-| # | Blocker | Evidence | Consequence if ignored |
-|---|---|---|---|
-| 1 | **No CORS allowlist** | `CORS_ALLOWED_ORIGINS` is in neither the app's Secrets nor `.replit` `[userenv]`. `app.ts:40` calls `resolveCorsPolicy(process.env)` at module load, and it throws in production when the value is missing | **The new API crashes before listening** and the platform restart-loops it. Today's build predates that rule, which is the only reason production runs |
-| 2 | **Boot migrates only Stripe's schema** | `index.ts` wires `runMigrations: runStripeMigrations`; background workers start immediately after | CRM and voice routes, and the workers, would hit tables that do not exist. **The reviewed schema upgrade must be applied before the new build is published, never after** |
-| 3 | **No `ADMIN_PASSWORD`** | Absent from Secrets and userenv; `POST /crm/staff/bootstrap` returns 503 without it | No first owner can be created in production, so nobody can sign in |
-| 4 | **`CRM_EMAIL_TEST_MODE` unset** | Mail is simulated unless the exact string `false` is set | Invitations, resets and support replies would be recorded but never sent |
+**Never `push` and never `migrate:fresh` against production**: push is a
+whole-schema reconciler that also drops orphaned sequences, and migrate:fresh
+bootstraps empty databases only.
 
-Not blockers, but decided at deploy time rather than guessed:
+1. **Barrel tables (`crm_*`, `intake_*`, `discovery_submissions`,
+   `form_submissions`, helpdesk, …):** apply reviewed DDL generated by diffing
+   production's real catalog against a push-built reference catalog of the exact
+   candidate (`scratchpad/catalog.mjs` + `catalog-diff.mjs`; additive only,
+   every non-additive difference is reported for a decision, never applied).
+   The 20 reviewed artifacts in `docs/crm-ops/schema/` are the source of truth
+   for anything they cover, including the two newest:
+   `M7-companies.sql` and `M7-reminder-delivery-uniqueness.sql`.
+2. **`M5-task-due-kind.sql` is the one file that writes to existing rows** and
+   production has 40 tasks. Run it exactly once, and record the before/after
+   count of overdue open tasks — the backfill's promise is that the number does
+   not change.
+3. **voice 0000–0013 and scheduling 0000–0003** go through
+   `migrate:voice` / `migrate:scheduling` with `--target prod --expect-db
+   <name> --expect-fingerprint <hex12> --confirm prod`. Production has no
+   `drizzle` schema at all, so no journal baselining is needed.
+4. **discovery 0000 will fail on production as written**: its first statements
+   are 15 `ALTER TABLE discovery_submissions ADD COLUMN` without `IF NOT
+   EXISTS`, and production already has all 15 (added through the SQL console on
+   2026-09-09). Create only the missing discovery tables, then insert that one
+   journal row with `hash` = sha256 of the raw `.sql` and `created_at` = the
+   journal's `when`, exactly as `baseline-journals.mjs` computes them. This goes
+   into the reviewed upgrade file for the receptionist session to read.
+5. **Replit's publish-time "Generated migrations" gate** diffs the workspace
+   development database against production and applies DDL itself without
+   writing our journals. Expand "View full SQL", classify every statement, and
+   approve nothing destructive. Bringing the development database to the same
+   schema first makes that diff empty, which is the safest state to approve.
 
-- **`TRUSTED_PROXY_HOPS`** defaults to 0 (trust no forwarded header), so login
-  throttling buckets everyone behind the proxy together. Traffic through the
-  domain and through `*.replit.app` crosses different numbers of hops, so the
-  value is set only after observing real forwarded headers in production.
-- **`CRM_PUBLIC_BASE_URL`** is unset, but activation links fall back to the
-  existing `CRM_BASE_URL`.
+## 6. Backup and rehearsal, before anything touches production
 
-Already present and reusable: `RESEND_API_KEY`, `SESSION_SECRET`, and Replit's
-AI integration (`AI_INTEGRATIONS_OPENAI_API_KEY` / `…_BASE_URL`, a local
-Modelfarm proxy billed to Replit usage credits).
+Point-in-time recovery is **on (last 7 days)**; scheduled backups are **off**.
+The workspace has `pg_dump`, `pg_restore`, `initdb`, `pg_ctl` and `postgres`, so
+the whole rehearsal happens inside Replit and production data never leaves it:
 
----
+1. Prove the identity of `SNAPSHOT_SOURCE` without printing it
+   (`current_database()`, table count 27, the row counts above).
+2. `pg_dump -Fc` to a path outside the repository; record the timestamp.
+3. `initdb` a throwaway cluster under `/tmp`, restore into it, and compare row
+   counts table by table against the source.
+4. Apply the upgrade to the restored copy; re-run the catalog diff against the
+   reference until it is empty but for known, reported differences.
+5. Boot the candidate API against the restored copy and exercise it: `/api/readyz`
+   200, bootstrap an owner, an authenticated write persists, a planted stale
+   `processing` row is reclaimed by the worker.
+6. **Inspect what the workers would do on first boot against real data** —
+   pending scheduled messages, active sequences, due reminders — before live
+   mail is enabled, so publishing cannot release old work to customers.
 
-## 4. Backup and recovery
+## 7. Publish, then prove it by behaviour
 
-- **Point-in-time recovery: On, last 7 days.** Scheduled backups: **Off.**
-- The dashboard offers the production connection string, but it is a secret, so
-  the owner copies it into a workspace Secret (`SNAPSHOT_SOURCE`) rather than it
-  being relayed.
-- The workspace has `pg_dump`, `pg_restore`, `initdb`, `pg_ctl` and `postgres`,
-  so the rehearsal happens entirely inside Replit: dump production, start a
-  throwaway Postgres under `/tmp`, restore into it, compare row counts table by
-  table. Production data never leaves Replit.
+Check out the candidate in the workspace; `pnpm install --frozen-lockfile`;
+build the API; build `web-agency` and `helpdesk` with their required env
+(helpdesk needs `PORT` and `BASE_PATH=/ai-receptionist/dashboard` plus the four
+`VITE_VOICE_*` flags); set the Secrets in §4; tell the receptionist session;
+Publish; classify the migration gate; then verify:
 
----
+- `GET /api/readyz` → 200 (the current build has no such route);
+- the owner bootstraps their own account at `/admin` and signs in;
+- an authenticated CRM write persists across a reload;
+- `GET /api/crm/operations/jobs` shows the scheduler claiming work;
+- the receptionist sign-in and the SMS STOP webhook still behave;
+- the customer portal answers on `sitemintdigital.com/portal` after the
+  marketing republish.
 
-## 5. Integration
+**A changed frontend bundle or a 200 from `/api/healthz` is not evidence.**
 
-The receptionist branch on GitHub has only **4 commits** the CRM branch lacks
-(voice browser tokens, publish digest, browser-test error classification, and
-voice migration `0009`). A dry-run merge conflicts only in three
-`lib/db/*Contract.test.ts` count pins — no application code. The release is
-that merge, gated like any other candidate.
+### The hosting question that must be answered before reminders are trusted
 
----
-
-## 6. Order of operations
-
-1. Owner adds `SNAPSHOT_SOURCE` → dump production, restore into a throwaway
-   database inside the workspace, prove row counts match.
-2. Assemble the release: CRM branch + the 4 receptionist commits; resolve the
-   contract pins; full gates on the exact candidate.
-3. Build the upgrade: compare production's real schema with the candidate's,
-   generate additive DDL, apply it to the restored copy, and boot the candidate
-   against that copy before touching production.
-4. Owner adds `ADMIN_PASSWORD`; set `CORS_ALLOWED_ORIGINS`
-   (`https://sitemintdigital.com,https://www.sitemintdigital.com,https://sitemintdigital.replit.app`)
-   and `CRM_EMAIL_TEST_MODE=false`.
-5. Apply the rehearsed upgrade to production.
-6. In the workspace: check out the candidate, build the API explicitly and both
-   frontends with their env, then Publish.
-7. Verify by behaviour: `/api/readyz` 200 (the old build has no such route);
-   the owner bootstraps their own account at `/admin`; an authenticated CRM
-   write persists; workers claim a planted job; receptionist sign-in and the
-   SMS STOP webhook still behave.
+The reminder engine, the signup worker and the delivery queues run **inside the
+api-server process**. Web Asset Builder is an **Autoscale** deployment, which
+can scale to zero: while nothing is serving traffic, nothing fires, and the work
+arrives late in a burst. Either keep an instance always running, or drive
+`POST /api/crm/operations/jobs/run` from a platform scheduler. This is an owner
+decision with a cost attached; it is not solvable in code.
 
 ## Do not
 
-- Toggle "Enable Receiving" on the apex domain in Resend — it writes an apex MX
-  record. Inbound goes on `reply.sitemintdigital.com` as its own domain.
-- Publish before steps 3–5, or treat a changed frontend bundle or a 200 from
-  `/api/healthz` as proof of a backend deploy.
+- Toggle "Enable Receiving" on the apex domain in Resend — it writes an apex MX.
+  Inbound belongs on `reply.sitemintdigital.com` as its own domain.
+- Publish before the rehearsal in §6, or treat a bundle hash as proof.
 - Point production at a test database, or copy `@sitemintdigital.test` fixture
   accounts into it.
+- Approve the two queued Replit Agent tasks on the SiteMint-Digital app ("Get
+  the CRM running on Replit with a live database", "Connect external services").
+  They propose the topology the owner ruled out.
