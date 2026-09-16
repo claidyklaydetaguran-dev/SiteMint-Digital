@@ -148,7 +148,7 @@ export default function Support() {
         <h2 className="sd-subsection__title">{SUPPORT_COPY.formTitle}</h2>
         <p className="sd-muted">{SUPPORT_COPY.formDetail}</p>
 
-        <form onSubmit={submit} noValidate>
+        <form className="si-form" onSubmit={submit} noValidate>
           <label className="si-label" htmlFor="support-subject">{SUPPORT_COPY.subjectLabel}</label>
           <input
             id="support-subject"
@@ -242,15 +242,20 @@ export default function Support() {
                     </div>
                   ))}
 
-                  <label className="si-label" htmlFor={`support-reply-${request.id}`}>{SUPPORT_COPY.replyLabel}</label>
-                  <textarea
-                    id={`support-reply-${request.id}`}
-                    className="si-input"
-                    rows={3}
-                    value={reply}
-                    placeholder={SUPPORT_COPY.replyPlaceholder}
-                    onChange={(e) => setReply(e.target.value)}
-                  />
+                  {/* si-form supplies the --v2-* properties the si-* field
+                      styles read; without an ancestor carrying it, these
+                      render with no border and no background. */}
+                  <div className="si-form">
+                    <label className="si-label" htmlFor={`support-reply-${request.id}`}>{SUPPORT_COPY.replyLabel}</label>
+                    <textarea
+                      id={`support-reply-${request.id}`}
+                      className="si-input"
+                      rows={3}
+                      value={reply}
+                      placeholder={SUPPORT_COPY.replyPlaceholder}
+                      onChange={(e) => setReply(e.target.value)}
+                    />
+                  </div>
                   <Button type="button" onClick={() => sendReply.mutate()} disabled={sendReply.isPending || reply.trim() === ""}>
                     {sendReply.isPending ? SUPPORT_COPY.replyPending : SUPPORT_COPY.reply}
                   </Button>

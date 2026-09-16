@@ -294,6 +294,16 @@
   color: var(--v2-color-text-muted);
 }
 
+/* Help text under a field. Used by Settings and previously undefined, so it
+   rendered at body size with nothing distinguishing it from the value above
+   it. Inside .si-form, so the --v2-* properties resolve. */
+.si-help {
+  margin: var(--v2-space-1) 0 0;
+  color: var(--v2-color-text-muted, var(--v2-color-text));
+  font-size: var(--v2-text-small);
+  line-height: var(--v2-leading-body);
+}
+
 .si-input {
   width: 100%;
   min-height: 44px;
