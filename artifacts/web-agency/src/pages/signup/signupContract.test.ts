@@ -1,14 +1,13 @@
 /**
- * V5 customer-shell foundation — committed contract tests for the
- * invite-only AI Receptionist signup page (S-1).
+ * Committed contract tests for the AI Receptionist account-creation page:
+ * ordinary registration, no invite code.
  *
  * Run via: pnpm --filter @workspace/scripts run test
  *
- * Phase 5's suite pinned the previous open-trial signup (name, business
- * name, email, phone, industry, password, no invite gate). S-1 replaces that
- * flow entirely, so this file is rewritten against the new contract rather
- * than patched — the previous premises (no invite code, no timezone, no
- * Terms acknowledgement) are the opposite of what S-1 requires.
+ * History: Phase 5 pinned an open trial signup, S-1 pinned an invite-only one,
+ * and the owner retired the private-beta invitation for customer signup on
+ * 2026-09-16. This suite now pins registration WITHOUT an invite, while
+ * keeping S-1's timezone and Terms acknowledgement.
  *
  * Same arrangement as every other contract test in this app: behavioural
  * checks execute `signupContract.ts` directly; structural checks read the
@@ -21,7 +20,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  BETA_REQUEST_HREF,
   emptySignupForm,
   MIN_PASSWORD_LENGTH,
   SIGNUP_ENDPOINT,
@@ -31,6 +29,7 @@ import {
   buildSignupPayload,
   detectTimezone,
   mapSignupError,
+  SIGNUP_UNAVAILABLE_MESSAGE,
   validateSignup,
   type SignupFormValues,
 } from "./signupContract.js";
@@ -57,7 +56,6 @@ function check(name: string, condition: boolean, detail?: string): void {
 }
 
 const valid: SignupFormValues = {
-  inviteCode: "BETA-2026-XQ7",
   ownerName: "Jamie Rivera",
   businessName: "Northgate Plumbing",
   email: "jamie@northgate.example",
@@ -71,27 +69,27 @@ console.log("\n--- signup payload contract ---");
   const payload = buildSignupPayload(valid);
   const keys = Object.keys(payload).sort();
   check(
-    "payload carries exactly the seven contracted keys",
-    JSON.stringify(keys) === JSON.stringify(["acceptedTerms", "businessName", "email", "inviteCode", "ownerName", "password", "timezone"]),
+    "payload carries exactly the six contracted keys — no invite code",
+    JSON.stringify(keys) === JSON.stringify(["acceptedTerms", "businessName", "email", "ownerName", "password", "timezone"]),
     keys.join(","),
   );
-  check("inviteCode is passed through", payload.inviteCode === valid.inviteCode);
+  check("no inviteCode is sent", !("inviteCode" in payload));
   check("ownerName is passed through", payload.ownerName === valid.ownerName);
   check("businessName is passed through", payload.businessName === valid.businessName);
-  check("email is passed through untrimmed", payload.email === valid.email);
+  check("email is trimmed", buildSignupPayload({ ...valid, email: "  jamie@northgate.example " }).email === valid.email);
   check("password is passed through unaltered", payload.password === valid.password);
   check("timezone is passed through", payload.timezone === valid.timezone);
   check("acceptedTerms is always sent as literal true", payload.acceptedTerms === true);
-  check("endpoint is the documented invite-signup route", SIGNUP_ENDPOINT === "/api/receptionist/auth/invite-signup");
+  check("endpoint is the registration route", SIGNUP_ENDPOINT === "/api/receptionist/auth/register");
   check("method is POST", SIGNUP_METHOD === "POST");
-  check("no open trial-signup endpoint remains referenced", !/\/api\/receptionist\/auth\/signup["'`]/.test(pageSrc));
+  check("the page calls neither the invite route nor the older signup route", !/auth\/(invite-signup|signup)["'`]/.test(pageSrc));
 }
 
 console.log("\n--- client-side validation, in field order ---");
 {
   const empty = emptySignupForm();
   check("an empty form is rejected", validateSignup(empty).ok === false);
-  check("invite code is checked first", validateSignup(empty).focusField === "inviteCode");
+  check("owner name is checked first", validateSignup(empty).focusField === "ownerName");
 
   const noOwner = validateSignup({ ...valid, ownerName: "" });
   check("a missing owner name is rejected", noOwner.ok === false);
@@ -102,7 +100,7 @@ console.log("\n--- client-side validation, in field order ---");
 
   const noEmail = validateSignup({ ...valid, email: "" });
   check("a missing email is rejected", noEmail.ok === false);
-  check("no client-side email-format rule (the server decides)", validateSignup({ ...valid, email: "not-an-email" }).ok === true);
+  check("an obviously malformed email is rejected client-side", validateSignup({ ...valid, email: "not-an-email" }).focusField === "email");
 
   const shortPw = validateSignup({ ...valid, password: "1234567" });
   check(`a password under ${MIN_PASSWORD_LENGTH} characters is rejected`, shortPw.ok === false);
@@ -118,18 +116,23 @@ console.log("\n--- client-side validation, in field order ---");
 
 console.log("\n--- API error mapping ---");
 {
-  const invalid = mapSignupError(400, "That invite code is invalid or has expired.");
-  check("400 reads as an invalid/expired code or validation failure", invalid.outcome === "invalid");
-  check("400 shows the server's own message", invalid.message === "That invite code is invalid or has expired.");
+  const invalid = mapSignupError(400, "Enter a valid email address.");
+  check("400 reads as a validation failure", invalid.outcome === "invalid");
+  check("400 shows the server's own message", invalid.message === "Enter a valid email address.");
 
-  const dup = mapSignupError(409, "An account already exists for that email.");
-  check("409 reads as a duplicate account", dup.outcome === "duplicate");
-  check("409 offers sign-in as the recovery", dup.offerSignIn === true);
+  const dup = mapSignupError(409, "anything");
+  check("409 reads as an existing account", dup.outcome === "duplicate");
+  check("409 offers recovery (sign in / reset) rather than a second account", dup.offerRecovery === true);
+
+  const limited = mapSignupError(429);
+  check("429 reads as rate-limited", limited.outcome === "limited" && limited.offerRecovery === false);
 
   const off = mapSignupError(503);
   check("503 reads as unavailable", off.outcome === "unavailable");
-  check("503 names the private-beta invitation posture", /invitation/i.test(off.message) && /private beta/i.test(off.message));
-  check("503 does not offer sign-in (there is no account to sign into)", off.offerSignIn === false);
+  check("503 says so plainly, without private-beta or invitation wording", off.message === SIGNUP_UNAVAILABLE_MESSAGE && !/invitation|private beta/i.test(off.message));
+  check("503 does not offer recovery (there is no account to recover)", off.offerRecovery === false);
+
+  check("a 500 never echoes server internals", mapSignupError(500, "stack trace here").message !== "stack trace here");
 
   const other = mapSignupError(500);
   check("an unmapped failure falls back to a generic message", other.message.length > 0 && other.outcome === "error");
@@ -146,7 +149,6 @@ console.log("\n--- timezone select ---");
 console.log("\n--- required fields are on the page ---");
 {
   const fields = [
-    { id: "s-invite-code", label: "Invite code" },
     { id: "s-owner-name", label: "Your name" },
     { id: "s-business-name", label: "Business name" },
     { id: "s-email", label: "Work email" },
@@ -158,7 +160,7 @@ console.log("\n--- required fields are on the page ---");
     check(`field ${f.id} is rendered`, pageSrc.includes(`id="${f.id}"`));
     check(`field ${f.id} has a label bound with htmlFor`, pageSrc.includes(`htmlFor="${f.id}"`));
   }
-  check("the invite code field is required", /id="s-invite-code"[\s\S]{0,400}?aria-required="true"/.test(pageSrc));
+  check("there is no invite code field", !pageSrc.includes("s-invite-code") && !/Invite code/i.test(pageText));
   check("the Terms checkbox is a real checkbox input", /id="s-accept-terms"[\s\S]{0,80}?type="checkbox"/.test(pageSrc));
   check("the Terms checkbox links to both Terms and Privacy", pageSrc.includes("ROUTES.terms") && pageSrc.includes("ROUTES.privacy"));
   check("timezone is a native select, not a custom widget", pageSrc.includes('<select id="s-timezone"'));
@@ -168,19 +170,16 @@ console.log("\n--- required fields are on the page ---");
   check("business-name autocomplete is organization", pageSrc.includes('autoComplete="organization"'));
 }
 
-console.log("\n--- states: submitting, invalid code, duplicate, unavailable ---");
+console.log("\n--- states: submitting, duplicate, unavailable ---");
 {
   check("a submitting state disables the submit button", pageSrc.includes("disabled={submitting}"));
   check("the submitting state is announced in the button", pageSrc.includes("Creating your account"));
   check(
-    "a duplicate account (409) offers 'Sign in instead'",
-    pageSrc.includes('outcome === "duplicate"') && pageSrc.includes("Sign in instead"),
+    "an existing account (409) offers sign-in and password reset",
+    pageSrc.includes('outcome === "duplicate"') && pageSrc.includes("Sign in instead") && pageSrc.includes("DASHBOARD_URLS.passwordReset"),
   );
-  check(
-    "an unavailable beta (503) offers Request Beta Access, linked to the beta section",
-    pageSrc.includes('outcome === "unavailable"') && pageSrc.includes("Request Beta Access") && pageSrc.includes("BETA_REQUEST_HREF"),
-  );
-  check("the beta-request destination is the documented in-page anchor", BETA_REQUEST_HREF === "/ai-receptionist#beta");
+  check("the password-reset destination is the dashboard's reset page", routesSrc.includes('passwordReset: dashboardUrl("/password-reset")'));
+  check("no beta-request dead end remains on the page", !/Request Beta Access|BETA_REQUEST_HREF/.test(pageSrc));
   check("field-level errors are rendered per field, tied by aria-describedby", pageSrc.includes("aria-describedby={describedBy("));
 }
 
@@ -220,7 +219,7 @@ console.log("\n--- readiness wording and honest next steps ---");
 {
   check("readiness comes from the shared source", pageSrc.includes("CAPABILITY_STATUS") && pageSrc.includes("READINESS"));
   check("heading matches the S-1 title exactly", /Set up your AI Receptionist/.test(pageSrc));
-  check("the page states signup is invite-gated", /invit/i.test(pageText));
+  check("the page no longer describes an invitation or private beta", !/invit|private beta/i.test(pageText));
   check("the page never promises automatic activation", !/activat(e|ion)s?\s+(automatically|immediately)/i.test(pageText));
 
   const overclaims: Array<[string, RegExp]> = [

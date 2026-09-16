@@ -66,7 +66,7 @@ export const whatWeBuildV4: V4PanelItem[] = [
     label: "AI Receptionist",
     outcome: "Help every caller",
     description:
-      "Answers routine calls, collects details, and sends you a useful summary. Private beta.",
+      "Answers routine calls, collects details, and sends you a useful summary. Early access.",
     href: ROUTES.aiReceptionist,
     glyph: "voice",
   },
@@ -126,13 +126,10 @@ export const startLabelV4 = "Start a Project";
 /* Account-journey actions (owner directive 2026-09-11 §5): the product
  * header acquires through the working account journey. Create Account is
  * registration; Sign In is returning-user access — distinct on purpose.
- * The beta-request section remains reachable on the page itself as a
- * secondary contact path. */
+ * The private-beta request path was retired 2026-09-16. */
 export const createAccountHrefV4 = ROUTES.aiReceptionistSignup;
 export const createAccountLabelV4 = "Create Account";
 
-export const requestBetaHrefV4 = `${ROUTES.aiReceptionist}#beta`;
-export const requestBetaLabelV4 = "Request Beta Access";
 export const explorePreviewHrefV4 = `${ROUTES.aiReceptionist}#preview`;
 export const explorePreviewLabelV4 = "Explore the Interactive Preview";
 export const productSignInLabelV4 = "Already a client? Sign in";

@@ -418,8 +418,8 @@ export interface ManualInvoicingCopy {
 /** Shown instead of the Upgrade control while `checkoutEnabled()` is false. */
 export function manualInvoicingCopy(): ManualInvoicingCopy {
   return {
-    title: "Billing during the private beta",
-    detail: "Billing during the private beta is handled by SiteMint (manual invoicing).",
+    title: "Billing is arranged with SiteMint",
+    detail: "Billing is arranged directly with SiteMint. Nothing is charged from this page.",
   };
 }
 

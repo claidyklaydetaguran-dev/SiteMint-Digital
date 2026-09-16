@@ -28,7 +28,6 @@ import {
 } from "@/pages/receptionist-v5/sections";
 import { CallTheaterV5, HeroCallTheaterV5 } from "@/components/receptionist-v5/CallTheaterV5";
 import { LiveDemoPanel } from "@/components/receptionist-v5/LiveDemoPanel";
-import { BetaRequestForm } from "@/components/receptionist-v5/BetaRequestForm";
 import { DashboardPreview } from "@/components/receptionist-v5/DashboardPreview";
 import { MintSignalCorner } from "@/components/v5/MintSignal";
 import { Reveal } from "@/components/v5/Reveal";
@@ -46,7 +45,7 @@ type Readiness = "available" | "beta" | "development" | "planned";
 
 const READINESS_LABEL: Record<Readiness, string> = {
   available: "Available now",
-  beta: "Private beta",
+  beta: "Early access",
   development: "In development",
   planned: "Planned",
 };
@@ -333,12 +332,12 @@ const WHAT_IT_DOES: { title: string; body: string; status: Readiness }[] = [
   },
   {
     title: "Answering and guiding callers",
-    body: "Greeting callers, asking your questions, and helping them reach the right next step by your business rules.",
-    status: "development",
+    body: "Greeting callers, asking your questions, and taking a message by your business rules. Publish your assistant and talk to it from your browser to test it.",
+    status: "beta",
   },
   {
     title: "Appointment scheduling and calendar",
-    body: "Availability check, request, approve/book, reschedule, cancel, and Google Calendar availability — certified on staging; customer controls arriving in the private beta.",
+    body: "Check availability, book, reschedule and cancel against your connected Google Calendar. You can set it up and test it from your account.",
     status: "beta",
   },
   {
@@ -353,7 +352,7 @@ const WHAT_IT_DOES: { title: string; body: string; status: Readiness }[] = [
   },
   {
     title: "Assigned number and live inbound calling",
-    body: "A dedicated phone number that routes real calls to the receptionist, activated once testing is approved.",
+    body: "A dedicated phone number that routes real calls to your receptionist. Connected with SiteMint after you have tested it; not self-service yet.",
     status: "development",
   },
   {
@@ -363,8 +362,8 @@ const WHAT_IT_DOES: { title: string; body: string; status: Readiness }[] = [
   },
   {
     title: "Human transfer",
-    body: "Handing a call to a person mid-conversation, for situations the receptionist shouldn't resolve alone.",
-    status: "planned",
+    body: "Handing a call to a person mid-conversation. Not yet verified on a live call, so not offered yet.",
+    status: "development",
   },
 ];
 
@@ -531,7 +530,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I sign up right now?",
-    a: "The AI Receptionist is invite-only during private beta. Requesting access starts the conversation — it does not create an account immediately.",
+    a: "Yes. Create an account, confirm your email, then set up your assistant and test it from your browser. Answering a real business phone number is a separate step you complete with SiteMint when you are ready.",
   },
   {
     q: "What if the receptionist can't handle something?",
@@ -547,7 +546,7 @@ export default function AiReceptionistV5() {
   usePageMeta({
     title: "AI Receptionist — SiteMint Digital",
     description:
-      "See how an AI receptionist answers, qualifies, and books for your business — explore the simulated preview and request private-beta access.",
+      "See how an AI receptionist answers, qualifies, and books for your business — explore the simulated preview and create an account to set up your own.",
   });
   return (
     <PublicShell
@@ -632,7 +631,7 @@ export default function AiReceptionistV5() {
         <section id={SECTION_ID.preview} className="smv5__section">
           <div className="smv5__container">
             <span className="smv5__eyebrow">Interactive preview</span>
-            <h2 className="smv5__h2">See how it responds, before you request access</h2>
+            <h2 className="smv5__h2">See how it responds, before you create an account</h2>
             <p className="smv5__lede">
               Pick a topic and watch the same voice-object states a real conversation moves
               through — Ready, Listening, Thinking, Speaking. Nothing here places a call.
@@ -673,8 +672,8 @@ export default function AiReceptionistV5() {
             <span className="smv5__eyebrow">What it does</span>
             <h2 className="smv5__h2">What's available now, and what's coming</h2>
             <p className="smv5__lede">
-              Every capability below is labelled honestly. Nothing marked Private beta, In
-              development, or Planned is active for the public today.
+              Every capability below is labelled honestly. Early access means you can set it up
+              and test it in your own account today. In development and Planned are not active yet.
             </p>
             <div className="smv5-grid">
               {WHAT_IT_DOES.map((item) => (
@@ -694,7 +693,7 @@ export default function AiReceptionistV5() {
             <span className="smv5__eyebrow">Appointments and calendar</span>
             <h2 className="smv5__h2">The full appointment lifecycle</h2>
             <p className="smv5__lede">
-              Certified on staging; customer controls arriving in the private beta.
+              Set it up in your account, connect your calendar, and test the whole lifecycle.
             </p>
             {/* "Business-rule lookup" motif: the six stops themselves reveal
                 in order (transform + opacity, staggered) as this checklist
@@ -882,8 +881,8 @@ export default function AiReceptionistV5() {
           </div>
         </section>
 
-        {/* ── 14 · Private-beta posture ────────────────────────────────── */}
-        <section id={SECTION_ID["beta-posture"]} className="smv5__section smv5__section--tight">
+        {/* ── 14 · What works today ────────────────────────────────────── */}
+        <section id={SECTION_ID.availability} className="smv5__section smv5__section--tight">
           <div className="smv5__container">
             <span className="smv5-badge smv5-badge--beta">{HERO_COPY.betaStatus}</span>
             <p className="smv5__lede" style={{ marginBottom: 0 }}>
@@ -923,17 +922,23 @@ export default function AiReceptionistV5() {
           </div>
         </section>
 
-        {/* ── 16 · Request Beta Access ──────────────────────────────────── */}
-        <section id={SECTION_ID.beta} className="smv5__section">
+        {/* ── 16 · Create an account ────────────────────────────────────── */}
+        <section id={SECTION_ID["get-started"]} className="smv5__section">
           <div className="smv5__container">
-            <span className="smv5__eyebrow">Request Beta Access</span>
-            <h2 className="smv5__h2">Start the conversation</h2>
+            <span className="smv5__eyebrow">Get started</span>
+            <h2 className="smv5__h2">Create your account</h2>
             <p className="smv5__lede">
-              The AI Receptionist is invite-only during private beta. Tell us about your
-              business and the SiteMint team will follow up to walk through onboarding. If
-              beta requests aren't open yet, you'll see exactly why below.
+              Set up your business, configure your assistant and test it from your browser.
+              No invitation needed.
             </p>
-            <BetaRequestForm />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              <Link href={ROUTES.aiReceptionistSignup} className="smv5-btn smv5-btn--primary">
+                Create account
+              </Link>
+              <a href={DASHBOARD_URLS.login} className="smv5-btn smv5-btn--outline">
+                Sign in
+              </a>
+            </div>
             <p className="smv5__lede" style={{ marginTop: 20, fontSize: 13 }}>
               Prefer email? Reach us at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>

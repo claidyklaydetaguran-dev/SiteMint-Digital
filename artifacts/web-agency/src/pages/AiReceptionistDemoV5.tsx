@@ -104,8 +104,8 @@ export default function AiReceptionistDemoV5() {
               <a href={dashboardUrl("/login")} className="v3-btn v3-btn--primary">
                 Sign in
               </a>
-              <Link href={`${ROUTES.aiReceptionist}#beta`} className="v3-btn v3-btn--outline">
-                Request access
+              <Link href={ROUTES.aiReceptionistSignup} className="v3-btn v3-btn--outline">
+                Create account
               </Link>
               <Link href={`${ROUTES.aiReceptionist}#preview`} className="v3-btn v3-btn--quiet">
                 Try the interactive preview
@@ -160,12 +160,12 @@ export default function AiReceptionistDemoV5() {
           <div className="v3-container v3-reveal" ref={reveal}>
             <h2 className="v3-h2 reveal-clip">Ready when you are.</h2>
             <p className="v3-lede reveal-fade-up">
-              The AI Receptionist is in private, invite-only beta. Request
-              access and we will walk your business through setup.
+              Create an account to set up your own assistant and test it from
+              your browser. No invitation needed.
             </p>
             <div className="v3m-hero__actions reveal-fade-up">
-              <Link href={`${ROUTES.aiReceptionist}#beta`} className="v3-btn v3-btn--primary">
-                Request private beta
+              <Link href={ROUTES.aiReceptionistSignup} className="v3-btn v3-btn--primary">
+                Create account
               </Link>
               <a href={dashboardUrl("/login")} className="v3-btn v3-btn--outline">
                 Client sign in

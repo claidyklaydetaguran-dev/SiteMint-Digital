@@ -249,8 +249,8 @@ console.log("\n--- accessibility structure ---");
 console.log("\n--- product truth ---");
 {
   check(
-    "the heading names the SMS receptionist",
-    pageProse.includes("Sign in to your") && pageProse.includes("SMS Receptionist"),
+    "the heading names the AI Receptionist",
+    pageProse.includes("Sign in to your") && pageProse.includes("AI Receptionist"),
   );
   check("the readiness tiers are rendered", pageText.includes("CAPABILITY_STATUS.map"));
   check("the tier label is always shown as text", pageText.includes("READINESS[item.tier].label"));

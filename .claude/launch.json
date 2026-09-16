@@ -32,6 +32,25 @@
         "API_PROXY_TARGET": "http://localhost:8090",
         "PORT": "22066"
       }
+    },
+    {
+      "name": "receptionist-dashboard",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@workspace/helpdesk",
+        "run",
+        "dev"
+      ],
+      "port": 21622,
+      "url": "http://localhost:21622",
+      "env": {
+        "PORT": "21622",
+        "BASE_PATH": "/ai-receptionist/dashboard/",
+        "API_PROXY_TARGET": "http://localhost:8090",
+        "VITE_VOICE_PLATFORM_ENABLED": "true",
+        "VITE_VOICE_PUBLISH_ENABLED": "true"
+      }
     }
   ]
 }

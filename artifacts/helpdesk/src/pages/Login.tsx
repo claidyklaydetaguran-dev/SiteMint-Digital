@@ -173,11 +173,11 @@ export default function Login() {
               last thing read in the link above it, and stacking the two put
               the product name on screen twice before the task was named. */}
           <h1 className="si-title">
-            Sign in to your <span className="si-title__live">SMS Receptionist</span>
+            Sign in to your <span className="si-title__live">AI Receptionist</span>
           </h1>
           <p className="si-lede">
-            Your dashboard holds the conversations your receptionist has had, the
-            questions it asks, and your account settings.
+            Your dashboard holds your calls and messages, your assistant, and your
+            account settings.
           </p>
 
           {/* One bordered object on the page: the form, and the readiness the

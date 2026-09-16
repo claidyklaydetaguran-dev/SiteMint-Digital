@@ -1,23 +1,20 @@
 /**
- * V5 customer-shell foundation — the invite-only AI Receptionist signup
- * contract, as pure functions (S-1).
+ * The AI Receptionist account-creation contract, as pure functions.
  *
- * S-1 replaces the previous open trial signup (name, business name, email,
- * phone, industry, password — Phase 5) with an invite-gated account-creation
- * flow: invite code, owner name, business name, work email, password,
- * timezone, and a required Terms/Privacy acknowledgement. Industry and every
- * other configuration decision moves to the guided onboarding hub (S-3,
- * `pages/setup/setupContract.ts` in helpdesk) — this page's only job is to
- * create the account.
+ * Ordinary registration: owner name, business name, work email, password,
+ * timezone (optional), and a required Terms/Privacy acknowledgement. No invite
+ * code — the private-beta invitation requirement is retired for customer
+ * signup (invitations remain for joining someone else's team). Industry and
+ * every other configuration decision belong to the guided setup the account
+ * opens into; this page's only job is to create the account.
  *
- * Endpoint, per the task brief:
- *
- *   POST /api/receptionist/auth/invite-signup
- *   { inviteCode, ownerName, businessName, email, password, timezone, acceptedTerms: true }
+ *   POST /api/receptionist/auth/register
+ *   { ownerName, businessName, email, password, timezone, acceptedTerms: true }
  *     → 201 (session cookie set)
- *     → 400 { error }   invalid/expired code, validation
- *     → 409 { error }   duplicate email
- *     → 503 { error }   INVITE_SIGNUP_ENABLED is off
+ *     → 400 { error }                        validation
+ *     → 409 { error, code: "email_exists" }  an account already exists
+ *     → 429 { error }                        too many attempts
+ *     → 503 { error }                        registration is switched off
  *
  * No imports, so this stays portable into the plain `tsx` test runner with
  * no path-alias resolution — matching every other contract module in this
@@ -25,7 +22,6 @@
  */
 
 export interface SignupFormValues {
-  inviteCode: string;
   ownerName: string;
   businessName: string;
   email: string;
@@ -36,7 +32,6 @@ export interface SignupFormValues {
 
 export function emptySignupForm(defaultTimezone = ""): SignupFormValues {
   return {
-    inviteCode: "",
     ownerName: "",
     businessName: "",
     email: "",
@@ -50,7 +45,6 @@ export function emptySignupForm(defaultTimezone = ""): SignupFormValues {
 export const EMPTY_SIGNUP_FORM: SignupFormValues = emptySignupForm();
 
 export interface SignupPayload {
-  inviteCode: string;
   ownerName: string;
   businessName: string;
   email: string;
@@ -59,7 +53,7 @@ export interface SignupPayload {
   acceptedTerms: true;
 }
 
-export const SIGNUP_ENDPOINT = "/api/receptionist/auth/invite-signup";
+export const SIGNUP_ENDPOINT = "/api/receptionist/auth/register";
 export const SIGNUP_METHOD = "POST";
 
 /**
@@ -69,10 +63,9 @@ export const SIGNUP_METHOD = "POST";
  */
 export function buildSignupPayload(form: SignupFormValues): SignupPayload {
   return {
-    inviteCode: form.inviteCode,
-    ownerName: form.ownerName,
-    businessName: form.businessName,
-    email: form.email,
+    ownerName: form.ownerName.trim(),
+    businessName: form.businessName.trim(),
+    email: form.email.trim(),
     password: form.password,
     timezone: form.timezone,
     acceptedTerms: true,
@@ -83,7 +76,6 @@ export interface SignupValidation {
   ok: boolean;
   formError: string;
   fieldErrors: {
-    inviteCode?: string;
     ownerName?: string;
     businessName?: string;
     email?: string;
@@ -99,15 +91,11 @@ export const MIN_PASSWORD_LENGTH = 8;
 
 /**
  * Client-side rules, evaluated in field order so the first problem in the
- * form is always the one reported: invite code → owner name → business name
- * → email → password length → the Terms/Privacy checkbox. No email-format
- * rule is added — the server decides that, exactly as every other auth
- * contract in this app leaves it.
+ * form is always the one reported: owner name → business name → email →
+ * password length → the Terms/Privacy checkbox. The email check is only the
+ * obvious shape; the server remains the authority.
  */
 export function validateSignup(form: SignupFormValues): SignupValidation {
-  if (!form.inviteCode.trim()) {
-    return { ok: false, formError: "Enter your invite code.", fieldErrors: { inviteCode: "Required." }, focusField: "inviteCode" };
-  }
   if (!form.ownerName.trim()) {
     return { ok: false, formError: "Enter your name.", fieldErrors: { ownerName: "Required." }, focusField: "ownerName" };
   }
@@ -116,6 +104,9 @@ export function validateSignup(form: SignupFormValues): SignupValidation {
   }
   if (!form.email.trim()) {
     return { ok: false, formError: "Enter your work email.", fieldErrors: { email: "Required." }, focusField: "email" };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    return { ok: false, formError: "Enter a valid email address.", fieldErrors: { email: "Check the address." }, focusField: "email" };
   }
   if (form.password.length < MIN_PASSWORD_LENGTH) {
     return {
@@ -139,39 +130,44 @@ export function validateSignup(form: SignupFormValues): SignupValidation {
 export const SIGNUP_NETWORK_ERROR =
   "We couldn't reach the server. Your details are still here — try again.";
 export const SIGNUP_GENERIC_ERROR = "Signup failed — please try again.";
+export const SIGNUP_UNAVAILABLE_MESSAGE =
+  "Account creation is unavailable right now. Please try again later.";
+export const SIGNUP_EXISTS_MESSAGE =
+  "An account already exists for this email.";
+export const SIGNUP_RATE_LIMITED_MESSAGE =
+  "Too many attempts from this connection. Please wait a while and try again.";
 
-export const BETA_UNAVAILABLE_MESSAGE = "Signup is by invitation during the private beta.";
-/** Base-relative in-app anchor into the AI Receptionist page's beta section. */
-export const BETA_REQUEST_HREF = "/ai-receptionist#beta";
-
-export type SignupOutcome = "success" | "invalid" | "duplicate" | "unavailable" | "error";
+export type SignupOutcome = "success" | "invalid" | "duplicate" | "unavailable" | "limited" | "error";
 
 export interface MappedSignupError {
   outcome: SignupOutcome;
   message: string;
-  offerSignIn: boolean;
+  /** Offer "Sign in" and "Reset your password" — an existing account is recovered, never duplicated. */
+  offerRecovery: boolean;
 }
 
 /**
  * Map an API failure to the message and recovery this page offers.
  *
- * 400 covers both an invalid/expired invite code and ordinary field
- * validation — the server's own message distinguishes them, so it is shown
- * verbatim rather than re-interpreted. 409 is a duplicate account and offers
- * sign-in. 503 means invite signup is off entirely and points at the beta
- * request path instead of a dead form.
+ * 400 is field validation and the server's own message is shown verbatim.
+ * 409 is an existing account: the page offers sign-in and password reset
+ * rather than a second business. 429 is the rate limit. 503 means
+ * registration is switched off — stated plainly, with no dead-end link.
  */
 export function mapSignupError(status: number, serverError?: string): MappedSignupError {
   if (status === 409) {
-    return { outcome: "duplicate", message: serverError?.trim() ? serverError : "An account already exists for that email.", offerSignIn: true };
+    return { outcome: "duplicate", message: SIGNUP_EXISTS_MESSAGE, offerRecovery: true };
   }
   if (status === 503) {
-    return { outcome: "unavailable", message: BETA_UNAVAILABLE_MESSAGE, offerSignIn: false };
+    return { outcome: "unavailable", message: SIGNUP_UNAVAILABLE_MESSAGE, offerRecovery: false };
+  }
+  if (status === 429) {
+    return { outcome: "limited", message: SIGNUP_RATE_LIMITED_MESSAGE, offerRecovery: false };
   }
   if (status === 400) {
-    return { outcome: "invalid", message: serverError?.trim() ? serverError : "That invite code is invalid or has expired.", offerSignIn: false };
+    return { outcome: "invalid", message: serverError?.trim() ? serverError : "Check the highlighted details and try again.", offerRecovery: false };
   }
-  return { outcome: "error", message: serverError?.trim() ? serverError : SIGNUP_GENERIC_ERROR, offerSignIn: false };
+  return { outcome: "error", message: SIGNUP_GENERIC_ERROR, offerRecovery: false };
 }
 
 // ─── Timezone select — browser default preselected ─────────────────────────

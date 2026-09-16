@@ -425,12 +425,6 @@ export function SiteHeaderV4({ tone = "light", headerMode = "company" }: SiteHea
                 className="v4-btn v4-btn--primary v4-header__cta"
                 aria-label="Create Account"
               >
-                {/* Below ~480px the brand wordmark is already gone (CSS);
-                    shortening "Request Private Beta" → "Beta" buys back the
-                    width the product name needs to never truncate. "Beta"
-                    is a substring of the constant aria-label above, so the
-                    visible text is always contained in the accessible name
-                    at both sizes. */}
                 {/* "Account" is a substring of the accessible name
                     "Create Account", preserving label-in-name at the
                     narrow size exactly like the previous CTA pair. */}

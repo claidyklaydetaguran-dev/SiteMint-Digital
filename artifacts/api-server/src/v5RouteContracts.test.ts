@@ -131,6 +131,12 @@ describe("guard placement — the three new flag-gated public routes", () => {
       forbidden: [/inviteSignupIpLimiter/, /consumeInviteCode\(/, /createFirmForInviteSignup\(/, /createSession\(/],
     },
     {
+      file: "routes/receptionistInvites.ts",
+      handler: 'router.post("/receptionist/auth/register"',
+      flag: "isPublicRegistrationEnabled",
+      forbidden: [/inviteSignupIpLimiter/, /createFirmForInviteSignup\(/, /createSession\(/, /enqueueSignupJobs\(/],
+    },
+    {
       file: "routes/publicBetaRequests.ts",
       handler: 'router.post("/public/beta-requests"',
       flag: "isPublicBetaRequestsEnabled",

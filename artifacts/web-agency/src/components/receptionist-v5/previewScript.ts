@@ -10,7 +10,7 @@
  *
  * Seven curated branches (OWNER-REVIEW-WORKBOOK L-9 / V5-BLUEPRINT §8):
  * about SiteMint, services, the receptionist, how setup works, supported
- * workflows, private-beta access, next step.
+ * workflows, getting access, next step.
  *
  * This module has no imports, so it stays trivially portable into a plain
  * `tsx` test process (same reasoning as `sections.ts`).
@@ -118,7 +118,7 @@ export const PREVIEW_BRANCHES: PreviewBranch[] = [
         state: "speaking",
         line: {
           who: "Assistant",
-          text: "Availability checks, appointment requests, and the approve, reschedule, and cancel steps that follow — certified on staging today, with the customer-facing controls arriving in the private beta.",
+          text: "Availability checks, appointment requests, and the approve, reschedule, and cancel steps that follow — you can connect your Google Calendar and test them from your own account.",
         },
       },
     ],
@@ -135,11 +135,11 @@ export const PREVIEW_BRANCHES: PreviewBranch[] = [
         state: "speaking",
         line: {
           who: "Assistant",
-          text: "The AI Receptionist is invite-only during private beta. Requesting access takes a minute, and the SiteMint team follows up directly to walk through onboarding.",
+          text: "Create an account from this page. You confirm your email, set up your business and assistant, and can test it from your browser straight away.",
         },
       },
     ],
-    ending: "Preview ended — topic: Private-beta access.",
+    ending: "Preview ended — topic: Getting access.",
   },
   {
     id: "next-step",
@@ -152,7 +152,7 @@ export const PREVIEW_BRANCHES: PreviewBranch[] = [
         state: "speaking",
         line: {
           who: "Assistant",
-          text: "Requesting beta access is the fastest path in. If you'd rather look around first, the sections below cover exactly what's available now versus what's still in development.",
+          text: "Creating an account is the fastest path in. If you'd rather look around first, the sections below cover exactly what works today versus what's still in development.",
         },
       },
     ],

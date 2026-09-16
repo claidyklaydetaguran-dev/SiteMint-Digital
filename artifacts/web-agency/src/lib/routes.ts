@@ -141,6 +141,7 @@ export function dashboardUrl(path = "/"): string {
 export const DASHBOARD_URLS = {
   root: dashboardUrl("/"),
   login: dashboardUrl("/login"),
+  passwordReset: dashboardUrl("/password-reset"),
 } as const;
 
 /**

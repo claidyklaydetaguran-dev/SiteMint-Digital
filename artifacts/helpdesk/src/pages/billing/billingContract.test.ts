@@ -269,11 +269,11 @@ check(
   "outside a bundler (the plain tsx test runner) the flag defaults closed",
   checkoutEnabled() === false,
 );
-eq("the manual-invoicing title names the private beta", manualInvoicingCopy().title, "Billing during the private beta");
+eq("the manual-invoicing title is plain", manualInvoicingCopy().title, "Billing is arranged with SiteMint");
 eq(
-  "the manual-invoicing detail is the exact brief wording",
+  "the manual-invoicing detail says nothing is charged here",
   manualInvoicingCopy().detail,
-  "Billing during the private beta is handled by SiteMint (manual invoicing).",
+  "Billing is arranged directly with SiteMint. Nothing is charged from this page.",
 );
 check(
   "an eligible trial account sees the manual-invoicing notice when checkout is disabled",

@@ -101,7 +101,7 @@ const CAPABILITY_GROUPS: CapabilityGroup[] = [
       { label: "Forms & inquiry handling", outcome: "A structured brief instead of a two-line email — read properly before anyone calls you back." },
       { label: "Reminders", outcome: "Follow-up happens on time, every time — and stops when a human replies." },
       { label: "Customer communication", outcome: "Messages in your voice, with your rules." },
-      { label: "AI Receptionist", outcome: "Help every caller, even when your team is busy — private beta." },
+      { label: "AI Receptionist", outcome: "Help every caller, even when your team is busy — early access." },
     ],
     detailsHref: "/discovery-systems",
     detailsLabel: "View follow-up system details",
@@ -310,7 +310,7 @@ function ReceptionistSpotlight() {
       <div className="v4-container sm-split sm-split--reverse">
         <div className="sm-split__copy reveal-h-right" ref={reveal} data-v4-reveal>
           <span className="v4-kicker">06 — AI Receptionist</span>
-          <span className="sm-badge sm-badge--beta">Private beta — invite only</span>
+          <span className="sm-badge sm-badge--beta">Early access — create an account</span>
           <h2 className="v4-h2 reveal-clip">Never let a good opportunity end at a missed call.</h2>
           <p className="v4-lede reveal-fade-up">
             SiteMint AI Receptionist is built to answer incoming calls, handle
@@ -364,7 +364,7 @@ function ReceptionistSpotlight() {
               </li>
             </ul>
             <span className="sm-callsignal__thread" aria-hidden="true" />
-            <p className="sm-callsignal__note">Simulated preview — private beta</p>
+            <p className="sm-callsignal__note">Simulated preview</p>
           </div>
           <ShotFrame
             src={hdCallsShot}
@@ -557,7 +557,7 @@ const WHY_POINTS = [
   },
   {
     title: "Honest about capability",
-    body: "Every feature on this site is labelled available, private beta, in development, or planned. Nothing planned looks live.",
+    body: "Every feature on this site is labelled available, early access, in development, or planned. Nothing planned looks live.",
   },
   {
     title: "A small, senior team",
@@ -671,8 +671,8 @@ const FAQ_ITEMS: FaqItem[] = [
     a: "Two ways: AI-assisted development (we use AI tools to build faster, with human review and testing on everything that ships) and, where it's in scope, AI automation inside your system — evaluation, routing, drafting. Judgment calls stay with a person.",
   },
   {
-    q: "What is the AI Receptionist private beta?",
-    a: "SiteMint's AI Receptionist product is in an invite-only private beta. It does not retain call audio or full transcripts. Request beta access from the AI Receptionist page to be considered.",
+    q: "Can I try the AI Receptionist?",
+    a: "Yes. Create an account from the AI Receptionist page to set up your assistant and test it from your browser. It does not retain call audio or full transcripts. Connecting a real business phone number is a separate step completed with SiteMint.",
   },
 ];
 

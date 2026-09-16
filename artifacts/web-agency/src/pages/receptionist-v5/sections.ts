@@ -23,9 +23,9 @@ export const RECEPTIONIST_V5_SECTIONS = [
   { id: "privacy", label: "Privacy and retention" },
   { id: "use-cases", label: "Built for different businesses" },
   { id: "setup", label: "Setup process" },
-  { id: "beta-posture", label: "Private beta" },
+  { id: "availability", label: "What works today" },
   { id: "faq", label: "FAQ" },
-  { id: "beta", label: "Request Beta Access" },
+  { id: "get-started", label: "Create account" },
   { id: "sign-in", label: "Existing clients" },
 ] as const;
 
@@ -45,8 +45,8 @@ export const PREVIEW_LABEL =
  * redesign) — `eyebrow`/`betaStatus`/`primaryCta`/`secondaryCta` replace the
  * retired `pill` field; `primaryCta` and `secondaryCta` also SWAPPED which
  * action is visually primary (filled) vs. secondary (outline): the
- * Interactive Preview is now the filled, primary action and Request Beta
- * Access is the outline, secondary one. See `AiReceptionistV5.tsx`'s hero
+ * Interactive Preview is now the filled, primary action and Create Account
+ * is the outline, secondary one. See `AiReceptionistV5.tsx`'s hero
  * section for the anchor wiring.
  */
 export const HERO_COPY = {
@@ -63,17 +63,17 @@ export const HERO_COPY = {
     "It answers routine calls with your approved business information, collects the caller's details and why they're calling, helps schedule where you've set that up, and sends you a useful summary.",
   /** Filled/primary action — anchors to the Interactive Preview section. */
   primaryCta: "Explore the Interactive Preview",
-  /** Outline/secondary action — the working account journey (2026-09-11 §5).
-   * The beta-request section remains on the page as a secondary contact
-   * path, and the signup page itself falls back to it while registration
-   * is closed (503). */
+  /** Outline/secondary action — ordinary account registration (the private-beta
+   * request path was retired 2026-09-16). */
   secondaryCta: "Create Account",
   signInPrompt: "Already a client?",
   signInCta: "Sign in",
 } as const;
 
-/** L-5: the only pricing statement permitted before certification. */
-export const PRICING_POSTURE = "Private-beta pricing is provided during onboarding.";
+/** L-5: the only pricing statement permitted before certification. No price is
+ * invented and no charge is implied by creating an account. */
+export const PRICING_POSTURE =
+  "Creating an account and testing your assistant costs nothing. Pricing for live calling is agreed with you before any charge is made.";
 
-/** Where a visitor can reach us while beta requests are closed (ThankYou.tsx). */
+/** Where a visitor can reach the SiteMint team directly. */
 export const CONTACT_EMAIL = "info.sitemint@gmail.com";

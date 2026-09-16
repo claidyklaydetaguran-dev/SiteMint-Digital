@@ -45,7 +45,7 @@ const FLAGS: Array<[string, string, string]> = [
   ["VOICE_DIGEST_ENABLED", "P7", "Daily per-firm digest emails"],
   ["STRIPE_BOOT_SYNC_ENABLED", "core", "Stripe webhook registration/backfill at boot"],
   ["CRM_MARKETING_AUTOSEND_ENABLED", "M4", "Scheduled marketing broadcasts starting themselves on the CRM scheduler tick — the only worker that can email customers with nobody pressing Send"],
-  ["PUBLIC_REGISTRATION_ENABLED", "R4", "Unauthenticated self-registration (POST /receptionist/auth/signup)"],
+  ["PUBLIC_REGISTRATION_ENABLED", "R4", "Unauthenticated self-registration (POST /receptionist/auth/register, and the older POST /receptionist/auth/signup)"],
   ["PUBLIC_FORM_SUBMISSIONS_ENABLED", "R4", "Unauthenticated public lead forms (contact / discovery / landing-test submit)"],
   ["PUBLIC_ANALYTICS_WRITES_ENABLED", "R5", "Unauthenticated analytics/telemetry writes (POST /landing-test/view)"],
   ["AI_TOOLKIT_CHECKOUT_ENABLED", "R6", "Unauthenticated Stripe Checkout Session creation (POST /ai-toolkit/checkout)"],

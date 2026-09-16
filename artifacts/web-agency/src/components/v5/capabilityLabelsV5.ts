@@ -14,7 +14,8 @@ export type CapabilityLevelV5 =
 
 export const capabilityLabelsV5: Record<CapabilityLevelV5, string> = {
   available: "Available now",
-  "private-beta": "Private beta",
+  // Key kept for stability; customers can now create an account and test.
+  "private-beta": "Early access",
   "in-development": "In development",
   planned: "Planned",
 };

@@ -10,7 +10,12 @@ import { Router, type Request, type Response } from "express";
 import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import { createSession, COOKIE_NAME, COOKIE_OPTIONS } from "../lib/receptionistAuth.js";
 import { requireOperator } from "../lib/operatorGate.js";
-import { isInviteSignupEnabled, INVITE_SIGNUP_DISABLED_MESSAGE } from "../lib/publicWriteFlags.js";
+import {
+  isInviteSignupEnabled,
+  INVITE_SIGNUP_DISABLED_MESSAGE,
+  isPublicRegistrationEnabled,
+  PUBLIC_REGISTRATION_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
 import { consumeInviteCode, attachInviteToFirm, createInvite, listInvites, resolveInviteTtlMs } from "../lib/voiceInvites/inviteService.js";
 import { createFirmForInviteSignup } from "../lib/voiceInvites/inviteSignup.js";
 import { SlidingWindowLimiter, getClientIp } from "../lib/contactProtection.js";
@@ -101,6 +106,98 @@ router.post("/receptionist/auth/invite-signup", async (req: Request, res: Respon
     res.status(201).json({ firm: created.firm });
   } catch (err) {
     req.log.error({ err }, "[invite-signup] error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/receptionist/auth/register ──────────────────────────────────────
+//
+// Ordinary customer registration: the invite route's complete flow — same
+// validation, same firm creation, same session, same verification pipeline —
+// without an invite. Gated by PUBLIC_REGISTRATION_ENABLED, the existing
+// self-registration flag. It shares the invite route's per-IP budget, so the
+// two doors together allow no more attempts than either did alone.
+//
+// Registration creates a customer business and nothing else: no operator
+// role, no phone number, no plan change. What a new account may do (calls,
+// publishing) stays governed by the server-side limits those features
+// already enforce.
+
+export const EMAIL_EXISTS_MESSAGE =
+  "An account already exists for this email. Sign in, or reset your password if you have forgotten it.";
+
+router.post("/receptionist/auth/register", async (req: Request, res: Response) => {
+  // Fail-closed gate. FIRST statement in the handler — ahead of the rate
+  // limiter, validation, the firm insert, and session creation.
+  if (!isPublicRegistrationEnabled()) {
+    res.status(503).json({ error: PUBLIC_REGISTRATION_DISABLED_MESSAGE });
+    return;
+  }
+
+  const ip = getClientIp(req);
+  if (inviteSignupIpLimiter.isOverLimit(ip)) {
+    res.status(429).json({ error: "Too many attempts. Try again later." });
+    return;
+  }
+  inviteSignupIpLimiter.record(ip);
+
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const ownerName = typeof body.ownerName === "string" ? body.ownerName.trim() : "";
+  const businessName = typeof body.businessName === "string" ? body.businessName.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  const acceptedTerms = body.acceptedTerms === true;
+
+  if (!ownerName || !businessName || !email || !password) {
+    res.status(400).json({ error: "Your name, business name, email and password are required." });
+    return;
+  }
+  if (ownerName.length > 120 || businessName.length > 160) {
+    res.status(400).json({ error: "Names must be shorter." });
+    return;
+  }
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: "Enter a valid email address." });
+    return;
+  }
+  if (!acceptedTerms) {
+    res.status(400).json({ error: "You must accept the terms to continue." });
+    return;
+  }
+  if (password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters." });
+    return;
+  }
+  if (password.length > 200) {
+    res.status(400).json({ error: "Password is too long." });
+    return;
+  }
+
+  try {
+    const created = await createFirmForInviteSignup({ ownerName, businessName, email, password });
+    if (!created.ok) {
+      // An existing account is recovered by signing in or resetting the
+      // password — never by creating a second business for the same email.
+      res.status(409).json({ error: EMAIL_EXISTS_MESSAGE, code: "email_exists" });
+      return;
+    }
+
+    const token = await createSession(created.firm.id, created.firm.email);
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+
+    try {
+      await enqueueSignupJobs(
+        created.firm.id,
+        { fullName: ownerName, businessName, email: created.firm.email ?? undefined },
+        ["crm_link", "verification_email"],
+      );
+    } catch (enqueueErr) {
+      req.log.error({ err: enqueueErr, firmId: created.firm.id }, "[register] pipeline enqueue failed");
+    }
+
+    res.status(201).json({ firm: created.firm });
+  } catch (err) {
+    req.log.error({ err }, "[register] error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

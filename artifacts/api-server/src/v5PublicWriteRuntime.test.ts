@@ -153,6 +153,44 @@ describe("V5 public-write gates — runtime behaviour", () => {
     expect(dbHits.length).toBeGreaterThan(0);
   });
 
+  it("register is refused with 503 and touches no database when PUBLIC_REGISTRATION_ENABLED is absent", async () => {
+    delete process.env["PUBLIC_REGISTRATION_ENABLED"];
+    const res = await post("/api/receptionist/auth/register", {
+      ownerName: "A",
+      businessName: "B",
+      email: "a@b.test",
+      password: "Str0ngPassw0rd!",
+      acceptedTerms: true,
+    });
+    expect(res.status).toBe(503);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("register needs no invite, stays refused for non-\"true\" values, and passes the gate on exactly \"true\"", async () => {
+    for (const bad of ["", "TRUE", "1", "yes"]) {
+      process.env["PUBLIC_REGISTRATION_ENABLED"] = bad;
+      const res = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "a@b.test", password: "Str0ngPassw0rd!", acceptedTerms: true });
+      expect(res.status, `value=${bad}`).toBe(503);
+      expect(dbHits, `value=${bad}`).toEqual([]);
+    }
+    process.env["PUBLIC_REGISTRATION_ENABLED"] = "true";
+    try {
+      // Validation refuses before any database access.
+      const invalid = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "not-an-email", password: "Str0ngPassw0rd!", acceptedTerms: true });
+      expect(invalid.status).toBe(400);
+      const noTerms = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "c@d.test", password: "Str0ngPassw0rd!" });
+      expect(noTerms.status).toBe(400);
+      expect(dbHits).toEqual([]);
+      // A valid body with no invite code at all reaches account creation,
+      // which hits the trapped database.
+      const res = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "e@f.test", password: "Str0ngPassw0rd!", acceptedTerms: true });
+      expect(res.status).not.toBe(503);
+      expect(dbHits.length).toBeGreaterThan(0);
+    } finally {
+      delete process.env["PUBLIC_REGISTRATION_ENABLED"];
+    }
+  });
+
   it("public beta-requests is refused with 503 and touches no database when PUBLIC_BETA_REQUESTS_ENABLED is absent", async () => {
     const res = await post("/api/public/beta-requests", { name: "A", businessName: "B", workEmail: "a@b.test" });
     expect(res.status).toBe(503);
@@ -195,6 +233,7 @@ describe("V5 public-write gates — runtime behaviour", () => {
   it("no refusal discloses the flag name or internal configuration", async () => {
     for (const [path, body] of [
       ["/api/receptionist/auth/invite-signup", { inviteCode: "X" }],
+      ["/api/receptionist/auth/register", {}],
       ["/api/public/beta-requests", {}],
       ["/api/public/demo/session", {}],
     ] as const) {

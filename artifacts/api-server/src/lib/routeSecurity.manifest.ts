@@ -565,6 +565,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/receptionist/account/verify-email/confirm": "token-proven",
   "POST /api/receptionist/account/verify-email/request": "session",
   "POST /api/receptionist/auth/invite-signup": "feature-flag",
+  "POST /api/receptionist/auth/register": "feature-flag",
   "POST /api/receptionist/auth/login": "credential",
   "POST /api/receptionist/auth/logout": "session",
   "POST /api/receptionist/auth/signup": "feature-flag",

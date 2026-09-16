@@ -1,33 +1,21 @@
 /**
- * V5 customer-shell foundation — invite-only AI Receptionist signup (S-1).
+ * AI Receptionist account creation.
  *
- * The filename, route registration order and base-path handling are
- * unchanged: `App.tsx` still lazy-loads this module at
- * `ROUTES.aiReceptionistSignup`, ahead of `ROUTES.aiReceptionist`.
+ * Ordinary registration — owner name, business name, work email, password,
+ * timezone, and a required Terms/Privacy acknowledgement — with no invite code.
+ * Creating the account signs the owner in, sends the email-verification
+ * message, and opens the dashboard's guided setup. An email that already has
+ * an account is recovered through sign-in or password reset, never duplicated.
  *
- * **What changed.** S-1 replaces the previous open trial signup (name,
- * business name, email, phone, industry, password) with an invite-gated
- * account-creation flow: invite code, owner name, business name, work
- * email, password, timezone, and a required Terms/Privacy acknowledgement.
- * Industry and every configuration decision now belong to the guided
- * onboarding hub the account lands in after signup (S-3). The fire-and-forget
- * `/api/landing-test/submit` lead capture from the previous page is removed —
- * this page creates a real account now, so a parallel unauthenticated lead
- * record duplicates what the account itself already is.
+ * States: submitting; per-field validation errors; an existing account (409,
+ * with Sign in / Reset password); too many attempts (429); registration
+ * switched off (503); and success, which hard-navigates into the dashboard SPA
+ * once the server has set the session cookie.
  *
- * **States**, per the task brief: submitting; per-field validation errors;
- * an invalid/expired invite code (400); a duplicate account (409, with a
- * "Sign in instead" recovery); the private beta not accepting signups right
- * now (503, with a "Request Beta Access" link into the AI Receptionist
- * page's beta section); and success, which — unchanged from before —
- * hard-navigates into the dashboard SPA once the server has set the session
- * cookie.
- *
- * Accessibility carries over the Phase 5 baseline: persistent visible
- * labels, explicit Required text, `autocomplete` on every field, an
- * accessible password-visibility toggle, inline errors tied to inputs by
- * `aria-describedby`, a form-level alert that takes focus on failure, and
- * 44px minimum control heights.
+ * Accessibility: persistent visible labels, explicit Required text,
+ * `autocomplete` on every field, an accessible password-visibility toggle,
+ * inline errors tied to inputs by `aria-describedby`, a form-level alert that
+ * takes focus on failure, and 44px minimum control heights.
  */
 
 import { useRef, useState } from "react";
@@ -36,7 +24,6 @@ import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import {
-  BETA_REQUEST_HREF,
   detectTimezone,
   emptySignupForm,
   SIGNUP_ENDPOINT,
@@ -61,8 +48,8 @@ const NEXT_STEPS = [
     body: "Business details, your assistant's prompt and voice, availability, and your phone number are all configured in the setup hub — not on this form.",
   },
   {
-    title: "Activation is handled with SiteMint",
-    body: "During the private beta, going live happens together with SiteMint once setup is complete.",
+    title: "Test before you take real calls",
+    body: "You can publish your assistant and talk to it from your browser as soon as setup is saved. Answering a real business phone number is connected separately, when you are ready.",
   },
 ];
 
@@ -77,7 +64,6 @@ export default function LandingReceptionistSignup() {
 
   const alertRef = useRef<HTMLDivElement | null>(null);
   const fieldRefs = {
-    inviteCode: useRef<HTMLInputElement | null>(null),
     ownerName: useRef<HTMLInputElement | null>(null),
     businessName: useRef<HTMLInputElement | null>(null),
     email: useRef<HTMLInputElement | null>(null),
@@ -86,7 +72,7 @@ export default function LandingReceptionistSignup() {
   };
 
   const set =
-    (k: "inviteCode" | "ownerName" | "businessName" | "email" | "password" | "timezone") =>
+    (k: "ownerName" | "businessName" | "email" | "password" | "timezone") =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -139,7 +125,7 @@ export default function LandingReceptionistSignup() {
   };
 
   const describedBy = (
-    field: "inviteCode" | "ownerName" | "businessName" | "email" | "password" | "acceptedTerms",
+    field: "ownerName" | "businessName" | "email" | "password" | "acceptedTerms",
     ...extra: string[]
   ) => {
     const ids = [...extra];
@@ -168,11 +154,11 @@ export default function LandingReceptionistSignup() {
               Back to AI Receptionist
             </Link>
 
-            <p className="v2-eyebrow">AI Receptionist — Private beta</p>
+            <p className="v2-eyebrow">AI Receptionist</p>
             <h1 className="sg-title">Set up your AI Receptionist</h1>
             <p className="sg-lede">
-              Accounts are created by invitation during the private beta. Enter the invite code
-              from your invitation to create your account.
+              Create your account to set up and test your receptionist. We&rsquo;ll email you a link
+              to confirm your address, and you can finish setup at your own pace.
             </p>
 
             <ul className="sg-readiness">
@@ -192,7 +178,7 @@ export default function LandingReceptionistSignup() {
               {error && (
                 <div ref={alertRef} className="sg-alert" role="alert" tabIndex={-1} aria-live="assertive">
                   <span className="sg-alert__label">
-                    {outcome === "unavailable" ? "Not available" : "Error"}
+                    {outcome === "unavailable" || outcome === "limited" ? "Not available" : outcome === "duplicate" ? "Account exists" : "Error"}
                   </span>
                   <span className="sg-alert__text">
                     {error}
@@ -202,45 +188,16 @@ export default function LandingReceptionistSignup() {
                         <a href={DASHBOARD_URLS.login} className="sg-alert__link">
                           Sign in instead
                         </a>
-                        .
-                      </>
-                    )}
-                    {outcome === "unavailable" && (
-                      <>
-                        {" "}
-                        <Link href={BETA_REQUEST_HREF} className="sg-alert__link">
-                          Request Beta Access
-                        </Link>
+                        {" or "}
+                        <a href={DASHBOARD_URLS.passwordReset} className="sg-alert__link">
+                          reset your password
+                        </a>
                         .
                       </>
                     )}
                   </span>
                 </div>
               )}
-
-              <div className="sg-field">
-                <label htmlFor="s-invite-code" className="sg-label">
-                  Invite code <span className="sg-req">Required</span>
-                </label>
-                <input
-                  id="s-invite-code"
-                  ref={fieldRefs.inviteCode}
-                  className={`sg-input${fieldErrors.inviteCode ? " sg-input--invalid" : ""}`}
-                  type="text"
-                  value={form.inviteCode}
-                  onChange={set("inviteCode")}
-                  autoComplete="off"
-                  required
-                  aria-required="true"
-                  aria-invalid={fieldErrors.inviteCode ? true : undefined}
-                  aria-describedby={describedBy("inviteCode")}
-                />
-                {fieldErrors.inviteCode && (
-                  <p className="sg-error" id="inviteCode-error">
-                    {fieldErrors.inviteCode}
-                  </p>
-                )}
-              </div>
 
               <div className="sg-row">
                 <div className="sg-field">
@@ -451,7 +408,6 @@ export default function LandingReceptionistSignup() {
 }
 
 interface SignupFormValuesErrors {
-  inviteCode?: string;
   ownerName?: string;
   businessName?: string;
   email?: string;
