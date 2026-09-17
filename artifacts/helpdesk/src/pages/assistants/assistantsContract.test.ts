@@ -1080,7 +1080,7 @@ section("Publish — one request per activation, and honest outcomes");
   );
   check(
     "and that copy names the fix",
-    /Choose a different preset/.test(publishRouteErrorMessage(err.code, err.message)),
+    /Choose one of the listed options in Greeting & voice/.test(publishRouteErrorMessage(err.code, err.message)),
   );
 }
 
