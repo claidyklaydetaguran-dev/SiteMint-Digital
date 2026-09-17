@@ -67,8 +67,17 @@ describe("trend and activity", () => {
   it("has fourteen days ending today, with phone and browser calls apart", () => {
     const s = buildDashboardSummary(base);
     expect(s.trend).toHaveLength(14);
-    expect(s.trend!.at(-1)).toEqual({ date: "2026-09-17", telephone: 1, browser: 1 });
-    expect(s.trend!.at(-2)).toEqual({ date: "2026-09-16", telephone: 1, browser: 0 });
+    expect(s.trend!.at(-1)).toEqual({ date: "2026-09-17", telephone: 1, browser: 1, other: 0 });
+    expect(s.trend!.at(-2)).toEqual({ date: "2026-09-16", telephone: 1, browser: 0, other: 0 });
+  });
+
+  it("a call whose channel was not reported is neither a phone call nor a test", () => {
+    const s = buildDashboardSummary({
+      ...base,
+      calls: [{ callId: "c9", channel: "unknown", state: "completed", startedAt: at("2026-09-17T20:00:00Z"), durationSec: 63, callerNumberDisplay: "Unknown" }],
+    });
+    expect(s.trend!.at(-1)).toEqual({ date: "2026-09-17", telephone: 0, browser: 0, other: 1 });
+    expect(s.activity.find((a) => a.id === "c9")?.title).toBe("Call (channel not reported)");
   });
 
   it("merges calls, messages, bookings and new contacts, newest first, with drilldown links", () => {

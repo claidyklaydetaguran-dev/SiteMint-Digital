@@ -1539,6 +1539,7 @@
 .dash-trend__hit { fill: transparent; }
 .dash-trend__phone { fill: var(--sd-accent); }
 .dash-trend__test { fill: var(--sd-text-muted); opacity: 0.45; }
+.dash-trend__other { fill: var(--sd-border-strong); }
 .dash-trend__svg g:focus { outline: none; }
 .dash-trend__svg g:focus .dash-trend__hit,
 .dash-trend__svg g:hover .dash-trend__hit { fill: var(--sd-surface-accent); }
@@ -1547,6 +1548,7 @@
 .dash-swatch { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 .dash-swatch--phone { background: var(--sd-accent); }
 .dash-swatch--test { background: var(--sd-text-muted); opacity: 0.45; }
+.dash-swatch--other { background: var(--sd-border-strong); }
 
 .dash-test {
   display: flex;

@@ -22,7 +22,7 @@ export interface DashboardSummary {
   generatedAt: string;
   timezone: string;
   cards: Array<{ key: string; label: string; value: number | null; detail: string; href: string }>;
-  trend: Array<{ date: string; telephone: number; browser: number }> | null;
+  trend: Array<{ date: string; telephone: number; browser: number; other?: number }> | null;
   activity: Array<{ kind: "call" | "message" | "booking" | "contact"; id: string; title: string; detail: string; at: string; href: string; urgent: boolean }>;
   unavailable: string[];
 }
@@ -54,12 +54,13 @@ function readable(text: string, timezone: string): string {
 
 function TrendChart({ trend }: { trend: NonNullable<DashboardSummary["trend"]> }) {
   const [focus, setFocus] = useState<number | null>(null);
-  const max = Math.max(1, ...trend.map((d) => d.telephone + d.browser));
+  const all = (d: (typeof trend)[number]) => d.telephone + d.browser + (d.other ?? 0);
+  const max = Math.max(1, ...trend.map(all));
   const width = 280;
   const height = 88;
   const gap = 4;
   const barW = (width - gap * (trend.length - 1)) / trend.length;
-  const total = trend.reduce((n, d) => n + d.telephone + d.browser, 0);
+  const total = trend.reduce((n, d) => n + all(d), 0);
   const shown = focus === null ? null : trend[focus]!;
   const label = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -67,7 +68,7 @@ function TrendChart({ trend }: { trend: NonNullable<DashboardSummary["trend"]> }
     <figure className="dash-trend">
       <figcaption className="dash-trend__caption">
         {shown
-          ? `${label(shown.date)}: ${shown.telephone} phone, ${shown.browser} test`
+          ? `${label(shown.date)}: ${shown.telephone} phone, ${shown.browser} test${shown.other ? `, ${shown.other} other` : ""}`
           : `${total} call${total === 1 ? "" : "s"} in the last 14 days`}
       </figcaption>
       <svg viewBox={`0 0 ${width} ${height + 16}`} className="dash-trend__svg" role="group" aria-label={`Calls per day for the last 14 days, ${total} in total. Focus a day to read it.`}>
@@ -76,6 +77,7 @@ function TrendChart({ trend }: { trend: NonNullable<DashboardSummary["trend"]> }
           const x = i * (barW + gap);
           const phoneH = (d.telephone / max) * (height - 4);
           const testH = (d.browser / max) * (height - 4);
+          const otherH = ((d.other ?? 0) / max) * (height - 4);
           return (
             <g
               key={d.date}
@@ -84,11 +86,12 @@ function TrendChart({ trend }: { trend: NonNullable<DashboardSummary["trend"]> }
               onMouseLeave={() => setFocus(null)}
               onFocus={() => setFocus(i)}
               onBlur={() => setFocus(null)}
-              aria-label={`${label(d.date)}: ${d.telephone} phone calls, ${d.browser} test calls`}
+              aria-label={`${label(d.date)}: ${d.telephone} phone calls, ${d.browser} test calls, ${d.other ?? 0} other calls`}
             >
               <rect x={x} y={0} width={barW} height={height} className="dash-trend__hit" />
               <rect x={x} y={height - phoneH} width={barW} height={phoneH} rx="2" className="dash-trend__phone" />
               <rect x={x} y={height - phoneH - testH} width={barW} height={testH} rx="2" className="dash-trend__test" />
+              <rect x={x} y={height - phoneH - testH - otherH} width={barW} height={otherH} rx="2" className="dash-trend__other" />
             </g>
           );
         })}
@@ -98,6 +101,7 @@ function TrendChart({ trend }: { trend: NonNullable<DashboardSummary["trend"]> }
       <div className="dash-trend__legend">
         <span><i className="dash-swatch dash-swatch--phone" aria-hidden="true" /> Phone calls</span>
         <span><i className="dash-swatch dash-swatch--test" aria-hidden="true" /> Browser tests</span>
+        <span><i className="dash-swatch dash-swatch--other" aria-hidden="true" /> Other</span>
       </div>
     </figure>
   );

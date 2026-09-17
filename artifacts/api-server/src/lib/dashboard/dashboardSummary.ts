@@ -60,6 +60,8 @@ export interface TrendPoint {
   date: string;
   telephone: number;
   browser: number;
+  /** Calls the provider did not identify as either; never guessed into one. */
+  other: number;
 }
 
 export interface ActivityItem {
@@ -174,7 +176,7 @@ export function buildDashboardSummary(input: DashboardInputs): DashboardSummary 
     for (let i = 13; i >= 0; i--) {
       const key = dateKey(new Date(now.getTime() - i * DAY_MS), timezone);
       if (index.has(key)) continue; // a daylight-saving day can repeat a key
-      const point = { date: key, telephone: 0, browser: 0 };
+      const point = { date: key, telephone: 0, browser: 0, other: 0 };
       index.set(key, point);
       days.push(point);
     }
@@ -182,7 +184,8 @@ export function buildDashboardSummary(input: DashboardInputs): DashboardSummary 
       const point = index.get(dateKey(call.startedAt, timezone));
       if (!point) continue;
       if (call.channel === "browser") point.browser += 1;
-      else point.telephone += 1;
+      else if (call.channel === "telephone") point.telephone += 1;
+      else point.other += 1;
     }
     trend = days;
   }
@@ -191,7 +194,8 @@ export function buildDashboardSummary(input: DashboardInputs): DashboardSummary 
     ...(input.calls ?? []).map((c) => ({
       kind: "call" as const,
       id: c.callId,
-      title: c.channel === "browser" ? "Browser test call" : `Call from ${c.callerNumberDisplay}`,
+      title:
+        c.channel === "browser" ? "Browser test call" : c.channel === "telephone" ? `Call from ${c.callerNumberDisplay}` : "Call (channel not reported)",
       detail: `${CALL_STATE_WORDS[c.state] ?? "Status unknown"}${c.durationSec !== undefined ? ` · ${Math.round(c.durationSec)}s` : ""}`,
       at: c.startedAt.toISOString(),
       href: `/activity/calls/${encodeURIComponent(c.callId)}`,
