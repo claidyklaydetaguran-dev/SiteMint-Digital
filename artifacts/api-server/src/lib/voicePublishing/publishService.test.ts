@@ -98,6 +98,7 @@ function catalogPreset(): RuntimeCatalogPreset {
 function catalog(): RuntimeCatalog {
   return {
     version: 1,
+    voices: {},
     presets: {
       "natural-balanced": catalogPreset(),
       "fast-response": { ...catalogPreset(), key: "fast-response" } as RuntimeCatalogPreset,
@@ -458,7 +459,7 @@ describe("configuration rejection — the provider is never called", () => {
 
   it("rejects a preset absent from the runtime catalog as unsupported, not as invalid config", async () => {
     const repository = new FakePublishRepository({ seed: [seedDraft({ config: validConfig("budget-friendly") })] });
-    const sparseCatalog = { version: 1, presets: { "natural-balanced": catalogPreset() } } as RuntimeCatalog;
+    const sparseCatalog = { version: 1, presets: { "natural-balanced": catalogPreset() }, voices: {} } as RuntimeCatalog;
     const provider = new ScriptedVoiceProvider({ outcomes: [] });
 
     const result = await publishAssistant(

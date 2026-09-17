@@ -97,6 +97,20 @@ export function extractPublishableAssistantConfig(
     );
   }
 
+  // Optional customer voice choice, independent of the preset. An unknown or
+  // withdrawn voice fails closed; it is never swapped for another voice.
+  let voiceKey: string | undefined;
+  const voiceRaw = (config.voiceModel as Record<string, unknown>).voice;
+  if (voiceRaw !== undefined && voiceRaw !== null) {
+    if (typeof voiceRaw !== "string" || voiceRaw.trim().length === 0) {
+      fail('config "voiceModel.voice" must be a non-empty string when provided.');
+    }
+    voiceKey = voiceRaw.trim();
+    if (!Object.prototype.hasOwnProperty.call(catalog.voices, voiceKey)) {
+      throw new PublishFoundationError("UNSUPPORTED_PRESET", "Selected voice is not available in this environment.");
+    }
+  }
+
   if (!isPlainObject(config.prompt)) {
     fail('config "prompt" must be a plain object.');
   }
@@ -123,6 +137,7 @@ export function extractPublishableAssistantConfig(
 
   return {
     presetKey,
+    ...(voiceKey !== undefined ? { voiceKey } : {}),
     systemInstructions,
     firstMessageMode,
     ...(firstMessage !== undefined ? { firstMessage } : {}),

@@ -403,18 +403,30 @@ export const PRESET_RECOVERY = {
    it, so that sentence pointed at nothing. */
 
 export const VOICE_MODEL = {
-  /* V5 PR-6 (C-4): tab renamed "Voice & Model" -> "Voice" — provider/model
-     detail moved behind the Advanced disclosure below, so the tab title no
-     longer needs to name both. */
-  title: "Voice",
-  detail: "Choose how this assistant sounds.",
-  presetGroupLabel: "Voice preset",
-  includedHeading: "What's included",
-  advancedHeading: "Advanced: provider and model detail",
-  moreOptionsHeading: "More voice options",
-  moreOptionsDetail:
-    "These aren't the two recommended presets, but they're still fully supported — choose one here if you need it.",
-  curatedNote: "Two curated options, tuned for most businesses.",
+  /* 2026-09-17: a voice (who speaks) and a response style (how quickly and
+     carefully it answers) are separate choices. Both lists come from the
+     server catalog, so every option shown can be published. */
+  title: "Greeting & voice",
+  detail: "What callers hear first, and the voice that says it.",
+  greetingHelp: "The opening line on every call.",
+  voiceHeading: "Voice",
+  presetGroupLabel: "Response style",
+  voiceDetail: "Press Play to hear each voice before choosing.",
+  singleVoice: "This workspace uses one standard voice.",
+  greetingPreviewNote: "To hear your own greeting in the chosen voice, save and start a browser test — the assistant says it first.",
+  styleHeading: "Response style",
+  styleDetail: "How quickly and how carefully the assistant answers.",
+  advancedHeading: "Advanced: cost and speed estimates",
+  advancedDetail: "Estimates for the selected response style. They are guides, not a bill.",
+} as const;
+
+/** A saved choice this environment can no longer publish. Nothing changes until the business chooses. */
+export const VOICE_UNAVAILABLE = {
+  styleTitle: "The saved response style isn't available",
+  styleDetail: "Choose one of the response styles below, then save. Nothing changes until you do.",
+  voiceTitle: "The saved voice isn't available",
+  voiceDetail: "Choose one of the voices below, then save. Nothing changes until you do.",
+  publishBlocked: "Choose an available voice and response style, then save before publishing.",
 } as const;
 
 /* ── Configuration tab (C-2) ───────────────────────────────────────────────

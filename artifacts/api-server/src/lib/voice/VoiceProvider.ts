@@ -18,6 +18,7 @@ import type {
   VoiceBrowserTokenInput,
   VoiceBrowserTokenResult,
   VoicePhoneNumberRecord,
+  VoiceSampleAudio,
 } from "./types";
 
 export interface VoiceProvider {
@@ -61,6 +62,14 @@ export interface VoiceProvider {
    * owner-gated acquisition seam.
    */
   listPhoneNumbers?(): Promise<VoicePhoneNumberRecord[]>;
+
+  /**
+   * A short provider-hosted recording of one voice, so a business can hear a
+   * voice before choosing it. READ ONLY and optional: a provider without
+   * samples omits it, and `undefined` means this voice has no sample — never
+   * substitute a different voice or synthesized stand-in for it.
+   */
+  getVoiceSample?(voice: { provider: string; voiceId: string }): Promise<VoiceSampleAudio | undefined>;
 
   /**
    * Points one telephone number at one assistant, or at nothing.

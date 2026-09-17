@@ -123,7 +123,8 @@ function sanitizePrompt(value: unknown, fallback: AssistantPromptState): Assista
 
 function sanitizeVoiceModel(value: unknown, fallback: AssistantVoiceModelState): AssistantVoiceModelState {
   const src = isPlainObject(value) ? value : {};
-  return { preset: voicePresetId(src.preset, fallback.preset) };
+  const voice = typeof src.voice === "string" && /^[a-z][a-z0-9-]{1,39}$/.test(src.voice) ? src.voice : fallback.voice ?? null;
+  return { preset: voicePresetId(src.preset, fallback.preset), voice };
 }
 
 /**

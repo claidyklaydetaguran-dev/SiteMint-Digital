@@ -93,6 +93,7 @@ const fixedClock: Clock = { now: () => new Date(FIXED_NOW.getTime()) };
 function catalog(): RuntimeCatalog {
   return {
     version: 1,
+    voices: {},
     presets: {
       "natural-balanced": {
         provider: "vapi",

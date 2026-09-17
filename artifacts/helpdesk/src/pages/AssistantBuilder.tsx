@@ -26,10 +26,12 @@ import {
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { STATUS_LABEL, isEligibleForDelete, isPublishableStatus } from "@/lib/assistantStatus";
 import { publishRouteErrorMessage, safeSyncErrorMessage } from "@/lib/publishErrors";
+import { unavailableChoice, useVoiceOptions } from "@/lib/voiceOptions";
 import { browserTestDisabledReason, browserTestSyncWarning } from "@/lib/browserVoice/eligibility";
 import {
   BUILDER,
   PRESET_RECOVERY,
+  VOICE_UNAVAILABLE,
   SAVE,
   SYNC,
   SAVE_PROMPT_EITHER,
@@ -295,6 +297,7 @@ export default function AssistantBuilder() {
   const updateMutation = useUpdateAssistant(numericId ?? -1);
   const publishMutation = useBuilderPublish(numericId);
   const syncMutation = useBuilderSync(numericId);
+  const voiceOptions = useVoiceOptions();
 
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
   const [baseline, setBaseline] = useState<{ name: string; draft: AssistantDraft } | null>(null);
@@ -476,8 +479,22 @@ export default function AssistantBuilder() {
     requestAnimationFrame(() => publishButtonRef.current?.focus());
   };
 
+  // One availability answer for eligibility, the blocker sentence and the
+  // banner: the server catalog's, via the options endpoint. Unknown (still
+  // loading or failed) is not treated as available.
+  const voiceChoiceProblem = draft
+    ? voiceOptions.data
+      ? unavailableChoice(voiceOptions.data, draft.voiceModel.preset, draft.voiceModel.voice)
+      : isSupportedVoicePreset(draft.voiceModel.preset)
+        ? null
+        : "style"
+    : null;
+  const voiceChoiceKnown = !!voiceOptions.data;
+
   const publishEligible =
     publishInBuild &&
+    voiceChoiceKnown &&
+    voiceChoiceProblem === null &&
     !!assistant &&
     !!numericId &&
     !!draft &&
@@ -515,7 +532,11 @@ export default function AssistantBuilder() {
         // the blocker rather than being hidden behind a transient one. The server
         // would reject it with `unsupported_preset` anyway; this only says so
         // before the customer spends a publish attempt on it.
-        if (!isSupportedVoicePreset(draft.voiceModel.preset)) return PRESET_RECOVERY.publishBlocked;
+        if (voiceChoiceProblem !== null) return VOICE_UNAVAILABLE.publishBlocked;
+        if (!voiceChoiceKnown)
+          return voiceOptions.isError
+            ? "Voice choices couldn't be checked. Reload the page to try again."
+            : "Checking voice choices…";
         if (updateMutation.isPending) return "Saving is in progress. Publish will be available once saving finishes.";
         if (publishMutation.isPending) return "Publishing is already in progress.";
         if (assistant.status === "publishing") return "Publishing is already in progress.";
@@ -921,9 +942,14 @@ export default function AssistantBuilder() {
                 the builder.
               </Notice>
             )}
-            {!isSupportedVoicePreset(draft.voiceModel.preset) && (
-              <Notice tone="warn" role="status" title={PRESET_RECOVERY.title}>
-                {PRESET_RECOVERY.detail}
+            {voiceChoiceProblem !== null && (
+              <Notice
+                tone="warn"
+                role="status"
+                title={voiceChoiceProblem === "voice" ? VOICE_UNAVAILABLE.voiceTitle : VOICE_UNAVAILABLE.styleTitle}
+              >
+                {voiceChoiceProblem === "voice" ? VOICE_UNAVAILABLE.voiceDetail : VOICE_UNAVAILABLE.styleDetail}{" "}
+                Open Greeting &amp; voice to choose.
               </Notice>
             )}
             {assistant.status === "error" && assistant.syncError && (

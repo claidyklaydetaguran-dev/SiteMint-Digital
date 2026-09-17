@@ -16,7 +16,7 @@ const ROUTE_ERROR_COPY: Record<PublishRouteErrorCode, string> = {
   assistant_config_invalid:
     "This assistant's configuration can't be published as-is. Review the builder and save your changes, then try again.",
   unsupported_preset:
-    "The selected voice preset isn't supported for publishing. Choose a different preset, save your changes, and try again.",
+    "The selected voice or response style isn't available. Choose one of the listed options in Greeting & voice, save, and try again.",
   already_published: "This assistant has already been published.",
   publish_in_progress: "Publishing is already in progress.",
   publish_uncertain:
@@ -94,7 +94,7 @@ const SYNC_ERROR_COPY: Record<PublishSyncErrorCode, string> = {
   runtime_catalog_not_configured: "Publishing isn't fully configured in this environment yet.",
   runtime_catalog_invalid: "Publishing isn't fully configured in this environment yet.",
   unsupported_preset:
-    "The selected voice preset isn't supported for publishing. Choose a different preset and save before publishing again.",
+    "The selected voice or response style isn't available. Choose one of the listed options in Greeting & voice and save before publishing again.",
   assistant_config_invalid:
     "This assistant's configuration needs attention before it can be published. Review and save your changes.",
   provider_authentication_failed: "The voice provider couldn't be reached. Contact support if this continues.",

@@ -153,3 +153,9 @@ export interface Clock {
 export const systemClock: Clock = {
   now: () => new Date(),
 };
+
+/** Audio bytes of a provider voice sample, validated as audio before they leave the provider adapter. */
+export interface VoiceSampleAudio {
+  contentType: string;
+  bytes: Buffer;
+}

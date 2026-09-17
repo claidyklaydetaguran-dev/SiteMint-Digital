@@ -74,6 +74,8 @@ export interface AssistantVoiceModelState {
    * the value on the customer's behalf.
    */
   preset: StoredVoicePresetId;
+  /** A catalog voice key, or null to use the response style's own voice. */
+  voice: string | null;
 }
 
 export interface AssistantAnalysisState {
@@ -148,6 +150,7 @@ export function draftFromTemplate(template: AssistantTemplate): AssistantDraft {
     },
     voiceModel: {
       preset: "natural-balanced",
+      voice: null,
     },
     tools: {
       permittedActions: [...PERMITTED_ACTION_IDS],

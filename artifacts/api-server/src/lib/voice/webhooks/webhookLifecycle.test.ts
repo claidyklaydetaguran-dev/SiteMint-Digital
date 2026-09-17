@@ -478,7 +478,7 @@ function catalogPreset(): RuntimeCatalogPreset {
 }
 
 function catalog(): RuntimeCatalog {
-  return { version: 1, presets: { "natural-balanced": catalogPreset() } } as RuntimeCatalog;
+  return { version: 1, presets: { "natural-balanced": catalogPreset() }, voices: {} } as RuntimeCatalog;
 }
 
 function assistantRow(): VoiceAssistant {

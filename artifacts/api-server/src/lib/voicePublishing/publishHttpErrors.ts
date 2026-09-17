@@ -37,7 +37,7 @@ const MESSAGE_BY_CODE: Record<PublishRouteErrorCode, string> = {
   invalid_request: "The request was not valid.",
   assistant_not_found: "Assistant not found.",
   assistant_config_invalid: "This assistant's configuration cannot be published as-is.",
-  unsupported_preset: "This assistant's selected voice preset is not supported for publishing.",
+  unsupported_preset: "This assistant's selected voice or response style is not available.",
   already_published: "This assistant has already been published.",
   publish_in_progress: "A publish attempt for this assistant is already in progress.",
   publish_uncertain: "Publishing could not be confirmed. Do not retry automatically.",

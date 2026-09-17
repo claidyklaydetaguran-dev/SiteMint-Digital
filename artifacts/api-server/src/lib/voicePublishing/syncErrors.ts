@@ -80,7 +80,7 @@ const MESSAGE_BY_CODE: Record<SyncRouteErrorCode, string> = {
   provider_link_missing: "This assistant has no confirmed provider connection to update.",
   unsupported_provider: "Updating is not available for this assistant's provider.",
   assistant_config_invalid: "This assistant's configuration cannot be sent to the voice provider as-is.",
-  unsupported_preset: "This assistant's selected voice preset is not supported.",
+  unsupported_preset: "This assistant's selected voice or response style is not available.",
   sync_in_progress: "An update for this assistant is already in progress.",
   provider_authentication_failed: "The voice provider rejected the request credentials.",
   provider_rate_limited: "The voice provider rate-limited this request.",

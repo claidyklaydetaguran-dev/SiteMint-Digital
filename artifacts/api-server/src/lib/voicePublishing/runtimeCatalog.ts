@@ -19,6 +19,8 @@ import {
   type RuntimeCatalogPreset,
   type RuntimeCatalogTranscriber,
   type RuntimeCatalogVoice,
+  type RuntimeCatalogVoiceOption,
+  type ExtractedAssistantPublishConfig,
 } from "./types.js";
 
 export const VOICE_RUNTIME_CATALOG_ENV_VAR = "VOICE_RUNTIME_CATALOG_JSON";
@@ -56,7 +58,11 @@ export function isSiteMintPresetKey(value: string): value is SiteMintPresetKey {
   return (SITEMINT_PRESET_KEYS as readonly string[]).includes(value);
 }
 
-const TOP_LEVEL_KEYS = new Set(["version", "presets"]);
+const TOP_LEVEL_KEYS = new Set(["version", "presets", "voices"]);
+const VOICE_OPTION_KEYS = new Set(["key", "label", "description", "voice"]);
+/** Voice keys are stable, lowercase slugs — they are stored in assistant config. */
+const VOICE_KEY_PATTERN = /^[a-z][a-z0-9-]{1,39}$/;
+const MAX_VOICE_OPTIONS = 12;
 const PRESET_KEYS = new Set(["key", "provider", "model", "voice", "transcriber"]);
 const MODEL_KEYS = new Set(["provider", "model"]);
 const VOICE_KEYS = new Set(["provider", "voiceId", "version"]);
@@ -172,6 +178,20 @@ function parsePresetEntry(value: unknown, index: number): { key: string; preset:
   return { key, preset };
 }
 
+function parseVoiceOption(value: unknown, index: number): { key: string; option: RuntimeCatalogVoiceOption } {
+  if (!isPlainObject(value)) fail(`Runtime catalog voice at index ${index} must be a plain object.`);
+  requireNoUnknownKeys(value, VOICE_OPTION_KEYS, `Runtime catalog voice at index ${index}`);
+  const key = typeof value.key === "string" ? value.key.trim() : "";
+  if (!VOICE_KEY_PATTERN.test(key)) fail(`Runtime catalog voice at index ${index} must have a lowercase slug "key".`);
+  const label = requireNonEmptyString(value.label, "voices.label");
+  if (label.length > 60) fail("voices.label must be at most 60 characters.");
+  const description = requireNonEmptyString(value.description, "voices.description");
+  if (description.length > 160) fail("voices.description must be at most 160 characters.");
+  const voice = parseVoice(value.voice);
+  if (voice.provider !== "vapi") fail(`Voice "${key}" must have provider "vapi".`);
+  return { key, option: { label, description, voice } };
+}
+
 /**
  * Parses and strictly validates a runtime catalog JSON string. Bounds input
  * size before JSON.parse. Rejects unknown top-level/preset/nested keys,
@@ -232,7 +252,18 @@ export function parseRuntimeCatalog(raw: string): RuntimeCatalog {
     presets[key] = preset;
   });
 
-  return { version: RUNTIME_CATALOG_VERSION, presets: Object.freeze(presets) };
+  const voices: Record<string, RuntimeCatalogVoiceOption> = {};
+  if (parsed.voices !== undefined) {
+    if (!Array.isArray(parsed.voices)) fail('Runtime catalog "voices" must be an array when provided.');
+    if (parsed.voices.length > MAX_VOICE_OPTIONS) fail(`Runtime catalog may list at most ${MAX_VOICE_OPTIONS} voices.`);
+    parsed.voices.forEach((entry, index) => {
+      const { key, option } = parseVoiceOption(entry, index);
+      if (Object.prototype.hasOwnProperty.call(voices, key)) fail("Runtime catalog contains a duplicate voice key.");
+      voices[key] = option;
+    });
+  }
+
+  return { version: RUNTIME_CATALOG_VERSION, presets: Object.freeze(presets), voices: Object.freeze(voices) };
 }
 
 /**
@@ -256,4 +287,28 @@ export function loadRuntimeCatalogFromEnv(): RuntimeCatalog {
 /** Looks up a single preset by key. Returns undefined for any key not present in this catalog — callers decide how to fail. */
 export function getRuntimeCatalogPreset(catalog: RuntimeCatalog, presetKey: string): RuntimeCatalogPreset | undefined {
   return catalog.presets[presetKey];
+}
+
+/**
+ * The one place a saved assistant's choices become literal provider values:
+ * the preset supplies model and transcriber, and a chosen catalog voice (when
+ * present) replaces the preset's voice. Publish, sync and the sync-state digest
+ * all call this, so the three can never disagree about which voice is sent.
+ * Throws UNSUPPORTED_PRESET for a preset or voice this environment cannot
+ * publish — never substitutes another.
+ */
+export function resolveRuntimePreset(
+  catalog: RuntimeCatalog,
+  extracted: Pick<ExtractedAssistantPublishConfig, "presetKey" | "voiceKey">,
+): RuntimeCatalogPreset {
+  const preset = catalog.presets[extracted.presetKey];
+  if (!preset) {
+    throw new PublishFoundationError("UNSUPPORTED_PRESET", "Selected response style is not available in this environment.");
+  }
+  if (extracted.voiceKey === undefined) return preset;
+  const option = catalog.voices[extracted.voiceKey];
+  if (!option) {
+    throw new PublishFoundationError("UNSUPPORTED_PRESET", "Selected voice is not available in this environment.");
+  }
+  return { ...preset, voice: { ...option.voice } };
 }

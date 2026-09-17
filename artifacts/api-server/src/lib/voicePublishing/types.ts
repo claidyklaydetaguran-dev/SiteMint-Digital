@@ -45,6 +45,21 @@ export interface RuntimeCatalogPreset {
 export interface RuntimeCatalog {
   version: 1;
   presets: Readonly<Record<string, RuntimeCatalogPreset>>;
+  /**
+   * Curated voices a customer may choose, independent of the performance
+   * preset. Optional in the wire format; empty when the environment offers
+   * only each preset's own voice. The voice a customer chooses replaces the
+   * preset's voice at publish time — model and transcriber still come from
+   * the preset.
+   */
+  voices: Readonly<Record<string, RuntimeCatalogVoiceOption>>;
+}
+
+/** One customer-selectable voice. Label/description are display copy; `voice` is the literal provider value. */
+export interface RuntimeCatalogVoiceOption {
+  label: string;
+  description: string;
+  voice: RuntimeCatalogVoice;
 }
 
 export type PublishFirstMessageMode = "assistant-speaks-first" | "wait-for-caller";
@@ -91,6 +106,8 @@ export const UNKNOWN_PUBLISH_ERROR_CODE: PublishSyncErrorCode = "unknown_publish
  */
 export interface ExtractedAssistantPublishConfig {
   presetKey: string;
+  /** A key into `RuntimeCatalog.voices`, when the customer chose a voice. */
+  voiceKey?: string;
   systemInstructions: string;
   firstMessageMode: PublishFirstMessageMode;
   firstMessage?: string;

@@ -1,42 +1,27 @@
-import { BrainCircuit, AudioLines, Ear, Cpu, AlertTriangle, Check, ChevronDown } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Loader2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CharCountField } from "@/components/common/CharCountField";
 import { CostBreakdown } from "@/components/common/CostBreakdown";
 import { LatencyMeter } from "@/components/common/LatencyMeter";
 import { VoiceSamplePlayer } from "@/components/common/VoiceSamplePlayer";
-import { VOICE_MODEL_PRESETS, findVoicePreset } from "@/lib/assistantEstimates";
-import {
-  PRESET_RECOVERY,
-  VOICE_MODEL,
-  isCuratedVoicePreset,
-  type SupportedVoicePresetId,
-} from "@/pages/assistants/assistantsContract";
+import { findVoicePreset } from "@/lib/assistantEstimates";
+import { effectiveVoiceKey, unavailableChoice, useVoiceOptions } from "@/lib/voiceOptions";
+import { VOICE_MODEL, VOICE_UNAVAILABLE } from "@/pages/assistants/assistantsContract";
 import type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
 /**
  * "Greeting & voice" — what callers hear first, and the voice that says it.
  *
- * Two curated presets are the primary choice, each with a sample player and a
- * plain-language description. The other two supported presets, and the
- * provider/model detail, live under Advanced — still fully selectable and
- * still fully publishable, just not presented as a first choice. A saved
- * config carrying a retired preset still gets the truthful recovery state
- * above the picker; that behaviour is unchanged.
+ * Voices and response styles come from the server's own catalog, so every
+ * choice shown here can be published in this environment. A voice is who
+ * speaks; a response style is how quickly and carefully the assistant
+ * answers — two separate decisions. A saved choice this environment can no
+ * longer publish is reported with the available replacements and is never
+ * changed on the business's behalf.
  *
- * Presentation only in this pass. The curated cards stay `div`s carrying
- * `role="radio"` rather than becoming `button`s, because each one contains its
- * own Play control and a button inside a button is invalid.
+ * Cards are `div role="radio"` rather than buttons because each voice card
+ * holds its own Play control, and a button inside a button is invalid.
  */
-
-const FRIENDLY_STACK = [
-  { icon: BrainCircuit, label: "Conversational model", desc: "Understands the caller and decides how to respond." },
-  { icon: AudioLines, label: "Natural voice", desc: "Speaks back in a clear, human-sounding voice." },
-  { icon: Ear, label: "Accurate transcription", desc: "Turns what the caller says into text the assistant can use." },
-  { icon: Cpu, label: "SiteMint voice runtime", desc: "Coordinates the conversation in real time." },
-];
-
-const CURATED_PRESETS = VOICE_MODEL_PRESETS.filter((p) => isCuratedVoicePreset(p.id));
-const MORE_PRESETS = VOICE_MODEL_PRESETS.filter((p) => !isCuratedVoicePreset(p.id));
 
 const MUTED = {
   margin: "var(--sd-space-1, .25rem) 0 0",
@@ -47,7 +32,7 @@ const MUTED = {
 
 const CHOICE_GRID = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 15rem), 1fr))",
   gap: "var(--sd-space-3, .75rem)",
   minWidth: 0,
 } as const;
@@ -58,28 +43,25 @@ function choiceStyle(active: boolean) {
     flexDirection: "column" as const,
     gap: "var(--sd-space-2, .5rem)",
     minWidth: 0,
+    minHeight: 44,
     padding: "var(--sd-space-4, 1rem)",
-    border: `1px solid ${active ? "var(--sd-accent, #27e9b5)" : "var(--sd-border, rgba(59,82,101,.12))"}`,
+    border: `${active ? 2 : 1}px solid ${active ? "var(--sd-accent, #27e9b5)" : "var(--sd-border, rgba(59,82,101,.12))"}`,
     borderRadius: "var(--sd-radius-card, 10px)",
     background: active ? "var(--sd-surface-accent, #f0f9f6)" : "var(--sd-surface, #fff)",
     cursor: "pointer",
     textAlign: "left" as const,
+    font: "inherit",
   };
 }
 
-function ChoiceHead({ label, active }: { label: string; active: boolean }) {
+function ChoiceHead({ label, active, badge }: { label: string; active: boolean; badge?: string }) {
   return (
     <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sd-space-2, .5rem)" }}>
-      <span
-        style={{
-          minWidth: 0,
-          fontSize: "var(--sd-text-body, .875rem)",
-          fontWeight: 600,
-          color: "var(--sd-text, #051824)",
-          overflowWrap: "anywhere",
-        }}
-      >
+      <span style={{ minWidth: 0, fontSize: "var(--sd-text-body, .875rem)", fontWeight: 600, color: "var(--sd-text, #051824)", overflowWrap: "anywhere" }}>
         {label}
+        {badge && (
+          <span style={{ marginLeft: 8, fontSize: "var(--sd-text-micro, .6875rem)", fontWeight: 600, color: "var(--sd-accent-ink, #0b5f4b)" }}>{badge}</span>
+        )}
       </span>
       {active && (
         <span
@@ -103,18 +85,29 @@ function ChoiceHead({ label, active }: { label: string; active: boolean }) {
   );
 }
 
+function Notice({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="sd-error" role="status" style={{ borderColor: "var(--sd-warn-border, rgba(138,82,0,.28))", background: "var(--sd-warn-surface, #fdf6ec)" }}>
+      <AlertTriangle className="sd-error__icon" style={{ color: "var(--sd-warn, #8a5200)" }} aria-hidden="true" />
+      <div className="sd-error__body">
+        <span className="sd-error__title">{title}</span>
+        <p className="sd-error__detail" style={{ color: "var(--sd-warn, #8a5200)" }}>{detail}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function VoiceTab({ draft, update }: BuilderTabProps) {
-  // The greeting lives here, with the voice that speaks it — the two are one
-  // decision for a business owner ("what do callers hear first?"), and
-  // splitting them across two screens is what made this journey feel like a
-  // config editor.
+  const options = useVoiceOptions();
   const setPrompt = (patch: Partial<typeof draft.prompt>) =>
     update((d) => ({ ...d, prompt: { ...d.prompt, ...patch } }));
-  const preset = findVoicePreset(draft.voiceModel.preset);
-  const selectedIsCurated = isCuratedVoicePreset(draft.voiceModel.preset);
+  const chooseVoice = (key: string) => update((d) => ({ ...d, voiceModel: { ...d.voiceModel, voice: key } }));
+  const chooseStyle = (key: string) =>
+    update((d) => ({ ...d, voiceModel: { ...d.voiceModel, preset: key as typeof d.voiceModel.preset } }));
 
-  const choosePreset = (id: SupportedVoicePresetId) =>
-    update((d) => ({ ...d, voiceModel: { ...d.voiceModel, preset: id } }));
+  const preset = draft.voiceModel.preset;
+  const voice = draft.voiceModel.voice ?? null;
+  const estimates = findVoicePreset(preset);
 
   return (
     <>
@@ -123,7 +116,6 @@ export default function VoiceTab({ draft, update }: BuilderTabProps) {
         <p style={MUTED}>{VOICE_MODEL.detail}</p>
       </div>
 
-      {/* The first thing a caller hears, above the voice that says it. */}
       <CharCountField
         id="greeting"
         label="Greeting"
@@ -132,146 +124,96 @@ export default function VoiceTab({ draft, update }: BuilderTabProps) {
         maxLength={300}
         rows={2}
         placeholder="What the assistant says first"
-        helpText="The opening line on every call."
+        helpText={VOICE_MODEL.greetingHelp}
       />
 
-      {preset === undefined && (
-        <div className="sd-error" role="status" style={{ borderColor: "var(--sd-warn-border, rgba(138,82,0,.28))", background: "var(--sd-warn-surface, #fdf6ec)" }}>
-          <AlertTriangle className="sd-error__icon" style={{ color: "var(--sd-warn, #8a5200)" }} aria-hidden="true" />
-          <div className="sd-error__body">
-            <span className="sd-error__title">{PRESET_RECOVERY.title}</span>
-            <p className="sd-error__detail" style={{ color: "var(--sd-warn, #8a5200)" }}>
-              {PRESET_RECOVERY.detail}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div>
-        <p style={{ ...MUTED, marginTop: 0 }}>{VOICE_MODEL.curatedNote}</p>
-        <div role="radiogroup" aria-label={VOICE_MODEL.presetGroupLabel} style={CHOICE_GRID}>
-          {CURATED_PRESETS.map((p) => {
-            const active = p.id === draft.voiceModel.preset;
-            return (
-              <div
-                key={p.id}
-                role="radio"
-                aria-checked={active}
-                tabIndex={0}
-                onClick={() => choosePreset(p.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    choosePreset(p.id);
-                  }
-                }}
-                style={choiceStyle(active)}
-              >
-                <ChoiceHead label={p.label} active={active} />
-                <span style={{ ...MUTED, marginTop: 0 }}>{p.friendlyDescription}</span>
-                <VoiceSamplePlayer presetId={p.id} presetLabel={p.label} />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="sd-h2">{VOICE_MODEL.includedHeading}</h3>
-        <ul className="sd-list" style={{ marginTop: "var(--sd-space-3, .75rem)" }}>
-          {FRIENDLY_STACK.map((item) => (
-            <li className="sd-list__item" key={item.label}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "var(--sd-space-3, .75rem)",
-                  padding: "var(--sd-space-3, .75rem) var(--sd-space-4, 1rem)",
-                  minWidth: 0,
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    flex: "0 0 auto",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 32,
-                    height: 32,
-                    borderRadius: "var(--sd-radius-control, 6px)",
-                    background: "var(--sd-surface-accent, #f0f9f6)",
-                    color: "var(--sd-accent-ink, #051824)",
-                  }}
-                >
-                  <item.icon className="sd-navlink__icon" />
-                </span>
-                <span style={{ minWidth: 0 }}>
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: "var(--sd-text-body, .875rem)",
-                      fontWeight: 600,
-                      color: "var(--sd-text, #051824)",
-                    }}
-                  >
-                    {item.label}
-                  </span>
-                  <span style={{ ...MUTED, display: "block" }}>{item.desc}</span>
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {preset === undefined ? (
-        <p
-          style={{
-            margin: 0,
-            padding: "var(--sd-space-4, 1rem)",
-            border: "1px dashed var(--sd-border-strong, rgba(59,82,101,.24))",
-            borderRadius: "var(--sd-radius-control, 6px)",
-            background: "var(--sd-surface-alt, #f6fbfa)",
-            fontSize: "var(--sd-text-small, .8125rem)",
-            color: "var(--sd-text-muted, #3b5265)",
-          }}
-        >
-          {PRESET_RECOVERY.estimatesUnavailable}
+      {options.isLoading && (
+        <p style={MUTED} role="status">
+          <Loader2 className="inline h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Loading voices…
         </p>
-      ) : (
-        <div style={CHOICE_GRID}>
-          <div
-            style={{
-              padding: "var(--sd-space-4, 1rem)",
-              border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
-              borderRadius: "var(--sd-radius-card, 10px)",
-              background: "var(--sd-surface, #fff)",
-              minWidth: 0,
-            }}
-          >
-            <CostBreakdown preset={preset} />
-          </div>
-          <div
-            style={{
-              padding: "var(--sd-space-4, 1rem)",
-              border: "1px solid var(--sd-border, rgba(59,82,101,.12))",
-              borderRadius: "var(--sd-radius-card, 10px)",
-              background: "var(--sd-surface, #fff)",
-              minWidth: 0,
-            }}
-          >
-            <LatencyMeter latencyMs={preset.latencyMs} breakdown={preset.latencyBreakdown} />
+      )}
+      {options.isError && (
+        <div className="sd-error" role="alert">
+          <AlertTriangle className="sd-error__icon" aria-hidden="true" />
+          <div className="sd-error__body">
+            <span className="sd-error__title">Voices couldn't be loaded</span>
+            <p className="sd-error__detail">{(options.error as Error).message} Your saved choice is unchanged.</p>
+            <button type="button" className="sd-error__action" onClick={() => void options.refetch()}>
+              Try again
+            </button>
           </div>
         </div>
       )}
 
-      <Collapsible defaultOpen={!selectedIsCurated}>
+      {options.data && (() => {
+        const opts = options.data;
+        const current = effectiveVoiceKey(opts, preset, voice);
+        const problem = unavailableChoice(opts, preset, voice);
+        return (
+          <>
+            {problem === "style" && <Notice title={VOICE_UNAVAILABLE.styleTitle} detail={VOICE_UNAVAILABLE.styleDetail} />}
+            {problem === "voice" && <Notice title={VOICE_UNAVAILABLE.voiceTitle} detail={VOICE_UNAVAILABLE.voiceDetail} />}
+
+            <div>
+              <h3 className="sd-h2">{VOICE_MODEL.voiceHeading}</h3>
+              <p style={MUTED}>{VOICE_MODEL.voiceDetail}</p>
+              {opts.voices.length === 0 ? (
+                <p style={MUTED}>{VOICE_MODEL.singleVoice}</p>
+              ) : (
+                <div role="radiogroup" aria-label={VOICE_MODEL.voiceHeading} style={{ ...CHOICE_GRID, marginTop: "var(--sd-space-3, .75rem)" }}>
+                  {opts.voices.map((v) => {
+                    const active = v.key === current;
+                    return (
+                      <div
+                        key={v.key}
+                        role="radio"
+                        aria-checked={active}
+                        tabIndex={0}
+                        onClick={() => chooseVoice(v.key)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            chooseVoice(v.key);
+                          }
+                        }}
+                        style={choiceStyle(active)}
+                      >
+                        <ChoiceHead label={v.label} active={active} badge={v.key === opts.defaultVoice ? "Recommended" : undefined} />
+                        <span style={{ ...MUTED, marginTop: 0 }}>{v.description}</span>
+                        <VoiceSamplePlayer voiceKey={v.key} voiceLabel={v.label} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <p style={{ ...MUTED, marginTop: "var(--sd-space-3, .75rem)" }}>{VOICE_MODEL.greetingPreviewNote}</p>
+            </div>
+
+            <div>
+              <h3 className="sd-h2">{VOICE_MODEL.styleHeading}</h3>
+              <p style={MUTED}>{VOICE_MODEL.styleDetail}</p>
+              <div role="radiogroup" aria-label={VOICE_MODEL.styleHeading} style={{ ...CHOICE_GRID, marginTop: "var(--sd-space-3, .75rem)" }}>
+                {opts.styles.map((s) => {
+                  const active = s.key === preset;
+                  return (
+                    <button key={s.key} type="button" role="radio" aria-checked={active} onClick={() => chooseStyle(s.key)} style={choiceStyle(active)}>
+                      <ChoiceHead label={s.label} active={active} badge={s.key === opts.defaultStyle ? "Recommended" : undefined} />
+                      <span style={{ ...MUTED, marginTop: 0 }}>{s.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+      <Collapsible>
         <CollapsibleTrigger
           className="sd-error__action"
           style={{ width: "100%", justifyContent: "space-between", background: "var(--sd-surface-alt, #f6fbfa)" }}
         >
-          Advanced
+          {VOICE_MODEL.advancedHeading}
           <ChevronDown className="sd-navlink__icon" aria-hidden="true" />
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -287,49 +229,19 @@ export default function VoiceTab({ draft, update }: BuilderTabProps) {
               minWidth: 0,
             }}
           >
-            <div>
-              <h3 className="sd-h2">{VOICE_MODEL.moreOptionsHeading}</h3>
-              <p style={MUTED}>{VOICE_MODEL.moreOptionsDetail}</p>
-              <div
-                role="radiogroup"
-                aria-label={VOICE_MODEL.moreOptionsHeading}
-                style={{ ...CHOICE_GRID, marginTop: "var(--sd-space-3, .75rem)" }}
-              >
-                {MORE_PRESETS.map((p) => {
-                  const active = p.id === draft.voiceModel.preset;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => choosePreset(p.id)}
-                      style={{ ...choiceStyle(active), font: "inherit", minHeight: 44 }}
-                    >
-                      <ChoiceHead label={p.label} active={active} />
-                      <span style={{ ...MUTED, marginTop: 0 }}>{p.friendlyDescription}</span>
-                      <span
-                        style={{
-                          fontSize: "var(--sd-text-micro, .6875rem)",
-                          fontVariantNumeric: "tabular-nums",
-                          color: "var(--sd-text-muted, #3b5265)",
-                        }}
-                      >
-                        Est. ${p.costRangeLow.toFixed(2)}–${p.costRangeHigh.toFixed(2)}/min · ~{p.latencyMs} ms
-                      </span>
-                    </button>
-                  );
-                })}
+            <p style={{ ...MUTED, marginTop: 0 }}>{VOICE_MODEL.advancedDetail}</p>
+            {estimates ? (
+              <div style={CHOICE_GRID}>
+                <div style={{ padding: "var(--sd-space-4, 1rem)", border: "1px solid var(--sd-border, rgba(59,82,101,.12))", borderRadius: "var(--sd-radius-card, 10px)", background: "var(--sd-surface, #fff)", minWidth: 0 }}>
+                  <CostBreakdown preset={estimates} />
+                </div>
+                <div style={{ padding: "var(--sd-space-4, 1rem)", border: "1px solid var(--sd-border, rgba(59,82,101,.12))", borderRadius: "var(--sd-radius-card, 10px)", background: "var(--sd-surface, #fff)", minWidth: 0 }}>
+                  <LatencyMeter latencyMs={estimates.latencyMs} breakdown={estimates.latencyBreakdown} />
+                </div>
               </div>
-            </div>
-
-            <div>
-              <h3 className="sd-h2">{VOICE_MODEL.advancedHeading}</h3>
-              <p style={MUTED}>
-                Model, voice and transcription providers are chosen by the selected preset above. There is no
-                separate per-provider selection in this build.
-              </p>
-            </div>
+            ) : (
+              <p style={MUTED}>Estimates appear once a response style is chosen.</p>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

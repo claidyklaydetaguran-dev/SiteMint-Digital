@@ -1,24 +1,28 @@
-import type { SupportedVoicePresetId } from "@/pages/assistants/assistantsContract";
-
 /**
- * V5 PR-6 (C-4): provider-neutral seam for a short audio sample of a voice
- * preset. `VoiceSamplePlayer` calls this and nothing else — it never talks to
- * a provider, a CDN, or browser text-to-speech directly, so a future
- * implementation (e.g. serving a pre-recorded, owner-approved asset) can
- * replace this one function without touching any caller.
+ * A short recording of one voice, as the provider itself publishes it.
  *
- * The program's binding rule for this build is no paid and no browser-TTS
- * voice samples. This default implementation honors that literally: it makes
- * no network request, loads no audio, and calls no synthesis API. It always
- * reports the sample as not yet installed, truthfully, rather than
- * simulating one.
+ * Requested by catalog voice key only; the server resolves the key to the
+ * provider's own preview and returns the audio bytes. Nothing here synthesizes
+ * speech, uses browser text-to-speech, or plays a different voice as a
+ * stand-in — a voice without a sample is reported as unavailable.
  */
-export type VoiceSampleResult = { url: string } | { unavailable: true; reason: string };
+export type VoiceSampleResult = { url: string; release: () => void } | { unavailable: true; reason: string };
 
-export const VOICE_SAMPLE_UNAVAILABLE_REASON = "Voice samples are not installed yet.";
+export const VOICE_SAMPLE_UNAVAILABLE_REASON = "This voice has no sample yet.";
 
-export async function getVoiceSample(
-  _presetId: SupportedVoicePresetId,
-): Promise<VoiceSampleResult> {
-  return { unavailable: true, reason: VOICE_SAMPLE_UNAVAILABLE_REASON };
+export function voiceSampleEndpoint(voiceKey: string): string {
+  return `/api/receptionist/voice/voices/${encodeURIComponent(voiceKey)}/sample`;
+}
+
+export async function getVoiceSample(voiceKey: string, signal?: AbortSignal): Promise<VoiceSampleResult> {
+  const res = await fetch(voiceSampleEndpoint(voiceKey), { credentials: "include", signal });
+  if (res.status === 404) return { unavailable: true, reason: VOICE_SAMPLE_UNAVAILABLE_REASON };
+  if (res.status === 429) return { unavailable: true, reason: "Too many previews. Try again in a few minutes." };
+  if (!res.ok) throw new Error("The sample couldn't be loaded.");
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.startsWith("audio/")) throw new Error("The sample wasn't audio.");
+  const blob = await res.blob();
+  if (blob.size === 0) throw new Error("The sample was empty.");
+  const url = URL.createObjectURL(blob);
+  return { url, release: () => URL.revokeObjectURL(url) };
 }

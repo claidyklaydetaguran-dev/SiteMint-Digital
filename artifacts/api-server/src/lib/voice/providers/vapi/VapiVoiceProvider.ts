@@ -19,11 +19,40 @@ import type {
   VoiceBrowserTokenInput,
   VoiceBrowserTokenResult,
   VoicePhoneNumberRecord,
+  VoiceSampleAudio,
 } from "../../types";
 import { VAPI_PROVIDER_KEY, type VapiProviderConfig } from "./config";
 import { buildVapiArtifactPlan, loadVoiceArtifactPolicyFromEnv } from "./artifactPolicy";
 import { buildVapiAssistantRequestBody, mapVapiAssistantResponse } from "./mapper";
 import { validateVapiAssistantName, validateVapiRuntimeConfig } from "./types";
+
+// ── Voice samples ────────────────────────────────────────────────────────────
+// Vapi's voice library lists each voice with a preview recording hosted in
+// Vapi's own storage. Only that host is ever fetched: the URL comes from
+// Vapi's authenticated response for a voice already in our server catalog,
+// never from a request parameter, and redirects are refused.
+const VOICE_SAMPLE_HOST = /^vapi-voice-preview-audio-[a-z0-9-]+.s3.[a-z0-9-]+.amazonaws.com$/;
+const VOICE_LIBRARY_TTL_MS = 60 * 60 * 1000;
+const VOICE_SAMPLE_TTL_MS = 6 * 60 * 60 * 1000;
+const MAX_VOICE_SAMPLE_BYTES = 4 * 1024 * 1024;
+let voiceLibraryCache: { at: number; previews: Map<string, string> } | null = null;
+const voiceSampleCache = new Map<string, { at: number; audio: VoiceSampleAudio }>();
+
+/** Test hook: forget cached library and samples. */
+export function resetVapiVoiceSampleCaches(): void {
+  voiceLibraryCache = null;
+  voiceSampleCache.clear();
+}
+
+function sampleContentType(header: string | null, url: URL): string | null {
+  const type = (header ?? "").split(";")[0]!.trim().toLowerCase();
+  if (type.startsWith("audio/")) return type;
+  if (type === "" || type === "application/octet-stream" || type === "binary/octet-stream") {
+    if (url.pathname.endsWith(".wav")) return "audio/wav";
+    if (url.pathname.endsWith(".mp3")) return "audio/mpeg";
+  }
+  return null;
+}
 
 export { VAPI_PROVIDER_KEY } from "./config";
 
@@ -434,5 +463,82 @@ export class VapiVoiceProvider implements VoiceProvider {
     }
 
     return { providerAssistantId: id, deleted: true };
+  }
+
+  /**
+   * Returns the provider's own recording of one Vapi voice, or undefined when
+   * the library has no usable preview for it. Library and audio are cached, so
+   * repeated previews do not repeat provider traffic.
+   */
+  async getVoiceSample(voice: { provider: string; voiceId: string }): Promise<VoiceSampleAudio | undefined> {
+    if (voice.provider !== "vapi") return undefined;
+    const key = voice.voiceId.trim().toLowerCase();
+    if (key === "") return undefined;
+
+    const cached = voiceSampleCache.get(key);
+    if (cached && Date.now() - cached.at < VOICE_SAMPLE_TTL_MS) return cached.audio;
+
+    if (!voiceLibraryCache || Date.now() - voiceLibraryCache.at >= VOICE_LIBRARY_TTL_MS) {
+      const raw = await this.request("GET", "/voice-library/vapi");
+      const entries = Array.isArray(raw) ? raw : [];
+      const previews = new Map<string, string>();
+      for (const entry of entries) {
+        if (entry === null || typeof entry !== "object") continue;
+        const row = entry as Record<string, unknown>;
+        if (row.isDeleted === true) continue;
+        const id = typeof row.providerId === "string" ? row.providerId.trim().toLowerCase() : "";
+        const url = typeof row.previewUrl === "string" ? row.previewUrl.trim() : "";
+        if (id && url) previews.set(id, url);
+      }
+      voiceLibraryCache = { at: Date.now(), previews };
+    }
+
+    const href = voiceLibraryCache.previews.get(key);
+    if (!href) return undefined;
+    let url: URL;
+    try {
+      url = new URL(href);
+    } catch {
+      return undefined;
+    }
+    if (url.protocol !== "https:" || !VOICE_SAMPLE_HOST.test(url.hostname)) {
+      throw new VoiceProviderError("PROVIDER_ERROR", "Vapi returned a voice preview from an unexpected host.", {
+        provider: VAPI_PROVIDER_KEY,
+      });
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    try {
+      let response: Response;
+      try {
+        response = await fetch(url, { signal: controller.signal, redirect: "error" });
+      } catch (err) {
+        throw classifyTransportError(err, controller);
+      }
+      if (!response.ok) {
+        throw new VoiceProviderError("PROVIDER_ERROR", `The voice preview could not be fetched (status ${response.status}).`, {
+          provider: VAPI_PROVIDER_KEY,
+        });
+      }
+      const contentType = sampleContentType(response.headers.get("content-type"), url);
+      const declared = Number(response.headers.get("content-length") ?? "0");
+      if (!contentType || declared > MAX_VOICE_SAMPLE_BYTES) {
+        throw new VoiceProviderError("PROVIDER_ERROR", "The voice preview was not a usable audio file.", {
+          provider: VAPI_PROVIDER_KEY,
+        });
+      }
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length === 0 || bytes.length > MAX_VOICE_SAMPLE_BYTES) {
+        throw new VoiceProviderError("PROVIDER_ERROR", "The voice preview was empty or too large.", {
+          provider: VAPI_PROVIDER_KEY,
+        });
+      }
+      const audio: VoiceSampleAudio = { contentType, bytes };
+      voiceSampleCache.set(key, { at: Date.now(), audio });
+      return audio;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }

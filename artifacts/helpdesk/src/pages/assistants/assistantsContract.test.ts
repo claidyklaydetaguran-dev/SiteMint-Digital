@@ -944,11 +944,11 @@ check(
 );
 check(
   "the recovery state is shown on the tab that owns the choice",
-  voiceTabCode.includes("PRESET_RECOVERY.title") && voiceTabCode.includes("PRESET_RECOVERY.detail"),
+  voiceTabCode.includes("VOICE_UNAVAILABLE.styleTitle") && voiceTabCode.includes("VOICE_UNAVAILABLE.voiceTitle"),
 );
 check(
   "the recovery state is also shown in the builder header, so it is visible from every tab",
-  builderCode.includes("PRESET_RECOVERY.title"),
+  builderCode.includes("VOICE_UNAVAILABLE.styleTitle") && builderCode.includes("VOICE_UNAVAILABLE.voiceTitle"),
 );
 check(
   // V5 PR-6 (C-4): the curated-preset cards and the Advanced "more options"
@@ -963,20 +963,26 @@ check(
   // is now asserted directly: exactly one writer of `voiceModel`, it is
   // `choosePreset`, every card calls it, and there is no effect on this tab.
   "the recovery state changes nothing by itself — the preset is written only by an explicit choice",
-  (voiceTabCode.match(/voiceModel: \{/g) ?? []).length === 1 &&
-    /const choosePreset = \(id: SupportedVoicePresetId\) =>\s*update\(/.test(voiceTabCode) &&
-    (voiceTabCode.match(/choosePreset\(p\.id\)/g) ?? []).length >= 2 &&
+  // 2026-09-17: voice and response style are separate explicit choices; each
+  // is written by one named handler, called only from click/keyboard handlers.
+  (voiceTabCode.match(/voiceModel: \{/g) ?? []).length === 2 &&
+    /const chooseVoice = \(key: string\) => update\(/.test(voiceTabCode) &&
+    /const chooseStyle = \(key: string\) =>\s*update\(/.test(voiceTabCode) &&
+    /onClick=\{\(\) => chooseVoice\(v\.key\)\}/.test(voiceTabCode) &&
+    /onClick=\{\(\) => chooseStyle\(s\.key\)\}/.test(voiceTabCode) &&
     !/useEffect/.test(voiceTabCode),
 );
 check(
   "estimates are withheld rather than borrowed from a preset the customer never chose",
-  voiceTabCode.includes("PRESET_RECOVERY.estimatesUnavailable") &&
+  /estimates \? \(/.test(voiceTabCode) &&
+    voiceTabCode.includes("Estimates appear once a response style is chosen.") &&
     shellCode.includes("PRESET_RECOVERY.estimatesUnavailable"),
 );
 check(
   "publishing is blocked with the reason named, before an attempt is spent",
-  builderCode.includes("PRESET_RECOVERY.publishBlocked") &&
-    /isSupportedVoicePreset\(draft\.voiceModel\.preset\) &&/.test(builderCode),
+  builderCode.includes("VOICE_UNAVAILABLE.publishBlocked") &&
+    /voiceChoiceProblem === null &&/.test(builderCode) &&
+    /unavailableChoice\(voiceOptions\.data, draft\.voiceModel\.preset, draft\.voiceModel\.voice\)/.test(builderCode),
 );
 check(
   "the recovery copy names the one action that resolves it",

@@ -31,7 +31,7 @@ import { resolveEffectiveCapabilities } from "../voice/tools/firmCapabilities.js
 import type { VoiceToolName } from "../voice/tools/toolCatalog.js";
 import type { VoiceToolCapability } from "../voice/tools/toolCapabilities.js";
 import { loadVoiceCallPolicyFromEnv, type VoiceCallPolicy } from "./callPolicyConfig.js";
-import { loadRuntimeCatalogFromEnv, getRuntimeCatalogPreset } from "./runtimeCatalog.js";
+import { loadRuntimeCatalogFromEnv, resolveRuntimePreset } from "./runtimeCatalog.js";
 import { extractPublishableAssistantConfig } from "./persistedConfigMapper.js";
 import { PublishFoundationError } from "./errors.js";
 import type { ExtractedAssistantPublishConfig, PublishFirstMessageMode, RuntimeCatalog } from "./types.js";
@@ -326,10 +326,7 @@ function buildProviderInput(
   callPolicy: VoiceCallPolicy | null,
 ): { input: VoiceAssistantInput; extracted: ExtractedAssistantPublishConfig } {
   const extracted = extractPublishableAssistantConfig(assistant.config, catalog);
-  const preset = getRuntimeCatalogPreset(catalog, extracted.presetKey);
-  if (!preset) {
-    throw new PublishFoundationError("UNSUPPORTED_PRESET", "Selected voice preset is not present in the server runtime catalog.");
-  }
+  const preset = resolveRuntimePreset(catalog, extracted);
 
   const name = validateVapiAssistantName(assistant.name);
 
