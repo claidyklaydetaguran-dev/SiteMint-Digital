@@ -213,6 +213,29 @@ describe("toolDispatcher", () => {
     expect(results[0]!.result).toMatch(/after the caller confirms/i);
   });
 
+  // Staging, 17 Sept: the model asked for 2024-09-22 instead of 2026 and the
+  // caller was told the office was closed.
+  it("a date that has passed is refused with today's date, not reported as a closure", async () => {
+    const lookups: string[] = [];
+    const { deps } = makeDeps({
+      getDayAvailability: async (_f, date) => {
+        lookups.push(date);
+        return { dateKey: date, reason: "outside_hours", slots: [] };
+      },
+    });
+    const results = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "t1", name: "check_availability", args: { date: "2024-09-22" } }],
+      CTX,
+      deps,
+    );
+    // NOW is 2026-08-31 15:00Z, which is 11:00 on 31 August in New York.
+    expect(results[0]!.result).toContain("2024-09-22 has already passed");
+    expect(results[0]!.result).toContain("Monday, August 31, 2026 (2026-08-31)");
+    expect(results[0]!.result).not.toMatch(/closed/i);
+    expect(lookups).toEqual([]);
+  });
+
   it("a refused type id is answered with the ids that do exist", async () => {
     const { deps, log } = makeDeps({
       submitAppointmentRequest: async () => ({ ok: false, reason: "unknown_appointment_type" }),

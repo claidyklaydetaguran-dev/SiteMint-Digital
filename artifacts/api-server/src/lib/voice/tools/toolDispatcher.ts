@@ -225,6 +225,16 @@ async function runCheckAvailability(
   const { timezone, types } = await deps.getSchedulingContext(firmId);
   if (types.length === 0) return "Online scheduling isn't set up yet; the office will call back to arrange a time.";
 
+  // The model does not know today's date and has asked for dates in the wrong
+  // year (a staging call checked 2024-09-22 for "Tuesday the 22nd", which fell
+  // on a Sunday, and told the caller the office was closed). A past date is
+  // refused with today's date in the business's timezone, so it can correct
+  // the year instead of reporting a false closure.
+  const today = businessToday(now, timezone);
+  if (args.date < today.key) {
+    return `${args.date} has already passed. Today is ${today.spoken} (${today.key}). Work out the date the caller means from today and check again.`;
+  }
+
   const type = args.appointmentTypeId ? types.find((t) => t.id === args.appointmentTypeId) : types[0];
   if (!type) return "That appointment type isn't offered. " + typeMenu(types);
 
@@ -238,6 +248,19 @@ async function runCheckAvailability(
   // The id is stated outright: without it the model invented one from the
   // type name ("TEST" from "[TEST] Consultation") and every booking was refused.
   return `Open ${type.name} times (appointment type id ${type.id}): ${spoken}. Offer these to the caller. Only after the caller confirms a time, book it with appointmentTypeId "${type.id}" and the exact slot value.`;
+}
+
+/** Today's date in the business's timezone, as a YYYY-MM-DD key and as speech. */
+function businessToday(now: Date, timezone: string): { key: string; spoken: string } {
+  let zone = timezone;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+  } catch {
+    zone = "UTC";
+  }
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const spoken = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
+  return { key, spoken };
 }
 
 function typeMenu(types: Array<{ id: string; name: string; durationMin: number }>): string {
