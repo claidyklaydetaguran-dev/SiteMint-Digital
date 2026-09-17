@@ -593,3 +593,8 @@
     transition: none;
   }
 }
+/* Native playback supplies keyboard-accessible seek, pause and volume. */
+.sc-recording-player { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-block: 1rem; }
+.sc-recording-player audio { width: 100%; min-width: 0; }
+.sc-speed { font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 0.4rem; padding: 0.35rem 0.6rem; }
+.sc-speed option { color: var(--sd-text); background: var(--sd-surface); }

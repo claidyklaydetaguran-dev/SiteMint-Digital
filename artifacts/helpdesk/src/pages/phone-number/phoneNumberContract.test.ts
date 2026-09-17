@@ -2,7 +2,7 @@
  * V5 PR-8 — committed contract tests for the Phone Number screen.
  * Run via: tsx artifacts/helpdesk/src/pages/phone-number/phoneNumberContract.test.ts
  */
-import { COPY, PAGE, everyRenderableString, numberViewState } from "./phoneNumberContract.js";
+import { COPY, PAGE, everyRenderableString, numberViewState, numberRequestBody } from "./phoneNumberContract.js";
 
 let passed = 0;
 const failures: string[] = [];
@@ -30,6 +30,12 @@ check("the capabilities line states SMS is not enabled on this number", COPY.cap
 check("the capabilities line states voice is managed by SiteMint", COPY.capabilitiesLine.includes("managed by SiteMint"));
 
 section("String surface");
+
+eq("a number request needs a region", numberRequestBody({ kind: "new", region: " ", phone: "", notes: "" }), null);
+eq("existing number must include country code", numberRequestBody({ kind: "existing", region: "US", phone: "4155550100", notes: "" }), null);
+eq("punctuation alone is not a phone number", numberRequestBody({ kind: "existing", region: "US", phone: "+1-------", notes: "" }), null);
+check("new number requests do not include stale existing-number input", !numberRequestBody({ kind: "new", region: "US", phone: "+14155550100", notes: "" })!.includes("14155550100"));
+check("an existing number request preserves the number for ownership review", numberRequestBody({ kind: "existing", region: "US", phone: "+1 415 555 0100", notes: "Current carrier" })!.includes("+1 415 555 0100"));
 
 const strings = everyRenderableString();
 check("every renderable string is non-empty", strings.every((s) => typeof s === "string" && s.trim() !== ""));

@@ -5,11 +5,9 @@
  * only when `VITE_VOICE_PLATFORM_ENABLED` is true, exactly as before.
  *
  * ── Product classification ────────────────────────────────────────────────
- * A read-only view of one record from
- * `GET /api/receptionist/voice/calls/:callId`. It has no control that acts on
- * a call: no playback, no recording, no retry of the call itself, no
- * transfer, no assignment, no note, no delete, no CRM or appointment action,
- * no message. The single button on the page re-reads the same GET.
+ * A stored record from `GET /api/receptionist/voice/calls/:callId`, with
+ * on-demand replay of retained audio. Replay reauthorizes the business and
+ * policy on the server; it never starts or records a new conversation.
  *
  * The fabricated demo record this page used to render (a made-up caller,
  * phone number, transcript and booked-looking outcome, resolved from
@@ -32,6 +30,7 @@ import { useSession } from "@/hooks/useSession";
 import { useRealCallDetail } from "@/hooks/useVoiceCalls";
 import { useInquiriesForCall } from "@/hooks/useInquiries";
 import { useContactForCall } from "@/hooks/useContacts";
+import { CallRecording } from "@/pages/call-logs/CallRecording";
 import { ROUTES } from "@/lib/routes";
 import type { RealCallDetail, StructuredOutcome } from "@/lib/voiceCallsApi";
 import {
@@ -287,6 +286,8 @@ function Record({ call }: { call: RealCallDetail }) {
           </Fact>
         </dl>
       </header>
+
+      <CallRecording key={`${call.callId}:${call.artifactPolicy}`} callId={call.callId} policy={call.artifactPolicy} isFinal={call.isFinal} />
 
       <section className="sc-doc" aria-labelledby="sc-retention">
         <h2 className="sc-doc__heading" id="sc-retention">

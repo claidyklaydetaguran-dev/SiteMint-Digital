@@ -71,6 +71,11 @@ export interface VoiceProvider {
    */
   getVoiceSample?(voice: { provider: string; voiceId: string }): Promise<VoiceSampleAudio | undefined>;
 
+  /** A fresh, short-lived recording URL. The caller must authorize the call
+   * first. Never persist, cache, or log the returned bearer URL. Undefined
+   * means no artifact is available, not proof that the call was recorded. */
+  getCallRecording?(providerCallId: string): Promise<{ url: string } | undefined>;
+
   /**
    * Points one telephone number at one assistant, or at nothing.
    *

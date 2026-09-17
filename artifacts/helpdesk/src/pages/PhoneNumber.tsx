@@ -20,7 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { COPY, PAGE, numberViewState } from "@/pages/phone-number/phoneNumberContract";
+import { NumberSetupRequest } from "@/pages/phone-number/NumberSetupRequest";
 import "@/styles/v2-dashboard.css";
+import "@/styles/v2-phone-number.css";
 
 export default function PhoneNumber() {
   const { data: me, isLoading: sessionLoading } = useSession();
@@ -80,10 +82,10 @@ export default function PhoneNumber() {
       )}
 
       {view === "none-assigned" && (
-        <div className="sd-empty">
-          <h3 className="sd-empty__title">{COPY.noneTitle}</h3>
-          <p className="sd-empty__detail">{COPY.noneDetail}</p>
-        </div>
+        <>
+          <p className="sd-page__meta">{COPY.noneDetail}</p>
+          <NumberSetupRequest />
+        </>
       )}
 
       {(view === "assigned" || view === "paused") && number && (

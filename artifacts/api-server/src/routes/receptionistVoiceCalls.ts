@@ -10,8 +10,11 @@ import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import { listRealCallsForFirm, getRealCallForFirm } from "../lib/voice/webhooks/realCallsRepository.js";
 import { callStateLabel } from "../lib/voice/webhooks/callStateModel.js";
 import type { RealCallRecord } from "../lib/voice/webhooks/callStateModel.js";
+import { SlidingWindowLimiter } from "../lib/contactProtection.js";
 
 const router = Router();
+const recordingLimiter = new SlidingWindowLimiter(120, 60 * 60 * 1000);
+setInterval(() => recordingLimiter.purgeStale(), 5 * 60 * 1000).unref();
 
 // ── artifact policy, as a non-secret read ─────────────────────────────────────
 //
@@ -122,6 +125,52 @@ router.get("/receptionist/voice/calls/:callId", requireReceptionistAuth, async (
 });
 
 // ── GET /api/receptionist/voice/provider-status ───────────────────────────────
+
+// Each play/retry rechecks the session, business ownership and current policy
+// before accessing an artifact. A current full policy never proves an older
+// call has audio. No URLs or provider error bodies go into logs or storage.
+router.get("/receptionist/voice/calls/:callId/recording", requireReceptionistAuth, async (req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  try {
+    const call = await getRealCallForFirm(req.firmId!, req.params.callId as string);
+    if (!call) {
+      res.status(404).json({ error: "Call not found" });
+      return;
+    }
+    if (readArtifactPolicy() !== "full") {
+      res.json({ status: "disabled" });
+      return;
+    }
+    if (call.synthetic) {
+      res.json({ status: "unavailable" });
+      return;
+    }
+    if (!call.isFinal) {
+      res.json({ status: "pending" });
+      return;
+    }
+    const bucket = `firm:${req.firmId}`;
+    if (recordingLimiter.isOverLimit(bucket)) {
+      res.setHeader("Retry-After", "3600");
+      res.status(429).json({ error: "Too many recording requests. Try again later." });
+      return;
+    }
+    recordingLimiter.record(bucket);
+    const { createProductionVoiceProvider } = await import("../lib/voicePublishing/providerFactory.js");
+    const provider = createProductionVoiceProvider();
+    if (!provider.getCallRecording) {
+      res.status(503).json({ error: "Recordings cannot be retrieved right now." });
+      return;
+    }
+    const recording = await provider.getCallRecording(call.callId);
+    res.json(recording ? { status: "available", url: recording.url } : { status: "unavailable" });
+  } catch (err) {
+    req.log.warn({ firmId: req.firmId, errorClass: err instanceof Error ? err.constructor.name : typeof err }, "[receptionist] recording unavailable");
+    res.status(503).json({ error: "The recording couldn't be loaded. Try again shortly." });
+  }
+});
+
 //
 // Reports only whether each Development env var is PRESENT — never a value,
 // length, prefix, or suffix. This backs the dashboard's honest

@@ -1,20 +1,15 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import {
   db, discoverySubmissions, crmLeads, crmActivities, crmTasks, crmProjects,
 } from "@workspace/db";
 import type { DiscoverySubmission } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
 
-// M1 cutover: the CRM gate now accepts a per-person staff session first and
-// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
-// is not "false". Keeping the name leaves every route below unchanged, and
-// the route-security manifest still reads "admin" for them.
-const requireAdmin = requireCrmAuth();
+// Every route checks the capability it uses, in addition to the staff session.
 
 // ── Task templates (mirrors crmProjects.ts) ───────────────────────────────────
 const DISCOVERY_TASK_TEMPLATES: Record<string, string[]> = {
@@ -115,7 +110,7 @@ function buildDeterministicSummary(sub: DeterministicSummaryInput): {
 
 // ── GET /api/crm/discovery-submissions ───────────────────────────────────────
 
-router.get("/crm/discovery-submissions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/discovery-submissions", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   const { status, budget, timeline, search, limit = "100", offset = "0" } =
     req.query as Record<string, string>;
 
@@ -143,7 +138,7 @@ router.get("/crm/discovery-submissions", requireAdmin, async (req: Request, res:
 
 // ── GET /api/crm/discovery-submissions/:id ────────────────────────────────────
 
-router.get("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/discovery-submissions/:id", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   const id = Number(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -161,7 +156,7 @@ router.get("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, 
 
 // ── POST /api/crm/discovery-submissions ───────────────────────────────────────
 
-router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/discovery-submissions", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const contactName = String(body.contactName || "").trim();
   const companyName = String(body.companyName || "").trim();
@@ -250,7 +245,7 @@ router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res
 
 // ── PATCH /api/crm/discovery-submissions/:id ─────────────────────────────────
 
-router.patch("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/discovery-submissions/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const id = Number(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -293,7 +288,7 @@ router.delete("/crm/discovery-submissions/:id", requireCrmAuth("leads.delete"), 
 
 router.post(
   "/crm/discovery-submissions/:id/generate-proposal",
-  requireAdmin,
+  requireCrmAuth("leads.write"),
   async (req: Request, res: Response) => {
     const id = Number(req.params["id"]);
     if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -330,7 +325,9 @@ router.post(
 
 router.post(
   "/crm/discovery-submissions/:id/convert-to-project",
-  requireAdmin,
+  requireCrmAuth("leads.write"),
+  requireCrmAuth("projects.write"),
+  requireCrmAuth("tasks.write"),
   async (req: Request, res: Response) => {
     const id = Number(req.params["id"]);
     if (!id) { res.status(400).json({ error: "Invalid id" }); return; }

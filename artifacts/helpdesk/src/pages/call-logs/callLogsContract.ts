@@ -668,7 +668,7 @@ export function applyFilters<T extends Pick<RealCallSummary, "channel" | "state"
 
 export const RETENTION_NONE = "Transcripts and recordings are not kept for this account.";
 export const RETENTION_TRANSCRIPT_ONLY = "Transcripts are kept for this account. Call audio is not.";
-export const RETENTION_FULL = "Call audio and transcripts are kept for this account.";
+export const RETENTION_FULL = "Current setting: retain call audio and transcripts. Availability is checked for each call; earlier calls may have no recording.";
 
 export function retentionDetail(policy: ArtifactPolicy | string | null | undefined): string {
   if (policy === "none") return RETENTION_NONE;

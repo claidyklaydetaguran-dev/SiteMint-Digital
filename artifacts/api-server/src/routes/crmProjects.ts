@@ -1,17 +1,12 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db, crmProjects, crmTasks, crmLeads, crmActivities, PROJECT_STAGES } from "@workspace/db";
 import type { ChecklistItem, ProjectLink } from "@workspace/db";
 import { eq, desc, inArray, and } from "drizzle-orm";
-import { validateToken } from "../lib/admin-session.js";
 import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 
 const router: IRouter = Router();
 
-// M1 cutover: the CRM gate now accepts a per-person staff session first and
-// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
-// is not "false". Keeping the name leaves every route below unchanged, and
-// the route-security manifest still reads "admin" for them.
-const requireAdmin = requireCrmAuth();
+// Every route checks the capability it uses, in addition to the staff session.
 
 // ── Project delivery task templates by project type ───────────────────────────
 const WEB_BUILD_TASKS = [
@@ -88,7 +83,7 @@ const DEFAULT_LAUNCH_CHECKLIST: ChecklistItem[] = [
 ].map((label) => ({ label, done: false }));
 
 // ── List projects (enriched with lead name + task counts) ─────────────────────
-router.get("/crm/projects", requireAdmin, async (_req: Request, res: Response) => {
+router.get("/crm/projects", requireCrmAuth("projects.read"), async (_req: Request, res: Response) => {
   try {
     const projects = await db.select().from(crmProjects).orderBy(desc(crmProjects.createdAt));
     const leadIds = [...new Set(projects.map((p) => p.leadId).filter((x): x is number => x != null))];
@@ -125,7 +120,7 @@ router.get("/crm/projects", requireAdmin, async (_req: Request, res: Response) =
 });
 
 // ── Single project with its tasks ─────────────────────────────────────────────
-router.get("/crm/projects/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/projects/:id", requireCrmAuth("projects.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -144,7 +139,7 @@ router.get("/crm/projects/:id", requireAdmin, async (req: Request, res: Response
 });
 
 // ── Create project (auto-generates delivery tasks + launch checklist) ─────────
-router.post("/crm/projects", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/projects", requireCrmAuth("projects.write"), requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const b = req.body as Record<string, unknown>;
     const name = typeof b.name === "string" ? b.name.trim() : "";
@@ -202,7 +197,7 @@ router.post("/crm/projects", requireAdmin, async (req: Request, res: Response) =
 });
 
 // ── Update project ────────────────────────────────────────────────────────────
-router.patch("/crm/projects/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/projects/:id", requireCrmAuth("projects.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -253,7 +248,7 @@ router.delete("/crm/projects/:id", requireCrmAuth("projects.delete"), async (req
 });
 
 // ── Add a task to a project ───────────────────────────────────────────────────
-router.post("/crm/projects/:id/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/projects/:id/tasks", requireCrmAuth("projects.write"), requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -277,7 +272,7 @@ router.post("/crm/projects/:id/tasks", requireAdmin, async (req: Request, res: R
 });
 
 // ── Toggle / update a project task ────────────────────────────────────────────
-router.patch("/crm/projects/:id/tasks/:taskId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/projects/:id/tasks/:taskId", requireCrmAuth("projects.write"), requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const taskId = Number(req.params.taskId);
@@ -299,7 +294,7 @@ router.patch("/crm/projects/:id/tasks/:taskId", requireAdmin, async (req: Reques
 });
 
 // ── Delete a project task ─────────────────────────────────────────────────────
-router.delete("/crm/projects/:id/tasks/:taskId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/projects/:id/tasks/:taskId", requireCrmAuth("projects.write"), requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const taskId = Number(req.params.taskId);

@@ -172,6 +172,52 @@ export class VapiVoiceProvider implements VoiceProvider {
     this.config = config;
   }
 
+  /** Vapi's authenticated artifact endpoint returns a short-lived redirect.
+   * Do not follow it with our private key, and do not reuse webhook URLs. */
+  async getCallRecording(providerCallId: string): Promise<{ url: string } | undefined> {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(providerCallId)) {
+      throw new VoiceProviderError("VALIDATION_FAILED", "Invalid call identifier.", { provider: VAPI_PROVIDER_KEY });
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    let response: Response | undefined;
+    try {
+      try {
+        response = await fetch(`${this.config.baseUrl}/call/${encodeURIComponent(providerCallId)}/mono-recording`, {
+          headers: { Authorization: `Bearer ${this.config.apiKey}` },
+          redirect: "manual",
+          signal: controller.signal,
+        });
+      } catch (err) {
+        throw classifyTransportError(err, controller);
+      }
+      if (response.status === 404 || response.status === 410) return undefined;
+      if (response.status !== 302) throw mapStatusToError(response.status);
+      const location = response.headers.get("location");
+      // Only Vapi's authenticated response may supply this URL. No request
+      // parameter is ever used as a download location. Storage hosts support
+      // byte ranges, so the browser can seek without buffering a whole call.
+      let url: URL;
+      try { url = new URL(location ?? ""); } catch {
+        throw new VoiceProviderError("PROVIDER_ERROR", "Recording location is unavailable.", { provider: VAPI_PROVIDER_KEY });
+      }
+      const storageHost = /^(?:[a-z0-9-]+\.)+s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/.test(url.hostname)
+        || /^s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/.test(url.hostname)
+        || url.hostname === "storage.googleapis.com"
+        || /^[a-z0-9-]+\.storage\.googleapis\.com$/.test(url.hostname)
+        || /^[a-z0-9-]+\.supabase\.co$/.test(url.hostname);
+      if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash
+        || !storageHost || url.href.length > 8192 || !url.search) {
+        throw new VoiceProviderError("PROVIDER_ERROR", "Recording location is unavailable.", { provider: VAPI_PROVIDER_KEY });
+      }
+      return { url: url.href };
+    } finally {
+      // Artifact bodies are never buffered or logged by this endpoint.
+      if (response?.body) await response.body.cancel().catch(() => {});
+      clearTimeout(timer);
+    }
+  }
+
   /**
    * Performs one HTTP exchange under a single deadline.
    *

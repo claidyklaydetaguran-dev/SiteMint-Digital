@@ -162,7 +162,7 @@ section("Premise — what the voice-calls API actually offers");
 
 const ROUTER_CALLS = routeSrc.match(/router\.(get|post|put|patch|delete)\("([^"]+)"/g) ?? [];
 
-eq("the voice-calls router exposes exactly three endpoints", ROUTER_CALLS.length, 3);
+eq("the voice-calls router exposes four authenticated read endpoints", ROUTER_CALLS.length, 4);
 
 check(
   "every voice-calls endpoint is a GET — the API this route reads has no writer",
@@ -170,11 +170,12 @@ check(
 );
 
 eq(
-  "the router's three paths are the two call reads plus provider-status",
+  "the router includes the owned-call recording read",
   ROUTER_CALLS.map((c) => /"([^"]+)"/.exec(c)![1]).sort(),
   [
     "/receptionist/voice/calls",
     "/receptionist/voice/calls/:callId",
+    "/receptionist/voice/calls/:callId/recording",
     "/receptionist/voice/provider-status",
   ],
 );
@@ -825,7 +826,9 @@ const BANNED: [string, RegExp][] = [
   ["a call can be answered from here", /\banswer (this |the )?call\b/i],
   ["a call can be transferred", /\btransfer (the |this )?call\b|\bcall transfer\b|\btransferred to\b|\bwarm transfer\b/i],
   ["a call can be retried", /\bretry (the |this )?call\b|\bcall (them |him |her )?again\b|\bredial\b/i],
-  ["a call was recorded", /\bcall recording\b|\brecorded call\b|\bplayback\b|\bplay (the |this )?(call|recording|audio)\b|\bwaveform\b|\blisten to (the |this )?call\b/i],
+  // Replay was explicitly requested on 17 Sep. Availability is checked at
+  // runtime; a claim that every call has audio remains forbidden.
+  ["all calls have recordings", /\bevery call (is recorded|has (a )?recording)\b|\ball calls are recorded\b/i],
   ["a booking was confirmed", /\bbooked\b|\bappointment (is|was) (set|made|created|confirmed|booked)\b|\bconfirmed (appointment|booking|for)\b|\badded to (the |your )?calendar\b/i],
   ["a customer was contacted", /\b(we|SiteMint|the assistant) (sent|texted|emailed|notified|contacted)\b|\bmessage sent\b|\bsms sent\b|\bemail sent\b|\bcallback sent\b/i],
   ["Vapi is named to the reader", /\bvapi\b/i],
