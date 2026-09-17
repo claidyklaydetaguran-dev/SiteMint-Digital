@@ -1559,6 +1559,19 @@ const GATED_NAV_ONLY_HREFS = gatedNavItems
  * nothing; SMS now uses its own icon (`Smartphone`), so `Bot` is gated-only.
  * `Gauge` is new: the live Usage record's icon.
  */
+/**
+ * An icon is present when lucide's factory call for it is emitted —
+ * `<alias>("phone", <paths>)` — not merely when its name appears in quotes.
+ * The bare spelling is not evidence: a gated-out build carries the contact
+ * form, whose field is also called "phone", and read that way the rule
+ * reported a leak no build contained (2026-09-18). Matching the call shape
+ * distinguishes the icon from an ordinary string of the same name, and was
+ * checked both ways against a real pair of builds: all 14 icons found in the
+ * voice-enabled build, none in the gated-out one.
+ */
+const emitsIcon = (js: string, emitted: string): boolean =>
+  new RegExp(`=\\s*[A-Za-z_$][\\w$]*\\("${emitted}",\\s*[A-Za-z_$][\\w$]*\\)`).test(js);
+
 const GATED_ONLY_ICONS: [string, string][] = [
   // "Bot" removed 2026-09 (V5): ungated components/common/PageHeader.tsx and
   // ProgressSteps.tsx import it for the Setup/assistant step marks, so its
@@ -1971,7 +1984,7 @@ if (!existsSync(distDir)) {
 
     eq(
       "no icon that only a gated record uses is emitted",
-      GATED_ONLY_ICONS.filter(([, emitted]) => everyJs.includes(`"${emitted}"`)).map(([n]) => n),
+      GATED_ONLY_ICONS.filter(([, emitted]) => emitsIcon(everyJs, emitted)).map(([n]) => n),
       [],
     );
 
@@ -2060,7 +2073,7 @@ if (!existsSync(distDir)) {
 
     eq(
       "every icon a gated record uses is present",
-      GATED_ONLY_ICONS.filter(([, emitted]) => !everyJs.includes(`"${emitted}"`)).map(([n]) => n),
+      GATED_ONLY_ICONS.filter(([, emitted]) => !emitsIcon(everyJs, emitted)).map(([n]) => n),
       [],
     );
 
