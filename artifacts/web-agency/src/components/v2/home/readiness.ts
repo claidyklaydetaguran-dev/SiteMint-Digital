@@ -33,21 +33,21 @@ export const CAPABILITY_STATUS: Array<{
   tier: ReadinessTier;
 }> = [
   {
-    capability: "SMS Receptionist",
+    capability: "Voice receptionist",
     description:
-      "Replies to inbound text inquiries, asks the questions the business needs answered, and keeps the conversation in one place.",
+      "Answers calls in a natural voice, takes messages with what the caller needs, and emails you a summary. You can test it in your browser before connecting a number.",
     tier: "available",
   },
   {
-    capability: "Voice experience",
+    capability: "Appointment booking and team access",
     description:
-      "A spoken version of the same receptionist. It is being built and is not answering customer calls.",
-    tier: "in-development",
+      "Books an appointment into your connected calendar once the caller confirms, and lets your team sign in with their own passwords and roles.",
+    tier: "available",
   },
   {
-    capability: "Connected CRM and automated follow-up",
+    capability: "Text messages to callers",
     description:
-      "Conversations flowing into a CRM record and follow-up running on its own. This is the direction of the product, not a shipped feature.",
+      "Confirmation texts and replies by text message. Not sent today; the receptionist never promises one.",
     tier: "planned",
   },
 ];

@@ -316,8 +316,8 @@ export default function Login() {
                 ))}
               </ul>
               <p className="si-status__note">
-                Signing in opens the SMS dashboard. Voice and connected CRM are
-                not part of it yet.
+                Signing in opens your receptionist dashboard. Text messages to
+                callers are not part of it yet.
               </p>
             </aside>
           </div>

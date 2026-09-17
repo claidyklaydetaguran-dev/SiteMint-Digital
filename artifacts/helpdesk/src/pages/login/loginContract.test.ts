@@ -257,30 +257,31 @@ console.log("\n--- product truth ---");
 
   // The three tiers must be worded exactly as the public site words them.
   for (const phrase of [
-    "SMS Receptionist",
-    "Voice experience",
-    "Connected CRM and automated follow-up",
+    "Voice receptionist",
+    "Appointment booking and team access",
+    "Text messages to callers",
     "Available now",
     "In development",
     "Planned",
   ]) {
     check(`"${phrase}" matches the public site's wording`, readinessSrc.includes(`"${phrase}"`) && publicReadinessSrc.includes(`"${phrase}"`));
   }
+  // 2026-09-17: voice, booking and team access ship; texts to callers are deferred.
   check(
-    "SMS is the tier marked available",
-    /\{ capability: "SMS Receptionist", tier: "available" \}/.test(readinessSrc),
+    "the voice receptionist is marked available",
+    /\{ capability: "Voice receptionist", tier: "available" \}/.test(readinessSrc),
   );
   check(
-    "voice is not marked available",
-    /\{ capability: "Voice experience", tier: "in-development" \}/.test(readinessSrc),
+    "booking and team access are marked available",
+    /\{ capability: "Appointment booking and team access", tier: "available" \}/.test(readinessSrc),
   );
   check(
-    "CRM is not marked available",
-    /\{ capability: "Connected CRM and automated follow-up", tier: "planned" \}/.test(readinessSrc),
+    "text messages are not marked available",
+    /\{ capability: "Text messages to callers", tier: "planned" \}/.test(readinessSrc),
   );
   check(
-    "the page states plainly that voice and CRM are not included yet",
-    pageProse.includes("Voice and connected CRM are not part of it yet."),
+    "the page states plainly that text messages are not included yet",
+    pageProse.includes("Text messages to callers are not part of it yet."),
   );
   check(
     "the page states where a successful sign-in leads",

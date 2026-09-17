@@ -47,7 +47,7 @@ const faqs: Array<{ q: string; a: string }> = [
   },
   {
     q: "Is the AI Receptionist available now?",
-    a: "The SMS receptionist is available now. A voice experience is in development and is not answering customer calls. Connected CRM and automated follow-up are planned direction, not shipped features — and they are labelled that way everywhere on this page.",
+    a: "Yes. The voice receptionist answers calls, takes messages and books appointments after the caller confirms, and your team can sign in with their own accounts. Text messages to callers are not sent yet — that is planned, and labelled that way everywhere on this page.",
   },
 ];
 

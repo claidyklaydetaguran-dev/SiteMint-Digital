@@ -30,7 +30,7 @@ export const READINESS: Record<ReadinessTier, { label: string }> = {
  * longer descriptions would turn this into a marketing block beside a form.
  */
 export const CAPABILITY_STATUS: Array<{ capability: string; tier: ReadinessTier }> = [
-  { capability: "SMS Receptionist", tier: "available" },
-  { capability: "Voice experience", tier: "in-development" },
-  { capability: "Connected CRM and automated follow-up", tier: "planned" },
+  { capability: "Voice receptionist", tier: "available" },
+  { capability: "Appointment booking and team access", tier: "available" },
+  { capability: "Text messages to callers", tier: "planned" },
 ];
