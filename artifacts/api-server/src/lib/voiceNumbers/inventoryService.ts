@@ -21,7 +21,7 @@
 //      `assigned` — because `assigned` is exactly what the customer-facing
 //      capability reads to tell a business that transfers will work.
 
-import { and, eq, ne, or } from "drizzle-orm";
+import { and, desc, eq, ne, or } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { voiceNumbers } from "@workspace/db/schema/voice";
 
@@ -158,8 +158,13 @@ export interface AssignDeps extends InventoryDeps {
    * telephone that rings out.
    */
   findPublishedAssistantId: (firmId: number) => Promise<number | null>;
-  /** The provider's own id for that assistant — what the number must be pointed at. */
-  findProviderAssistantId: (firmId: number) => Promise<string | null>;
+  /**
+   * The provider's own id for THAT assistant — what the number must be pointed
+   * at. It takes the assistant id, not just the firm: a business may have more
+   * than one published assistant, and the local row and the provider route must
+   * name the same one.
+   */
+  findProviderAssistantId: (firmId: number, assistantId: number) => Promise<string | null>;
   /**
    * Points the number at the assistant AT THE PROVIDER, which is what actually
    * routes calls. Absent means routing cannot be changed, and the assignment
@@ -261,7 +266,7 @@ export async function assignNumberToFirm(input: AssignInput, deps: AssignDeps): 
     pausedReason: "assignment_unconfirmed",
   });
 
-  const providerAssistantId = await deps.findProviderAssistantId(input.firmId);
+  const providerAssistantId = await deps.findProviderAssistantId(input.firmId, assistantId);
   if (providerAssistantId === null) return refuse("no_published_assistant");
 
   if (!deps.routeNumber || !deps.confirmProviderNumber) {
@@ -335,21 +340,32 @@ export async function assignNumberToFirm(input: AssignInput, deps: AssignDeps): 
 /** The firm's published assistant row id, if it has one. */
 export const productionFindPublishedAssistantId: AssignDeps["findPublishedAssistantId"] = async (firmId) => {
   const { voiceAssistants } = await import("@workspace/db/schema/voice");
+  // Deterministic: the most recently changed published assistant. Without an
+  // order, a business with two published assistants got whichever row the
+  // database happened to return — and the provider route was chosen by a
+  // second, independent query that could disagree with this one.
   const [row] = await db
     .select({ id: voiceAssistants.id })
     .from(voiceAssistants)
     .where(and(eq(voiceAssistants.firmId, firmId), eq(voiceAssistants.status, "published")))
+    .orderBy(desc(voiceAssistants.updatedAt), desc(voiceAssistants.id))
     .limit(1);
   return row?.id ?? null;
 };
 
 /** The PROVIDER's id for that assistant — the value a number must be pointed at. */
-export const productionFindProviderAssistantId: AssignDeps["findProviderAssistantId"] = async (firmId) => {
+export const productionFindProviderAssistantId: AssignDeps["findProviderAssistantId"] = async (firmId, assistantId) => {
   const { voiceAssistants } = await import("@workspace/db/schema/voice");
   const [row] = await db
     .select({ providerAssistantId: voiceAssistants.providerAssistantId })
     .from(voiceAssistants)
-    .where(and(eq(voiceAssistants.firmId, firmId), eq(voiceAssistants.status, "published")))
+    .where(
+      and(
+        eq(voiceAssistants.firmId, firmId),
+        eq(voiceAssistants.id, assistantId),
+        eq(voiceAssistants.status, "published"),
+      ),
+    )
     .limit(1);
   const id = row?.providerAssistantId ?? null;
   return typeof id === "string" && id.trim() !== "" ? id : null;

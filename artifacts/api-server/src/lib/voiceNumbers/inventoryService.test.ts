@@ -126,6 +126,24 @@ describe("assigning a number", () => {
     expect(h.writes.map((w) => w.state)).toEqual(["paused", "assigned"]);
   });
 
+  // A business may publish more than one assistant. The row it writes and the
+  // assistant it points the telephone at must be the same one: the provider id
+  // is now looked up BY assistant id, not by a second, independent query for
+  // "a published assistant of this firm".
+  it("routes the telephone to the same assistant it records", async () => {
+    const asked: Array<[number, number]> = [];
+    const h = deps({ assistantId: 12, confirm: { ...NUMBER, assignedAssistantId: "asst_twelve" } });
+    h.deps.findProviderAssistantId = async (firmId, assistantId) => {
+      asked.push([firmId, assistantId]);
+      return assistantId === 12 ? "asst_twelve" : "asst_other";
+    };
+    const result = await assignNumberToFirm({ providerNumberId: NUMBER.providerNumberId, firmId: 4 }, h.deps);
+    expect(result).toMatchObject({ ok: true, state: "assigned" });
+    expect(asked).toEqual([[4, 12]]);
+    expect(h.writes.every((w) => w.assignedAssistantId === 12)).toBe(true);
+    expect(h.routed).toEqual(["asst_twelve"]);
+  });
+
   it("leaves it paused when the provider cannot confirm it", async () => {
     for (const confirm of ["throws", null, "absent"] as const) {
       const h = deps({ confirm });
