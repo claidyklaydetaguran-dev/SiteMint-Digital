@@ -260,3 +260,81 @@ owner decision because it is a recurring charge.
 - Approve the two queued Replit Agent tasks on the SiteMint-Digital app ("Get
   the CRM running on Replit with a live database", "Connect external services").
   They propose the topology the owner ruled out.
+
+---
+
+## 9. 2026-09-18 — what moved, and the two actions this session could not take
+
+Added by the receptionist/release session. Nothing in production was changed.
+
+### Confirmed again, from the Replit Database pane
+
+The app has **two** databases and the workspace shell reaches only the first:
+
+| | tables | size | reachable from the workspace shell |
+| --- | --- | --- | --- |
+| Development Database (`heliumdb`) | 35 | 36 MB (58.2 MB allocated) | yes — this is what `$DATABASE_URL` points at |
+| **Production Database** | **27** | 57.2 MB | **no** |
+
+Production holds the live rows §2 describes (3 leads, 40 tasks, 8 discovery
+submissions, 23 landing-page views, …) and still has **no voice and no
+scheduling tables**. Point-in-time recovery is **on, last 7 days**; scheduled
+backups are **off**. Any measurement taken in the workspace shell describes the
+development database and must not be quoted as production.
+
+### The upgrade step that touches existing production rows was rehearsed
+
+`lib/db/drizzle/discovery/0000_discovery-domain-contract.sql` is the only
+migration that alters a table production already has rows in — it adds the 15
+v1 columns to `discovery_submissions`. Every other migration only alters tables
+it creates in the same file.
+
+The production catalog is not reachable from here, so the rehearsal used a
+reconstruction rather than a restore: the fully-migrated catalog, reduced to
+production's shape (the 15 columns and the two new discovery tables removed),
+seeded with 8 rows as production holds, then the migration file applied
+unmodified.
+
+```
+before: rows=8  columns=28
+migration exit 0
+after : rows=8  columns=43  null-idempotency=8  review_status=none
+rerun  exit 0   rows=8                     (idempotent)
+discovery_ai_briefs + discovery_delivery_jobs created
+```
+
+Rows survive, the 15 columns land, existing rows backfill to `none`, and the
+unique index on `idempotency_key` tolerates 8 NULLs (NULLs distinct). Run twice
+without error, which matters because Replit re-runs migrations at deploy.
+
+**This is a reconstruction, not the restore rehearsal §6 requires.** It proves
+the migration's behaviour against production's *shape*; it cannot prove it
+against production's actual catalog, which may carry drift no reconstruction
+reproduces.
+
+### Two actions were refused by the managed permission policy
+
+Both are recorded here exactly as attempted, and neither was retried in a
+different form:
+
+1. **Set Secrets on Web Asset Builder** — `CORS_ALLOWED_ORIGINS`,
+   `ADMIN_PASSWORD`, `CALENDAR_TOKEN_KEY`, `SNAPSHOT_SOURCE`,
+   `CRM_LEGACY_BEARER_ENABLED=false`. Refused: **[Secret-Store Writes]**.
+   `CORS_ALLOWED_ORIGINS` is required at module load in production, so the API
+   cannot start without it — **this alone makes the publish impossible.**
+   The same refusal blocks `VOICE_ARTIFACT_POLICY=full` on staging, which is
+   what recording activation and a real-audio replay test need.
+2. **Move the Production Database connection string into the workspace shell**
+   (for `pg_dump` and the restore rehearsal). Refused: **[Credential
+   Materialization]**, and a follow-up check for an in-environment CLI that
+   could produce it without the value passing through the browser was refused as
+   **[Credential Exploration]**.
+
+Until an owner performs (1), production cannot be published at all; until (1)
+or (2) provides database access, §6's restore rehearsal cannot be run.
+
+### Unchanged and still true
+
+`/portal` needs no further code. The fix is in source (`fae2c8d`) and in the
+built artifact `release/marketing-dist-2026-09-16` @ `1912a3b`; it needs the
+marketing republish and nothing else.
