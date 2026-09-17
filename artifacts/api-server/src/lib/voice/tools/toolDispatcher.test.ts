@@ -198,6 +198,42 @@ describe("toolDispatcher", () => {
     expect(spoken).toContain("Consultation");
   });
 
+  // Staging, 17 Sept: the answer named the type but not its id, the model
+  // invented "TEST" from "[TEST] Consultation", and every booking was refused.
+  it("states the appointment type id to book with, and asks for the caller's confirmation first", async () => {
+    const { deps } = makeDeps();
+    const results = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "t1", name: "check_availability", args: { date: "2026-09-01" } }],
+      CTX,
+      deps,
+    );
+    expect(results[0]!.result).toContain("appointment type id 3");
+    expect(results[0]!.result).toContain('appointmentTypeId "3"');
+    expect(results[0]!.result).toMatch(/after the caller confirms/i);
+  });
+
+  it("a refused type id is answered with the ids that do exist", async () => {
+    const { deps, log } = makeDeps({
+      submitAppointmentRequest: async () => ({ ok: false, reason: "unknown_appointment_type" }),
+    });
+    const results = await dispatchToolCalls(
+      FIRM,
+      [
+        {
+          toolCallId: "t1",
+          name: "book_appointment",
+          args: { appointmentTypeId: "TEST", startIso: "2026-09-01T14:00:00.000Z", customerName: "Pat Caller" },
+        },
+      ],
+      CTX,
+      deps,
+    );
+    expect(results[0]!.result).toContain("Consultation (30 minutes, id 3)");
+    expect(results[0]!.result).not.toMatch(/booked|confirmed/i);
+    expect(log.submits).toHaveLength(0);
+  });
+
   it("books via the injected advisory-locked submit and never echoes contact details", async () => {
     const { deps, log } = makeDeps();
     const results = await dispatchToolCalls(

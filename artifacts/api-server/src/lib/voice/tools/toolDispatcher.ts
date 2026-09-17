@@ -235,7 +235,9 @@ async function runCheckAvailability(
   const spoken = offered
     .map((s) => `${formatSlotForSpeech(s.startUtc, timezone)} (slot ${s.startUtc.toISOString()})`)
     .join("; ");
-  return `Open ${type.name} times: ${spoken}. Offer these to the caller; book with the exact slot value.`;
+  // The id is stated outright: without it the model invented one from the
+  // type name ("TEST" from "[TEST] Consultation") and every booking was refused.
+  return `Open ${type.name} times (appointment type id ${type.id}): ${spoken}. Offer these to the caller. Only after the caller confirms a time, book it with appointmentTypeId "${type.id}" and the exact slot value.`;
 }
 
 function typeMenu(types: Array<{ id: string; name: string; durationMin: number }>): string {
@@ -259,7 +261,8 @@ async function runBookAppointment(
     args.appointmentTypeId,
     startUtc,
     { name: args.customerName, phone: args.customerPhone ?? null, email: args.customerEmail ?? null },
-    { phoneConsent: true, smsConsent: args.smsConsent === true, emailConsent: false },
+    // Text messages are deferred: no SMS consent is recorded from a call.
+    { phoneConsent: true, smsConsent: false, emailConsent: false },
     now,
     // The provider's id for THIS tool call. A retry carries the same id, and
     // the repository returns the original request instead of creating a second
@@ -270,7 +273,7 @@ async function runBookAppointment(
   if (!result.ok) {
     return result.reason === "slot_no_longer_available"
       ? "That time was just taken. Check availability again and offer another slot."
-      : "That appointment type isn't valid. Check availability first and use its appointment type id.";
+      : "That appointment type isn't valid. " + typeMenu((await deps.getSchedulingContext(firmId)).types) + " Book again with one of those ids.";
   }
   // A repeat returns the same reference and sends nothing again: the caller
   // already has the confirmation text, and a second one would read as a second
@@ -303,7 +306,7 @@ async function runBookAppointment(
       spokenSummary: confirmed
         ? `Your appointment is confirmed — reference ${result.request.publicId}. Reply STOP to opt out.`
         : `Your appointment request is in — reference ${result.request.publicId}. The office will confirm shortly. Reply STOP to opt out.`,
-      callerConsented: args.smsConsent === true,
+      callerConsented: false, // texts are deferred; nothing is sent from a call
     });
   } catch {
     // outbox unavailability must not undo a successful booking
