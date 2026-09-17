@@ -28,7 +28,11 @@ const CAPABILITY_COPY: Record<string, { label: string; active: string }> = {
   },
   scheduling: {
     label: "Book appointments",
-    active: "Callers can check open times and ask for an appointment. You confirm each request.",
+    // Booking is automatic once the caller confirms the details and the
+    // calendar accepts the event; only then is the caller told it is booked.
+    // Without a connected calendar the request waits for the business.
+    active:
+      "Callers can check open times and book one. After the caller confirms the details, the appointment is added to your connected calendar and they're told it's booked. Without a connected calendar, requests wait for you to confirm.",
   },
   transfer: {
     label: "Put callers through to a person",

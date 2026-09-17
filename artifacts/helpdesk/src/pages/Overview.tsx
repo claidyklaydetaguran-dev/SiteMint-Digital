@@ -15,6 +15,7 @@
  * degrades gracefully to its SMS-only sections in the canonical build.
  */
 
+import { lazy, Suspense } from "react";
 import { Link } from "wouter";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
@@ -30,11 +31,12 @@ import {
   useRecentCalls,
   countCallsToday,
 } from "@/pages/overview/overviewApi";
-// Readiness is measured once, in the Setup hub's own module, and read here.
-// Overview used to re-derive it from the saved onboarding ticks alone, so the
-// two screens could — and did — disagree about whether an account was ready.
+// Readiness is measured once, on the server, and read here and by Setup, so the
+// two screens cannot disagree about whether an account is ready.
+import { useReadiness, overallTone, type Readiness } from "@/lib/readinessApi";
+// The needs-attention email signal and the assigned number still come from the
+// shared setup module until those reads move server-side as well.
 import { useSetupData } from "@/pages/setup/setupApi";
-import { SETUP_STEPS, deriveStepStatuses, isSetupComplete } from "@/pages/setup/setupContract";
 import {
   buildActivityFigures,
   buildNeedsAttention,
@@ -42,14 +44,18 @@ import {
   buildTodayFigures,
   buildUsage,
   countToday,
-  deriveReceptionistState,
   pageCopy,
   recentCalls as recentCallsOf,
   recentConversations,
-  RECEPTIONIST_STATE_LABEL,
   type ReceptionistState,
 } from "@/pages/overview/overviewContract";
 import "@/styles/v2-dashboard.css";
+
+// The receptionist panel is voice-platform content, so a build without the
+// voice platform must not carry it: the ternary folds and the import is gone.
+const DashboardPanel = voicePlatformEnabled
+  ? lazy(() => import("@/components/dashboard/DashboardPanel").then((m) => ({ default: m.DashboardPanel })))
+  : null;
 
 function todayLabel(): string {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -71,27 +77,20 @@ function OverviewSkeleton() {
   );
 }
 
-const STATE_TONE: Record<ReceptionistState, StatusTone> = {
-  not_set_up: "pending",
-  setup_in_progress: "next",
-  ready_for_activation: "warn",
+const READINESS_TONE: Record<ReturnType<typeof overallTone>, StatusTone> = {
   live: "live",
+  ready: "next",
+  working: "next",
+  warning: "warn",
+  muted: "pending",
 };
 
 // ─── Status header ───────────────────────────────────────────────────────
 
-function StatusHeader({
-  state,
-  numberDisplay,
-  calendarReady,
-}: {
-  state: ReceptionistState;
-  numberDisplay: string | null;
-  /** null when SiteMint could not check — never shown as either answer. */
-  calendarReady: boolean | null;
-}) {
+function StatusHeader({ readiness, numberDisplay }: { readiness: Readiness | undefined; numberDisplay: string | null }) {
+  const live = readiness?.state === "live_call_verified";
   return (
-    <section className="sd-status" data-state={state === "live" ? "answering" : "incomplete"} aria-labelledby="sd-status-title">
+    <section className="sd-status" data-state={live ? "answering" : "incomplete"} aria-labelledby="sd-status-title">
       <div className="sd-status__head">
         <span className="sd-status__dot" aria-hidden="true" />
         <div className="sd-status__body">
@@ -99,16 +98,15 @@ function StatusHeader({
             Receptionist status
           </h2>
           <p className="sd-status__detail">
-            {numberDisplay ? `Number: ${numberDisplay}` : "No phone number assigned yet."}
-            {" — "}
-            {calendarReady === null
-              ? "Calendar not checked."
-              : calendarReady
-                ? "Calendar connected and working."
-                : "Calendar isn't ready."}
+            {readiness ? readiness.detail : "Not checked — SiteMint couldn't read your setup just now."}
+            {" "}
+            {numberDisplay ? `Number: ${numberDisplay}.` : "No phone number connected yet."}
           </p>
         </div>
-        <StatusChip label={RECEPTIONIST_STATE_LABEL[state]} tone={STATE_TONE[state]} />
+        <StatusChip
+          label={readiness ? readiness.label : "Not checked"}
+          tone={readiness ? READINESS_TONE[overallTone(readiness.state)] : "pending"}
+        />
       </div>
     </section>
   );
@@ -127,29 +125,29 @@ export default function Overview() {
   const { data: session, isLoading: sessionLoading } = useSession();
 
   const setup = useSetupData();
+  const readiness = useReadiness();
   const openIssuesCount = useOpenIssuesCount();
   const pendingRequests = usePendingAppointmentRequestsCount();
   const recentCallsQuery = useRecentCalls();
 
-  if (sessionLoading || convsLoading || setup.loading) {
+  if (sessionLoading || convsLoading || setup.loading || readiness.isLoading) {
     return <OverviewSkeleton />;
   }
   if (!session) return null;
 
   const convs = conversations ?? [];
 
-  // Exactly the statuses the Setup hub shows, from exactly the same function.
-  const statuses = deriveStepStatuses(setup.saved, setup.signals);
-  const nonReviewSteps = SETUP_STEPS.filter((s) => s.key !== "review");
   const canReceiveEmail = setup.signals.emailVerified;
-
-  const state = deriveReceptionistState({
-    setupComplete: isSetupComplete(statuses),
-    anyStepDone: nonReviewSteps.some((s) => statuses[s.key] === "done"),
-    numberAssigned: setup.signals.phoneAssigned === true,
-    assistantPublished: setup.signals.assistantPublished === true,
-    assistantSynchronized: setup.signals.assistantSynchronized === true,
-  });
+  const r = readiness.data;
+  const state: ReceptionistState = !r
+    ? "setup_in_progress"
+    : r.state === "live_call_verified"
+      ? "live"
+      : r.state === "phone_connected" || r.state === "ready_to_activate_phone" || r.state === "ready_to_test"
+        ? "ready_for_activation"
+        : r.state === "setting_up" && r.steps.every((step) => step.state !== "done")
+          ? "not_set_up"
+          : "setup_in_progress";
 
   const isPaid = session.firm.planTier === "paid";
   const attention = convsError
@@ -189,11 +187,7 @@ export default function Overview() {
         <span className="sd-page__meta">{todayLabel()}</span>
       </div>
 
-      <StatusHeader
-        state={state}
-        numberDisplay={setup.assignedNumberDisplay}
-        calendarReady={setup.signals.calendarReady}
-      />
+      <StatusHeader readiness={r} numberDisplay={setup.assignedNumberDisplay} />
 
       {/* Exactly one next-best-action control (D-1) — its content already
           covers every state (setup incomplete, ready for activation, live
@@ -201,12 +195,18 @@ export default function Overview() {
           than duplicated per branch. */}
       <div style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
         <NextActionCard
-          title={nextAction.title}
-          detail={nextAction.detail}
-          actionLabel={nextAction.actionLabel}
-          href={nextAction.href}
+          title={r?.next && attention.length === 0 ? r.next.label : nextAction.title}
+          detail={r?.next && attention.length === 0 ? r.detail : nextAction.detail}
+          actionLabel={r?.next && attention.length === 0 ? "Continue" : nextAction.actionLabel}
+          href={r?.next && attention.length === 0 ? r.next.path : nextAction.href}
         />
       </div>
+
+      {DashboardPanel && (
+        <Suspense fallback={<div className="sd-skel sd-skel--figures" aria-hidden="true" />}>
+          <DashboardPanel readiness={r} />
+        </Suspense>
+      )}
 
       {attention.length > 0 && (
         <section className="sd-section" aria-labelledby="sd-attention-title">

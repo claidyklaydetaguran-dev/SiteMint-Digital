@@ -555,7 +555,7 @@ function HeroConfirmedCard() {
       <HeroConfirmGlyph />
       <div>
         <p className="smv5-herotheater__confirm">Tue 2:30 PM — Cleaning</p>
-        <p className="smv5-herotheater__note">Bloom Dental · confirmation texted to the caller</p>
+        <p className="smv5-herotheater__note">Bloom Dental · booked in the calendar after the caller confirmed</p>
       </div>
     </div>
   );

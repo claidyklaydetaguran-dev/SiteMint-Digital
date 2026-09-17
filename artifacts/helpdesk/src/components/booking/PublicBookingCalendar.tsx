@@ -456,8 +456,6 @@ function PublicContactAndReviewSteps({
   setContactPhone,
   contactEmail,
   setContactEmail,
-  smsConsent,
-  setSmsConsent,
   emailConsent,
   setEmailConsent,
   onSubmit,
@@ -512,13 +510,9 @@ function PublicContactAndReviewSteps({
             <Label htmlFor="public-contact-email" className="text-xs">Email (optional)</Label>
             <Input id="public-contact-email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} maxLength={200} className="mt-1 h-10" />
           </div>
-          {/* Consent is always opt-in and never inferred from providing a phone/email value. */}
-          {contactPhone.trim() && (
-            <label className="flex items-start gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
-              I agree to receive text messages about this appointment request at the number above.
-            </label>
-          )}
+          {/* Consent is always opt-in and never inferred from providing a phone/email value.
+              Text messages are deferred (owner decision 2026-09-17), so no SMS consent is
+              asked for: offering it would promise texts that are never sent. */}
           {contactEmail.trim() && (
             <label className="flex items-start gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={emailConsent} onChange={(e) => setEmailConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />

@@ -1,187 +1,144 @@
 /**
- * V5 customer-shell foundation — the Setup hub (S-3).
+ * Setup — four steps, read from the server's readiness answer.
  *
- * Ten steps in the approved order, each with a title, a one-line purpose, a
- * derived status chip and a deep link; one progress bar; one next-action
- * button at the top (never a list of actions); a final review step that
- * lists what is done and what is missing, with an always-disabled "Activate
- * receptionist" button — activation happens with SiteMint during
- * private-beta onboarding, never automatically from this page.
+ *   1. Business information
+ *   2. Greeting and voice
+ *   3. What it can do (messages always; booking and transfer optional)
+ *   4. Test and activate
  *
- * Status is the combination the brief specifies: the saved onboarding state
- * (`GET/PUT /api/receptionist/onboarding`) plus real-data inference for the
- * four steps that have an independent signal (business, availability,
- * calendar, phone number). Newly-inferred "done" steps are written back with
- * `PUT` once per data change, not on every render — see the effect below.
+ * Every status comes from `GET /api/receptionist/readiness`, which Overview
+ * reads too. Nothing here stores a tick: a calendar whose access is withdrawn
+ * stops reading as done on the next visit. A fact the server could not read
+ * says "Not checked".
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "wouter";
+import { CheckCircle2, Circle, AlertTriangle, HelpCircle, MinusCircle } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { NextActionCard } from "@/components/common/NextActionCard";
-import { ProgressSteps } from "@/components/common/ProgressSteps";
-import { useSetupData, useSyncInferredSteps } from "@/pages/setup/setupApi";
+import { InlineError } from "@/components/common/InlineError";
 import {
-  ACTIVATE_DISABLED_REASON,
-  PROGRESS_SAVE,
-  buildDisplaySteps,
-  buildNextAction,
-  buildReviewSummary,
-  deriveStepStatuses,
-  isSetupComplete,
-  pageCopy,
-  progressLabel,
-} from "@/pages/setup/setupContract";
+  CHECK_STATE_LABEL,
+  STEP_STATE_LABEL,
+  useReadiness,
+  type ReadinessCheck,
+  type ReadinessStep,
+} from "@/lib/readinessApi";
 import "@/styles/v2-dashboard.css";
 
-function SetupSkeleton() {
+const CHECK_ICON = {
+  done: CheckCircle2,
+  todo: Circle,
+  attention: AlertTriangle,
+  not_checked: HelpCircle,
+  off: MinusCircle,
+} as const;
+
+function CheckRow({ check }: { check: ReadinessCheck }) {
+  const Icon = CHECK_ICON[check.state];
   return (
-    <div className="sd-page" aria-busy="true">
-      <p className="sd-sr" role="status">
-        Loading your setup progress
-      </p>
-      <div className="sd-skel sd-skel--title" />
-      <div className="sd-skel sd-skel--status" />
-      <div className="sd-skel sd-skel--list" />
-    </div>
+    <li className="setup4-check" data-state={check.state}>
+      <Icon className="setup4-check__icon" aria-hidden="true" />
+      <div className="setup4-check__body">
+        <div className="setup4-check__head">
+          <span className="setup4-check__label">{check.label}</span>
+          <span className="setup4-check__state">{CHECK_STATE_LABEL[check.state]}</span>
+        </div>
+        <p className="setup4-check__detail">{check.detail}</p>
+      </div>
+      {check.fixPath && check.state !== "done" && (
+        <Link href={check.fixPath} className="setup4-check__action">
+          {check.state === "off" ? "Turn on" : check.state === "attention" ? "Fix" : "Open"}
+          <span className="sd-sr"> {check.label}</span>
+        </Link>
+      )}
+    </li>
+  );
+}
+
+function StepCard({ step }: { step: ReadinessStep }) {
+  const headingId = `setup-step-${step.key}`;
+  return (
+    <section className="setup4-step" data-state={step.state} aria-labelledby={headingId}>
+      <header className="setup4-step__head">
+        <span className="setup4-step__number" aria-hidden="true">
+          {step.number}
+        </span>
+        <div className="setup4-step__titles">
+          <h2 className="setup4-step__title" id={headingId}>
+            <span className="sd-sr">Step {step.number} of 4: </span>
+            {step.title}
+          </h2>
+          <p className="setup4-step__summary">{step.summary}</p>
+        </div>
+        <span className="setup4-step__state">{STEP_STATE_LABEL[step.state]}</span>
+      </header>
+      <ul className="setup4-checks">
+        {step.checks.map((c) => (
+          <CheckRow key={c.key} check={c} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
 export default function Setup() {
-  const data = useSetupData();
-  const sync = useSyncInferredSteps();
-  const syncedKey = useRef<string | null>(null);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const readiness = useReadiness();
 
-  // One place that performs the write and records what happened. A rejection
-  // is state, not a swallowed promise: the previous version fired this with
-  // `void`, so the 400 every one of these requests returned was invisible.
-  const runSync = useCallback(
-    async (saved: typeof data.saved, signals: typeof data.signals) => {
-      try {
-        const outcome = await sync(saved, signals);
-        setSaveFailed(outcome.failed.length > 0);
-      } catch {
-        setSaveFailed(true);
-      }
-    },
-    [sync],
-  );
+  if (readiness.isLoading) {
+    return (
+      <div className="sd-page" aria-busy="true">
+        <p className="sd-sr" role="status">Loading your setup</p>
+        <div className="sd-skel sd-skel--title" />
+        <div className="sd-skel sd-skel--list" />
+      </div>
+    );
+  }
 
-  const retrySync = useCallback(() => {
-    setSaveFailed(false);
-    // Clearing the guard lets the same signal snapshot be written again —
-    // otherwise a retry after a failure would be a no-op.
-    syncedKey.current = null;
-    void runSync(data.saved, data.signals);
-  }, [runSync, data.saved, data.signals]);
+  if (readiness.isError || !readiness.data) {
+    return (
+      <div className="sd-page sd-enter">
+        <PageHeader eyebrow="Setup" title="Set up your receptionist" description="Four steps from sign-up to answering real calls." />
+        <InlineError
+          title="Setup couldn't be checked"
+          description="SiteMint couldn't read where your setup stands. Nothing has changed. Try again."
+          onRetry={() => readiness.refetch()}
+        />
+      </div>
+    );
+  }
 
-  const statuses = deriveStepStatuses(data.saved, data.signals);
-  const display = buildDisplaySteps(statuses);
-  const next = buildNextAction(display);
-  const review = buildReviewSummary(display);
-  const complete = isSetupComplete(statuses);
-  const page = pageCopy();
-
-  // Write back newly-inferred "done" steps once the data this render is
-  // based on has actually changed — the ref key is the signal snapshot, so a
-  // re-render with the same signals never issues a second PUT.
-  useEffect(() => {
-    if (!data.ready) return;
-    const key = JSON.stringify(data.signals);
-    if (syncedKey.current === key) return;
-    syncedKey.current = key;
-    void runSync(data.saved, data.signals);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.ready, JSON.stringify(data.signals)]);
-
-  if (data.loading) return <SetupSkeleton />;
+  const r = readiness.data;
+  const done = r.steps.filter((s) => s.state === "done").length;
 
   return (
     <div className="sd-page sd-enter">
-      <PageHeader eyebrow={page.eyebrow} title={page.title} description={page.detail} />
+      <PageHeader eyebrow="Setup" title="Set up your receptionist" description="Four steps from sign-up to answering real calls." />
 
-      {saveFailed && (
-        <div
-          className="sd-error"
-          role="alert"
-          style={{ marginBottom: "var(--sd-space-4, 1rem)" }}
-        >
-          <div className="sd-error__body">
-            <span className="sd-error__title">{PROGRESS_SAVE.failedTitle}</span>
-            <p className="sd-error__detail">{PROGRESS_SAVE.failedDetail}</p>
-          </div>
-          <button type="button" className="sd-error__action" onClick={retrySync}>
-            {PROGRESS_SAVE.retryLabel}
-          </button>
-        </div>
+      <div className="setup4-overall" data-state={r.state} role="status" aria-live="polite">
+        <span className="setup4-overall__label">{r.label}</span>
+        <span className="setup4-overall__detail">{r.detail}</span>
+        <span className="setup4-overall__progress">
+          {done} of 4 steps complete
+        </span>
+      </div>
+
+      {r.next && (
+        <NextActionCard title={r.next.label} detail={r.detail} actionLabel="Continue" href={r.next.path} />
       )}
 
-      <NextActionCard
-        title={next.title}
-        detail={next.detail}
-        actionLabel={next.actionLabel}
-        href={next.href}
-      />
+      <div className="setup4-steps">
+        {r.steps.map((step) => (
+          <StepCard key={step.key} step={step} />
+        ))}
+      </div>
 
-      <section className="sd-section" aria-labelledby="setup-steps-title" style={{ marginTop: "var(--sd-space-6, 1.5rem)" }}>
-        <div className="sd-section__head">
-          <h2 className="sd-h2" id="setup-steps-title">
-            Setup steps
-          </h2>
-        </div>
-        <ProgressSteps steps={display} progressLabel={progressLabel(statuses)} />
-      </section>
-
-      <section
-        id="review"
-        className="sd-status"
-        data-state={complete ? "answering" : "incomplete"}
-        aria-labelledby="setup-review-title"
-        style={{ marginTop: "var(--sd-space-6, 1.5rem)" }}
-      >
-        <div className="sd-status__head">
-          <span className="sd-status__dot" aria-hidden="true" />
-          <div className="sd-status__body">
-            <h2 className="sd-status__title" id="setup-review-title">
-              Final review and activation
-            </h2>
-            <p className="sd-status__detail">
-              {complete
-                ? "Every step is complete. Review below, then request activation."
-                : `${review.missingTitles.length} step${review.missingTitles.length === 1 ? "" : "s"} still need${review.missingTitles.length === 1 ? "s" : ""} attention.`}
-            </p>
-          </div>
-        </div>
-
-        <div style={{ padding: "0 var(--sd-space-5, 1.25rem) var(--sd-space-4, 1rem)" }}>
-          {review.doneTitles.length > 0 && (
-            <p style={{ margin: "0 0 4px", fontSize: "var(--sd-text-small, .8125rem)", color: "var(--sd-text, #051824)" }}>
-              <strong>Done:</strong> {review.doneTitles.join(", ")}
-            </p>
-          )}
-          {review.missingTitles.length > 0 && (
-            <p style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)", color: "var(--sd-text-muted, #3b5265)" }}>
-              <strong>Missing:</strong> {review.missingTitles.join(", ")}
-            </p>
-          )}
-        </div>
-
-        <div className="sd-status__foot">
-          <button
-            type="button"
-            className="sd-step__action"
-            disabled
-            aria-disabled="true"
-            title={ACTIVATE_DISABLED_REASON}
-            style={{ opacity: 0.6, cursor: "not-allowed" }}
-          >
-            Activate receptionist
-          </button>
-          <p style={{ margin: "8px 0 0", fontSize: "var(--sd-text-small, .8125rem)", color: "var(--sd-text-muted, #3b5265)" }}>
-            {ACTIVATE_DISABLED_REASON}
-          </p>
-        </div>
-      </section>
+      <p className="setup4-footnote">
+        Checked {new Date(r.checkedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}.{" "}
+        <button type="button" className="sd-link" onClick={() => readiness.refetch()} disabled={readiness.isFetching}>
+          {readiness.isFetching ? "Checking…" : "Check again"}
+        </button>
+      </p>
     </div>
   );
 }

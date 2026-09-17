@@ -402,8 +402,9 @@ check(
     setupApiSrc.includes("useCalendarHealth"),
 );
 check(
-  "Overview derives its status from the same function the Setup hub renders",
-  pageSrc.includes("useSetupData") && pageSrc.includes("deriveStepStatuses"),
+  // 2026-09-17: readiness moved server-side; Setup and Overview read one answer.
+  "Overview derives its status from the same server answer the Setup page renders",
+  pageSrc.includes("useReadiness()") && read("artifacts/helpdesk/src/pages/Setup.tsx").includes("useReadiness()"),
 );
 check(
   "and no longer keeps a second, tick-only readiness derivation of its own",

@@ -158,7 +158,9 @@ export const TOOL_PARAMETER_SCHEMAS: Record<VoiceToolName, JsonObject> = {
       customerPhone: { type: "string", description: "Callback number the caller states, if any." },
       customerEmail: { type: "string", description: "Email the caller states, if any." },
       notes: { type: "string", description: "Anything the caller wants the office to know." },
-      smsConsent: { type: "boolean", description: "True only if the caller explicitly agrees to receive a confirmation text." },
+      // No smsConsent here: text messages to callers are deferred, so the
+      // receptionist is never invited to offer one. The argument parser still
+      // tolerates it from assistants published before this change.
     },
   },
   reschedule_appointment: {

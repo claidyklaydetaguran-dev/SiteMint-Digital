@@ -10,7 +10,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  ACTIVATE_DISABLED_REASON,
   EMPTY_SETUP_SIGNALS,
   PROGRESS_SAVE,
   SETUP_STEPS,
@@ -235,16 +234,23 @@ console.log("\n--- next action and review summary ---");
   check("review never lists itself as done or missing", !review.doneTitles.includes("Final review and activation") && !review.missingTitles.includes("Final review and activation"));
 }
 
-console.log("\n--- the page never activates automatically ---");
+console.log("\n--- the Setup page: four steps from the server's readiness answer ---");
 {
-  check("the activate control is disabled", pageSrc.includes("Activate receptionist") && /disabled\s*\n?\s*aria-disabled="true"/.test(pageSrc));
-  check("the disabled reason is shown, not silently hidden", pageSrc.includes("ACTIVATE_DISABLED_REASON"));
+  // 2026-09-17 (owner brief): setup was ten-plus steps worked out in the
+  // browser. It is now four, and the server decides every status, so Setup
+  // and the dashboard read one answer.
+  const readinessSrc = read("artifacts/api-server/src/lib/readiness/receptionistReadiness.ts");
+  const readinessApiSrc = read("artifacts/helpdesk/src/lib/readinessApi.ts");
+  check("the page reads the server readiness answer", pageSrc.includes("useReadiness()") && readinessApiSrc.includes('READINESS_ENDPOINT = "/receptionist/readiness"'));
+  check("and works nothing out for itself", !pageSrc.includes("deriveStepStatuses") && !pageSrc.includes("useSetupData"));
   check(
-    "the reason names SiteMint-mediated activation",
-    ACTIVATE_DISABLED_REASON.includes("SiteMint") && ACTIVATE_DISABLED_REASON.toLowerCase().includes("private-beta"),
+    "the server defines exactly the four approved steps",
+    ["Business information", "Greeting and voice", "What it can do", "Test and activate"].every((t) => readinessSrc.includes(`title: "${t}"`)),
   );
-  check("there is exactly one primary next-action control", pageSrc.includes("<NextActionCard"));
-  check("newly-inferred steps are written back, not just displayed", pageSrc.includes("useSyncInferredSteps"));
+  check("there is exactly one primary next-action control", (pageSrc.match(/<NextActionCard/g) ?? []).length === 1);
+  check("an unreadable answer is an error with a retry, never an empty checklist", pageSrc.includes("readiness.isError") && pageSrc.includes("onRetry"));
+  check("every check state is written in words, not colour alone", readinessApiSrc.includes('not_checked: "Not checked"') && pageSrc.includes("CHECK_STATE_LABEL[check.state]"));
+  check("nothing activates from this page", !/activate\(|requestActivation/i.test(pageSrc));
 }
 
 console.log("\n--- confirming the email address ---");
@@ -315,14 +321,6 @@ console.log("\n--- progress is actually recorded (the client speaks the route's 
       /updateOnboardingState\(\{ step, status: "done" \}\)/.test(apiSrc),
   );
 
-  // A rejected write must be observable. Fire-and-forget is what made the
-  // original defect survive in production.
-  check("the write-back is no longer fired and forgotten", !/void sync\(/.test(pageSrc));
-  check(
-    "a failed write is recorded as state and shown",
-    /setSaveFailed/.test(pageSrc) && pageSrc.includes("PROGRESS_SAVE.failedTitle"),
-  );
-  check("and it can be retried", pageSrc.includes("PROGRESS_SAVE.retryLabel"));
   check(
     "the failure sentence does not claim the customer's setup was lost",
     /still correct/i.test(PROGRESS_SAVE.failedDetail) &&
