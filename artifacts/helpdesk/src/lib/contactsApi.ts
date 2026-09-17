@@ -21,6 +21,10 @@ export interface ContactSummary {
   optedOut: boolean;
   callCount: number;
   conversationCount: number;
+  /** Optional so a dashboard deployed ahead of its backend still renders. */
+  email?: string | null;
+  /** Detail only. */
+  notes?: string | null;
 }
 
 export interface ContactCallRef {
@@ -83,6 +87,45 @@ export function fetchContactForCall(callId: string): Promise<ContactSummary | un
   return apiFetch<{ items: ContactSummary[]; count: number }>(
     `/receptionist/contacts?callId=${encodeURIComponent(callId)}`,
   ).then((res) => res.items[0]);
+}
+
+export interface ContactFieldError {
+  field: "phone" | "name" | "email" | "notes";
+  message: string;
+}
+
+export type ContactWriteResult =
+  | { ok: true; detail: ContactDetailResponse }
+  | { ok: false; message: string; errors: ContactFieldError[] };
+
+async function writeContact(path: string, method: "POST" | "PATCH", body: Record<string, unknown>): Promise<ContactWriteResult> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const errors = Array.isArray(data.errors) ? (data.errors as ContactFieldError[]) : [];
+      const message = typeof data.error === "string" && data.error.trim() !== "" ? data.error : "The contact wasn't saved. Try again.";
+      return { ok: false, message, errors };
+    }
+    return { ok: true, detail: data as unknown as ContactDetailResponse };
+  } catch {
+    return { ok: false, message: "We couldn't reach the server. Nothing was saved.", errors: [] };
+  }
+}
+
+/** Adds a contact by hand. The server records it as added manually. */
+export function createContact(fields: { phone: string; name: string; email: string; notes: string }): Promise<ContactWriteResult> {
+  return writeContact("/receptionist/contacts", "POST", fields);
+}
+
+/** Edits name, email and notes. The phone number is the contact's identity and never changes. */
+export function updateContact(id: string, fields: { name: string; email: string; notes: string }): Promise<ContactWriteResult> {
+  return writeContact(`/receptionist/contacts/${encodeURIComponent(id)}`, "PATCH", fields);
 }
 
 export function fetchContactDetail(id: string): Promise<ContactDetailResponse | undefined> {

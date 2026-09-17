@@ -1,74 +1,94 @@
 /**
- * Team — the people a business has invited to its account.
+ * Team — the people who can sign in to a business's receptionist dashboard.
  *
- * The backend has carried invite / list / revoke since P8
- * (`POST|GET|DELETE /api/receptionist/account/members`, plus the token-proven
- * `POST .../members/accept`). This page calls the first three.
+ * What the server does (api-server lib/voiceAccounts/membership.ts and
+ * lib/receptionistRoles.ts), and therefore what this page may say:
  *
- * What it must NOT claim, because none of it exists yet:
- *
- *   - Invited people cannot sign in. Sign-in checks only the business's own
- *     account (the protected receptionist auth files); a roster row grants no
- *     login, whatever its status.
- *   - There is no screen to accept an invitation, and no link in the email —
- *     so nobody "sets their own password" from it.
- *   - Roles are labels. Nothing on the server reads `role` to allow or refuse
- *     anything, so "staff" cannot be kept out of billing or the team.
- *
- * An earlier version promised all three. It is corrected here rather than
- * hidden, because the invite, list and remove controls do work and are worth
- * keeping: they are a truthful record of who the business intends to let in.
+ *   - An owner invites someone by email. The email carries a link to the
+ *     "Accept invitation" screen and a code valid for seven days.
+ *   - The invited person chooses their own password there and is signed in.
+ *     From then on they sign in with their own email and password.
+ *   - Roles are enforced on every request. Staff can see everything and handle
+ *     calls, messages, contacts, bookings and support; only owners can change
+ *     the receptionist, phone number, calendar connection, transfers, team,
+ *     billing and business details.
+ *   - Removing someone ends their sessions immediately.
+ *   - Only the business's main account changes the account's sign-in email
+ *     and password; every member manages their own password.
  *
  * This module owns strings and rules only. It claims nothing the endpoints do
- * not support: no sign-in, no permissions, no last-seen, no activity per member.
+ * not support: no last-seen, no per-member activity, no custom permissions.
  */
 
 export const PAGE = {
   eyebrow: "ACCOUNT",
   title: "Team",
   detail:
-    "Keep a list of the people you plan to give access to. Team sign-in is not available yet: invited people cannot sign in, and only your own email and password work.",
+    "Give colleagues their own sign-in. Owners can change settings; staff can see everything and handle calls, messages, contacts and bookings.",
+  staffDetail:
+    "You're signed in as staff. You can see the team, but only an owner can invite, remove or change someone's role.",
   loading: "Loading your team…",
   failed: "Your team couldn't be loaded. Try again shortly.",
 } as const;
 
 export const ROSTER = {
-  heading: "Invited people",
+  heading: "People",
   columnEmail: "Email",
   columnRole: "Role",
   columnStatus: "Status",
   columnInvited: "Invited",
-  emptyTitle: "No one invited yet",
-  emptyDetail: "Invitations you send are listed here. Invited people cannot sign in until team sign-in is available.",
+  you: "You",
+  accountHolderRow: "Main account",
+  accountHolderDetail: "The business's own sign-in. It is always an owner and can't be removed here.",
+  emptyTitle: "No one else has access yet",
+  emptyDetail: "Invite a colleague below. They'll get an email to choose their own password.",
   removeLabel: "Remove",
   removePendingLabel: "Removing…",
   removeConfirmTitle: "Remove this person?",
   removeConfirmDetail:
-    "They come off this list and their invitation code stops working. Nothing else changes, because they could not sign in.",
+    "They are signed out straight away and can't sign in again. An unused invitation stops working. You can invite them again later.",
   removeConfirmAction: "Remove",
   removeConfirmDismiss: "Keep them",
-  removedAnnouncement: "That person was removed from your team list.",
+  removedAnnouncement: "That person was removed and signed out.",
   removeFailedTitle: "That person wasn't removed",
   removeFailedDetail: "Nothing changed. Try again.",
+  roleChangeLabel: "Change role",
+  roleChangedAnnouncement: "Role updated.",
+  roleChangeFailedTitle: "The role wasn't changed",
 } as const;
 
 export const INVITE = {
   heading: "Invite someone",
   detail:
-    "We record the invitation and email them a code that is valid for seven days. They cannot sign in with it yet — team sign-in is not available.",
+    "We email them a link to choose their own password. The link and its code work once, for seven days.",
   emailLabel: "Their email address",
   roleLabel: "Role",
   submitLabel: "Send invitation",
   submitPendingLabel: "Sending…",
   sentTitle: "Invitation sent",
-  sentDetail: "They appear below as invited. They cannot sign in yet.",
+  sentDetail: "They appear in the list as invited until they accept.",
   failedTitle: "The invitation wasn't sent",
   emailRequired: "Enter their email address.",
   emailInvalid: "Enter a valid email address.",
 } as const;
 
+export const OWN_PASSWORD = {
+  heading: "Your password",
+  detail: "Change the password you use to sign in to this business.",
+  currentLabel: "Current password",
+  newLabel: "New password",
+  newHelp: "At least 8 characters.",
+  submitLabel: "Change password",
+  submitPendingLabel: "Changing…",
+  doneTitle: "Password changed",
+  doneDetail: "Any other place you were signed in has been signed out.",
+  failedTitle: "Your password wasn't changed",
+  tooShort: "Choose a password of at least 8 characters.",
+  currentRequired: "Enter your current password.",
+} as const;
+
 /** The one fact every Team string has to agree with. */
-export const TEAM_SIGN_IN_AVAILABLE = false;
+export const TEAM_SIGN_IN_AVAILABLE = true;
 
 export type MemberRole = "owner" | "staff";
 export type MemberStatus = "invited" | "active" | "revoked";
@@ -80,20 +100,13 @@ export interface TeamMember {
   status: string;
   invitedAt: string | null;
   acceptedAt: string | null;
+  isYou?: boolean;
 }
 
-/**
- * What each role means today: nothing is enforced.
- *
- * The server stores `owner` or `staff` and reads it for nothing else, so the
- * honest description is that a role is a label. It used to say staff could do
- * "everything except billing and the team", which the server has never
- * enforced.
- */
 export const ROLE_LABEL: Record<string, string> = { owner: "Owner", staff: "Staff" };
 export const ROLE_DETAIL: Record<string, string> = {
-  owner: "Recorded as an owner. Roles are labels for now and do not change what anyone can do.",
-  staff: "Recorded as staff. Roles are labels for now and do not change what anyone can do.",
+  owner: "Can do everything, including the receptionist's setup, phone number, calendar, team and billing.",
+  staff: "Can see everything and handle calls, messages, contacts, bookings and support. Can't change settings.",
 };
 
 export function roleLabel(role: string): string {
@@ -105,16 +118,9 @@ export const ROLE_OPTIONS: { value: MemberRole; label: string; detail: string }[
   { value: "owner", label: ROLE_LABEL.owner!, detail: ROLE_DETAIL.owner! },
 ];
 
-/**
- * Status wording that says what is TRUE of the person right now.
- *
- * No status grants sign-in, so none may say "has access". "Accepted" is only
- * reachable through the API (there is no accept screen), and still means the
- * person cannot sign in.
- */
 export const STATUS_LABEL: Record<string, string> = {
-  invited: "Invited — cannot sign in yet",
-  active: "Accepted — cannot sign in yet",
+  invited: "Invited — hasn't accepted yet",
+  active: "Can sign in",
   revoked: "Removed",
 };
 
@@ -128,8 +134,18 @@ export function statusTone(status: string): "attention" | "settled" | "muted" {
   return "muted";
 }
 
-/** Only someone still on the list (invited or accepted) can be removed. */
-export function canRemove(member: TeamMember): boolean {
+/**
+ * Whether the viewer may remove this row. Only owners manage the team, nobody
+ * removes themselves, and a removed row has nothing left to remove.
+ */
+export function canRemove(member: TeamMember, viewerIsOwner = true): boolean {
+  if (!viewerIsOwner || member.isYou === true) return false;
+  return member.status === "invited" || member.status === "active";
+}
+
+/** Whether the viewer may change this row's role. */
+export function canChangeRole(member: TeamMember, viewerIsOwner: boolean): boolean {
+  if (!viewerIsOwner || member.isYou === true) return false;
   return member.status === "invited" || member.status === "active";
 }
 
@@ -154,10 +170,16 @@ export function validateInvite(form: InviteForm): { ok: true; payload: { email: 
   return { ok: true, payload: { email, role: form.role } };
 }
 
+export function validateOwnPassword(current: string, next: string): { ok: true } | { ok: false; error: string } {
+  if (current === "") return { ok: false, error: OWN_PASSWORD.currentRequired };
+  if (next.length < 8) return { ok: false, error: OWN_PASSWORD.tooShort };
+  return { ok: true };
+}
+
 /**
  * The server's sentence is shown as-is when it has one — it knows things the
  * browser cannot, such as the member limit or that the address is already on
- * the roster. This is only the fallback.
+ * the team. This is only the fallback.
  */
 export function inviteErrorDetail(message: string | null | undefined): string {
   if (typeof message === "string" && message.trim() !== "") return message.trim();
@@ -169,6 +191,7 @@ export function everyRenderableString(): string[] {
     ...Object.values(PAGE),
     ...Object.values(ROSTER),
     ...Object.values(INVITE),
+    ...Object.values(OWN_PASSWORD),
     ...Object.values(ROLE_LABEL),
     ...Object.values(ROLE_DETAIL),
     ...Object.values(STATUS_LABEL),

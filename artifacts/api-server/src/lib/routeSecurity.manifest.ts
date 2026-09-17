@@ -473,11 +473,13 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   // Session AND the current password: the address is the login identity, so a
   // borrowed session alone must not be able to take the account over.
   "PATCH /api/receptionist/account/email": "session",
+  "PATCH /api/receptionist/account/members/:id": "session",
   // Business name, trade and timezone. Session only — unlike the address
   // above, none of these is the login identity, so changing one cannot take
   // the account over.
   "PATCH /api/receptionist/account/profile": "session",
   "PATCH /api/receptionist/agent-config": "session",
+  "PATCH /api/receptionist/contacts/:id": "session",
   "PATCH /api/receptionist/voice/assistants/:id": "session",
   "PATCH /api/receptionist/voice/messages/:id": "session",
   "PATCH /api/receptionist/voice/transfer-contacts/:id": "session",
@@ -557,6 +559,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/admin/voice/phone-numbers/:providerNumberId/release": "admin",
   "POST /api/receptionist/account/members": "session",
   "POST /api/receptionist/account/members/accept": "token-proven",
+  "POST /api/receptionist/account/member-password": "session",
   // Session AND the current password, rate limited: a borrowed session alone
   // must not be able to lock the owner out. Signs out every other session.
   "POST /api/receptionist/account/password/change": "session",
@@ -579,6 +582,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "POST /api/receptionist/calendar/requests/:publicId/approve": "session",
   "POST /api/receptionist/calendar/requests/:publicId/cancel": "session",
   "POST /api/receptionist/calendar/requests/:publicId/reschedule": "session",
+  "POST /api/receptionist/contacts": "session",
   "POST /api/receptionist/voice/assistants": "session",
   "POST /api/receptionist/voice/assistants/:id/duplicate": "session",
   "POST /api/receptionist/voice/assistants/:id/publish": "session",

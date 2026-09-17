@@ -26,16 +26,13 @@ export const DASHBOARD_MOUNT_PATH = "/ai-receptionist/dashboard";
 
 /**
  * The dashboard routes that consume a token from `?token=`. These are
- * `ROUTES.verifyEmail` and `ROUTES.passwordResetComplete` in
- * artifacts/helpdesk/src/lib/routes.ts.
- *
- * There is deliberately no member-invitation entry: the dashboard has no
- * screen that accepts an invitation, and team members cannot sign in yet, so
- * a link would lead nowhere.
+ * `ROUTES.verifyEmail`, `ROUTES.passwordResetComplete` and
+ * `ROUTES.acceptInvitation` in artifacts/helpdesk/src/lib/routes.ts.
  */
 export const ACCOUNT_LINK_PATHS = {
   verifyEmail: "/verify-email",
   passwordResetComplete: "/password-reset/complete",
+  acceptInvitation: "/accept-invitation",
 } as const;
 
 export type AccountLinkKind = keyof typeof ACCOUNT_LINK_PATHS;
@@ -88,6 +85,34 @@ export function passwordResetEmailText(rawToken: string, env: Env = process.env)
     ...(link === null ? [] : ["If the link does not open, enter that code on the password reset page."]),
     "",
     "If you did not request this, you can ignore this email — nothing changes without the code.",
+  ].join("\n");
+}
+
+/**
+ * Body of a team invitation. The link opens the dashboard screen where the
+ * invited person sets their own password; the code is the fallback.
+ */
+export function invitationEmailText(
+  businessName: string | null,
+  role: "owner" | "staff",
+  rawToken: string,
+  env: Env = process.env,
+): string {
+  const link = accountEmailLink("acceptInvitation", rawToken, env);
+  const who = businessName ? `${businessName} invited you` : "You were invited";
+  const access =
+    role === "owner"
+      ? "As an owner you can manage the receptionist, its phone number, calendar, team and billing."
+      : "As staff you can see calls, messages, contacts and bookings, and handle them. Settings stay with the owners.";
+  return [
+    `${who} to its SiteMint AI Receptionist team.`,
+    access,
+    "",
+    ...(link === null ? [] : ["Accept and choose your password here (the link works once, for 7 days):", link, ""]),
+    `Your invitation code (valid 7 days): ${rawToken}`,
+    ...(link === null ? [] : ["If the link does not open, enter that code on the invitation page of the dashboard."]),
+    "",
+    "If you were not expecting this, ignore this email — nothing happens without the code.",
   ].join("\n");
 }
 

@@ -21,6 +21,8 @@
  * app.
  */
 
+import { POLICY_VERSIONS } from "../legal/policyVersions";
+
 export interface SignupFormValues {
   ownerName: string;
   businessName: string;
@@ -51,6 +53,8 @@ export interface SignupPayload {
   password: string;
   timezone: string;
   acceptedTerms: true;
+  /** The policy versions shown on this page; the server records them. */
+  acceptedPolicies: { terms: string; privacy: string };
 }
 
 export const SIGNUP_ENDPOINT = "/api/receptionist/auth/register";
@@ -69,6 +73,7 @@ export function buildSignupPayload(form: SignupFormValues): SignupPayload {
     password: form.password,
     timezone: form.timezone,
     acceptedTerms: true,
+    acceptedPolicies: { terms: POLICY_VERSIONS.terms, privacy: POLICY_VERSIONS.privacy },
   };
 }
 
@@ -153,8 +158,16 @@ export interface MappedSignupError {
  * 409 is an existing account: the page offers sign-in and password reset
  * rather than a second business. 429 is the rate limit. 503 means
  * registration is switched off — stated plainly, with no dead-end link.
+ * A 409 with code `policies_outdated` means the policies changed mid-signup.
  */
-export function mapSignupError(status: number, serverError?: string): MappedSignupError {
+export const SIGNUP_POLICIES_CHANGED_MESSAGE =
+  "Our Terms or Privacy Policy changed while this page was open. Reload the page, review them, and try again.";
+
+export function mapSignupError(status: number, serverError?: string, code?: string): MappedSignupError {
+  // A policy update is also a 409, but it is not an existing account.
+  if (code === "policies_outdated") {
+    return { outcome: "error", message: SIGNUP_POLICIES_CHANGED_MESSAGE, offerRecovery: false };
+  }
   if (status === 409) {
     return { outcome: "duplicate", message: SIGNUP_EXISTS_MESSAGE, offerRecovery: true };
   }

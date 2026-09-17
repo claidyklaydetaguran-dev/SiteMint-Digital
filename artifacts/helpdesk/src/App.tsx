@@ -38,6 +38,7 @@ const PublicSchedule = lazy(() => import("@/pages/PublicSchedule"));
 const PasswordReset = lazy(() => import("@/pages/PasswordReset"));
 const PasswordResetComplete = lazy(() => import("@/pages/PasswordResetComplete"));
 const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
+const AcceptInvitation = lazy(() => import("@/pages/AcceptInvitation"));
 
 const Overview = lazy(() => import("@/pages/Overview"));
 const Setup = lazy(() => import("@/pages/Setup"));
@@ -177,6 +178,13 @@ function Router() {
         {() => (
           <AuthShell routeLabel="Email verification">
             <VerifyEmail />
+          </AuthShell>
+        )}
+      </Route>
+      <Route path={ROUTES.acceptInvitation}>
+        {() => (
+          <AuthShell routeLabel="Team invitation">
+            <AcceptInvitation />
           </AuthShell>
         )}
       </Route>

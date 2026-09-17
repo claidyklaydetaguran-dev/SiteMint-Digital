@@ -3,10 +3,10 @@
  *
  * Run via: tsx artifacts/helpdesk/src/pages/team/teamContract.test.ts
  *
- * The premise: the invite / list / revoke endpoints have existed since P8 and
- * the page calls them — but invited people cannot sign in (login checks only
- * the business's own account), there is no accept screen, and roles are not
- * enforced. The page must say exactly that and promise nothing more.
+ * The premise (2026-09-17, team access approved): invited people accept by
+ * choosing their own password, sign in with it, and are held to their role on
+ * every request; removal signs them out. The page must say exactly that, and
+ * offer staff nothing the server would refuse.
  */
 
 import { readFileSync } from "node:fs";
@@ -22,6 +22,7 @@ import {
   ROSTER,
   STATUS_LABEL,
   TEAM_SIGN_IN_AVAILABLE,
+  canChangeRole,
   canRemove,
   everyRenderableString,
   inviteErrorDetail,
@@ -30,6 +31,7 @@ import {
   statusLabel,
   statusTone,
   validateInvite,
+  validateOwnPassword,
   type TeamMember,
 } from "./teamContract.js";
 
@@ -54,6 +56,10 @@ const navSrc = read("artifacts/helpdesk/src/lib/nav.ts");
 const routesSrc = read("artifacts/helpdesk/src/lib/routes.ts");
 const appSrc = read("artifacts/helpdesk/src/App.tsx");
 const membershipSrc = read("artifacts/api-server/src/lib/voiceAccounts/membership.ts");
+const linksSrc = read("artifacts/api-server/src/lib/accountSecurity/accountEmailLinks.ts");
+const rolesSrc = read("artifacts/api-server/src/lib/receptionistRoles.ts");
+const authSrc = read("artifacts/api-server/src/lib/receptionistAuth.ts");
+const acceptSrc = read("artifacts/helpdesk/src/pages/AcceptInvitation.tsx");
 
 section("the page is actually reachable");
 
@@ -79,31 +85,46 @@ check("a failed read offers a retry", pageSrc.includes("Try again"));
 
 section("status says what is true of the person");
 
-// No status grants sign-in, so no status may say "has access".
-eq("an invitation not yet used", statusLabel("invited"), "Invited — cannot sign in yet");
-eq("an accepted invitation still cannot sign in", statusLabel("active"), "Accepted — cannot sign in yet");
+eq("an invitation not yet used", statusLabel("invited"), "Invited — hasn't accepted yet");
+eq("an accepted invitation can sign in", statusLabel("active"), "Can sign in");
 eq("someone removed", statusLabel("revoked"), "Removed");
-check("no status claims access", Object.values(STATUS_LABEL).every((s) => !/has access|signed in\b(?! yet)/i.test(s)));
 eq("an unrecognised status is not guessed", statusLabel("something_else"), "Unknown");
 check("each status reads differently", new Set(Object.values(STATUS_LABEL)).size === 3);
 eq("an unused invitation draws the eye", statusTone("invited"), "attention");
 eq("a removed person does not", statusTone("revoked"), "muted");
 
-section("who can be removed");
+section("who can change whom");
 
-const member = (status: string): TeamMember => ({ id: 1, email: "a@b.co.uk", role: "staff", status, invitedAt: null, acceptedAt: null });
-check("someone with access can be removed", canRemove(member("active")));
-check("an unused invitation can be withdrawn", canRemove(member("invited")));
-check("someone already removed cannot be removed again", !canRemove(member("revoked")));
-check("the confirmation says the invitation code stops working", /code stops working/i.test(ROSTER.removeConfirmDetail));
-check("and does not claim they had access to lose", !/lose access|no longer has access/i.test(ROSTER.removeConfirmDetail + ROSTER.removedAnnouncement));
+const member = (status: string, isYou = false): TeamMember => ({ id: 1, email: "a@b.co.uk", role: "staff", status, invitedAt: null, acceptedAt: null, isYou });
+check("an owner can remove someone with access", canRemove(member("active"), true));
+check("an owner can withdraw an unused invitation", canRemove(member("invited"), true));
+check("nobody removes a row already removed", !canRemove(member("revoked"), true));
+check("nobody removes themselves", !canRemove(member("active", true), true));
+check("staff remove nobody", !canRemove(member("active"), false));
+check("an owner can change another person's role", canChangeRole(member("active"), true));
+check("but not their own", !canChangeRole(member("active", true), true));
+check("staff change no roles", !canChangeRole(member("active"), false));
+check("removal says they are signed out straight away", /signed out straight away/i.test(ROSTER.removeConfirmDetail));
+check("the page hides invite controls from staff", pageSrc.includes("{viewer.isOwner && (") && pageSrc.includes("useViewer()"));
+check("members get their own password form; the main account uses Settings", pageSrc.includes("{!viewer.accountHolder && <OwnPasswordSection />}"));
+check("it calls the member password endpoint", pageSrc.includes("changeOwnMemberPassword") && apiSrc.includes('MEMBER_PASSWORD_ENDPOINT = "/api/receptionist/account/member-password"'));
+check("roles are changed with PATCH", apiSrc.includes("changeTeamMemberRole") && apiSrc.includes('method: "PATCH"'));
 
-section("roles are described as what they are: labels");
+section("roles describe what the server enforces");
 
 eq("two roles, staff offered first", ROLE_OPTIONS.map((o) => o.value), ["staff", "owner"]);
-// Nothing on the server reads `role` to allow or refuse anything.
-check("every role says it is a label only", Object.values(ROLE_DETAIL).every((d) => /labels for now/i.test(d)));
-check("no role claims a billing or team restriction", Object.values(ROLE_DETAIL).every((d) => !/billing|except|full access/i.test(d)));
+check("staff are told they can't change settings", /can't change settings/i.test(ROLE_DETAIL.staff!));
+check("owners are told they manage team and billing", /team and billing/i.test(ROLE_DETAIL.owner!));
+check("the server really enforces roles", rolesSrc.includes("export function accessDecision") && authSrc.includes("accessDecision(req.method"));
+check(
+  "staff writes the copy promises are on the server's allow-list",
+  [
+    "PATCH /receptionist/voice/messages/:id",
+    "POST /receptionist/contacts",
+    "POST /receptionist/calendar/requests/:publicId/approve",
+    "POST /receptionist/support/requests",
+  ].every((k) => rolesSrc.includes(`"${k}"`)),
+);
 eq("an unknown role is not guessed", roleLabel("superuser"), "Unknown role");
 check("no role claims per-page permissions", Object.values(ROLE_DETAIL).every((d) => !/per-page|granular|permission level/i.test(d)));
 
@@ -118,17 +139,24 @@ if (valid.ok) {
   eq("it is normalised", valid.payload.email, "colleague@business.co.uk");
   eq("the chosen role is carried", valid.payload.role, "owner");
 }
-check("the invite copy says how long the code lasts", /seven days/i.test(INVITE.detail));
-check("and that they cannot sign in with it", /cannot sign in/i.test(INVITE.detail));
-check("the sent copy says they cannot sign in yet", /cannot sign in yet/i.test(INVITE.sentDetail));
-// There is no accept screen and no link in the invitation email.
-check("no invite copy promises a link or a password of their own", !/link|set their (own )?password/i.test(INVITE.detail + INVITE.sentDetail));
-check("the invitation email says team sign-in is not available", membershipSrc.includes("Team sign-in is not available yet"));
-check("and no longer asks them to accept it to join", !/Accept it with your email address/.test(membershipSrc));
-
-// The server knows the member limit and the roster; the browser does not.
+check("the invite copy says how long the link lasts", /seven days/i.test(INVITE.detail));
+check("and that they choose their own password", /choose their own password/i.test(INVITE.detail));
+check("the invitation email links to the acceptance screen", membershipSrc.includes("invitationEmailText") && linksSrc.includes('acceptInvitation: "/accept-invitation"'));
+check("and no longer says sign-in is unavailable", !/not available yet/.test(membershipSrc + linksSrc));
 eq("the server's own sentence is shown when it has one", inviteErrorDetail("Member limit reached."), "Member limit reached.");
 check("a blank one falls back to something actionable", /try sending the invitation again/i.test(inviteErrorDetail("  ")));
+
+section("own password");
+
+check("a missing current password is refused", !validateOwnPassword("", "long enough").ok);
+check("a short new one is refused", !validateOwnPassword("old", "short").ok);
+check("a valid pair passes", validateOwnPassword("old", "long enough").ok);
+
+section("accepting an invitation");
+
+check("an accept route exists", routesSrc.includes('acceptInvitation: "/accept-invitation"'));
+check("it renders outside the dashboard shell", appSrc.includes("ROUTES.acceptInvitation") && appSrc.includes('import("@/pages/AcceptInvitation")'));
+check("the screen reads the link's token and sets a password", acceptSrc.includes('searchParams.get("token")') && acceptSrc.includes("acceptTeamInvitation"));
 
 section("dates");
 
@@ -143,13 +171,8 @@ check("every renderable string is non-empty", strings.every((s) => typeof s === 
 check("the page title is present", strings.includes(PAGE.title));
 // Nothing here may claim a capability the endpoints do not have.
 check("nothing claims last-seen or activity per member", strings.every((s) => !/last seen|last active|activity log/i.test(s)));
-eq("team sign-in is recorded as unavailable", TEAM_SIGN_IN_AVAILABLE, false);
-check("the page says invited people cannot sign in", /invited people cannot sign in/i.test(PAGE.detail));
-check(
-  "nothing promises sign-in, a password of their own, or role enforcement",
-  strings.every((s) => !/set their own password|own sign-in|has access|with access|get their own|except billing|full access/i.test(s)),
-);
-check("the nav description no longer says who else can sign in", !navSrc.includes("Who else can sign in"));
+eq("team sign-in is recorded as available", TEAM_SIGN_IN_AVAILABLE, true);
+check("nothing still says team members cannot sign in", strings.every((x) => !/cannot sign in|labels for now/i.test(x)));
 
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {

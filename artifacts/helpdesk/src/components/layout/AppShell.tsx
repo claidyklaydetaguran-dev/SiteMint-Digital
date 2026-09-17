@@ -411,6 +411,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sd-rail__workspace">
           <span className="sd-eyebrow">Workspace</span>
           <span className="sd-rail__workspace-name">{me.firm.name}</span>
+          {me.viewer && !me.viewer.accountHolder && (
+            <span className="sd-rail__workspace-role">
+              {me.viewer.email} · {me.viewer.role === "owner" ? "Owner" : "Staff"}
+            </span>
+          )}
         </div>
 
         <RailNav location={location} onNavigate={closeIfDrawer} />

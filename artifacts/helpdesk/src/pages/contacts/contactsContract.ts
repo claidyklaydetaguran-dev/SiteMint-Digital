@@ -17,19 +17,19 @@ import type { ContactCallRef, ContactConversationRef, ContactSource, ContactSumm
 export const PAGE = {
   eyebrow: "ACTIVITY",
   title: "Contacts",
-  detail: "Everyone who has called or texted your receptionist, in one place.",
+  detail: "Everyone who has called your receptionist, and anyone you add yourself.",
   loading: "Checking your session…",
 } as const;
 
 export const LIST = {
   searchLabel: "Search contacts",
-  searchPlaceholder: "Search by name or phone number",
+  searchPlaceholder: "Search by name, phone or email",
   loading: "Loading contacts…",
   failed: "Contacts couldn't be loaded. Try again shortly.",
   retryLabel: "Try again",
   retryingLabel: "Trying…",
   emptyTitle: "No contacts yet",
-  emptyDetail: "Contacts appear here once someone calls or texts your receptionist.",
+  emptyDetail: "Contacts appear here when someone calls your receptionist. You can also add one yourself.",
   noResultsTitle: "No contacts match that search",
   noResultsDetail: "Try a different name or phone number.",
   columnName: "Name",
@@ -93,6 +93,57 @@ export const DETAIL = {
   openConversation: "Open conversation",
 } as const;
 
+/* ── Adding and editing ────────────────────────────────────────────────── */
+
+export const FORM = {
+  addButton: "Add contact",
+  editButton: "Edit contact",
+  addTitle: "Add a contact",
+  addDetail: "Save someone your receptionist hasn't spoken to yet. Their calls will be linked to them by phone number.",
+  editTitle: "Edit contact",
+  editDetail: "The phone number can't be changed, because calls are matched to it. Add a new contact for a different number.",
+  phoneLabel: "Phone number",
+  phoneHelp: "Include the country code, for example +1 555 123 4567.",
+  nameLabel: "Name",
+  emailLabel: "Email",
+  notesLabel: "Notes",
+  notesHelp: "Only your team sees these.",
+  optional: "Optional",
+  required: "Required",
+  save: "Save contact",
+  saving: "Saving…",
+  cancel: "Cancel",
+  savedAnnouncement: "Contact saved.",
+  failedTitle: "The contact wasn't saved",
+  phoneRequired: "Enter a phone number.",
+  emailInvalid: "Enter a valid email address, or leave it blank.",
+  notesTooLong: "Keep notes under 2,000 characters.",
+  nameTooLong: "Keep the name under 120 characters.",
+  detailsHeading: "Details",
+  emailLabelDetail: "Email",
+  notesLabelDetail: "Notes",
+  none: "Not added",
+} as const;
+
+export interface ContactFormValues {
+  phone: string;
+  name: string;
+  email: string;
+  notes: string;
+}
+
+export function validateContactForm(
+  values: ContactFormValues,
+  mode: "add" | "edit",
+): { ok: true } | { ok: false; field: keyof ContactFormValues; message: string } {
+  if (mode === "add" && values.phone.replace(/[^0-9]/g, "").length === 0) return { ok: false, field: "phone", message: FORM.phoneRequired };
+  if (values.name.trim().length > 120) return { ok: false, field: "name", message: FORM.nameTooLong };
+  const email = values.email.trim();
+  if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, field: "email", message: FORM.emailInvalid };
+  if (values.notes.trim().length > 2000) return { ok: false, field: "notes", message: FORM.notesTooLong };
+  return { ok: true };
+}
+
 /* ── Saved messages reached through this contact's calls ────────────────── */
 
 export const INQUIRIES = {
@@ -136,6 +187,7 @@ export function everyRenderableString(): string[] {
     ...Object.values(LIST).filter((v): v is string => typeof v === "string"),
     ...Object.values(DETAIL),
     ...Object.values(INQUIRIES),
+    ...Object.values(FORM),
     NAME_FROM_INQUIRY_NOTE,
     ...(["voice", "sms", "manual", "unknown"] as const).map((s) => sourceLabel(s)),
     dispositionLabel(null),

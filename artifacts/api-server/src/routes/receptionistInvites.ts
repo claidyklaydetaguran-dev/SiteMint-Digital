@@ -18,6 +18,7 @@ import {
 } from "../lib/publicWriteFlags.js";
 import { consumeInviteCode, attachInviteToFirm, createInvite, listInvites, resolveInviteTtlMs } from "../lib/voiceInvites/inviteService.js";
 import { createFirmForInviteSignup } from "../lib/voiceInvites/inviteSignup.js";
+import { checkPolicyAcceptance, currentPolicyAcceptances, POLICY_MESSAGES } from "../lib/policyVersions.js";
 import { SlidingWindowLimiter, getClientIp } from "../lib/contactProtection.js";
 
 const router = Router();
@@ -75,7 +76,7 @@ router.post("/receptionist/auth/invite-signup", async (req: Request, res: Respon
       return;
     }
 
-    const created = await createFirmForInviteSignup({ ownerName, businessName, email, password });
+    const created = await createFirmForInviteSignup({ ownerName, businessName, email, password, policies: currentPolicyAcceptances() });
     if (!created.ok) {
       // The invite is already spent (see consumeInviteCode's doc comment) —
       // this is the accepted tradeoff, not a code path that leaves the
@@ -146,7 +147,7 @@ router.post("/receptionist/auth/register", async (req: Request, res: Response) =
   const businessName = typeof body.businessName === "string" ? body.businessName.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  const acceptedTerms = body.acceptedTerms === true;
+  const policies = checkPolicyAcceptance(body.acceptedTerms, body.acceptedPolicies);
 
   if (!ownerName || !businessName || !email || !password) {
     res.status(400).json({ error: "Your name, business name, email and password are required." });
@@ -160,8 +161,8 @@ router.post("/receptionist/auth/register", async (req: Request, res: Response) =
     res.status(400).json({ error: "Enter a valid email address." });
     return;
   }
-  if (!acceptedTerms) {
-    res.status(400).json({ error: "You must accept the terms to continue." });
+  if (!policies.ok) {
+    res.status(policies.reason === "outdated" ? 409 : 400).json({ error: POLICY_MESSAGES[policies.reason], code: `policies_${policies.reason}` });
     return;
   }
   if (password.length < 8) {
@@ -174,7 +175,7 @@ router.post("/receptionist/auth/register", async (req: Request, res: Response) =
   }
 
   try {
-    const created = await createFirmForInviteSignup({ ownerName, businessName, email, password });
+    const created = await createFirmForInviteSignup({ ownerName, businessName, email, password, policies: policies.accepted });
     if (!created.ok) {
       // An existing account is recovered by signing in or resetting the
       // password — never by creating a second business for the same email.

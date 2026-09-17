@@ -26,12 +26,22 @@ export const voiceContacts = pgTable("voice_contacts", {
   firstSeenAt:          timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
   lastSeenAt:           timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
   lastCallId:           text("last_call_id"),
+  /**
+   * How the contact first came to exist (0014): 'call' when a caller created
+   * it, 'manual' when someone at the business added it. Never rewritten.
+   */
+  origin:               text("origin").notNull().default("call"),
+  email:                text("email"),
+  notes:                text("notes"),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("uq_voice_contacts_firm_phone").on(table.firmId, table.phoneE164),
   index("ix_voice_contacts_firm_last_seen").on(table.firmId, table.lastSeenAt),
   check("ck_voice_contacts_phone_shape", sql`${table.phoneE164} ~ '^\\+[1-9][0-9]{6,14}$'`),
+  check("ck_voice_contacts_origin", sql`${table.origin} IN ('call', 'manual')`),
+  check("ck_voice_contacts_email_length", sql`${table.email} IS NULL OR char_length(${table.email}) BETWEEN 3 AND 254`),
+  check("ck_voice_contacts_notes_length", sql`${table.notes} IS NULL OR char_length(${table.notes}) <= 2000`),
 ]);
 
 export type VoiceContact = typeof voiceContacts.$inferSelect;

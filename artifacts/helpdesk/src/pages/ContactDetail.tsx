@@ -23,6 +23,8 @@ import {
   sourceLabel,
 } from "@/pages/contacts/contactsContract";
 import { relativeTime } from "@/lib/conversationUi";
+import { ContactFormDialog } from "@/pages/contacts/ContactFormDialog";
+import { FORM } from "@/pages/contacts/contactsContract";
 import "@/styles/v2-dashboard.css";
 
 function BackLink() {
@@ -97,7 +99,14 @@ export default function ContactDetail() {
           <p className="sd-page__meta">{contact.phone}</p>
           {resolved.fromInquiry && <p className="sd-page__meta">{NAME_FROM_INQUIRY_NOTE}</p>}
         </div>
-        {contact.optedOut && <Badge variant="outline">{DETAIL.optedOutLabel}: {DETAIL.optedOutTrue}</Badge>}
+        <div className="flex flex-wrap items-center gap-2">
+          {contact.optedOut && <Badge variant="outline">{DETAIL.optedOutLabel}: {DETAIL.optedOutTrue}</Badge>}
+          <ContactFormDialog
+            mode="edit"
+            contactId={String(contact.id)}
+            initial={{ name: contact.name, email: contact.email ?? null, notes: contact.notes ?? null }}
+          />
+        </div>
       </div>
 
       <dl className="sd-figures">
@@ -122,6 +131,16 @@ export default function ContactDetail() {
           <span className="sd-figure__label">{DETAIL.nextAppointmentLabel}</span>
         </div>
       </dl>
+
+      <section className="sd-section" aria-labelledby="contact-about-h">
+        <h2 className="sd-h2" id="contact-about-h">{FORM.detailsHeading}</h2>
+        <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+          <dt className="text-muted-foreground">{FORM.emailLabelDetail}</dt>
+          <dd>{contact.email ? contact.email : FORM.none}</dd>
+          <dt className="text-muted-foreground">{FORM.notesLabelDetail}</dt>
+          <dd className="whitespace-pre-wrap">{contact.notes ? contact.notes : FORM.none}</dd>
+        </dl>
+      </section>
 
       <section className="sd-section" aria-labelledby="contact-calls-h">
         <h2 className="sd-h2" id="contact-calls-h">{DETAIL.callsHeading}</h2>

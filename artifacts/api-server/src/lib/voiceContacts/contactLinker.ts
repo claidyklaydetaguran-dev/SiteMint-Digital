@@ -76,8 +76,9 @@ async function productionDeps(): Promise<ContactLinkerDeps> {
             lastSeenAt: now,
             lastCallId: callId,
             updatedAt: now,
-            // Keep the latest non-empty name; never blank out an existing one.
-            ...(displayName ? { displayName } : {}),
+            // A caller's name fills an empty one; it never replaces a name
+            // already on the contact, which may be one the business typed.
+            ...(displayName ? { displayName: sql`coalesce(${voiceContacts.displayName}, ${displayName})` } : {}),
           },
         })
         .returning({ contactId: voiceContacts.id });

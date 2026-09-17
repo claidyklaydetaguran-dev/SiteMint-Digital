@@ -81,17 +81,58 @@ export const voiceFirmMembers = pgTable("voice_firm_members", {
   invitedAt:  timestamp("invited_at", { withTimezone: true }).defaultNow().notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   revokedAt:  timestamp("revoked_at", { withTimezone: true }),
+  /**
+   * bcrypt hash of the member's own password (0014). Set when the member
+   * accepts an invitation; NULL until then. A member signs in with this, never
+   * with the business's password.
+   */
+  passwordHash:    text("password_hash"),
+  /**
+   * sha256 hex of the outstanding invitation code (0014). Binds an invitation
+   * to exactly this row, so one person's code cannot activate another's place.
+   */
+  inviteTokenHash: text("invite_token_hash"),
   createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:  timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("uq_voice_firm_members_firm_email").on(table.firmId, table.email),
   index("ix_voice_firm_members_firm_status").on(table.firmId, table.status),
+  index("ix_voice_firm_members_email_status").on(table.email, table.status),
+  check("ck_voice_firm_members_invite_hash_shape", sql`${table.inviteTokenHash} IS NULL OR ${table.inviteTokenHash} ~ '^[0-9a-f]{64}$'`),
   check("ck_voice_firm_members_role", sql`${table.role} IN ('owner', 'staff')`),
   check("ck_voice_firm_members_status", sql`${table.status} IN ('invited', 'active', 'revoked')`),
   check("ck_voice_firm_members_email_lower", sql`${table.email} = lower(${table.email})`),
 ]);
 
 export type VoiceFirmMember = typeof voiceFirmMembers.$inferSelect;
+
+// ── Policy acceptance (0014) ─────────────────────────────────────────────────
+// Which version of the Terms and the Privacy Policy a business accepted, and
+// when the server recorded it. One row per (business, policy, version): a
+// new version is a new row, so the history of what was agreed survives.
+export const POLICY_KINDS = ["terms", "privacy"] as const;
+export type PolicyKind = (typeof POLICY_KINDS)[number];
+
+export const voicePolicyAcceptances = pgTable("voice_policy_acceptances", {
+  id:         serial("id").primaryKey(),
+  firmId:     integer("firm_id")
+                .notNull()
+                .references(() => intakeFirms.id, { onDelete: "cascade" }),
+  policy:     text("policy").notNull(),
+  version:    text("version").notNull(),
+  /** The address that accepted, as it was at that moment. */
+  acceptedBy: text("accepted_by").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:  timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("uq_voice_policy_acceptances_firm_policy_version").on(table.firmId, table.policy, table.version),
+  index("ix_voice_policy_acceptances_firm").on(table.firmId),
+  check("ck_voice_policy_acceptances_policy", sql`${table.policy} IN ('terms', 'privacy')`),
+  check("ck_voice_policy_acceptances_version", sql`${table.version} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`),
+]);
+
+export type VoicePolicyAcceptance = typeof voicePolicyAcceptances.$inferSelect;
 
 export const voiceAuditLog = pgTable("voice_audit_log", {
   id:        serial("id").primaryKey(),

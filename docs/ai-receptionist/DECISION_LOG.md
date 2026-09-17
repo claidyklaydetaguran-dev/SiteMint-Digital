@@ -114,3 +114,49 @@ exact decision dates and discussion context are not available.
 - **Planning and PRDs**: Claude (external) in Plan Mode — inspection, audit, PRD authoring, reconciliation between phases.
 - **Implementation**: Replit Agent in Build Mode — code changes, schema changes, verification.
 - **Handoff protocol**: one PRD document per phase; Build Mode session begins only after PRD is reviewed and approved; QA verification + freeze after each phase before the next starts.
+
+## 2026-09-17 — Release decisions from the owner's workflow brief
+
+Owner clarifications that override any conflicting wording in the brief:
+
+- **Team access is included.** Members accept an invitation by choosing their
+  own password and sign in with it. `voice_firm_members` gained `password_hash`
+  and `invite_token_hash` (voice migration 0014); the invitation code is bound
+  to the invited row, so one person's code cannot activate another's place.
+  Every receptionist request resolves the session's address to the account
+  holder or an active member (`lib/receptionistRoles.ts`) — anything else is
+  refused, so removal takes effect on the next request. Staff get every read
+  and an explicit list of day-to-day writes; everything else is owner-only by
+  default. Only the account holder changes the account's own sign-in email and
+  password. The two protected auth files changed for this, as approved.
+- **Automatic booking is included.** The receptionist books after the caller
+  confirms, and says "booked" only once the calendar write and the booking
+  record both succeed (the existing confirm-on-call path). Without a connected
+  calendar a request waits for the business, and the caller is told so.
+- **SMS is deferred.** Sending stays disabled (`VOICE_SMS_ENABLED` unset). The
+  booking tool no longer offers a confirmation text, the public booking page no
+  longer asks for text consent, and marketing no longer shows one.
+- **Billing and Stripe remain last.** Usage tracking and limits stay as they are.
+- **Acceptance uses SiteMint Digital** with clearly labelled test records.
+- **Staging first.** Spoken browser, booking and inbound-phone acceptance happen
+  on staging; transfer is enabled only after a test with a consenting
+  recipient; production gets a limited verification after publication.
+
+Implementation decisions:
+
+- **Policy acceptance is recorded.** Signup sends the Terms and Privacy versions
+  it displayed; the server records them with its own timestamp in
+  `voice_policy_acceptances`, in the same transaction as the business, and
+  refuses a stale page (409 `policies_outdated`). Versions live in
+  `api-server/src/lib/policyVersions.ts` and
+  `web-agency/src/pages/legal/policyVersions.ts` and must change together. The
+  wording is pending owner/legal approval.
+- **Setup is four steps, owned by the server.** `GET /api/receptionist/readiness`
+  returns the steps (Business information · Greeting and voice · What it can do ·
+  Test and activate), one overall state (`setting_up`, `ready_to_test`,
+  `ready_to_activate_phone`, `phone_connected`, `live_call_verified`, `paused`,
+  `needs_attention`, `not_checked`) and one next action. An unreadable fact is
+  "Not checked", never done.
+- **Contacts can be added and edited by hand.** A contact keeps the origin it
+  was created with (`call` or `manual`). The phone number is its identity and is
+  never edited. A caller-stated name fills an empty name but never replaces one.

@@ -48,6 +48,8 @@ export const ROUTES = {
   passwordResetComplete: "/password-reset/complete",
   /** Email-verification confirm page (2026-09-11 §5) — token-proven, public. */
   verifyEmail: "/verify-email",
+  /** Team invitation: set a password and join (`?token=…`). Token-proven, public. */
+  acceptInvitation: "/accept-invitation",
 
   overview: "/",
   /** S-3: the persistent Setup hub. */
@@ -73,7 +75,7 @@ export const ROUTES = {
   // Issues are, below.
   billing: "/account/billing",
   settings: "/account/settings",
-  /** Invited people (invite/list/revoke since P8). Team members cannot sign in yet. */
+  /** The people who can sign in to this business, and their roles. */
   team: "/account/team",
   support: "/account/support",
 

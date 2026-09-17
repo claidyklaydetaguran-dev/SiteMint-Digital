@@ -23,6 +23,7 @@ import { Link } from "wouter";
 import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { PolicyDialog } from "@/components/legal/PolicyDialog";
 import {
   detectTimezone,
   emptySignupForm,
@@ -102,8 +103,8 @@ export default function LandingReceptionistSignup() {
         body: JSON.stringify(buildSignupPayload(form)),
       });
       if (!r.ok) {
-        const d = (await r.json().catch(() => ({}))) as { error?: string };
-        const mapped = mapSignupError(r.status, d.error);
+        const d = (await r.json().catch(() => ({}))) as { error?: string; code?: string };
+        const mapped = mapSignupError(r.status, d.error, d.code);
         setOutcome(mapped.outcome);
         setError(mapped.message);
         window.requestAnimationFrame(() => alertRef.current?.focus());
@@ -351,17 +352,15 @@ export default function LandingReceptionistSignup() {
                   style={{ width: 20, height: 20, minWidth: 20, marginTop: 2 }}
                 />
                 <label htmlFor="s-accept-terms" className="sg-label" style={{ fontWeight: 400 }}>
-                  I agree to the{" "}
-                  <Link href={ROUTES.terms} className="sg-alt__link">
-                    Terms
-                  </Link>{" "}
-                  and{" "}
-                  <Link href={ROUTES.privacy} className="sg-alt__link">
-                    Privacy Policy
-                  </Link>
-                  . <span className="sg-req">Required</span>
+                  I have read and agree to the Terms of Service and the Privacy Policy.{" "}
+                  <span className="sg-req">Required</span>
                 </label>
               </div>
+              <p className="sg-help" id="policy-links">
+                Read the <PolicyDialog policy="terms" label="Terms of Service" /> and the{" "}
+                <PolicyDialog policy="privacy" label="Privacy Policy" />. They open on this page, and
+                everything you have entered stays as it is.
+              </p>
               {fieldErrors.acceptedTerms && (
                 <p className="sg-error" id="acceptedTerms-error">
                   {fieldErrors.acceptedTerms}

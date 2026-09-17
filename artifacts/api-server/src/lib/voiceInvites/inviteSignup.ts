@@ -18,12 +18,19 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { intakeFirms } from "@workspace/db/schema";
+import { voicePolicyAcceptances, type PolicyKind } from "@workspace/db/schema/voice";
 
 export interface InviteSignupInput {
   ownerName: string;
   businessName: string;
   email: string;
   password: string;
+  /**
+   * The policy versions this person explicitly accepted. Recorded in the same
+   * transaction as the business, with the server's own timestamp, so an
+   * account never exists without its acceptance record.
+   */
+  policies: Array<{ policy: PolicyKind; version: string }>;
 }
 
 export type CreateFirmResult =
@@ -39,30 +46,39 @@ export async function createFirmForInviteSignup(input: InviteSignupInput): Promi
   const passwordHash = await bcrypt.hash(input.password, 12); // same cost as the protected signup route
 
   try {
-    const [inserted] = await db
-      .insert(intakeFirms)
-      .values({
-        name: input.businessName.trim() || input.ownerName.trim(),
-        email: emailNorm,
-        passwordHash,
-        practiceAreas: [],
-        statesServed: [],
-        statuteOfLimitationsDays: 0,
-        notifyEmail: emailNorm,
-        twilioNumber: "",
-        planTier: "trial",
-        trialConversationsLimit: 20,
-        qualifyingQuestions: [],
-      })
-      .returning({
-        id: intakeFirms.id,
-        name: intakeFirms.name,
-        email: intakeFirms.email,
-        planTier: intakeFirms.planTier,
-        trialConversationsLimit: intakeFirms.trialConversationsLimit,
-        createdAt: intakeFirms.createdAt,
-      });
-    if (!inserted || !inserted.email) throw new Error("firm insert returned no row");
+    const inserted = await db.transaction(async (tx) => {
+      const [firmRow] = await tx
+        .insert(intakeFirms)
+        .values({
+          name: input.businessName.trim() || input.ownerName.trim(),
+          email: emailNorm,
+          passwordHash,
+          practiceAreas: [],
+          statesServed: [],
+          statuteOfLimitationsDays: 0,
+          notifyEmail: emailNorm,
+          twilioNumber: "",
+          planTier: "trial",
+          trialConversationsLimit: 20,
+          qualifyingQuestions: [],
+        })
+        .returning({
+          id: intakeFirms.id,
+          name: intakeFirms.name,
+          email: intakeFirms.email,
+          planTier: intakeFirms.planTier,
+          trialConversationsLimit: intakeFirms.trialConversationsLimit,
+          createdAt: intakeFirms.createdAt,
+        });
+      if (!firmRow || !firmRow.email) throw new Error("firm insert returned no row");
+      if (input.policies.length > 0) {
+        await tx.insert(voicePolicyAcceptances).values(
+          input.policies.map((p) => ({ firmId: firmRow.id, policy: p.policy, version: p.version, acceptedBy: emailNorm })),
+        );
+      }
+      return firmRow;
+    });
+    if (!inserted.email) throw new Error("firm insert returned no row");
     return { ok: true, firm: { ...inserted, email: inserted.email } };
   } catch (err: unknown) {
     if ((err as { code?: string }).code === "23505") return { ok: false, reason: "duplicate_email" };

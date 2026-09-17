@@ -161,7 +161,7 @@ export async function productionEmailChangeDeps(): Promise<EmailChangeDeps> {
   const { db } = await import("@workspace/db");
   const { intakeFirms } = await import("@workspace/db/schema");
   const { voiceAccountStates } = await import("@workspace/db/schema/voice");
-  const { eq } = await import("drizzle-orm");
+  const { eq, sql } = await import("drizzle-orm");
   const { createAlertTransportFromEnv } = await import("../voiceAlerts/alertTransport.js");
   const { recordAuditEvent } = await import("../voiceAccounts/auditLog.js");
   const { issueAccountToken, verifyAccountPassword } = await import("./accountTokens.js");
@@ -186,7 +186,27 @@ export async function productionEmailChangeDeps(): Promise<EmailChangeDeps> {
       // notifyEmail follows the account address: it was seeded from it at
       // signup, and leaving it pointing at an address the business has just
       // abandoned would keep sending intake notices somewhere unread.
-      await db.update(intakeFirms).set({ email, notifyEmail: email }).where(eq(intakeFirms.id, firmId));
+      //
+      // Sessions carry the address they signed in with, and team access
+      // recognises the account holder by that address, so the holder's own
+      // sessions move with it. A team member who had the new address loses
+      // that membership: one address cannot be both the account and a member.
+      await db.transaction(async (tx) => {
+        const [before] = await tx.select({ email: intakeFirms.email }).from(intakeFirms).where(eq(intakeFirms.id, firmId)).limit(1);
+        await tx.update(intakeFirms).set({ email, notifyEmail: email }).where(eq(intakeFirms.id, firmId));
+        await tx.execute(
+          sql`DELETE FROM receptionist_sessions WHERE firm_id = ${firmId} AND lower(email) = ${email.toLowerCase()}`,
+        );
+        await tx.execute(
+          sql`UPDATE voice_firm_members SET status = 'revoked', revoked_at = now(), password_hash = NULL, invite_token_hash = NULL, updated_at = now()
+              WHERE firm_id = ${firmId} AND email = ${email.toLowerCase()} AND status <> 'revoked'`,
+        );
+        if (before?.email) {
+          await tx.execute(
+            sql`UPDATE receptionist_sessions SET email = ${email} WHERE firm_id = ${firmId} AND lower(email) = ${before.email.toLowerCase()}`,
+          );
+        }
+      });
     },
     clearVerification: async (firmId) => {
       const now = new Date();

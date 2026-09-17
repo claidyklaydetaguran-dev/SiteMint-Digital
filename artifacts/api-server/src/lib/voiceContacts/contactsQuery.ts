@@ -2,7 +2,8 @@
 // Derived entirely from existing tables (voice_contacts, voice_call_links,
 // voice_call_reviews, voice_sms_consents, intake_conversations,
 // scheduling_appointment_requests) via the existing repositories'
-// conventions — this module performs NO writes anywhere, and does not
+// conventions — this module performs NO writes anywhere (hand edits live in
+// contactWrites.ts), and does not
 // import or touch lib/voiceContacts/contactLinker.ts (the P5 call-linking
 // module), which stays exactly as it is.
 
@@ -17,8 +18,9 @@ export interface ContactListItem {
   id: number;
   name: string | null;
   phone: string;
-  /** Always "voice" today — this list is sourced from voice_contacts. "sms" and "manual" are reserved for future data sources and never emitted yet. */
-  source: "voice" | "sms" | "manual";
+  /** Where the contact came from: "voice" when a caller created it, "manual" when someone at the business added it. */
+  source: "voice" | "manual";
+  email: string | null;
   lastInteractionAt: string;
   disposition: string | null;
   nextAppointmentAt: string | null;
@@ -49,7 +51,9 @@ export async function listContactsForFirm(
   const whereClauses = [eq(voiceContacts.firmId, firmId)];
   if (trimmedQuery.length > 0) {
     const like = `%${trimmedQuery}%`;
-    whereClauses.push(or(ilike(voiceContacts.displayName, like), ilike(voiceContacts.phoneE164, like))!);
+    whereClauses.push(
+      or(ilike(voiceContacts.displayName, like), ilike(voiceContacts.phoneE164, like), ilike(voiceContacts.email, like))!,
+    );
   }
   if (trimmedCallId.length > 0) {
     whereClauses.push(sql`EXISTS (
@@ -67,6 +71,8 @@ export async function listContactsForFirm(
       phone: voiceContacts.phoneE164,
       lastInteractionAt: voiceContacts.lastSeenAt,
       lastCallId: voiceContacts.lastCallId,
+      origin: voiceContacts.origin,
+      email: voiceContacts.email,
       callCount: sql<number>`(SELECT COUNT(*) FROM ${voiceCallLinks} WHERE ${voiceCallLinks.contactId} = ${voiceContacts.id})::int`,
       conversationCount: sql<number>`(
         SELECT COUNT(*) FROM ${intakeConversations}
@@ -102,7 +108,8 @@ export async function listContactsForFirm(
     id: r.id,
     name: r.name,
     phone: r.phone,
-    source: "voice" as const,
+    source: r.origin === "manual" ? ("manual" as const) : ("voice" as const),
+    email: r.email,
     lastInteractionAt: r.lastInteractionAt.toISOString(),
     disposition: r.disposition,
     nextAppointmentAt: r.nextAppointmentAt,
@@ -126,6 +133,7 @@ export interface ContactConversationSummary {
 
 export interface ContactDetail extends ContactListItem {
   createdAt: string;
+  notes: string | null;
 }
 
 /** One saved message, reached through this contact's calls by foreign key. */
@@ -257,7 +265,9 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
       id: contact.id,
       name: contact.displayName,
       phone: contact.phoneE164,
-      source: "voice",
+      source: contact.origin === "manual" ? "manual" : "voice",
+      email: contact.email,
+      notes: contact.notes,
       lastInteractionAt: contact.lastSeenAt.toISOString(),
       disposition: dispositionRow[0]?.reviewState ?? null,
       nextAppointmentAt: nextAppointmentRow[0]?.requestedStartAt.toISOString() ?? null,

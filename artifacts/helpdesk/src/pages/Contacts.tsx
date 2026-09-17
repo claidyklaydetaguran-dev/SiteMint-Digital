@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useSession } from "@/hooks/useSession";
 import { useContactsList } from "@/hooks/useContacts";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import {
   dispositionLabel,
   sourceLabel,
 } from "@/pages/contacts/contactsContract";
+import { ContactFormDialog } from "@/pages/contacts/ContactFormDialog";
 import "@/styles/v2-dashboard.css";
 
 function useDebounced(value: string, delayMs: number): string {
@@ -60,6 +61,7 @@ export default function Contacts() {
   const [rawQuery, setRawQuery] = useState("");
   const query = useDebounced(rawQuery, 300);
   const contactsQuery = useContactsList(query);
+  const [, navigate] = useLocation();
 
   if (sessionLoading) {
     return <PageSkeleton label={PAGE.loading} list />;
@@ -77,6 +79,10 @@ export default function Contacts() {
           <h1 className="sd-page__title">{PAGE.title}</h1>
           <p className="sd-page__meta">{PAGE.detail}</p>
         </div>
+        <ContactFormDialog
+          mode="add"
+          onSaved={(detail) => navigate(`/activity/contacts/${encodeURIComponent(String(detail.contact.id))}`)}
+        />
       </div>
 
       <div className="max-w-sm">

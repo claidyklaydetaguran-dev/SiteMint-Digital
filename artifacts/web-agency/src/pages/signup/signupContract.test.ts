@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { POLICY_VERSIONS } from "../legal/policyVersions";
 import {
   emptySignupForm,
   MIN_PASSWORD_LENGTH,
@@ -29,6 +30,7 @@ import {
   buildSignupPayload,
   detectTimezone,
   mapSignupError,
+  SIGNUP_POLICIES_CHANGED_MESSAGE,
   SIGNUP_UNAVAILABLE_MESSAGE,
   validateSignup,
   type SignupFormValues,
@@ -40,6 +42,9 @@ const repoRoot = path.resolve(here, "../../../../..");
 const read = (rel: string) => readFileSync(path.join(repoRoot, rel), "utf8");
 
 const pageSrc = read("artifacts/web-agency/src/pages/LandingReceptionistSignup.tsx");
+const dialogSrc = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../components/legal/PolicyDialog.tsx"), "utf8");
+const termsPageSrc = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../LegalTermsV3.tsx"), "utf8");
+const privacyPageSrc = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../LegalPrivacyV3.tsx"), "utf8");
 const routesSrc = read("artifacts/web-agency/src/lib/routes.ts");
 const appSrc = read("artifacts/web-agency/src/App.tsx");
 
@@ -69,11 +74,22 @@ console.log("\n--- signup payload contract ---");
   const payload = buildSignupPayload(valid);
   const keys = Object.keys(payload).sort();
   check(
-    "payload carries exactly the six contracted keys — no invite code",
-    JSON.stringify(keys) === JSON.stringify(["acceptedTerms", "businessName", "email", "ownerName", "password", "timezone"]),
+    "payload carries exactly the seven contracted keys — no invite code",
+    JSON.stringify(keys) === JSON.stringify(["acceptedPolicies", "acceptedTerms", "businessName", "email", "ownerName", "password", "timezone"]),
     keys.join(","),
   );
   check("no inviteCode is sent", !("inviteCode" in payload));
+  check(
+    "the policy versions shown on the page are sent",
+    JSON.stringify(payload.acceptedPolicies) === JSON.stringify({ terms: POLICY_VERSIONS.terms, privacy: POLICY_VERSIONS.privacy }),
+  );
+  const serverVersions = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../../api-server/src/lib/policyVersions.ts"), "utf8");
+  check(
+    "and they are the versions the server records",
+    serverVersions.includes(`terms: "${POLICY_VERSIONS.terms}"`) && serverVersions.includes(`privacy: "${POLICY_VERSIONS.privacy}"`),
+  );
+  check("a policy change mid-signup is not reported as an existing account",
+    mapSignupError(409, "x", "policies_outdated").outcome !== "duplicate" && mapSignupError(409, "x", "policies_outdated").message === SIGNUP_POLICIES_CHANGED_MESSAGE);
   check("ownerName is passed through", payload.ownerName === valid.ownerName);
   check("businessName is passed through", payload.businessName === valid.businessName);
   check("email is trimmed", buildSignupPayload({ ...valid, email: "  jamie@northgate.example " }).email === valid.email);
@@ -162,7 +178,11 @@ console.log("\n--- required fields are on the page ---");
   }
   check("there is no invite code field", !pageSrc.includes("s-invite-code") && !/Invite code/i.test(pageText));
   check("the Terms checkbox is a real checkbox input", /id="s-accept-terms"[\s\S]{0,80}?type="checkbox"/.test(pageSrc));
-  check("the Terms checkbox links to both Terms and Privacy", pageSrc.includes("ROUTES.terms") && pageSrc.includes("ROUTES.privacy"));
+  // Owner defect 2026-09-17: opening a policy navigated away and lost the form.
+  check("Terms and Privacy open in in-page dialogs", pageSrc.includes('<PolicyDialog policy="terms"') && pageSrc.includes('<PolicyDialog policy="privacy"'));
+  check("no policy link navigates away from the form", !pageSrc.includes("ROUTES.terms") && !pageSrc.includes("ROUTES.privacy"));
+  check("the dialog trigger is a button, not a link", dialogSrc.includes('<button type="button" className="sg-alt__link sg-policy-link">'));
+  check("the dialog and the policy pages share one wording", termsPageSrc.includes("<TermsBody />") && privacyPageSrc.includes("<PrivacyBody />") && dialogSrc.includes("<TermsBody />") && dialogSrc.includes("<PrivacyBody />"));
   check("timezone is a native select, not a custom widget", pageSrc.includes('<select id="s-timezone"'));
   check("password autocomplete is new-password", pageSrc.includes('autoComplete="new-password"'));
   check("email autocomplete is set", pageSrc.includes('autoComplete="email"'));

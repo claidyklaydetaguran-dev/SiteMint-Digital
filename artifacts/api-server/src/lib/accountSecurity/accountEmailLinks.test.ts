@@ -31,8 +31,8 @@ import {
   type PasswordResetDeps,
 } from "./accountTokens.js";
 import { changeAccountEmail, type EmailChangeDeps } from "./emailChange.js";
-import { inviteMember, type MembershipDeps } from "../voiceAccounts/membership.js";
-import type { VoiceFirmMember } from "@workspace/db/schema/voice";
+import { inviteMember } from "../voiceAccounts/membership.js";
+import { inviteCodeIn, membershipFake } from "../voiceAccounts/membershipFake.js";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "..");
 const read = (p: string) => readFileSync(join(REPO, p), "utf8");
@@ -126,6 +126,7 @@ describe("the link itself", () => {
     const routes = read("artifacts/helpdesk/src/lib/routes.ts");
     expect(routes).toContain(`verifyEmail: "${ACCOUNT_LINK_PATHS.verifyEmail}"`);
     expect(routes).toContain(`passwordResetComplete: "${ACCOUNT_LINK_PATHS.passwordResetComplete}"`);
+    expect(routes).toContain(`acceptInvitation: "${ACCOUNT_LINK_PATHS.acceptInvitation}"`);
     // Same prefix the post-call email's dashboard link already uses. That link
     // points at /activity/calls/:id, the route the dashboard actually mounts;
     // the older /calls/:id shape matched no route at all.
@@ -133,10 +134,11 @@ describe("the link itself", () => {
     // And both pages actually read ?token=.
     expect(read("artifacts/helpdesk/src/pages/PasswordResetComplete.tsx")).toContain('searchParams.get("token")');
     expect(read("artifacts/helpdesk/src/pages/VerifyEmail.tsx")).toContain('searchParams.get("token")');
+    expect(read("artifacts/helpdesk/src/pages/AcceptInvitation.tsx")).toContain('searchParams.get("token")');
   });
 
-  it("has no invitation link, because there is no screen that accepts one", () => {
-    expect(Object.keys(ACCOUNT_LINK_PATHS).sort()).toEqual(["passwordResetComplete", "verifyEmail"]);
+  it("links only to the three screens that accept a token", () => {
+    expect(Object.keys(ACCOUNT_LINK_PATHS).sort()).toEqual(["acceptInvitation", "passwordResetComplete", "verifyEmail"]);
   });
 });
 
@@ -235,36 +237,26 @@ describe("the flows send what they minted", () => {
     expect(toOld?.text ?? "").not.toContain("RAW-TOKEN-VALUE");
   });
 
-  it("an invitation promises nothing that does not exist: no link, and says sign-in is unavailable", async () => {
-    const mail: Mail[] = [];
-    const now = new Date("2026-09-16T12:00:00.000Z");
-    const deps: MembershipDeps = {
-      tokens: tokenStore().deps,
-      listMembers: async () => [],
-      insertMember: async (row) =>
-        ({ id: 1, ...row, status: "invited", invitedAt: now, acceptedAt: null, revokedAt: null, createdAt: now, updatedAt: now }) as unknown as VoiceFirmMember,
-      activateMember: async () => true,
-      revokeMember: async () => true,
-      sendEmail: async (to, subject, text) => {
-        mail.push({ to, subject, text });
-        return { ok: true };
-      },
-      recordAudit: async () => {},
-      now: () => now,
-    };
-    const previous = process.env.VOICE_DASHBOARD_BASE_URL;
-    process.env.VOICE_DASHBOARD_BASE_URL = PUBLIC.VOICE_DASHBOARD_BASE_URL;
-    try {
-      expect((await inviteMember(7, "colleague@business.co.uk", "staff", deps)).ok).toBe(true);
-    } finally {
-      if (previous === undefined) delete process.env.VOICE_DASHBOARD_BASE_URL;
-      else process.env.VOICE_DASHBOARD_BASE_URL = previous;
-    }
-    const text = mail[0]?.text ?? "";
+  it("an invitation links to the acceptance screen with the minted token, and says what the role can do", async () => {
+    const f = membershipFake({ env: PUBLIC });
+    expect((await inviteMember(7, "colleague@business.co.uk", "staff", f.deps)).ok).toBe(true);
+    const text = f.mail[0]?.text ?? "";
+    const code = inviteCodeIn(text) as string;
+    const link = new URL(linkIn(text) as string);
+    expect(link.pathname).toBe("/ai-receptionist/dashboard/accept-invitation");
+    expect(link.searchParams.get("token")).toBe(code);
+    expect(f.roster[0]?.inviteTokenHash).toBe(hashToken(code));
+    expect(text).toContain("As staff");
+    expect(text).not.toMatch(/not available yet|a label for now/);
+  });
+
+  it("without a safe base, an invitation is code-only", async () => {
+    const f = membershipFake({ env: NO_BASE });
+    await inviteMember(7, "colleague@business.co.uk", "owner", f.deps);
+    const text = f.mail[0]?.text ?? "";
+    expect(inviteCodeIn(text)).toBeTruthy();
     expect(text).not.toMatch(/https?:\/\/|token=/);
-    expect(text).toContain("Team sign-in is not available yet");
-    expect(text).not.toMatch(/accept it|set (your|their) (own )?password/i);
-    expect(/code \(valid 7 days\): (\S+)/.exec(text)?.[1]).toBeTruthy();
+    expect(text).toContain("As an owner");
   });
 
   it("never writes a token or its link to a logger", async () => {

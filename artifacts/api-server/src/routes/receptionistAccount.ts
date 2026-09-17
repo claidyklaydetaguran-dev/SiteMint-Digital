@@ -6,7 +6,7 @@
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
-import { COOKIE_NAME, requireReceptionistAuth } from "../lib/receptionistAuth.js";
+import { COOKIE_NAME, COOKIE_OPTIONS, createSession, requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import {
   completePasswordReset,
   confirmEmailVerification,
@@ -17,7 +17,14 @@ import { changeAccountEmail, productionEmailChangeDeps } from "../lib/accountSec
 import { changeAccountPassword, productionPasswordChangeDeps } from "../lib/accountSecurity/passwordChange.js";
 import { applyProfilePatch, readBusinessProfile, validateProfilePatch } from "../lib/accountProfile/profileService.js";
 import { resolveVerifiedBusinessRecipient } from "../lib/voiceNotifications/recipient.js";
-import { acceptInvitation, inviteMember, listFirmMembers, revokeMemberById } from "../lib/voiceAccounts/membership.js";
+import {
+  acceptInvitation,
+  changeMemberPassword,
+  changeMemberRole,
+  inviteMember,
+  listFirmMembers,
+  revokeMemberById,
+} from "../lib/voiceAccounts/membership.js";
 import { resolveEntitlementsForFirm } from "../lib/voiceBilling/entitlements.js";
 import {
   isPasswordResetRequestsEnabled,
@@ -303,8 +310,11 @@ router.get("/receptionist/account/members", requireReceptionistAuth, async (req:
         status: m.status,
         invitedAt: m.invitedAt,
         acceptedAt: m.acceptedAt,
+        revokedAt: m.revokedAt,
+        isYou: req.memberId === m.id,
       })),
       count: members.length,
+      viewer: { role: req.receptionistRole, accountHolder: req.accountHolder, memberId: req.memberId ?? null },
     });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] member list failed");
@@ -320,12 +330,13 @@ router.post("/receptionist/account/members", requireReceptionistAuth, async (req
       const status =
         result.reason === "delivery_unavailable" ? 503 : result.reason === "already_member" || result.reason === "member_limit" ? 409 : 400;
       const message =
-        result.reason === "invalid_email" ? "A valid email address is required."
-        : result.reason === "invalid_role" ? "role must be 'owner' or 'staff'."
-        : result.reason === "already_member" ? "That address is already on the roster."
-        : result.reason === "member_limit" ? "Member limit reached."
-        : "Email delivery is not available right now.";
-      res.status(status).json({ error: message });
+        result.reason === "invalid_email" ? "Enter a valid email address."
+        : result.reason === "invalid_role" ? "Choose Owner or Staff."
+        : result.reason === "already_member" ? "That person is already invited or on the team."
+        : result.reason === "member_limit" ? "A business can have up to 10 team members. Remove someone first."
+        : result.reason === "own_address" ? "That is this account's own sign-in address."
+        : "Invitation emails can't be sent right now. Try again later.";
+      res.status(status).json({ error: message, code: result.reason });
       return;
     }
     res.status(201).json({ member: { id: result.member.id, email: result.member.email, role: result.member.role, status: result.member.status } });
@@ -335,18 +346,50 @@ router.post("/receptionist/account/members", requireReceptionistAuth, async (req
   }
 });
 
+// Token-proven: accepting sets the member's password and signs them in.
 router.post("/receptionist/account/members/accept", async (req: Request, res: Response) => {
   if (limited(req, res, "invite-accept")) return;
   const body = (req.body ?? {}) as Record<string, unknown>;
   try {
-    const result = await acceptInvitation(body.token, body.email);
+    const result = await acceptInvitation(body.token, body.email, body.password);
     if (!result.ok) {
-      res.status(401).json({ error: "That invitation is invalid or expired." });
+      if (result.reason === "weak_password") {
+        res.status(400).json({ error: "Choose a password of at least 8 characters.", code: "weak_password" });
+        return;
+      }
+      res.status(401).json({ error: "That invitation is invalid, expired, or for a different address.", code: "invalid_invitation" });
       return;
     }
+    const token = await createSession(result.firmId, result.email);
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[account] invite accept failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+router.patch("/receptionist/account/members/:id", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const memberId = Number(req.params.id);
+  if (!Number.isInteger(memberId)) {
+    res.status(400).json({ error: "Invalid member id." });
+    return;
+  }
+  try {
+    const role = (req.body as Record<string, unknown> | undefined)?.role;
+    const result = await changeMemberRole(req.firmId!, memberId, role, undefined, req.memberId ?? null);
+    if (!result.ok) {
+      const status = result.reason === "not_found" ? 404 : 400;
+      const message =
+        result.reason === "not_found" ? "Member not found."
+        : result.reason === "self" ? "You can't change your own role. Ask another owner."
+        : "Choose Owner or Staff.";
+      res.status(status).json({ error: message, code: result.reason });
+      return;
+    }
+    res.json({ member: { id: result.member.id, email: result.member.email, role: result.member.role, status: result.member.status } });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] role change failed");
     res.status(500).json({ error: "Internal error" });
   }
 });
@@ -358,14 +401,46 @@ router.delete("/receptionist/account/members/:id", requireReceptionistAuth, asyn
     return;
   }
   try {
-    const result = await revokeMemberById(req.firmId!, memberId);
+    const result = await revokeMemberById(req.firmId!, memberId, undefined, req.memberId ?? null);
     if (!result.ok) {
+      if (result.reason === "self") {
+        res.status(400).json({ error: "You can't remove yourself. Ask another owner.", code: "self" });
+        return;
+      }
       res.status(404).json({ error: "Member not found." });
       return;
     }
     res.status(204).end();
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] revoke failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// A team member changes their own password (the account holder uses
+// /account/password/change). Their other sessions end; this one is renewed.
+router.post("/receptionist/account/member-password", requireReceptionistAuth, async (req: Request, res: Response) => {
+  if (req.memberId === null || req.memberId === undefined) {
+    res.status(400).json({ error: "Use Change password for the business account.", code: "account_holder" });
+    return;
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  try {
+    const result = await changeMemberPassword(req.firmId!, req.memberId, body.currentPassword, body.newPassword);
+    if (!result.ok) {
+      const status = result.reason === "wrong_password" ? 401 : result.reason === "not_found" ? 404 : 400;
+      const message =
+        result.reason === "wrong_password" ? "Your current password is incorrect."
+        : result.reason === "weak_password" ? "Choose a password of at least 8 characters."
+        : "Your membership was not found.";
+      res.status(status).json({ error: message, code: result.reason });
+      return;
+    }
+    const token = await createSession(req.firmId!, req.firmEmail!);
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] member password change failed");
     res.status(500).json({ error: "Internal error" });
   }
 });

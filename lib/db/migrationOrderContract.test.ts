@@ -650,8 +650,10 @@ check(
   // voice 0013 added voice_support_requests and voice_support_messages, so a
   // business's request to SiteMint is a record with a state rather than an
   // email nobody can see afterwards.
-  "the committed migrations create exactly thirty-six domain tables",
-  domainTables.length === 36,
+  // voice 0014 added voice_policy_acceptances (which Terms and Privacy
+  // versions a business accepted, and when).
+  "the committed migrations create exactly thirty-seven domain tables",
+  domainTables.length === 37,
   domainTables.join(","),
 );
 check(

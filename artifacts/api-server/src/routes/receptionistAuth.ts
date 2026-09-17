@@ -23,6 +23,7 @@ import {
   isPublicRegistrationEnabled,
   PUBLIC_REGISTRATION_DISABLED_MESSAGE,
 } from "../lib/publicWriteFlags.js";
+import { findMemberLogins } from "../lib/receptionistRoles.js";
 
 const router = Router();
 
@@ -183,6 +184,34 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
       .from(intakeFirms)
       .where(eq(intakeFirms.email, emailNorm));
 
+    // ── Team members sign in with their own password ───────────────────────────
+    // Tried only when the business account itself does not accept this
+    // password, so an account holder's sign-in is unchanged. Failures fall
+    // through to the same 401 and the same limiter records below.
+    const firmAccepts = !!firm?.passwordHash && (await bcrypt.compare(password, firm.passwordHash));
+    if (!firmAccepts) {
+      for (const member of await findMemberLogins(emailNorm)) {
+        if (!(await bcrypt.compare(password, member.passwordHash))) continue;
+        const [memberFirm] = await db.select().from(intakeFirms).where(eq(intakeFirms.id, member.firmId));
+        if (!memberFirm) continue;
+        loginEmailLimiter.reset(emailNorm);
+        const memberToken = await createSession(member.firmId, member.email);
+        res.cookie(COOKIE_NAME, memberToken, COOKIE_OPTIONS);
+        res.json({
+          firm: {
+            id:                      memberFirm.id,
+            name:                    memberFirm.name,
+            email:                   memberFirm.email,
+            planTier:                memberFirm.planTier,
+            trialConversationsLimit: memberFirm.trialConversationsLimit,
+            createdAt:               memberFirm.createdAt,
+          },
+          member: { email: member.email },
+        });
+        return;
+      }
+    }
+
     // ── Failure: unknown account ───────────────────────────────────────────────
     if (!firm || !firm.passwordHash) {
       loginIpLimiter.record(ip);
@@ -195,7 +224,7 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
       return;
     }
 
-    const valid = await bcrypt.compare(password, firm.passwordHash);
+    const valid = firmAccepts;
 
     // ── Failure: wrong password ────────────────────────────────────────────────
     if (!valid) {
@@ -266,7 +295,15 @@ router.get("/receptionist/auth/me", requireReceptionistAuth, async (req: Request
       .from(intakeConversations)
       .where(eq(intakeConversations.firmId, req.firmId!));
 
-    res.json({ firm, conversationCount: Number(countRow?.count ?? 0) });
+    res.json({
+      firm,
+      conversationCount: Number(countRow?.count ?? 0),
+      viewer: {
+        email:         req.firmEmail,
+        role:          req.receptionistRole,
+        accountHolder: req.accountHolder,
+      },
+    });
   } catch (err) {
     req.log.error({ err }, "[receptionist] /me error");
     res.status(500).json({ error: "Internal server error" });

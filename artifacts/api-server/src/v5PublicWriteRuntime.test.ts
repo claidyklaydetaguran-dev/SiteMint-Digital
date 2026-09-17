@@ -13,6 +13,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { CURRENT_POLICY_VERSIONS } from "./lib/policyVersions.js";
 
 process.env["DATABASE_URL"] ??= "postgresql://127.0.0.1:1/guard_never_connected";
 process.env["CORS_ALLOWED_ORIGINS"] ??= "https://example.test";
@@ -120,6 +121,8 @@ function request(method: string, path: string, body?: unknown, extraHeaders: Rec
   });
 }
 
+// A second client address, so extra checks stay inside the per-address signup limit.
+const OTHER_CLIENT = { "X-Forwarded-For": "203.0.113.9" };
 const post = (path: string, body: unknown, headers?: Record<string, string>) => request("POST", path, body, headers);
 const get = (path: string, headers?: Record<string, string>) => request("GET", path, undefined, headers);
 
@@ -183,8 +186,17 @@ describe("V5 public-write gates — runtime behaviour", () => {
       expect(dbHits).toEqual([]);
       // A valid body with no invite code at all reaches account creation,
       // which hits the trapped database.
-      const res = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "e@f.test", password: "Str0ngPassw0rd!", acceptedTerms: true });
-      expect(res.status).not.toBe(503);
+      // Acceptance must name the policy versions the page showed; a stale
+      // page is refused before any database access, as is a missing one.
+      const noVersions = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "e@f.test", password: "Str0ngPassw0rd!", acceptedTerms: true }, OTHER_CLIENT);
+      expect(noVersions.status).toBe(400);
+      const stale = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "e@f.test", password: "Str0ngPassw0rd!", acceptedTerms: true, acceptedPolicies: { terms: "2020-01-01", privacy: CURRENT_POLICY_VERSIONS.privacy } }, OTHER_CLIENT);
+      expect(stale.status).toBe(409);
+      expect(stale.body).toContain("policies_outdated");
+      expect(dbHits).toEqual([]);
+      const res = await post("/api/receptionist/auth/register", { ownerName: "A", businessName: "B", email: "e@f.test", password: "Str0ngPassw0rd!", acceptedTerms: true, acceptedPolicies: { ...CURRENT_POLICY_VERSIONS } });
+      expect(res.status, res.body).not.toBe(503);
+      expect(res.status, res.body).not.toBe(429);
       expect(dbHits.length).toBeGreaterThan(0);
     } finally {
       delete process.env["PUBLIC_REGISTRATION_ENABLED"];

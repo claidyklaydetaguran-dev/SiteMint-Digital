@@ -10,9 +10,18 @@ export interface SessionFirm {
   createdAt: string;
 }
 
+/** Who is signed in: the business's main account, or a team member. */
+export interface SessionViewer {
+  email: string;
+  role: "owner" | "staff";
+  accountHolder: boolean;
+}
+
 export interface SessionData {
   firm: SessionFirm;
   conversationCount: number;
+  /** Absent from servers that predate team access; treat that as the main account. */
+  viewer?: SessionViewer;
 }
 
 export const SESSION_KEY = ["receptionist-me"] as const;
@@ -24,6 +33,18 @@ export function useSession() {
     retry: false,
     staleTime: 60_000,
   });
+}
+
+/**
+ * The signed-in person's role. The server enforces it on every request; the
+ * dashboard uses it only to avoid offering actions that would be refused.
+ * While the session is unresolved, nobody is treated as an owner.
+ */
+export function useViewer(): { isOwner: boolean; accountHolder: boolean; role: "owner" | "staff" | null; email: string | null } {
+  const { data } = useSession();
+  if (!data) return { isOwner: false, accountHolder: false, role: null, email: null };
+  const viewer = data.viewer ?? { email: data.firm.email ?? "", role: "owner" as const, accountHolder: true };
+  return { isOwner: viewer.role === "owner", accountHolder: viewer.accountHolder, role: viewer.role, email: viewer.email };
 }
 
 export function useLogout() {

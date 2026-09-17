@@ -178,6 +178,15 @@ export interface TeamMemberResponse {
   status: string;
   invitedAt: string | null;
   acceptedAt: string | null;
+  revokedAt?: string | null;
+  /** True for the signed-in person's own row. */
+  isYou?: boolean;
+}
+
+export interface TeamViewer {
+  role: "owner" | "staff";
+  accountHolder: boolean;
+  memberId: number | null;
 }
 
 export type TeamResult<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -201,7 +210,7 @@ async function teamFetch<T>(path: string, init?: RequestInit): Promise<TeamResul
   }
 }
 
-export function fetchTeamMembers(): Promise<TeamResult<{ items: TeamMemberResponse[]; count: number }>> {
+export function fetchTeamMembers(): Promise<TeamResult<{ items: TeamMemberResponse[]; count: number; viewer?: TeamViewer }>> {
   return teamFetch(MEMBERS_ENDPOINT);
 }
 
@@ -211,6 +220,24 @@ export function inviteTeamMember(email: string, role: string): Promise<TeamResul
 
 export function removeTeamMember(id: number): Promise<TeamResult<Record<string, unknown>>> {
   return teamFetch(`${MEMBERS_ENDPOINT}/${encodeURIComponent(String(id))}`, { method: "DELETE" });
+}
+
+export function changeTeamMemberRole(id: number, role: string): Promise<TeamResult<{ member: TeamMemberResponse }>> {
+  return teamFetch(`${MEMBERS_ENDPOINT}/${encodeURIComponent(String(id))}`, { method: "PATCH", body: JSON.stringify({ role }) });
+}
+
+export const MEMBER_PASSWORD_ENDPOINT = "/api/receptionist/account/member-password";
+
+/** A team member changes their own password. */
+export function changeOwnMemberPassword(currentPassword: string, newPassword: string): Promise<TeamResult<{ ok: true }>> {
+  return teamFetch(MEMBER_PASSWORD_ENDPOINT, { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+}
+
+export const ACCEPT_INVITATION_ENDPOINT = "/api/receptionist/account/members/accept";
+
+/** Token-proven: sets the invited person's password and signs them in. */
+export function acceptTeamInvitation(token: string, email: string, password: string): Promise<TeamResult<{ ok: true }>> {
+  return teamFetch(ACCEPT_INVITATION_ENDPOINT, { method: "POST", body: JSON.stringify({ token, email, password }) });
 }
 
 // ─── Email address ───────────────────────────────────────────────────────

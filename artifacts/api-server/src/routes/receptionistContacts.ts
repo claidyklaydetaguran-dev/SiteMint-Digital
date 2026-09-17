@@ -1,12 +1,12 @@
-// V5 PR-5: read-only, firm-scoped caller directory. Every response is
-// derived from lib/voiceContacts/contactsQuery.ts, which always filters by
-// req.firmId — a contact id belonging to another firm resolves to
-// undefined and this route answers 404, never a cross-firm leak. No writes
-// happen anywhere in this file.
+// Firm-scoped contact directory. Reads come from
+// lib/voiceContacts/contactsQuery.ts and hand edits from contactWrites.ts;
+// both always filter by req.firmId, so a contact id belonging to another firm
+// resolves to nothing and this route answers 404, never a cross-firm leak.
 
 import { Router, type Request, type Response } from "express";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
 import { listContactsForFirm, getContactDetailForFirm } from "../lib/voiceContacts/contactsQuery.js";
+import { createManualContact, updateContact } from "../lib/voiceContacts/contactWrites.js";
 
 const router = Router();
 
@@ -45,6 +45,53 @@ router.get("/receptionist/contacts/:id", requireReceptionistAuth, async (req: Re
     res.json(result);
   } catch (err) {
     req.log.error({ err, firmId: req.firmId }, "[contacts] detail failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /api/receptionist/contacts ───────────────────────────────────────────
+
+router.post("/receptionist/contacts", requireReceptionistAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await createManualContact(req.firmId!, (req.body ?? {}) as Record<string, unknown>);
+    if (!result.ok) {
+      if (result.reason === "exists") {
+        res.status(409).json({ error: "A contact with that phone number already exists.", code: "exists" });
+        return;
+      }
+      res.status(400).json({ error: result.errors[0]?.message ?? "Check the details.", errors: result.errors });
+      return;
+    }
+    const detail = await getContactDetailForFirm(req.firmId!, result.id);
+    res.status(201).json(detail);
+  } catch (err) {
+    req.log.error({ errorClass: err instanceof Error ? err.name : "unknown", firmId: req.firmId }, "[contacts] create failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PATCH /api/receptionist/contacts/:id ──────────────────────────────────────
+
+router.patch("/receptionist/contacts/:id", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid contact id." });
+    return;
+  }
+  try {
+    const result = await updateContact(req.firmId!, id, (req.body ?? {}) as Record<string, unknown>);
+    if (!result.ok) {
+      if (result.reason === "not_found") {
+        res.status(404).json({ error: "Contact not found." });
+        return;
+      }
+      res.status(400).json({ error: result.errors[0]?.message ?? "Check the details.", errors: result.errors });
+      return;
+    }
+    const detail = await getContactDetailForFirm(req.firmId!, result.id);
+    res.json(detail);
+  } catch (err) {
+    req.log.error({ errorClass: err instanceof Error ? err.name : "unknown", firmId: req.firmId }, "[contacts] update failed");
     res.status(500).json({ error: "Internal error" });
   }
 });

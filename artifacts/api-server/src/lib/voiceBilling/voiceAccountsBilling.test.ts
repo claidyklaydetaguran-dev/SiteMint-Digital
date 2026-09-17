@@ -41,10 +41,8 @@ import {
   requestPasswordReset,
   type AccountTokenDeps,
 } from "../accountSecurity/accountTokens.js";
-import { acceptInvitation, inviteMember, type MembershipDeps } from "../voiceAccounts/membership.js";
 import { recordAuditEvent } from "../voiceAccounts/auditLog.js";
 import { accountRateLimitAllows } from "../../routes/receptionistAccount.js";
-import type { VoiceFirmMember } from "@workspace/db/schema/voice";
 
 const NOW = new Date("2026-08-30T12:00:00.000Z");
 const CATALOG = JSON.stringify([
@@ -392,73 +390,7 @@ describe("verification and membership", () => {
     expect(verifiedAt).toEqual(NOW);
   });
 
-  function member(overrides: Partial<VoiceFirmMember> = {}): VoiceFirmMember {
-    return {
-      id: 1,
-      firmId: 7,
-      email: "staff@firm.example",
-      role: "staff",
-      status: "invited",
-      invitedAt: NOW,
-      acceptedAt: null,
-      revokedAt: null,
-      createdAt: NOW,
-      updatedAt: NOW,
-      ...overrides,
-    } as VoiceFirmMember;
-  }
-
-  function membershipHarness(opts: { roster?: VoiceFirmMember[]; insertOk?: boolean; sendOk?: boolean; activateOk?: boolean } = {}) {
-    const tokens = memoryTokens();
-    const sent: string[] = [];
-    const revoked: number[] = [];
-    const deps: Partial<MembershipDeps> = {
-      tokens,
-      listMembers: async () => opts.roster ?? [],
-      insertMember: async (row) => ((opts.insertOk ?? true) ? member({ email: row.email, role: row.role }) : undefined),
-      activateMember: async () => opts.activateOk ?? true,
-      revokeMember: async (_firmId, memberId) => {
-        revoked.push(memberId);
-        return true;
-      },
-      sendEmail: async (_to, _subject, text) => {
-        sent.push(text);
-        return { ok: opts.sendOk ?? true };
-      },
-      recordAudit: async () => {},
-      now: () => NOW,
-    };
-    return { deps, sent, revoked, tokens };
-  }
-
-  it("invitation validates, bounds the roster, compensates failed delivery, and accepts by token+email", async () => {
-    const h = membershipHarness();
-    expect(await inviteMember(7, "not-an-email", "staff", h.deps)).toEqual({ ok: false, reason: "invalid_email" });
-    expect(await inviteMember(7, "a@b.co", "superuser", h.deps)).toEqual({ ok: false, reason: "invalid_role" });
-
-    const full = membershipHarness({ roster: Array.from({ length: 10 }, (_, i) => member({ id: i + 1, email: `m${i}@x.co` })) });
-    expect(await inviteMember(7, "new@x.co", "staff", full.deps)).toEqual({ ok: false, reason: "member_limit" });
-
-    const dup = membershipHarness({ insertOk: false });
-    expect(await inviteMember(7, "staff@firm.example", "staff", dup.deps)).toEqual({ ok: false, reason: "already_member" });
-
-    const down = membershipHarness({ sendOk: false });
-    expect(await inviteMember(7, "staff@firm.example", "staff", down.deps)).toEqual({ ok: false, reason: "delivery_unavailable" });
-    expect(down.revoked).toEqual([1]); // the dead roster row was compensated away
-
-    const ok = membershipHarness();
-    const invited = await inviteMember(7, "Staff@Firm.example", "staff", ok.deps);
-    expect(invited.ok).toBe(true);
-    const rawToken = /code \(valid 7 days\): (\S+)/.exec(ok.sent[0]!)?.[1];
-    expect(await acceptInvitation(rawToken, "staff@firm.example", ok.deps)).toEqual({ ok: true, firmId: 7 });
-    expect(await acceptInvitation(rawToken, "staff@firm.example", ok.deps)).toEqual({ ok: false, reason: "invalid_or_expired" });
-
-    const wrongEmail = membershipHarness({ activateOk: false });
-    const invited2 = await inviteMember(7, "other@firm.example", "staff", wrongEmail.deps);
-    expect(invited2.ok).toBe(true);
-    const rawToken2 = /code \(valid 7 days\): (\S+)/.exec(wrongEmail.sent[0]!)?.[1];
-    expect(await acceptInvitation(rawToken2, "guess@evil.example", wrongEmail.deps)).toEqual({ ok: false, reason: "no_invitation" });
-  });
+  // Invitations, member passwords and revocation: lib/voiceAccounts/membership.test.ts.
 });
 
 // ── audit + rate limiter ─────────────────────────────────────────────────────
