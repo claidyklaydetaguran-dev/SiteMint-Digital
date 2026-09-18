@@ -338,3 +338,117 @@ or (2) provides database access, §6's restore rehearsal cannot be run.
 `/portal` needs no further code. The fix is in source (`fae2c8d`) and in the
 built artifact `release/marketing-dist-2026-09-16` @ `1912a3b`; it needs the
 marketing republish and nothing else.
+
+---
+
+## 10. 2026-09-18 (later) — the owner's call, and the Google Calendar picture
+
+### The five production secrets are present
+
+Checked by key name on Web Asset Builder → Secrets: `ADMIN_PASSWORD`,
+`CALENDAR_TOKEN_KEY`, `CORS_ALLOWED_ORIGINS`, `CRM_LEGACY_BEARER_ENABLED`,
+`SNAPSHOT_SOURCE` all exist. **Their formats are not yet verified**: that needs a
+command inside the workspace, and this session could not drive that workspace's
+terminal (see §11).
+
+### The reported call: diagnosed from its own records
+
+The call is `01a0b14c` on staging — 206 s, `completed`, final. What it produced:
+
+- An appointment request: *Klyde Taguran, [TEST] Consultation, Fri 18 Sep 10:00*,
+  status **pending_review**, shown in the dashboard as "Nobody has accepted
+  these yet. The caller was told the time was requested, not booked."
+- A post-call business summary, queued and **accepted by Resend** (notification
+  id 10, 1 attempt, no error).
+
+So three separate things were wrong, not one:
+
+1. **No booking, by design.** The business has no Google Calendar connected
+   (Scheduling → Calendar reads "Calendar isn't connected"), so
+   `approveRequestToBooked` returns `no_connection` and the request correctly
+   stays `pending_review`. The assistant said "requested, not confirmed", which
+   is the honest behaviour — the missing piece is the calendar, not the booking
+   code.
+2. **The business summary was wrong.** Its subject was "Call received — no
+   message taken" and its body said "Nothing is recorded as outstanding from
+   this call", while the appointment sat waiting for a decision. The composer
+   had no concept of an appointment and nothing joined a request to its call.
+   **Fixed** in `27a2a78`: `scheduling_appointment_requests.provider_call_id`
+   (additive migration 0004 + rollback), the dispatcher passes the call id, and
+   the email now names the service, the time, the caller's contacts and the
+   status in the caller's own words. Four tests, including the exact sentence
+   the defect produced.
+3. **There is no caller confirmation email, at all.** The notification kind
+   (`caller_acknowledgement`) and its dedupe key exist and are referenced by
+   nothing; `book_appointment` sends the caller no email, and the SMS path is
+   wired with `callerConsented: false` so it never fires. The composer says so
+   in as many words: "No copy has been sent to them." This is missing
+   functionality, not configuration — nothing can be switched on to produce it.
+
+All 8 post-call summaries on staging are `accepted` with `deliveryStatus: null`:
+Resend took them, and no delivery webhook is configured, so **inbox arrival is
+unproven either way**. Provider acceptance is not delivery.
+
+### Google Calendar for the public — where it actually stands
+
+The OAuth client the deployed staging app uses is
+`957911641063-777tpn5fl8...apps.googleusercontent.com`, in Google Cloud project
+**`sitemint-staging`** (number 957911641063), owned by
+**sitemint.staging@gmail.com**. The scopes it asks for are already the narrow
+three — `calendar.freebusy`, `calendar.events`,
+`calendar.calendarlist.readonly` — with `access_type=offline`.
+
+| Setting | Current value |
+| --- | --- |
+| User type | External |
+| Publishing status | **Testing** |
+| Test users | claidyklaydetaguran@gmail.com, sitemint.staging@gmail.com (2 / 100) |
+| Branding | app name, logo, home page, privacy link, terms link, authorized domain — **all empty** |
+| Verification | "not required since your app is in Testing" |
+
+Two consequences:
+
+- **`claidytaguran2@gmail.com` is not on the test-user list**, which is exactly
+  why the owner's connection was refused. Publishing (or adding that address as
+  a staging aid) fixes it.
+- The console itself says "To publish your app, you must complete your
+  configuration on the Branding page" — so branding is the gate before
+  publishing, and publishing is the gate before verification.
+
+Production has **no Google configuration at all**: Web Asset Builder holds no
+`GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`/`_REDIRECT_URI` and no
+`CALENDAR_CONNECT_ENABLED`, so a production customer cannot reach the flow yet.
+The production redirect URI will be
+`https://sitemintdigital.com/api/receptionist/calendar/google/callback`.
+
+### The blocker: Google Cloud now demands 2-step verification
+
+Reads of the project succeed. The first **write** — adding a test user —
+redirected to `/enable-mfa`:
+
+> "Google Cloud access blocked. Effective September 16, 2026, Google Cloud has
+> begun to enforce 2-step verification (2SV) … Go to your security settings to
+> turn on 2-step verification."
+
+Nothing in the Google configuration can be changed until 2SV is enabled on
+**sitemint.staging@gmail.com**. That is an account-security action requiring the
+owner's own password and second factor, so it is not something this session may
+perform.
+
+## 11. The Replit workspace terminal was not usable this session
+
+Commands could be typed into Web Asset Builder's shell only while that browser
+tab was the foreground tab; `document.hasFocus()` reads false otherwise and
+synthesized keystrokes are discarded. Screenshot capture of that tab also timed
+out repeatedly once terminal output arrived.
+
+What that blocked: verifying the five secrets' formats, and using
+`SNAPSHOT_SOURCE` for the production backup and the restore rehearsal. Enabling
+Replit's "Accessible Terminal Output" (now on) makes shell output readable as
+DOM text, which removes the screenshot dependency for a future session; the
+focus requirement remains.
+
+Two capability denials were also recorded and not worked around: starting a
+small file server inside the workspace to read command output
+(**[Expose Local Services]**), and reading the clipboard after copying the
+production connection string (**[Credential Materialization]**).
