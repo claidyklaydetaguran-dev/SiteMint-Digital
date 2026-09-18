@@ -71,9 +71,23 @@ export const bookAppointmentArgs = z
     /** Spoken-back contact details for the reviewing human; never used for routing. */
     customerPhone: boundedText(32).optional(),
     customerEmail: z.string().trim().max(200).email().optional(),
+    /**
+     * The caller heard their address read back and confirmed it, and asked to
+     * be emailed. Only this authorizes an email to them.
+     *
+     * An address stated in passing is not permission to write to it, and a
+     * mis-heard address is worse than none: it sends a stranger a real
+     * person's appointment. Same rule, and same structural guarantee below, as
+     * `save_message.emailCopyRequested`.
+     */
+    emailConfirmed: z.boolean().optional(),
     smsConsent: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (v) => v.emailConfirmed !== true || typeof v.customerEmail === "string",
+    { message: "a confirmed email requires the caller's email address" },
+  );
 
 export const rescheduleAppointmentArgs = z
   .object({
@@ -156,8 +170,16 @@ export const TOOL_PARAMETER_SCHEMAS: Record<VoiceToolName, JsonObject> = {
       startIso: { type: "string", description: "Chosen slot start, exactly as returned by check_availability (ISO datetime)." },
       customerName: { type: "string", description: "Caller's name for the appointment." },
       customerPhone: { type: "string", description: "Callback number the caller states, if any." },
-      customerEmail: { type: "string", description: "Email the caller states, if any." },
+      customerEmail: {
+        type: "string",
+        description: "Email address the caller states, if any. Read it back to them before booking.",
+      },
       notes: { type: "string", description: "Anything the caller wants the office to know." },
+      emailConfirmed: {
+        type: "boolean",
+        description:
+          "True only if you read the email address back to the caller, they confirmed it was right, and they asked to be emailed about this appointment. Never true otherwise.",
+      },
       // No smsConsent here: text messages to callers are deferred, so the
       // receptionist is never invited to offer one. The argument parser still
       // tolerates it from assistants published before this change.

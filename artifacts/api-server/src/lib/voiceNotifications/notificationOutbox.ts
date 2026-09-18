@@ -226,6 +226,28 @@ export function callerAckDedupeKey(messageId: number): string {
 }
 
 /**
+ * One key per appointment per OUTCOME, so the caller is emailed at most once
+ * for "you asked for this" and at most once for "it is confirmed".
+ *
+ * Keyed on the request's durable public id rather than the call or the tool
+ * call, because the things that repeat are the provider's events: a redelivered
+ * end-of-call report, a retried tool call, a reconnect that replays the
+ * conversation. All of them resolve to the same request, so all of them land on
+ * the same key and insert nothing the second time.
+ *
+ * The stage is part of the key on purpose. A time that is requested and later
+ * accepted is two different facts for the caller, and the second one is worth
+ * an email; without the stage the confirmation would be swallowed as a
+ * duplicate of the request.
+ */
+export function callerAppointmentAckDedupeKey(
+  requestPublicId: string,
+  stage: "pending" | "booked",
+): string {
+  return `caller_ack:appointment:${requestPublicId}:${stage}`;
+}
+
+/**
  * The provider-side idempotency key for one outbox row. Stable for the row's
  * whole life, so every retry of the same notification carries the same key.
  *

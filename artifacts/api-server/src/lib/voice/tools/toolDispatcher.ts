@@ -30,6 +30,8 @@ import {
   type SaveMessageArgs,
 } from "./toolCatalog.js";
 import { CAPABILITY_BY_TOOL, parseToolCapabilities, type VoiceToolCapability } from "./toolCapabilities.js";
+import { composeCallerAckEmail } from "../../voiceNotifications/callerAckComposer.js";
+import { callerAppointmentAckDedupeKey } from "../../voiceNotifications/notificationOutbox.js";
 
 export interface ToolCallRequest {
   toolCallId: string;
@@ -147,6 +149,20 @@ export interface ToolSchedulingDeps {
    * Checking here makes the gate hold on both sides of the wire.
    */
   authorizedCapabilities?: () => readonly VoiceToolCapability[];
+  /** The business's own name, for the caller's copy. */
+  loadBusinessName?: (firmId: number) => Promise<string>;
+  /**
+   * Queues the caller's appointment email. Optional so an existing caller that
+   * supplies its own deps keeps working, and absent simply means no caller
+   * email is sent — never that one is sent somewhere else.
+   */
+  enqueueCallerAck?: (input: {
+    firmId: number;
+    recipient: string;
+    dedupeKey: string;
+    subject: string;
+    body: string;
+  }) => Promise<void>;
   logger?: (event: string, meta: Record<string, unknown>) => void;
 }
 
@@ -192,6 +208,28 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
       return { inserted: result.inserted };
     },
     openIssue: (input) => issues.openVoiceIssue(input),
+    loadBusinessName: async (firmId) => {
+      const { db } = await import("@workspace/db");
+      const { intakeFirms } = await import("@workspace/db/schema");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db
+        .select({ name: intakeFirms.name })
+        .from(intakeFirms)
+        .where(eq(intakeFirms.id, firmId))
+        .limit(1);
+      return row?.name ?? "Your appointment";
+    },
+    enqueueCallerAck: async (input) => {
+      const outbox = await import("../../voiceNotifications/notificationOutbox.js");
+      await outbox.enqueueNotification({
+        firmId: input.firmId,
+        kind: "caller_acknowledgement",
+        dedupeKey: input.dedupeKey,
+        recipient: input.recipient,
+        subject: input.subject,
+        body: input.body,
+      });
+    },
   };
 }
 
@@ -279,6 +317,61 @@ function typeMenu(types: Array<{ id: string; name: string; durationMin: number }
   );
 }
 
+/**
+ * Queues the caller's own copy of an appointment, when — and only when — they
+ * gave an address and confirmed it on the call.
+ *
+ * Every refusal here is silent to the caller and total: no address, no consent,
+ * or no transport wired means no email, never a fallback recipient and never
+ * the business's address instead. Emailing an appointment to whoever we happen
+ * to know is worse than emailing nobody.
+ *
+ * Best-effort by design: a booking that succeeded must not be undone because
+ * the outbox was unreachable, so every failure is swallowed after logging.
+ */
+async function enqueueCallerAppointmentAck(
+  firmId: number,
+  request: SchedulingAppointmentRequest,
+  confirmed: boolean,
+  deps: ToolSchedulingDeps,
+): Promise<void> {
+  if (!deps.enqueueCallerAck) return;
+  const recipient = request.customerEmail;
+  if (typeof recipient !== "string" || recipient === "") return;
+  // The persisted consent, not the tool argument: what was actually recorded
+  // against the row is the thing we are willing to act on later.
+  if (request.emailConsent !== true) return;
+
+  try {
+    const context = await deps.getSchedulingContext(firmId);
+    const serviceName =
+      context.types.find((t) => t.id === String(request.appointmentTypeId))?.name ?? "Appointment";
+    const businessName = (await deps.loadBusinessName?.(firmId)) ?? "Your appointment";
+    const stage = confirmed ? "booked" : "pending";
+    const composed = composeCallerAckEmail({
+      businessName,
+      serviceName,
+      startAt: request.requestedStartAt,
+      timeZone: request.timezone ?? context.timezone,
+      status: stage,
+      reference: request.publicId,
+    });
+    await deps.enqueueCallerAck({
+      firmId,
+      recipient,
+      dedupeKey: callerAppointmentAckDedupeKey(request.publicId, stage),
+      subject: composed.subject,
+      body: composed.body,
+    });
+  } catch (err) {
+    deps.logger?.("voice_caller_ack_not_queued", {
+      firmId,
+      requestPublicId: request.publicId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 async function runBookAppointment(
   firmId: number,
   toolCallId: string,
@@ -294,7 +387,14 @@ async function runBookAppointment(
     startUtc,
     { name: args.customerName, phone: args.customerPhone ?? null, email: args.customerEmail ?? null },
     // Text messages are deferred: no SMS consent is recorded from a call.
-    { phoneConsent: true, smsConsent: false, emailConsent: false },
+    // Email consent is recorded only when the caller heard the address read
+    // back and asked to be written to — the schema refuses the flag without an
+    // address, and this refuses it without both.
+    {
+      phoneConsent: true,
+      smsConsent: false,
+      emailConsent: args.emailConfirmed === true && typeof args.customerEmail === "string",
+    },
     now,
     // The provider's id for THIS tool call. A retry carries the same id, and
     // the repository returns the original request instead of creating a second
@@ -344,6 +444,15 @@ async function runBookAppointment(
   } catch {
     // outbox unavailability must not undo a successful booking
   }
+
+  // The caller's own copy. Queued, never sent inline: a mail provider that
+  // hangs must not hold up a live conversation, and the outbox already owns
+  // retries, idempotency and delivery state.
+  //
+  // `booked` is passed only when the calendar write actually returned booked,
+  // so an unanswered or refused write can never produce "CONFIRMED" in the
+  // caller's inbox while the dashboard still shows a pending request.
+  await enqueueCallerAppointmentAck(firmId, result.request, confirmed, deps);
 
   if (confirmed) {
     return `Confirmed and in the calendar. Reference id ${result.request.publicId}. Tell the caller the appointment is booked.`;
@@ -423,6 +532,10 @@ async function runRescheduleAppointment(
     await deps.cancelAppointmentRequestByPublicId(firmId, created.request.publicId);
     return "I couldn't find the original appointment to move. The office can help with the existing booking.";
   }
+  // The moved time carries the original's consent, so a caller who agreed to
+  // be emailed about the appointment is told where it went. Always `pending`:
+  // a reschedule writes a request that a human still accepts.
+  await enqueueCallerAppointmentAck(firmId, created.request, false, deps);
   return `The new time is requested, not yet confirmed. New reference id ${created.request.publicId}. Tell the caller the office will confirm the change — do not tell them it is rescheduled.`;
 }
 

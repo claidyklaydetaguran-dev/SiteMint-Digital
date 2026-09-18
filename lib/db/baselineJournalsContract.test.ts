@@ -105,7 +105,10 @@ const expectedAll = readAllExpectedMigrations();
 // Nineteen: voice 0013 (voice_support_requests + voice_support_messages).
 // Twenty: voice 0014 (voice_policy_acceptances; member password and invitation
 // binding; contact origin, email and notes).
-check("the committed folders describe twenty migrations", expectedAll.length === 20, String(expectedAll.length));
+// Twenty-one: scheduling 0004 (scheduling_appointment_requests.provider_call_id
+// — the key that joins an appointment back to the call that requested it, so
+// the business's post-call email can name it).
+check("the committed folders describe twenty-one migrations", expectedAll.length === 21, String(expectedAll.length));
 check(
   "expected migrations are unique by created_at",
   new Set(expectedAll.map((e) => e.createdAt)).size === expectedAll.length,
