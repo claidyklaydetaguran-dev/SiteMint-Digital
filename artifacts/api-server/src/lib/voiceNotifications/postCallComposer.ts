@@ -48,10 +48,30 @@ export interface PostCallMessageFacts {
   emailAckRequested: boolean;
 }
 
+/**
+ * An appointment the caller asked for on this call.
+ *
+ * `status` is the persisted status, not a reading of it: `pending_review`
+ * means the caller was told the time was requested and someone still has to
+ * accept it. A call that requested a time and reported "nothing outstanding"
+ * is the defect this exists to close.
+ */
+export interface PostCallAppointmentFacts {
+  customerName: string;
+  appointmentTypeName: string;
+  startAt: Date;
+  status: string;
+  customerEmail: string | null;
+  customerPhone: string | null;
+}
+
 export interface PostCallComposition {
   subject: string;
   body: string;
 }
+
+/** Statuses in which the business still owes the caller a decision. */
+const AWAITING_DECISION = new Set(["pending_review", "held", "requested"]);
 
 function formatDuration(durationSec: number | null): string {
   if (durationSec === null || !Number.isFinite(durationSec) || durationSec < 0) return "not recorded";
@@ -85,6 +105,8 @@ export interface ComposePostCallInput {
   businessName: string;
   facts: PostCallFacts;
   messages: readonly PostCallMessageFacts[];
+  /** Appointments requested on this call. Empty when the caller asked for none. */
+  appointments?: readonly PostCallAppointmentFacts[];
   /** Authenticated deep link into the dashboard. Sign-in still required. */
   dashboardUrl: string;
   /** Business timezone for rendering times; the caller is never shown UTC. */
@@ -93,17 +115,27 @@ export interface ComposePostCallInput {
 
 export function composePostCallEmail(input: ComposePostCallInput): PostCallComposition {
   const { facts, messages } = input;
+  const appointments = input.appointments ?? [];
   const isTest = facts.source === "browser_test";
   const isSynthetic = facts.source === "synthetic_qa";
   const primary = messages[0];
+  const firstAppointment = appointments[0];
   const urgent = messages.some((m) => m.urgency === "urgent");
+  const awaiting = appointments.filter((a) => AWAITING_DECISION.has(a.status));
+
+  // An appointment outranks a message in the subject: it is the only outcome
+  // that can expire while the business reads its inbox.
+  const headline = firstAppointment
+    ? `${awaiting.length > 0 ? "Appointment requested" : "Appointment booked"} by ${firstAppointment.customerName}` +
+      ` — ${formatWhen(firstAppointment.startAt, input.timeZone)}`
+    : messages.length > 0
+      ? `New message from ${primary!.callerName}: ${primary!.topic}`
+      : "Call received — no message taken";
 
   const subject = [
     isSynthetic ? "[QA]" : isTest ? "[Test]" : null,
     urgent ? "[Urgent]" : null,
-    messages.length > 0
-      ? `New message from ${primary!.callerName}: ${primary!.topic}`
-      : "Call received — no message taken",
+    headline,
   ]
     .filter(Boolean)
     .join(" ");
@@ -135,14 +167,53 @@ export function composePostCallEmail(input: ComposePostCallInput): PostCallCompo
   lines.push(`  Ended:     ${facts.endedReason ?? "not reported"}`);
   lines.push("");
 
+  for (const [index, appointment] of appointments.entries()) {
+    const pending = AWAITING_DECISION.has(appointment.status);
+    lines.push(
+      appointments.length > 1 ? `APPOINTMENT ${index + 1} OF ${appointments.length}` : "APPOINTMENT",
+    );
+    lines.push(`  For:       ${appointment.customerName}`);
+    lines.push(`  Service:   ${appointment.appointmentTypeName}`);
+    lines.push(`  Time:      ${formatWhen(appointment.startAt, input.timeZone)}`);
+    lines.push(`  Call back: ${appointment.customerPhone ?? "no number given"}`);
+    lines.push(`  Email:     ${appointment.customerEmail ?? "no email given"}`);
+    if (pending) {
+      // The caller heard "requested, not confirmed". The business must read the
+      // same thing, or it will assume the time is already in its calendar.
+      lines.push(`  Status:    REQUESTED — not booked. The caller was told the time was`);
+      lines.push(`             requested and that someone would confirm it. It is not in`);
+      lines.push(`             any calendar until you accept it in the dashboard.`);
+    } else if (appointment.status === "booked") {
+      lines.push(`  Status:    Booked and written to your connected calendar.`);
+    } else {
+      lines.push(`  Status:    ${appointment.status}`);
+    }
+    lines.push("");
+  }
+
   if (messages.length === 0) {
     lines.push("MESSAGE");
-    lines.push("  None. The assistant did not save a message on this call, so there");
-    lines.push("  are no caller details to act on. If you expected one, open the call");
-    lines.push("  in the dashboard to see what happened.");
+    if (appointments.length > 0) {
+      lines.push("  None. The caller asked for a time rather than leaving a message.");
+    } else {
+      lines.push("  None. The assistant did not save a message on this call, so there");
+      lines.push("  are no caller details to act on. If you expected one, open the call");
+      lines.push("  in the dashboard to see what happened.");
+    }
     lines.push("");
     lines.push("WHAT YOU NEED TO DO");
-    lines.push("  Nothing is recorded as outstanding from this call.");
+    if (awaiting.length > 0) {
+      lines.push(
+        awaiting.length > 1
+          ? `  Accept or decline ${awaiting.length} requested times in the dashboard. Until you do,`
+          : "  Accept or decline the requested time in the dashboard. Until you do,",
+      );
+      lines.push("  nothing is booked and the caller is waiting on your decision.");
+    } else if (appointments.length > 0) {
+      lines.push("  Nothing. The appointment above is already booked.");
+    } else {
+      lines.push("  Nothing is recorded as outstanding from this call.");
+    }
   } else {
     for (const [index, message] of messages.entries()) {
       lines.push(messages.length > 1 ? `MESSAGE ${index + 1} OF ${messages.length}` : "MESSAGE");
@@ -161,12 +232,21 @@ export function composePostCallEmail(input: ComposePostCallInput): PostCallCompo
       lines.push("");
     }
     lines.push("WHAT YOU NEED TO DO");
-    lines.push(
-      messages.length > 1
-        ? `  Follow up on ${messages.length} saved messages. Nothing has been promised to`
-        : "  Follow up with this caller. Nothing has been promised to",
-    );
-    lines.push("  the caller on your behalf beyond 'someone will follow up'.");
+    if (awaiting.length > 0) {
+      lines.push(
+        awaiting.length > 1
+          ? `  Accept or decline ${awaiting.length} requested times in the dashboard — nothing is`
+          : "  Accept or decline the requested time in the dashboard — nothing is",
+      );
+      lines.push("  booked until you do — and follow up on the message above.");
+    } else {
+      lines.push(
+        messages.length > 1
+          ? `  Follow up on ${messages.length} saved messages. Nothing has been promised to`
+          : "  Follow up with this caller. Nothing has been promised to",
+      );
+      lines.push("  the caller on your behalf beyond 'someone will follow up'.");
+    }
   }
 
   lines.push("");

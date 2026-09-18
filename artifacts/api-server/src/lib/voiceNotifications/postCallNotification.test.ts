@@ -14,6 +14,7 @@ vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 
 import {
   composePostCallEmail,
+  type PostCallAppointmentFacts,
   type PostCallFacts,
   type PostCallMessageFacts,
 } from "./postCallComposer.js";
@@ -60,6 +61,20 @@ function message(overrides: Partial<PostCallMessageFacts> = {}): PostCallMessage
   };
 }
 
+function appointment(
+  overrides: Partial<PostCallAppointmentFacts> = {},
+): PostCallAppointmentFacts {
+  return {
+    customerName: "Klyde Taguran",
+    appointmentTypeName: "Consultation",
+    startAt: new Date("2026-09-18T14:00:00.000Z"),
+    status: "pending_review",
+    customerEmail: null,
+    customerPhone: "+63 918 606 9624",
+    ...overrides,
+  };
+}
+
 const BASE = {
   businessName: "Northgate Electrical",
   dashboardUrl: "https://example.test/ai-receptionist/dashboard/activity/calls/call_abc_123",
@@ -88,6 +103,70 @@ describe("post-call email composition", () => {
     expect(body).toContain("Nothing is recorded as outstanding");
     // Nothing may imply the call was dealt with.
     expect(body).not.toMatch(/handled|taken care of|resolved|completed/i);
+  });
+
+  // 2026-09-18. The owner's own call requested a time and the email it sent
+  // said "Call received — no message taken … Nothing is recorded as
+  // outstanding", because the composer had no idea appointments existed. A
+  // caller waiting on a decision must never be reported as nothing to do.
+  it("names an appointment the caller requested, and does not call it booked", () => {
+    const { subject, body } = composePostCallEmail({
+      ...BASE,
+      facts: facts(),
+      messages: [],
+      appointments: [appointment()],
+    });
+
+    expect(subject).toBe("Appointment requested by Klyde Taguran — Fri, Sep 18, 10:00 AM EDT");
+    expect(body).toContain("APPOINTMENT");
+    expect(body).toContain("Consultation");
+    expect(body).toContain("REQUESTED — not booked");
+    expect(body).toContain("Accept or decline the requested time");
+    // The exact sentence the defect produced.
+    expect(body).not.toContain("Nothing is recorded as outstanding");
+    // And it must not claim a calendar holds it.
+    expect(body).not.toMatch(/written to your connected calendar/i);
+  });
+
+  it("says booked only when the request actually reached the calendar", () => {
+    const { subject, body } = composePostCallEmail({
+      ...BASE,
+      facts: facts(),
+      messages: [],
+      appointments: [appointment({ status: "booked" })],
+    });
+
+    expect(subject.startsWith("Appointment booked by Klyde Taguran")).toBe(true);
+    expect(body).toContain("written to your connected calendar");
+    expect(body).toContain("Nothing. The appointment above is already booked.");
+    expect(body).not.toContain("REQUESTED — not booked");
+  });
+
+  it("keeps both the message and the pending decision when a call produced each", () => {
+    const { body } = composePostCallEmail({
+      ...BASE,
+      facts: facts(),
+      messages: [message()],
+      appointments: [appointment()],
+    });
+
+    expect(body).toContain("Quote for kitchen rewire");
+    expect(body).toContain("REQUESTED — not booked");
+    expect(body).toContain("nothing is");
+    expect(body).toContain("booked until you do");
+  });
+
+  it("is unchanged for a call that produced neither", () => {
+    const { subject, body } = composePostCallEmail({
+      ...BASE,
+      facts: facts(),
+      messages: [],
+      appointments: [],
+    });
+
+    expect(subject).toBe("Call received — no message taken");
+    expect(body).toContain("Nothing is recorded as outstanding");
+    expect(body).not.toContain("APPOINTMENT");
   });
 
   it("labels a browser test call unmistakably, at the top", () => {

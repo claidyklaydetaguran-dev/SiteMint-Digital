@@ -1,0 +1,2 @@
+ALTER TABLE "scheduling_appointment_requests" ADD COLUMN "provider_call_id" text;--> statement-breakpoint
+CREATE INDEX "ix_scheduling_appointment_requests_firm_provider_call" ON "scheduling_appointment_requests" USING btree ("firm_id","provider_call_id");

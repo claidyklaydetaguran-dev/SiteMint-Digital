@@ -266,6 +266,20 @@ export const schedulingAppointmentRequests = pgTable("scheduling_appointment_req
    * page, the dashboard), which is why the unique index below is partial.
    */
   toolCallId:           text("tool_call_id"),
+  /**
+   * The voice provider's own id for the CALL this request was made on.
+   *
+   * Distinct from `toolCallId`, which identifies one tool invocation and exists
+   * for idempotency. This names the conversation, so the call record and the
+   * post-call email can both say "a time was requested on this call". Without
+   * it the business's own summary of a call that booked something reported
+   * "nothing outstanding", because nothing joined the two.
+   *
+   * NULL for every request that did not come from a call (the public booking
+   * page, the dashboard), so it is indexed but never unique: one call may
+   * legitimately produce more than one request.
+   */
+  providerCallId:       text("provider_call_id"),
   holdExpiresAt:        timestamp("hold_expires_at", { withTimezone: true }),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -278,6 +292,8 @@ export const schedulingAppointmentRequests = pgTable("scheduling_appointment_req
     .on(table.firmId, table.toolCallId)
     .where(sql`${table.toolCallId} IS NOT NULL`),
   index("ix_scheduling_appointment_requests_firm_id_status").on(table.firmId, table.status),
+  index("ix_scheduling_appointment_requests_firm_provider_call")
+    .on(table.firmId, table.providerCallId),
   index("ix_scheduling_appointment_requests_firm_id_start").on(table.firmId, table.requestedStartAt),
   check(
     "ck_scheduling_appointment_requests_status",

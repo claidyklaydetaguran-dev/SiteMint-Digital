@@ -319,6 +319,7 @@ async function createRequestRow(
   now: Date,
   freeBusyProvider: FreeBusyProvider | undefined,
   toolCallId?: string,
+  providerCallId?: string,
 ): Promise<SlotMutationResult> {
   const typeIdNum = Number(appointmentTypeId);
   if (!Number.isInteger(typeIdNum)) return { ok: false, reason: "unknown_appointment_type" };
@@ -379,6 +380,7 @@ async function createRequestRow(
         emailConsent: consent.emailConsent,
         holdExpiresAt: status === "held" ? new Date(now.getTime() + HOLD_DURATION_MIN * 60_000) : null,
         ...(toolCallId !== undefined && toolCallId !== "" ? { toolCallId } : {}),
+        ...(providerCallId !== undefined && providerCallId !== "" ? { providerCallId } : {}),
       })
       .returning();
 
@@ -420,10 +422,37 @@ export async function submitAppointmentRequest(
   freeBusyProvider?: FreeBusyProvider,
   /** The provider's tool-call id, when this came from a voice tool call. */
   toolCallId?: string,
+  /** The provider's call id, so the call this was requested on can be named. */
+  providerCallId?: string,
 ): Promise<SlotMutationResult> {
   return createRequestRow(
     firmId, appointmentTypeId, startUtc, "pending_review", source, contact, consent, now, freeBusyProvider, toolCallId,
+    providerCallId,
   );
+}
+
+/**
+ * The requests made on one call, oldest first.
+ *
+ * Firm-scoped like every other read here: another business's call id returns
+ * nothing rather than someone else's appointments.
+ */
+export async function listAppointmentRequestsForCall(
+  firmId: number,
+  providerCallId: string,
+): Promise<SchedulingAppointmentRequest[]> {
+  if (providerCallId === "") return [];
+  return db
+    .select()
+    .from(schedulingAppointmentRequests)
+    .where(
+      and(
+        eq(schedulingAppointmentRequests.firmId, firmId),
+        eq(schedulingAppointmentRequests.providerCallId, providerCallId),
+      ),
+    )
+    .orderBy(schedulingAppointmentRequests.createdAt)
+    .limit(20);
 }
 
 export async function listAppointmentRequests(firmId: number): Promise<SchedulingAppointmentRequest[]> {

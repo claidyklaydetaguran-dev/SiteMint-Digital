@@ -34,6 +34,7 @@ import { ALERT_SEND_TIMEOUT_MS, type AlertTransport } from "../voiceAlerts/alert
 import type { RealCallRecord } from "../voice/webhooks/callStateModel.js";
 import {
   composePostCallEmail,
+  type PostCallAppointmentFacts,
   type PostCallFacts,
   type PostCallMessageFacts,
 } from "./postCallComposer.js";
@@ -341,6 +342,12 @@ export interface PostCallSourceDeps {
   loadBusinessName: (firmId: number) => Promise<string>;
   loadCallFacts: (firmId: number, providerCallId: string) => Promise<PostCallFacts | undefined>;
   loadMessages: (firmId: number, providerCallId: string) => Promise<PostCallMessageFacts[]>;
+  /**
+   * The appointments requested on this call. Optional so an existing caller
+   * that supplies its own deps keeps working; absent means "none recorded",
+   * which is what the composer already says.
+   */
+  loadAppointments?: (firmId: number, providerCallId: string) => Promise<PostCallAppointmentFacts[]>;
   resolveRecipient: (firmId: number) => Promise<{ ok: true; email: string } | { ok: false; reason: string }>;
   dashboardUrl: (providerCallId: string) => string;
   timeZone: (firmId: number) => Promise<string>;
@@ -426,6 +433,25 @@ async function productionSourceDeps(): Promise<PostCallSourceDeps> {
         emailAckRequested: row.emailAckRequested,
       }));
     },
+    loadAppointments: async (firmId, providerCallId) => {
+      const rows = await scheduling.listAppointmentRequestsForCall(firmId, providerCallId);
+      if (rows.length === 0) return [];
+      // Types are resolved once, by id, so the email names the service the
+      // caller chose rather than a number.
+      let names = new Map<string, string>();
+      try {
+        const config = await scheduling.buildAvailabilityConfig(firmId);
+        names = new Map(config.appointmentTypes.map((t) => [String(t.id), t.name]));
+      } catch { /* an unreadable config must not lose the appointment */ }
+      return rows.map((row) => ({
+        customerName: row.customerName === "" ? "the caller" : row.customerName,
+        appointmentTypeName: names.get(String(row.appointmentTypeId)) ?? "Appointment",
+        startAt: row.requestedStartAt,
+        status: row.status,
+        customerEmail: row.customerEmail,
+        customerPhone: row.customerPhone,
+      }));
+    },
     resolveRecipient: (firmId) => resolveVerifiedBusinessRecipient(firmId),
     dashboardUrl: (providerCallId) => dashboardCallUrl(providerCallId),
     timeZone: async (firmId) => {
@@ -463,9 +489,10 @@ export async function announceFinishedCall(
     return { ok: false, reason: "no_verified_recipient" };
   }
 
-  const [businessName, messages, timeZone] = await Promise.all([
+  const [businessName, messages, appointments, timeZone] = await Promise.all([
     resolved.loadBusinessName(firmId),
     resolved.loadMessages(firmId, providerCallId),
+    resolved.loadAppointments?.(firmId, providerCallId) ?? Promise.resolve([]),
     resolved.timeZone(firmId),
   ]);
 
@@ -473,6 +500,7 @@ export async function announceFinishedCall(
     businessName,
     facts,
     messages,
+    appointments,
     dashboardUrl: resolved.dashboardUrl(providerCallId),
     timeZone,
   });
@@ -513,15 +541,17 @@ export async function refreshQueuedPostCallNotification(
   const resolved = deps ?? (await productionSourceDeps());
   const facts = await resolved.loadCallFacts(firmId, providerCallId);
   if (!facts) return false;
-  const [businessName, messages, timeZone] = await Promise.all([
+  const [businessName, messages, appointments, timeZone] = await Promise.all([
     resolved.loadBusinessName(firmId),
     resolved.loadMessages(firmId, providerCallId),
+    resolved.loadAppointments?.(firmId, providerCallId) ?? Promise.resolve([]),
     resolved.timeZone(firmId),
   ]);
   const composed = composePostCallEmail({
     businessName,
     facts,
     messages,
+    appointments,
     dashboardUrl: resolved.dashboardUrl(providerCallId),
     timeZone,
   });

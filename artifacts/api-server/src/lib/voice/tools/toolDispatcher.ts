@@ -79,6 +79,12 @@ export interface ToolSchedulingDeps {
     now: Date,
     /** The provider tool-call id, so a retry returns the original request. */
     toolCallId?: string,
+    /**
+     * The provider call id, so the request can be named in the call record and
+     * in the business's post-call email. Without it a call that requested a
+     * time reports "nothing outstanding".
+     */
+    providerCallId?: string,
   ) => Promise<SlotMutation>;
   cancelAppointmentRequestByPublicId: (firmId: number, publicId: string) => Promise<boolean>;
   /**
@@ -160,8 +166,10 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
       const rows = await repo.listAppointmentRequests(firmId);
       return rows.find((r) => r.publicId === publicId);
     },
-    submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId) =>
-      repo.submitAppointmentRequest(firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, undefined, toolCallId),
+    submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId, providerCallId) =>
+      repo.submitAppointmentRequest(
+        firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, undefined, toolCallId, providerCallId,
+      ),
     cancelAppointmentRequestByPublicId: (firmId, publicId) => repo.cancelAppointmentRequestByPublicId(firmId, publicId),
     // The dashboard's Approve, called from the call instead of from a click.
     // It answers "disabled" when calendar writing is off and "no_connection"
@@ -277,6 +285,7 @@ async function runBookAppointment(
   args: BookAppointmentArgs,
   deps: ToolSchedulingDeps,
   now: Date,
+  providerCallId: string,
 ): Promise<string> {
   const startUtc = new Date(args.startIso);
   const result = await deps.submitAppointmentRequest(
@@ -292,6 +301,7 @@ async function runBookAppointment(
     // one — or, worse, refusing the repeat because the caller's own first
     // request now occupies the slot.
     toolCallId,
+    providerCallId,
   );
   if (!result.ok) {
     return result.reason === "slot_no_longer_available"
@@ -365,6 +375,7 @@ async function runRescheduleAppointment(
   args: RescheduleAppointmentArgs,
   deps: ToolSchedulingDeps,
   now: Date,
+  providerCallId: string,
 ): Promise<string> {
   // Order of operations: verify the old request exists (firm-scoped), book
   // the new slot first (revalidated + advisory-locked, preserving the old
@@ -387,6 +398,7 @@ async function runRescheduleAppointment(
     { phoneConsent: old.phoneConsent, smsConsent: old.smsConsent, emailConsent: old.emailConsent },
     now,
     toolCallId,
+    providerCallId,
   );
   if (!created.ok) {
     return created.reason === "slot_no_longer_available"
@@ -542,11 +554,15 @@ async function executeOne(
       case "check_availability":
         return await runCheckAvailability(firmId, parsed.data as CheckAvailabilityArgs, deps, now);
       case "book_appointment":
-        return await runBookAppointment(firmId, call.toolCallId, parsed.data as BookAppointmentArgs, deps, now);
+        return await runBookAppointment(
+          firmId, call.toolCallId, parsed.data as BookAppointmentArgs, deps, now, context.providerCallId,
+        );
       case "cancel_appointment":
         return await runCancelAppointment(firmId, parsed.data as CancelAppointmentArgs, deps);
       case "reschedule_appointment":
-        return await runRescheduleAppointment(firmId, call.toolCallId, parsed.data as RescheduleAppointmentArgs, deps, now);
+        return await runRescheduleAppointment(
+          firmId, call.toolCallId, parsed.data as RescheduleAppointmentArgs, deps, now, context.providerCallId,
+        );
       case "save_message":
         return await runSaveMessage(firmId, call.toolCallId, parsed.data as SaveMessageArgs, context, deps);
     }
