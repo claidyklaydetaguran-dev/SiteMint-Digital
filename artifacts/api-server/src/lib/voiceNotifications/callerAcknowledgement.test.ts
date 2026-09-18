@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 
 import { composeCallerAckEmail } from "./callerAckComposer.js";
-import { callerAppointmentAckDedupeKey } from "./notificationOutbox.js";
+import { appointmentsOrNone, callerAppointmentAckDedupeKey } from "./notificationOutbox.js";
 import { dispatchToolCalls, type ToolSchedulingDeps } from "../voice/tools/toolDispatcher.js";
 import type { SchedulingAppointmentRequest } from "@workspace/db/schema/scheduling";
 
@@ -302,6 +302,49 @@ describe("a failing email never breaks the appointment", () => {
 
     expect(log.acks).toHaveLength(0);
     expect(results[0]!.result).toContain("Requested, not yet confirmed");
+  });
+});
+
+// ── the appointment lookup must never cost the business its summary ──────────
+
+describe("an unreadable appointment list degrades one section, not the email", () => {
+  const deps = (over: Record<string, unknown> = {}) =>
+    ({
+      loadBusinessName: async () => "B",
+      loadCallFacts: async () => undefined,
+      loadMessages: async () => [],
+      resolveRecipient: async () => ({ ok: true, recipient: "b@example.test" }),
+      dashboardUrl: () => "https://example.test",
+      timeZone: async () => "UTC",
+      ...over,
+    }) as never;
+
+  it("returns no appointments when the lookup throws, instead of propagating", async () => {
+    const logged: string[] = [];
+    const result = await appointmentsOrNone(
+      deps({
+        loadAppointments: async () => {
+          // What a schema missing provider_call_id actually does.
+          throw new Error('column "provider_call_id" does not exist');
+        },
+        logger: (event: string) => logged.push(event),
+      }),
+      7,
+      "call_x",
+    );
+
+    expect(result).toEqual([]);
+    expect(logged).toContain("voice_post_call_appointments_unreadable");
+  });
+
+  it("returns none, not a failure, when no lookup is wired at all", async () => {
+    expect(await appointmentsOrNone(deps(), 7, "call_x")).toEqual([]);
+  });
+
+  it("passes the appointments straight through when the lookup works", async () => {
+    const one = [{ customerName: "Pat" }] as never;
+    const result = await appointmentsOrNone(deps({ loadAppointments: async () => one }), 7, "call_x");
+    expect(result).toBe(one);
   });
 });
 

@@ -360,6 +360,34 @@ export async function refreshQueuedNotification(
 
 // ── composing the post-call announcement from persisted facts ────────────────
 
+/**
+ * The appointments for one call, or none if that lookup fails for any reason.
+ *
+ * Deliberately swallowing: the appointment section is an ADDITION to the
+ * business's summary, and the summary is the part someone is waiting on. A
+ * lookup that throws — a column the deployed schema does not have yet, a
+ * transient database error — must degrade that section, never delete the whole
+ * email. The webhook already catches and logs, so without this the failure is
+ * silent and total: the call is recorded and nothing is ever sent.
+ */
+export async function appointmentsOrNone(
+  deps: PostCallSourceDeps,
+  firmId: number,
+  providerCallId: string,
+): Promise<PostCallAppointmentFacts[]> {
+  if (!deps.loadAppointments) return [];
+  try {
+    return await deps.loadAppointments(firmId, providerCallId);
+  } catch (err) {
+    deps.logger?.("voice_post_call_appointments_unreadable", {
+      firmId,
+      providerCallId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
+}
+
 export interface PostCallSourceDeps {
   loadBusinessName: (firmId: number) => Promise<string>;
   loadCallFacts: (firmId: number, providerCallId: string) => Promise<PostCallFacts | undefined>;
@@ -514,7 +542,7 @@ export async function announceFinishedCall(
   const [businessName, messages, appointments, timeZone] = await Promise.all([
     resolved.loadBusinessName(firmId),
     resolved.loadMessages(firmId, providerCallId),
-    resolved.loadAppointments?.(firmId, providerCallId) ?? Promise.resolve([]),
+    appointmentsOrNone(resolved, firmId, providerCallId),
     resolved.timeZone(firmId),
   ]);
 
@@ -566,7 +594,7 @@ export async function refreshQueuedPostCallNotification(
   const [businessName, messages, appointments, timeZone] = await Promise.all([
     resolved.loadBusinessName(firmId),
     resolved.loadMessages(firmId, providerCallId),
-    resolved.loadAppointments?.(firmId, providerCallId) ?? Promise.resolve([]),
+    appointmentsOrNone(resolved, firmId, providerCallId),
     resolved.timeZone(firmId),
   ]);
   const composed = composePostCallEmail({
