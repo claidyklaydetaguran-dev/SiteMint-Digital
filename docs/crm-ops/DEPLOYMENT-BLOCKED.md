@@ -452,3 +452,103 @@ Two capability denials were also recorded and not worked around: starting a
 small file server inside the workspace to read command output
 (**[Expose Local Services]**), and reading the clipboard after copying the
 production connection string (**[Credential Materialization]**).
+
+---
+
+## 12. 2026-09-18 — the production restore rehearsal, done for real
+
+Candidate `a2ae143`. Run inside the Web Asset Builder workspace. No production
+write of any kind; production was read once, by `pg_dump`.
+
+### Identities, confirmed before anything was touched
+
+| | database | tables | evidence |
+| --- | --- | --- | --- |
+| `DATABASE_URL` (workspace) | development | 35 | — |
+| `SNAPSHOT_SOURCE` | **production** | **27** | 3 leads, 40 tasks, 0 voice tables — matches the Replit console |
+
+`SNAPSHOT_SOURCE` is a postgres URL and is **not** equal to `DATABASE_URL`, so
+the backup reads the right database. No value was printed, copied or stored.
+
+### Secret formats, verified in the environment
+
+| Secret | Result |
+| --- | --- |
+| `CORS_ALLOWED_ORIGINS` | 1 origin, bare, no wildcard, includes `sitemintdigital.com` |
+| `CALENDAR_TOKEN_KEY` | decodes to **exactly 32 bytes** — valid, and NOT rotated |
+| `CRM_LEGACY_BEARER_ENABLED` | `"false"` |
+| `ADMIN_PASSWORD` | present, length 12 |
+| `SNAPSHOT_SOURCE` | postgres scheme, distinct from the workspace database |
+
+**Open question for the owner:** only one origin is configured. §4 of this
+document recommended three (apex, `www`, and `sitemintdigital.replit.app`).
+Server-side proxying does not trigger CORS, so one origin is sufficient for the
+proxied path — but a browser that lands on `www.` or calls the backend origin
+directly would be refused. Worth settling before publish.
+
+### Backup and restore
+
+```
+pg_dump --format=custom     exit 0, 229,846 bytes, empty stderr
+                            server 16.15, pg_dump 16.10
+pg_restore → rehearsal_0918 exit 0, empty stderr
+restored:                   27 tables, 3 leads, 40 tasks, 8 discovery submissions
+```
+
+The rehearsal database lives on the development server, not production. The
+dump file is under `/tmp/rehearsal/`, outside the repository and outside
+anything a deployment packages.
+
+### The upgrade, run with the real runner
+
+The candidate was cloned from the pushed branch (`a2ae143`, 21 migration files)
+and migrated with `migrate-guard.mjs` — the same guard the documented process
+uses, which verified the target's identity before touching anything:
+
+```
+--target dev --expect-db rehearsal_0918 --expect-fingerprint 4b4ba7f6b73c
+scheduling  exit 0
+discovery   exit 0
+voice       exit 0
+```
+
+| | before | after |
+| --- | --- | --- |
+| tables | 27 | **64** |
+| crm_leads / crm_tasks / discovery_submissions | 3 / 40 / 8 | **3 / 40 / 8** |
+| discovery_submissions columns | 28 | **43** (the 15 v1 columns) |
+| voice_* / scheduling_* tables | 0 / 0 | **26 / 8** |
+| journals (voice / scheduling / discovery) | — | **15 / 5 / 1 = 21** |
+| `scheduling_appointment_requests.provider_call_id` | — | present |
+
+**Every existing production record survived.** Nothing was rewritten, and no
+applied migration file was edited.
+
+### Hashes checked against the database, not the docs
+
+```
+hashes in the three journals        21
+sha256 of the committed .sql files  21
+sets identical                      yes   (0 only-in-db, 0 only-in-files)
+```
+
+### The domain-ordering trap: investigated, and it is not live
+
+`MIGRATIONS.md` §3 — and the handoff that repeated it — warn that a shared
+Drizzle journal silently skips the discovery migration when scheduling runs
+first. That was true of a shared journal. It is **not true of this candidate**.
+
+Each domain has its own journal table (`__drizzle_migrations_voice`,
+`_scheduling`, `_discovery`), so there is no shared watermark to mask anything.
+Tested adversarially rather than assumed: the rehearsal deliberately ran
+**scheduling → discovery → voice**, the order the warning says breaks, and
+discovery applied fully (`J_DISC = 1`, discovery_submissions 28 → 43 columns).
+
+`MIGRATIONS.md` §3 should be corrected; until it is, treat the per-domain
+journal tables as the authority.
+
+### What this does NOT establish
+
+The rehearsal proves the schema upgrade is safe against real production data.
+It says nothing about application behaviour after deployment, and it is not a
+substitute for the staging customer journey.
