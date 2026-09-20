@@ -1,0 +1,1 @@
+const e={campaign:{summary:"One email, sent once, to a list of people."},sequence:{summary:"Several messages over days. Contacts are enrolled, and each step goes out on its own schedule."},queue:{name:"Sequence queue",summary:"Every message a sequence has scheduled, one row per message per contact. Marketing campaigns never appear here."}};export{e as M};
