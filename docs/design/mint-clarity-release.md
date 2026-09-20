@@ -1,6 +1,6 @@
 # Mint Clarity public design release
 
-Status: implemented locally; production publishing is pending. No live deployment has been changed.
+Status: PUBLISHED to https://sitemintdigital.com on 2026-09-20. Public release marker confirms sourceCommit 3094afe; homepage asset is index-B309onjv.js. Replit confirms publication.
 
 ## Scope
 
@@ -29,12 +29,20 @@ Source baseline: 8a7aa11838895c1afb91556a0594ffce53c245da. Implementation checko
 
 ## Publishing handoff
 
-The available Replit browser is signed out. The marketing app must be opened by the owner in an authenticated browser and identified as the app currently serving sitemintdigital.com before release.
+The owner signed into Replit. The SiteMint-Digital app is confirmed to own sitemintdigital.com and www.sitemintdigital.com. The marketing package was transferred through release/mint-clarity-3094afe on GitHub. All 313 file checksums passed on Replit. The old mkt directory is retained as mkt.rollback-mint-3094afe.
 
-The frontend build is not yet the complete production marketing artifact. Run the existing `artifacts/web-agency/scripts/prerender.mjs` release step against a fresh `dist/public`, then verify rendered public documents, legitimate SPA fallback routes, 404 behavior, and the marketing proxy. Preserve the existing backend upstream and production config. Do not redeploy Web Asset Builder or run migrations for this visual update.
+The existing prerender build completed for 22 HTML documents and the SPA-fallback manifest. Local marketing-server checks returned 200 for home, receptionist, services, and signup; unknown paths returned 404. Preserve the existing backend upstream and production config. Do not redeploy Web Asset Builder or run migrations for this visual update.
 
 After publishing, verify actual homepage asset hashes, homepage/receptionist visuals, service deep links, signup, receptionist login, staff CRM entry, client portal, and API proxy responses through the public domain. A frontend release does not establish that calendar, SMS, billing, or notification delivery works end to end.
 
 ## Next visual pass
 
 Use existing product screenshots and a few deliberately chosen service illustrations. Keep each image next to one concrete outcome and one useful action. Do not imply fictional businesses, sample data, or generated people are client testimonials. Preserve short explanatory text so owners know what they are buying and where to go next.
+
+## Live verification result
+
+Homepage, receptionist, services, pricing, about, work, discovery, and signup documents return HTTP 200 with index-B309onjv.js. Browser-verified homepage imagery and receptionist example tabs work. Receptionist sign-in and admin entry still load the pre-existing backend builds. Unknown public paths return 404. /api/healthz returns 200.
+
+Two pre-existing backend limitations remain: /api/readyz returns 404; /portal/sign-in now passes the marketing proxy and returns HTTP 200, but its upstream React application renders "404 Page Not Found". This is not a working client portal. No authenticated action, real call, message delivery, calendar, or billing operation was claimed verified.
+
+Release artifact branch: https://github.com/claidyklaydetaguran-dev/SiteMint-Digital/tree/release/mint-clarity-3094afe . Deployed package commit: 2c1a37a6. Rollback files remain in the Replit workspace at mkt.rollback-mint-3094afe.
