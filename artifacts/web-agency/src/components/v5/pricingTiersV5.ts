@@ -38,7 +38,8 @@ export const pricingTiersV5: PricingTierV5[] = [
     name: "Starter Site System",
     tagline: "A credible, working online home for a new or small business.",
     priceFrom: "From $2,995",
-    bestFor: "New businesses and local service providers who need a trustworthy first website.",
+    bestFor:
+      "New businesses and local service providers who need a trustworthy first website.",
     includes: [
       "Strategy & discovery",
       "Responsive website",
@@ -56,7 +57,8 @@ export const pricingTiersV5: PricingTierV5[] = [
     name: "Growth Digital System",
     tagline: "A conversion-focused website with a real system behind it.",
     priceFrom: "From $5,995",
-    bestFor: "Service businesses ready to convert visitors into tracked leads, not just traffic.",
+    bestFor:
+      "Service businesses ready to convert visitors into tracked leads, not just traffic.",
     includes: [
       "Advanced website or web app",
       "Custom conversion journey",
@@ -71,9 +73,11 @@ export const pricingTiersV5: PricingTierV5[] = [
   {
     id: "custom",
     name: "Custom Connected System",
-    tagline: "A complete connected system: web app, CRM, and automation together.",
+    tagline:
+      "A complete connected system: web app, CRM, and automation together.",
     priceFrom: "From $9,995",
-    bestFor: "Established businesses that need a web application, CRM/internal operations system, and automation working as one system.",
+    bestFor:
+      "Established businesses that need a web application, CRM/internal operations system, and automation working as one system.",
     includes: [
       "Custom web application",
       "CRM / internal operations system",
@@ -104,4 +108,4 @@ export const PRICING_DISCLAIMER_V5 =
 
 /** AI Receptionist is never priced on this page. */
 export const AI_RECEPTIONIST_PRICING_NOTE_V5 =
-  "AI Receptionist pricing is provided during private-beta onboarding.";
+  "Request pricing for the assisted AI Receptionist pilot. Subscription, usage and setup are discussed separately from website project pricing.";

@@ -19,6 +19,7 @@ import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
+import "@/components/mint/mint-auth.css";
 
 interface AuthShellProps {
   children: ReactNode;

@@ -171,10 +171,111 @@
 
 /* Keep existing service-page primitives within the approved public palette. */
 .mint-site {
- --sm-font-display: "DM Sans", Arial, sans-serif;
- --sm-font-body: "DM Sans", Arial, sans-serif;
- --sm-text: #203c34; --sm-text-muted: #5a7066;
- --sm-mint-500: #28745c; --sm-mint-700: #173f35;
- --sm-line: #dbe6de; --sm-line-strong: #91b1a0;
+  --sm-font-display: "DM Sans", Arial, sans-serif;
+  --sm-font-body: "DM Sans", Arial, sans-serif;
+  --sm-text: #203c34;
+  --sm-text-muted: #5a7066;
+  --sm-mint-500: #28745c;
+  --sm-mint-700: #173f35;
+  --sm-line: #dbe6de;
+  --sm-line-strong: #91b1a0;
 }
-.mint-site .sm-mark::after { display: none; }
+.mint-site .sm-mark::after {
+  display: none;
+}
+
+/* Final public journey polish: restrained hierarchy and accessible controls. */
+.mint-site > header nav > a[aria-current="page"] {
+  color: var(--forest);
+  text-decoration: underline;
+  text-decoration-color: #91b1a0;
+  text-underline-offset: 7px;
+  text-decoration-thickness: 2px;
+}
+.mint-site > header nav > a.button:hover {
+  color: white;
+}
+.mint-site .mint-signin summary,
+.mint-site .menu-toggle {
+  min-height: 44px;
+}
+.mint-site .mint-signin summary {
+  display: flex;
+  align-items: center;
+}
+.mint-site .mint-signin > div {
+  top: 48px;
+}
+.mint-site :is(input, textarea, select):focus-visible {
+  outline: 3px solid #3e9978;
+  outline-offset: 3px;
+}
+.mint-site .mint-inquiry {
+  width: min(1180px, 90%);
+  margin: 24px auto 0;
+  padding: clamp(24px, 4vw, 48px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--mint);
+}
+.mint-site .mint-inquiry h2 {
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  margin: 12px 0 16px;
+}
+.mint-site .mint-inquiry p {
+  max-width: 68ch;
+}
+.mint-site .mint-inquiry pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 15px;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.mint-site .mint-inquiry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.mint-site .mint-inquiry .mint-inquiry-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.mint-site .v3-lede,
+.mint-site .v4-lede {
+  text-wrap: pretty;
+}
+.mint-site .v3-display,
+.mint-site .v4-h2 {
+  text-wrap: balance;
+}
+@media (max-width: 600px) {
+  .mint-site .mint-inquiry-actions > * {
+    width: 100%;
+  }
+  .mint-site .footer-bottom {
+    gap: 16px;
+  }
+  .mint-site .footer-bottom > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mint-site *,
+  .mint-site *::before,
+  .mint-site *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

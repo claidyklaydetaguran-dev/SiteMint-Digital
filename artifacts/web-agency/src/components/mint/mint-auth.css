@@ -1,0 +1,50 @@
+/* Signup inherits the approved public brand without changing auth contracts. */
+.v2-auth-shell .sg-page.sg-page.sg-page {
+  --v3-porcelain: #f9fbf8;
+  --v3-white: #fff;
+  --v3-ice: #e4f2e9;
+  --v3-mint: #b9ddc9;
+  --v3-ink: #203c34;
+  --v3-charcoal: #173f35;
+  --v3-slate: #5a7066;
+  --v3-font-sans: "DM Sans", Arial, sans-serif;
+}
+.v2-auth-shell .sg-page .sg-title,
+.v2-auth-shell .sg-page .sg-form__title {
+  font-family: "DM Sans", Arial, sans-serif;
+  text-wrap: balance;
+}
+.v2-auth-shell .sg-page .sg-submit {
+  background: #173f35;
+  color: white;
+  border-radius: 7px;
+}
+.v2-auth-shell .sg-page .sg-submit:hover:not(:disabled) {
+  background: #275b49;
+}
+.v2-auth-shell .sg-page :focus-visible {
+  outline: 3px solid #28745c;
+  outline-offset: 3px;
+}
+
+.mint-portal-auth {
+  background: #f9fbf8;
+  color: #203c34;
+}
+.mint-portal-auth input {
+  background: #fff;
+  border-color: #dbe6de;
+  border-radius: 7px;
+}
+.mint-portal-auth button[type="submit"] {
+  background: #173f35;
+  color: #fff;
+  border-radius: 7px;
+}
+.mint-portal-auth button[type="submit"]:hover:not(:disabled) {
+  background: #275b49;
+}
+.mint-portal-auth :focus-visible {
+  outline: 3px solid #28745c;
+  outline-offset: 3px;
+}

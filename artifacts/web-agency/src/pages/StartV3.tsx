@@ -6,13 +6,22 @@
  * the system of record for new inquiries).
  */
 
-import { Link } from "wouter";
-import { ArrowRight, Clock, FileText, MessagesSquare, Phone, Mail, ShieldCheck } from "lucide-react";
+import { Link, useSearch } from "wouter";
+import {
+  ArrowRight,
+  Clock,
+  FileText,
+  MessagesSquare,
+  Phone,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
 import { ROUTES } from "@/lib/routes";
 import { useReveal } from "@/components/v3/useReveal";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { BrowserFrame } from "@/components/v5/BrowserFrame";
 import discoveryStep from "@/assets/product/discovery-step.png";
+import { InquiryContext } from "@/components/mint/InquiryContext";
 import "@/styles/v5-pages.css";
 
 /** Real contact details (W-12) — same values as `ThankYou.tsx`. */
@@ -23,141 +32,181 @@ const SUPPORT_RESPONSE_TIME = "within 1 business day";
 
 export default function StartV3() {
   const reveal = useReveal();
+  const search = useSearch();
+  const isReceptionist =
+    new URLSearchParams(search).get("service") === "ai-receptionist";
   usePageMeta({
     title: "Start with SiteMint — SiteMint Digital",
-    description: "Every SiteMint project starts with a short, structured discovery brief. See what to expect, or contact us directly.",
+    description:
+      "Every SiteMint project starts with a short, structured discovery brief. See what to expect, or contact us directly.",
   });
 
   return (
     <div className="v3-start-page sm-v5page">
       <section className="v3m-page-hero" data-tone="porcelain">
-        <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
+        <div
+          className="v3-container v3m-page-hero__inner v3-reveal"
+          ref={reveal}
+        >
           <span className="v3-eyebrow reveal-fade-up">Start with SiteMint</span>
           {/* Headline is the hero LCP text — left static (no mask-reveal) so
               first paint isn't delayed; eyebrow/lede/actions carry the motion. */}
           <h1 className="v3-display">
-            Ten minutes now saves three calls later.
+            {isReceptionist
+              ? "A receptionist that fits your business."
+              : "Ten minutes now saves three calls later."}
           </h1>
           <p className="v3-lede reveal-fade-up">
-            Every SiteMint project starts with a short discovery brief. It's
-            structured, it saves as you go, and a person — not a machine —
-            reads every word.
+            {isReceptionist ? (
+              "Start with a conversation about your calls. We'll help you plan the setup, understand the costs and test your receptionist before you rely on it."
+            ) : (
+              <>
+                Every SiteMint project starts with a short discovery brief. It's
+                structured, it saves as you go, and a person — not a machine —
+                reads every word.
+              </>
+            )}
           </p>
           <div className="v3m-hero__actions reveal-fade-up">
-            <Link href={ROUTES.discovery} className="v3-btn v3-btn--primary">
-              Begin the discovery brief
+            <Link
+              href={
+                isReceptionist
+                  ? `${ROUTES.start}?service=ai-receptionist#pilot-pricing`
+                  : ROUTES.discovery
+              }
+              className="v3-btn v3-btn--primary"
+            >
+              {isReceptionist
+                ? "Request pilot pricing"
+                : "Begin the discovery brief"}
               <ArrowRight aria-hidden="true" size={16} />
             </Link>
           </div>
         </div>
       </section>
+      <InquiryContext />
 
-      <section className="v3-section" data-tone="white">
-        <div className="v3-container v3m-split v3-reveal" ref={reveal}>
-          <div className="v3m-split__copy reveal-h-left">
-            <span className="v3m-sechead__no">What to expect</span>
-            <h2 className="v3-h2 reveal-clip">Here's exactly what happens.</h2>
-            <ol className="v3st-expect">
-              <li className="reveal-fade-up">
-                <strong>You complete the brief</strong>
-                <span>
-                  About ten minutes of focused questions about your business
-                  and what keeps falling through. Save and resume any time.
-                </span>
-              </li>
-              <li className="reveal-fade-up">
-                <strong>We read it properly</strong>
-                <span>
-                  A person reviews your brief — what you wrote shapes the
-                  conversation, so nothing gets asked twice.
-                </span>
-              </li>
-              <li className="reveal-fade-up">
-                <strong>You get a straight answer</strong>
-                <span>
-                  A plain recommendation: what to build, what to skip, and what
-                  it takes. If we're not the right fit, we'll say so.
-                </span>
-              </li>
-              <li className="reveal-fade-up">
-                <strong>You decide</strong>
-                <span>
-                  No pressure sequence, no countdown timers. The brief is
-                  useful to you even if we never work together.
-                </span>
-              </li>
-            </ol>
-            {/* Mini-preview of the actual discovery form (owner directive
+      {!isReceptionist && (
+        <section className="v3-section" data-tone="white">
+          <div className="v3-container v3m-split v3-reveal" ref={reveal}>
+            <div className="v3m-split__copy reveal-h-left">
+              <span className="v3m-sechead__no">What to expect</span>
+              <h2 className="v3-h2 reveal-clip">
+                Here's exactly what happens.
+              </h2>
+              <ol className="v3st-expect">
+                <li className="reveal-fade-up">
+                  <strong>You complete the brief</strong>
+                  <span>
+                    About ten minutes of focused questions about your business
+                    and what keeps falling through. Save and resume any time.
+                  </span>
+                </li>
+                <li className="reveal-fade-up">
+                  <strong>We read it properly</strong>
+                  <span>
+                    A person reviews your brief — what you wrote shapes the
+                    conversation, so nothing gets asked twice.
+                  </span>
+                </li>
+                <li className="reveal-fade-up">
+                  <strong>You get a straight answer</strong>
+                  <span>
+                    A plain recommendation: what to build, what to skip, and
+                    what it takes. If we're not the right fit, we'll say so.
+                  </span>
+                </li>
+                <li className="reveal-fade-up">
+                  <strong>You decide</strong>
+                  <span>
+                    No pressure sequence, no countdown timers. The brief is
+                    useful to you even if we never work together.
+                  </span>
+                </li>
+              </ol>
+              {/* Mini-preview of the actual discovery form (owner directive
                 2026-09-05: "more real product evidence"). Claims verified
                 against the live form: `DiscoveryProgress.tsx` sets
                 `TOTAL_STEPS` from an 8-entry `STEP_LABELS` list, and
                 `useDiscoveryDraft.ts` persists every change to
                 `localStorage` only — no server draft exists yet. */}
-            <div className="v3st-preview reveal-scale-settle">
-              <BrowserFrame
-                src={discoveryStep}
-                alt="SiteMint's real guided discovery form, showing a structured question step with a progress bar"
-                caption="This is the actual form — preview data"
-                addressLabel="/discovery"
-                className="sm-browser-frame--compact"
-              />
-              <p className="v3st-preview__meta">
-                <span>8 guided steps</span>
-                <span>Autosaves in your browser</span>
-              </p>
+              <div className="v3st-preview reveal-scale-settle">
+                <BrowserFrame
+                  src={discoveryStep}
+                  alt="SiteMint's real guided discovery form, showing a structured question step with a progress bar"
+                  caption="This is the actual form — preview data"
+                  addressLabel="/discovery"
+                  className="sm-browser-frame--compact"
+                />
+                <p className="v3st-preview__meta">
+                  <span>8 guided steps</span>
+                  <span>Autosaves in your browser</span>
+                </p>
+              </div>
+            </div>
+            <div className="v3m-split__media">
+              <div
+                className="v3-card v3st-panel reveal-scale-settle"
+                data-tone="ice"
+              >
+                <ul className="v3m-checks">
+                  <li>
+                    <Clock aria-hidden="true" />
+                    <span>
+                      <strong>~10 minutes</strong> — structured, with progress
+                      saved as you go
+                    </span>
+                  </li>
+                  <li>
+                    <FileText aria-hidden="true" />
+                    <span>
+                      <strong>A real brief</strong> — you'll see what your
+                      answers become
+                    </span>
+                  </li>
+                  <li>
+                    <MessagesSquare aria-hidden="true" />
+                    <span>
+                      <strong>A human reply</strong> — read and answered by the
+                      people who'd do the work
+                    </span>
+                  </li>
+                  <li>
+                    <ShieldCheck aria-hidden="true" />
+                    <span>
+                      <strong>Your information, respected</strong> — used to
+                      respond to you, nothing else
+                    </span>
+                  </li>
+                </ul>
+                <Link
+                  href={ROUTES.discovery}
+                  className="v3-btn v3-btn--primary"
+                >
+                  Begin the discovery brief
+                </Link>
+              </div>
             </div>
           </div>
-          <div className="v3m-split__media">
-            <div className="v3-card v3st-panel reveal-scale-settle" data-tone="ice">
-              <ul className="v3m-checks">
-                <li>
-                  <Clock aria-hidden="true" />
-                  <span>
-                    <strong>~10 minutes</strong> — structured, with progress
-                    saved as you go
-                  </span>
-                </li>
-                <li>
-                  <FileText aria-hidden="true" />
-                  <span>
-                    <strong>A real brief</strong> — you'll see what your answers
-                    become
-                  </span>
-                </li>
-                <li>
-                  <MessagesSquare aria-hidden="true" />
-                  <span>
-                    <strong>A human reply</strong> — read and answered by the
-                    people who'd do the work
-                  </span>
-                </li>
-                <li>
-                  <ShieldCheck aria-hidden="true" />
-                  <span>
-                    <strong>Your information, respected</strong> — used to
-                    respond to you, nothing else
-                  </span>
-                </li>
-              </ul>
-              <Link href={ROUTES.discovery} className="v3-btn v3-btn--primary">
-                Begin the discovery brief
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Contact — folded in from the retired standalone /contact page
           (W-12). `/contact` redirects here (`${ROUTES.start}#contact`). */}
-      <section className="v3-section" data-tone="porcelain" id="contact" style={{ scrollMarginTop: "5rem" }}>
+      <section
+        className="v3-section"
+        data-tone="porcelain"
+        id="contact"
+        style={{ scrollMarginTop: "5rem" }}
+      >
         <div className="v3-container v3sp-two v3-reveal" ref={reveal}>
           <span className="v3m-sechead__no">Prefer to talk first?</span>
           <div className="v3sp-two__body reveal-h-left">
             <h2 className="v3-h2 reveal-clip">That works too.</h2>
             <p className="v3-body reveal-fade-up">
               If a form isn't how you think, reach out directly and we'll have
-              the same conversation by message or call. The brief can come
-              later — or we'll fill it in together.
+              the same conversation by message or call. The brief can come later
+              — or we'll fill it in together.
             </p>
             <ul className="v3m-checks">
               <li className="reveal-fade-up">

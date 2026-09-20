@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
@@ -8,7 +8,31 @@ import "./mint-legacy.css";
 export function MintChrome({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [location]);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const signinRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    setOpen(false);
+    if (signinRef.current) signinRef.current.open = false;
+  }, [location]);
+  useEffect(() => {
+    function dismiss(event: PointerEvent) {
+      if (
+        signinRef.current &&
+        !signinRef.current.contains(event.target as Node)
+      ) {
+        signinRef.current.open = false;
+      }
+    }
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
+  const navigation = [
+    [ROUTES.services, "Services"],
+    [ROUTES.aiReceptionist, "AI Receptionist"],
+    [ROUTES.workV3, "Work"],
+    [ROUTES.pricing, "Pricing"],
+    [ROUTES.about, "About"],
+  ] as const;
   return (
     <div className="mint-site" data-shell="public" data-chrome="mint">
       <RouteScrollManager />
@@ -23,31 +47,59 @@ export function MintChrome({ children }: { children: ReactNode }) {
           SiteMint <small>Digital</small>
         </Link>
         <button
+          ref={menuRef}
+          type="button"
           className="menu-toggle"
           aria-expanded={open}
           aria-controls="mint-navigation"
           onClick={() => setOpen(!open)}
         >
-          Menu
+          {open ? "Close" : "Menu"}
         </button>
         <nav
           id="mint-navigation"
           className={open ? "open" : ""}
           aria-label="Main navigation"
           onKeyDown={(e) => {
-            if (e.key === "Escape") setOpen(false);
+            if (e.key !== "Escape") return;
+            if (signinRef.current?.open) {
+              signinRef.current.open = false;
+              signinRef.current.querySelector("summary")?.focus();
+            } else if (open) {
+              setOpen(false);
+              menuRef.current?.focus();
+            }
           }}
         >
-          <Link href={ROUTES.services}>Services</Link>
-          <Link href={ROUTES.aiReceptionist}>AI Receptionist</Link>
-          <Link href={ROUTES.workV3}>Work</Link>
-          <Link href={ROUTES.pricing}>Pricing</Link>
-          <Link href={ROUTES.about}>About</Link>
-          <details className="mint-signin">
+          {navigation.map(([href, label]) => (
+            <Link
+              key={href}
+              href={href}
+              aria-current={location === href ? "page" : undefined}
+            >
+              {label}
+            </Link>
+          ))}
+          <details
+            ref={signinRef}
+            className="mint-signin"
+            onBlur={(event) => {
+              if (
+                !event.currentTarget.contains(
+                  event.relatedTarget as Node | null,
+                )
+              ) {
+                event.currentTarget.open = false;
+              }
+            }}
+          >
             <summary>Sign in</summary>
             <div>
               <a href={DASHBOARD_URLS.login}>Receptionist workspace</a>
               <a href="/portal/sign-in">Client portal</a>
+              <Link href={`${ROUTES.start}#contact`}>
+                Need help signing in?
+              </Link>
             </div>
           </details>
           <Link className="button compact" href={ROUTES.discovery}>
@@ -71,6 +123,8 @@ export function MintChrome({ children }: { children: ReactNode }) {
             <Link href={ROUTES.services}>Our services</Link>
             <Link href={ROUTES.aiReceptionist}>AI Receptionist</Link>
             <Link href={ROUTES.process}>Our approach</Link>
+            <Link href={ROUTES.pricing}>Pricing</Link>
+            <Link href={ROUTES.insights}>Insights</Link>
             <Link href={ROUTES.start}>Contact SiteMint</Link>
           </div>
         </div>
@@ -79,6 +133,8 @@ export function MintChrome({ children }: { children: ReactNode }) {
           <div>
             <Link href={ROUTES.privacy}>Privacy</Link> ·{" "}
             <Link href={ROUTES.terms}>Terms</Link>
+            {" · "}
+            <a href={ROUTES.adminLogin}>Staff sign in</a>
           </div>
         </div>
       </footer>
