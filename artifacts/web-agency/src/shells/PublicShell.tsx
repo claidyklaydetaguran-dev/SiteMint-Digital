@@ -1,5 +1,5 @@
 /**
- * Frontend V2 — PublicShell (Phase 1).
+ * Public marketing shell. The v4 compatibility selector now uses Mint Clarity.
  *
  * The shell for the public marketing journey. One of exactly three intentional
  * shells (`PublicShell`, `AuthShell`, `DashboardShell`).
@@ -23,6 +23,7 @@
  */
 
 import { Suspense, type ReactNode } from "react";
+import { MintChrome } from "@/components/mint/MintChrome";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
@@ -30,8 +31,6 @@ import { SiteHeader } from "@/components/v2/SiteHeader";
 import { SiteFooter } from "@/components/v2/SiteFooter";
 import { SiteHeaderV3 } from "@/components/v3/SiteHeaderV3";
 import { SiteFooterV3 } from "@/components/v3/SiteFooterV3";
-import { SiteHeaderV4 } from "@/components/v4/SiteHeaderV4";
-import { SiteFooterV4 } from "@/components/v4/SiteFooterV4";
 import { useHashScrollV4 } from "@/components/v4/useHashScrollV4";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import { HOME_SECTIONS } from "@/lib/routes";
@@ -43,13 +42,12 @@ interface PublicShellProps {
   /** Which chrome wraps the page. See the module comment. */
   chrome?: "none" | "v2" | "v3" | "v4";
   /**
-   * V3/V4 chrome: pages that open on an ink hero let it run underneath the
-   * floating header ("ink"); light pages pad below it ("light").
+   * Legacy V3 tone. Mint Clarity renders its own light navigation.
    */
   heroTone?: "ink" | "light";
   /**
-   * V4 chrome only (IA §3 / L-7): `"product"` swaps the header's company CTA
-   * for the AI Receptionist product actions. See `SiteHeaderV4Props`.
+   * Retained for existing route compatibility. Mint navigation has one
+   * consistent sign-in chooser; product actions live in the page.
    */
   headerMode?: "company" | "product";
 }
@@ -59,7 +57,6 @@ export function PublicShell({
   routeLabel,
   chrome = "none",
   heroTone = "light",
-  headerMode = "company",
 }: PublicShellProps) {
   const [location] = useLocation();
   // Route-aware anchors (R1): resolves /#section navigations after lazy
@@ -68,41 +65,17 @@ export function PublicShell({
 
   const boundary = (
     <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
-      <Suspense fallback={<RouteFallback label={routeLabel ?? "Loading page"} />}>
+      <Suspense
+        fallback={<RouteFallback label={routeLabel ?? "Loading page"} />}
+      >
         {children}
       </Suspense>
     </RouteErrorBoundary>
   );
 
+  // Existing public routes opt into v4; this seam now renders Mint Clarity.
   if (chrome === "v4") {
-    // Frontend V4 "Signal": the V4 chrome plus the `.v4-shell` token remap —
-    // inside it the V3 tone/role system resolves to the Signal palette, so
-    // `.v3m-*` page vocabulary inherits V4 without markup changes
-    // (tokens-v4.css). V3 remains the rollback chrome.
-    return (
-      // Professional redesign perf fix (2026-09-09): the shell stamps the
-      // header mode (data-header-mode) so CSS can size --v4-hdr-h without a
-      // `:has()` — the :has() variant cost ~3.2s of Style & Layout on the
-      // receptionist product page under Lighthouse.
-      <div
-        className="v4-shell"
-        data-shell="public"
-        data-chrome="v4"
-        data-hero-tone={heroTone}
-        data-tone={heroTone === "ink" ? "ink" : "porcelain"}
-        data-header-mode={headerMode}
-      >
-        <RouteScrollManager />
-        <a className="v4-skip" href={`#${HOME_SECTIONS.main}`}>
-          Skip to main content
-        </a>
-        <SiteHeaderV4 tone={heroTone} headerMode={headerMode} />
-        <main id={HOME_SECTIONS.main} className="v4-shell__main" tabIndex={-1}>
-          {boundary}
-        </main>
-        <SiteFooterV4 />
-      </div>
-    );
+    return <MintChrome>{boundary}</MintChrome>;
   }
 
   if (chrome === "v3") {
@@ -137,7 +110,11 @@ export function PublicShell({
   }
 
   return (
-    <div className="v2-public-shell v2-shell" data-shell="public" data-chrome="v2">
+    <div
+      className="v2-public-shell v2-shell"
+      data-shell="public"
+      data-chrome="v2"
+    >
       <RouteScrollManager />
       <a className="v2-skip" href={`#${HOME_SECTIONS.main}`}>
         Skip to main content

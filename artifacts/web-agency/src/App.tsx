@@ -33,21 +33,10 @@ import { DashboardShell } from "@/shells/DashboardShell";
  */
 
 // ── Public marketing ────────────────────────────────────────────────────────
-// Frontend V5 (owner amendment, workbook W-1): the homepage renders HomeV5
-// under chrome="v4" — the V4 chrome, tokens, and Reveal-adjacent primitives
-// carry forward unchanged. HomeV4 stays in the repository, unrouted, as the
-// rollback reference (reused directly by HomeV5 for its hero mechanics) —
-// ROLLBACK: swap HomeV5 back to HomeV4 to revert instantly. V3 pages remain
-// routed under the V4 chrome (the .v4-shell token remap re-skins their
-// vocabulary); V3 components stay untouched as the rollback layer.
-// Perf (owner closeout directive): the landing route is EAGER — a lazy "/"
-// spent a second round-trip fetching the home chunk before the hero copy
-// (the LCP element) could render. Every other page stays lazy.
-import HomeV5 from "@/pages/HomeV5";
-// `HomeV4` is not imported here — it is no longer routed, and its only
-// remaining consumer is `HomeV5.tsx` (`import { SignalHeroV4 } from
-// "@/pages/HomeV4"`), which is enough to keep it in the bundle and keep it
-// as a rollback reference. Re-add a lazy import + Route here to roll back.
+// Approved Mint Clarity public design. The homepage is eager for first paint;
+// the receptionist page remains lazy. Existing service routes retain their
+// content and interactions inside the shared Mint public shell.
+import { MintHome } from "@/components/mint/MintHome";
 const ServicesV3 = lazyRoute(() => import("@/pages/ServicesV3"));
 const WebsitesAppsV3 = lazyRoute(() => import("@/pages/WebsitesAppsV3"));
 const DiscoverySystemsV3 = lazyRoute(() => import("@/pages/DiscoverySystemsV3"));
@@ -55,7 +44,7 @@ const DiscoverySystemsV3 = lazyRoute(() => import("@/pages/DiscoverySystemsV3"))
 // folds in a substantial CRM & internal systems section. `AutomationV3`
 // stays in the repository, unrouted, as a rollback reference — the old
 // `/automation` path 301s to `aiSystems` below instead of rendering it.
-const AiReceptionistV5 = lazyRoute(() => import("@/pages/AiReceptionistV5"));
+const MintReceptionist = lazyRoute(() => import("@/components/mint/MintReceptionist").then(m => ({default:m.MintReceptionist})));
 const AiReceptionistDemoV5 = lazyRoute(() => import("@/pages/AiReceptionistDemoV5"));
 const AiSystemsV5 = lazyRoute(() => import("@/pages/AiSystemsV5"));
 const WorkV3 = lazyRoute(() => import("@/pages/WorkV3"));
@@ -344,7 +333,7 @@ function Router() {
       <Route path={ROUTES.aiReceptionistDemo}>{() => <AiReceptionistDemoV5 />}</Route>
       {/* V5: the product page renders its own PublicShell (product header
           actions, ink hero) — no App-level shell wrapper here. */}
-      <Route path={ROUTES.aiReceptionist}>{() => <AiReceptionistV5 />}</Route>
+      <Route path={ROUTES.aiReceptionist}>{() => <MintReceptionist />}</Route>
 
       {/* ── Legacy AI Receptionist routes — redirect to helpdesk SPA ──────────
           Cross-application document navigations. These resolve through the
@@ -373,7 +362,7 @@ function Router() {
       <Route path={ROUTES.home}>
         {() => (
           <PublicShell routeLabel="The homepage" chrome="v4" heroTone="ink">
-            <HomeV5 />
+            <MintHome />
           </PublicShell>
         )}
       </Route>

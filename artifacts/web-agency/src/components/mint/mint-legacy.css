@@ -1,0 +1,180 @@
+/* The approved public-only palette. Existing service content and form logic remain intact. */
+.mint-site {
+  --v3-font-sans: "DM Sans", Arial, sans-serif;
+  --v3-font-serif: "DM Sans", Arial, sans-serif;
+  --v3-ink: #173f35;
+  --v3-charcoal: #e4f2e9;
+  --v3-charcoal-2: #d8ebe0;
+  --v3-porcelain: #f9fbf8;
+  --v3-white: #fff;
+  --v3-slate: #5a7066;
+  --v3-slate-d: #5a7066;
+  --v3-mint: #28745c;
+  --v3-mint-deep: #28745c;
+  --v3-cyan: #28745c;
+  --v3-ice: #e4f2e9;
+  --v3-bg: #fff;
+  --v3-fg: #203c34;
+  --v3-fg-muted: #5a7066;
+  --v3-line: #dbe6de;
+  --v4-font-display: "DM Sans", Arial, sans-serif;
+  --v4-font-body: "DM Sans", Arial, sans-serif;
+  color: #203c34;
+  background: #fff;
+  font-family: "DM Sans", Arial, sans-serif;
+}
+.mint-site [data-tone] {
+  --v3-bg: #fff;
+  --v3-fg: #203c34;
+  --v3-fg-muted: #5a7066;
+  --v3-line: #dbe6de;
+  --v3-line-strong: #91b1a0;
+  --v3-accent: #28745c;
+  --v3-accent-contrast: #fff;
+}
+.mint-site [data-tone="ink"],
+.mint-site [data-tone="charcoal"],
+.mint-site .v3m-page-hero {
+  --v3-bg: #e4f2e9;
+  --v3-fg: #203c34;
+  --v3-fg-muted: #5a7066;
+  background: #e4f2e9;
+  color: #203c34;
+}
+.mint-site .v3m-page-hero {
+  padding: 65px 0;
+}
+.mint-site .v3-display,
+.mint-site .v3-h1,
+.mint-site .v3-h2,
+.mint-site .v3-serif {
+  font-family: "DM Sans", Arial, sans-serif;
+  letter-spacing: -0.035em;
+  font-weight: 550;
+}
+.mint-site .v3-display {
+  font-size: clamp(36px, 4.8vw, 62px);
+  line-height: 1.12;
+}
+.mint-site .v3-btn {
+  border-radius: 7px;
+  font-family: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mint-site .v3-btn--primary {
+  background: #173f35;
+  color: white;
+  border-color: #173f35;
+}
+.mint-site .v3-btn--outline {
+  border-color: #8aa99a;
+  color: #173f35;
+  background: transparent;
+}
+.mint-site .sm-mark {
+  color: inherit;
+  background: none;
+}
+.mint-site .v3-eyebrow {
+  letter-spacing: 0;
+  text-transform: none;
+  color: #4d7564;
+}
+.mint-site .v3-reveal,
+.mint-site .reveal-fade-up,
+.mint-site .reveal-scale-settle {
+  opacity: 1;
+  transform: none;
+}
+.mint-site .mint-signin {
+  position: relative;
+  border: 0;
+  padding: 0;
+}
+.mint-site .mint-signin summary {
+  font-size: 14px;
+  font-weight: 400;
+  gap: 8px;
+}
+.mint-site .mint-signin summary:after {
+  font-size: 16px;
+}
+.mint-site .mint-signin > div {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 30;
+  width: 220px;
+  background: white;
+  border: 1px solid #dbe6de;
+  box-shadow: 0 12px 30px #173f3512;
+  border-radius: 8px;
+  padding: 8px;
+}
+.mint-site .mint-signin a {
+  display: block;
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 5px;
+}
+.mint-site .mint-signin a:hover {
+  background: #e4f2e9;
+}
+.mint-site > header nav {
+  gap: 20px;
+}
+@media (max-width: 1100px) {
+  .mint-site > header nav {
+    gap: 12px;
+    font-size: 12px;
+  }
+  .mint-site > header .button.compact {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 900px) {
+  .mint-site > header {
+    flex-wrap: wrap;
+  }
+  .mint-site .menu-toggle {
+    display: block;
+  }
+  .mint-site > header nav {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 16px;
+  }
+  .mint-site > header nav.open {
+    display: flex;
+  }
+  .mint-site > header nav > a {
+    padding: 10px;
+    font-size: 15px;
+  }
+  .mint-site .mint-signin {
+    padding: 10px;
+  }
+  .mint-site .mint-signin > div {
+    position: static;
+    margin-top: 12px;
+    width: 100%;
+    box-shadow: none;
+  }
+  .mint-site .v3m-page-hero {
+    padding: 38px 0;
+  }
+}
+
+/* Keep existing service-page primitives within the approved public palette. */
+.mint-site {
+ --sm-font-display: "DM Sans", Arial, sans-serif;
+ --sm-font-body: "DM Sans", Arial, sans-serif;
+ --sm-text: #203c34; --sm-text-muted: #5a7066;
+ --sm-mint-500: #28745c; --sm-mint-700: #173f35;
+ --sm-line: #dbe6de; --sm-line-strong: #91b1a0;
+}
+.mint-site .sm-mark::after { display: none; }
