@@ -37,6 +37,7 @@ An empty `crm_test_d` database was created on the development server for disposa
 - Initial backend run: 1,716 passed, 599 skipped, two failing tests and one failing suite. Git ownership configuration and a cold Svix import accounted for two files; both passed on targeted rerun (18 tests).
 - The remaining guard test exposed an eager database import when only reading the disposable-name allowlist. The helper now imports the client only when checking a connected database's identity. All four guard tests pass; the allowlist and identity enforcement are unchanged.
 - Full local backend rerun: 96 files passed, 36 skipped; 1,720 tests passed and 599 database-dependent tests skipped. Exit 0.
+- Complete backend suite on isolated release `6ff789b` with freshly bootstrapped `crm_test_d`: **132 files, 2,319 tests passed, no skips**, exit 0. Child environment excluded live provider credentials; test delivery mode was enabled. This establishes automated application behavior on the current schema, not successful live-provider delivery or production browser login.
 - Updated public frontend Vite build passed. Prerender passed: 22 documents and SPA fallback, exit 0.
 - Database-dependent tests and authenticated production journeys are not certified by the no-database unit run.
 - Voice staging health/readiness respond 200; browser reaches its sign-in page after retry. No successful authenticated staging journey is claimed yet.
@@ -49,8 +50,16 @@ An empty `crm_test_d` database was created on the development server for disposa
 
 ## Remaining release gates
 
-1. Verify isolated schema bootstrap and CRM/auth journeys with test-only fixtures and delivery sinks.
-2. Fresh production backup and restore rehearsal including CRM packet and domain migrations; verify data preservation and schema completeness.
+Fresh guarded backup completed from `neondb`, fingerprint `d375623a3d85`, to `/tmp/sitemint-backup-20260922.dump` inside Web Asset Builder: 229,840 bytes, mode 600. This temporary backup must not be packaged or committed. Restoration and upgrade verification remain separate requirements.
+
+Restore completed into newly created development-only `scratch_release_20260922` (fingerprint `355ba9dfb61e`). Both reviewed CRM packets (`0001`, `0002`) and voice/discovery/scheduling migrations passed using the identity-gated runners. Lead/task/discovery counts stayed 3/40/8. All 1,587 column definitions (type, nullability, default) match the test database. Staff and voice-notification tables are now present in the rehearsal only.
+
+Indexes/constraints are not byte-for-byte identical to the fresh schema: the restored database retains a partial unique email index on intake_firms rather than a named UNIQUE constraint, and an extra receptionist_sessions firm index and cascading firm foreign key. Counts: fresh 357 indexes / 409 constraints; rehearsal 358 / 409. Preserve existing objects and assess the differences; no production constraint was removed or changed. No current application reference to the named email constraint was found.
+
+Public package `02421d7`, source `f531741`, is pushed and checksum-verified in the marketing workspace. Replit republish was started; live verification is required before calling it deployed. Rollback directory: `mkt.rollback-mint-f531741`.
+
+1. Isolated schema bootstrap and all backend automated tests passed. Browser-authenticated journeys remain to verify.
+2. Backup and additive upgrade rehearsal passed with preserved checked record counts. Review the preserved index/constraint differences and production identity before production migration.
 3. Resolve production settings, build provenance and provider enablement.
 4. Deploy exact reviewed artifacts and verify public routes, staff access, invited portal access and receptionist access through the real domain.
 5. Publish evidence of supported pilot capabilities and unresolved provider dependencies. Do not claim the whole product is ready from HTTP status codes or passing unit tests alone.
