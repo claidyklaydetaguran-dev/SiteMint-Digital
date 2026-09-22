@@ -51,7 +51,7 @@ const APEX = "https://sitemintdigital.com";
  *
  * `/ai-toolkit` is deliberately absent — it is a public product microsite.
  */
-const PRIVATE_PREFIXES = ["/admin", "/ai-receptionist/dashboard", "/app", "/portal"];
+const PRIVATE_PREFIXES = ["/admin", "/ai-receptionist/dashboard", "/app", "/portal", "/ai-receptionist/signup", "/thank-you"];
 const isPrivateSurface = (pathname) =>
   PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
