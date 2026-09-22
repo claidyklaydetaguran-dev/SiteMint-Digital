@@ -1,3 +1,4 @@
+import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V3 — Selected work.
  *
@@ -393,6 +394,7 @@ export default function WorkV3() {
           </div>
         </div>
       </section>
+      <MintPageStory kind="work" />
 
       <section className="v3-section" data-tone="porcelain">
         <div className="v3-container v3-reveal" ref={reveal}>

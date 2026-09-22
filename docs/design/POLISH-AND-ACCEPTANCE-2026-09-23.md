@@ -85,3 +85,12 @@ Three generated illustrative business photographs, converted to 1536x1024 WebP: 
 - Final web-agency, helpdesk and API builds pass. Clean prerender completes 22 documents plus SPA fallback. Fourteen canonical public routes pass HTML title/description/canonical/H1 checks and have no missing referenced local assets. The local preview was restarted against this final output and visually rechecked.
 - Fixed the prerender browser-port collision by using a private ephemeral debugging port per run and a bounded startup check. Build and prerender must still run serially when sharing the same output directory.
 - Final candidate preview: http://127.0.0.1:8772/. This pass has not been published to production. Full receptionist/provider acceptance and the rest of the CRM staging write journeys remain open.
+
+## Visual expansion and connection evidence — 2026-09-23
+
+- Added five optimized illustrative scenes for Services, Receptionist, Work, Pricing and About. Generated people are explicitly illustrative, not represented as clients or staff.
+- Homepage now includes a three-choice business challenge selector and an expandable four-stage customer journey. Sticky navigation retains stable height; rounded arrow buttons and reduced-motion behavior are scoped to public pages. Sign-in choices explain the different workspaces.
+- TypeScript, Vite build, 17 test files / 161 tests and all 22 prerender documents passed. Desktop and 390px homepage checks show no horizontal overflow; selector changes the visual, copy and destination; sticky header stays at top.
+- Resend workspace key is sending-restricted (domain-list request returns restricted_api_key). One explicitly authorized test to owner/director addresses was accepted with provider id 01a0cb49-14ff-741d-a6f3-9c46181211c1. Director mailbox INBOX receipt independently confirmed through Gmail. Owner inbox not inspected. This is a provider test, not CRM or call-notification end-to-end acceptance. No global mail switch or campaign changed.
+- Workspace environment has no GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI / CALENDAR_CONNECT_ENABLED. CRM_BASE_URL remains a development hostname. Workspace TWILIO_AUTH_TOKEN absent; production previously reported configured, so workspace and deployment settings must be reconciled without assuming equivalence.
+- Google Cloud browser has only personal accounts available. Requested project-owner login; no Cloud terms accepted, no billing enabled, no permissions or credentials changed. OAuth test allowlist/production verification remain unresolved.

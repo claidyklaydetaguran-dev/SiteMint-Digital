@@ -9,6 +9,13 @@ import "./mint-scenes.css";
 export function MintChrome({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 24);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, []);
   const shellRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -54,7 +61,7 @@ export function MintChrome({ children }: { children: ReactNode }) {
       <a className="skip" href="#main-content">
         Skip to content
       </a>
-      <header ref={headerRef}>
+      <header ref={headerRef} data-scrolled={scrolled}>
         <Link className="logo" href={ROUTES.home}>
           <span className="mark" aria-hidden="true">
             s
@@ -110,8 +117,8 @@ export function MintChrome({ children }: { children: ReactNode }) {
           >
             <summary>Sign in</summary>
             <div>
-              <a href={DASHBOARD_URLS.login}>Receptionist workspace</a>
-              <a href="/portal/sign-in">Client portal</a>
+              <a href={DASHBOARD_URLS.login}>Receptionist workspace<small>Calls, appointments and your assistant</small></a>
+              <a href="/portal/sign-in">Client portal<small>Your website project, files and support</small></a>
               <Link href={`${ROUTES.start}#contact`}>
                 Need help signing in?
               </Link>

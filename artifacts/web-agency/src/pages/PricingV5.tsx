@@ -1,3 +1,4 @@
+import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V5 — Pricing (W-13 superseded by amendment §10; V5-BLUEPRINT §9).
  * Three tiers, the mandatory disclaimer, and a client-side "configure your
@@ -311,6 +312,7 @@ export default function PricingV5() {
           </div>
         </div>
       </section>
+      <MintPageStory kind="pricing" />
 
       <section className="v3-section" data-tone="white">
         <div className="v3-container v3-reveal" ref={reveal}>

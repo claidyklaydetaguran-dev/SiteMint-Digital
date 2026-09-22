@@ -1,3 +1,4 @@
+import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V3 — About page. Company facts only; no invented team bios,
  * awards, or history.
@@ -49,6 +50,7 @@ export default function AboutV3() {
           </p>
         </div>
       </section>
+      <MintPageStory kind="about" />
 
       <section className="v3-section" data-tone="porcelain">
         <div className="v3-container v3-reveal" ref={reveal}>

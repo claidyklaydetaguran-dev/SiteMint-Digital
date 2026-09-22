@@ -1,3 +1,4 @@
+import { MintPageStory } from "./MintStories";
 import { useState } from "react";
 import { PublicShell } from "@/shells/PublicShell";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -242,6 +243,7 @@ export function MintReceptionist() {
           </div>
         </div>
       </section>
+      <MintPageStory kind="receptionist" />
       <div className="benefit-strip wrap">
         <div>
           <span>{"☎"}</span>

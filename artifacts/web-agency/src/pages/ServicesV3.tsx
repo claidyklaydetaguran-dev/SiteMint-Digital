@@ -1,3 +1,4 @@
+import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V3/V5 — Services hub ("What We Build"). Orients, then routes to
  * the service pages.
@@ -291,6 +292,7 @@ export default function ServicesV3() {
           </div>
         </div>
       </section>
+      <MintPageStory kind="services" />
 
       <section className="v3-section" data-tone="porcelain">
         <div className="v3-container v3-reveal" ref={reveal}>

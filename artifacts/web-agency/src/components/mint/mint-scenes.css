@@ -103,3 +103,75 @@
   .mint-site .greeting { padding: 15px; left: 12px; right: 12px; bottom: 12px; }
   .mint-site .understanding-image img { aspect-ratio: 1.2; object-fit: cover; }
 }
+
+/* Stable sticky navigation: visual state changes never alter header geometry. */
+.mint-site > header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  max-width: none;
+  padding-inline: max(5%, calc((100vw - 1260px) / 2));
+  background: rgba(255, 255, 255, .97);
+  border-bottom: 1px solid transparent;
+  transition: box-shadow .25s ease, background .25s ease, border-color .25s ease;
+}
+.mint-site > header[data-scrolled="true"] {
+  background: rgba(249, 251, 248, .96);
+  backdrop-filter: blur(14px);
+  border-bottom-color: var(--line);
+  box-shadow: 0 8px 26px rgba(23,63,53,.07);
+}
+.mint-site > header nav > a:not(.button) { position: relative; }
+.mint-site > header nav > a:not(.button)::after {
+  content: ""; position: absolute; bottom: -7px; left: 0; right: 0;
+  height: 2px; background: var(--green); transform: scaleX(0);
+  transform-origin: left; transition: transform .2s ease;
+}
+.mint-site > header nav > a:hover::after,
+.mint-site > header nav > a[aria-current="page"]::after { transform: scaleX(1); }
+.mint-site .mint-signin small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); white-space: normal; margin-top: 3px; }
+.mint-site .mint-signin > div { min-width: 275px; }
+.mint-site .button, .mint-site .v3-btn {
+  border-radius: 999px; gap: 14px;
+  transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.mint-site a.button::after {
+  content: "↗"; display: grid; place-items: center; flex: 0 0 27px;
+  width: 27px; height: 27px; border-radius: 50%;
+  background: rgba(255,255,255,.15); transition: transform .2s ease;
+}
+.mint-site a.button.outline::after { background: rgba(23,63,53,.08); }
+.mint-site a.button:hover::after { transform: rotate(45deg); }
+.mint-site .button:hover, .mint-site .v3-btn:hover { box-shadow: 0 5px 14px rgba(23,63,53,.12); }
+.mint-site > header nav a.button:hover { color: white; }
+.mint-site section[id] { scroll-margin-top: calc(var(--mint-header-height) + 20px); }
+.mint-site .mint-finder { background: var(--paper); border-block: 1px solid var(--line); }
+.mint-site .finder-options { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin: 28px 0 36px; }
+.mint-site .finder-options button {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+  text-align: left; background: white; color: var(--forest);
+  transition: background .2s, border-color .2s;
+}
+.mint-site .finder-options button[aria-pressed="true"] { background: var(--forest); border-color: var(--forest); color: white; }
+.mint-site .finder-options button:hover:not([aria-pressed="true"]) { background: var(--mint); }
+.mint-site .finder-result .story-image img { aspect-ratio: 1.5; object-fit: cover; }
+.mint-site .finder-result h3 { font-size: clamp(27px,3vw,38px); line-height: 1.2; }
+.mint-site .mint-page-story { padding-block: clamp(56px,7vw,100px); }
+.mint-site .launch-layout { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(24px,5vw,64px); align-items: start; }
+.mint-site .launch-steps details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+.mint-site .launch-steps summary { cursor: pointer; font-weight: 550; font-size: 19px; }
+.mint-site .launch-steps summary span { font-size: 12px; color: var(--green); margin-right: 14px; }
+.mint-site .launch-steps p { margin: 16px 0 4px; font-size: 15px; }
+@media (max-width: 760px) {
+  .mint-site .finder-options, .mint-site .launch-layout { grid-template-columns: 1fr; }
+  .mint-site .finder-options { gap: 8px; }
+  .mint-site .finder-options button { padding: 15px 18px; }
+  .mint-site .finder-result .story-copy { order: 0; }
+  .mint-site > header nav.open { max-height: calc(100svh - 90px); overflow-y: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mint-site > header, .mint-site .button, .mint-site .v3-btn,
+  .mint-site a.button::after, .mint-site > header nav > a::after,
+  .mint-site .finder-options button { transition: none; }
+}

@@ -1,3 +1,4 @@
+import { MintServiceFinder, MintLaunchJourney } from "./MintStories";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import ownerPhoto from "@/assets/mint/business-owner.webp";
 import understandingPhoto from "@/assets/mint/understanding.webp";
@@ -160,6 +161,7 @@ export function MintHome() {
           </article>
         </div>
       </section>
+      <MintServiceFinder />
       <section className="section wrap story-chapter" aria-labelledby="website-story-title">
         <figure className="story-image">
           <img src={websitePhoto} alt="Illustration of a business owner and designer reviewing a website on desktop and mobile" width="1536" height="1024" loading="lazy" decoding="async" />
@@ -269,6 +271,7 @@ export function MintHome() {
           </div>
         </div>
       </section>
+      <MintLaunchJourney />
       <section className="section wrap" style={{ paddingTop: "10px" }}>
         <div className="faq">
           <h2>{"A few things you might be wondering."}</h2>
