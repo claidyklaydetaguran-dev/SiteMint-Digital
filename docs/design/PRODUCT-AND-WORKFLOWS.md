@@ -205,7 +205,7 @@ Release order: identify source and target → validate config → fresh backup �
 
 ## 8. Launch evidence — still required
 
-As checked 2026-09-22, the public marker is `3094afe`; polish `a6ff07d` is packaged as `6ff789b` but not yet confirmed live. Health is 200; readiness is 404. Private routes serve older frontend assets. Web Asset Builder's UI reports its last successful publish about two months ago. These are release blockers, not proof that the newer source is absent.
+The public Mint Clarity release is verified live at source `f531741`, packaged as `02421d7`. The backend retry also published successfully; health/readiness return 200, and staff setup, client-portal sign-in and receptionist sign-in render through the public domain. Exact evidence is in `LAUNCH-AUDIT-2026-09-22.md`; the public marker does not identify the API or private applications. The production additive schema upgrade passed after a restore rehearsal. Replit's initial generated migration proposed reversing that upgrade because development was stale; that publish was cancelled. Development was then upgraded and its public columns, constraints and indexes match production. Authenticated journeys remain a separate acceptance requirement: the business owner's password setup is pending with the owner.
 
 To call the site ready: verify public inquiry persistence; staff login/reload/logout and role refusal; invited client access to only their data; receptionist login/setup and tenant refusal; calendar/request distinction; correct worker/error status; real-domain routes/assets. Record exact environment, build, action and observed result. Staging is authorized for test accounts and sample records; production test records are not authorized.
 
