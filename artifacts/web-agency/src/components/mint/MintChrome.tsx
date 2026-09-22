@@ -4,10 +4,25 @@ import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import "./mint.css";
 import "./mint-legacy.css";
+import "./mint-scenes.css";
 
 export function MintChrome({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => shellRef.current?.style.setProperty(
+      "--mint-header-height", `${header.getBoundingClientRect().height}px`,
+    );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+  const immersive = ["/", "/services", "/websites-apps", "/discovery-systems", "/ai-systems", "/ai-receptionist", "/about", "/process", "/work", "/insights"].includes(location);
   const menuRef = useRef<HTMLButtonElement>(null);
   const signinRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -34,12 +49,12 @@ export function MintChrome({ children }: { children: ReactNode }) {
     [ROUTES.about, "About"],
   ] as const;
   return (
-    <div className="mint-site" data-shell="public" data-chrome="mint">
+    <div ref={shellRef} className="mint-site" data-shell="public" data-chrome="mint" data-immersive={immersive}>
       <RouteScrollManager />
       <a className="skip" href="#main-content">
         Skip to content
       </a>
-      <header>
+      <header ref={headerRef}>
         <Link className="logo" href={ROUTES.home}>
           <span className="mark" aria-hidden="true">
             s

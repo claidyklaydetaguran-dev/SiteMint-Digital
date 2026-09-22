@@ -27,11 +27,11 @@ import "@/styles/v5-pages.css";
 const productionWork = [
   {
     icon: AudioLines,
-    kicker: capabilityLabelsV5["private-beta"],
+    kicker: "Assisted pilot",
     title: "SiteMint AI Receptionist platform",
-    body: "Our own voice and SMS receptionist product: answering, qualifying, and handing off to people — with consent handling, opt-out enforcement, and firm-scoped data isolation built into the platform itself. Currently in private, invite-only beta.",
+    body: "Our receptionist product helps answer questions, capture messages, and arrange appointments. Each business joins through assisted setup and testing. Calendar booking, transfers, and notifications depend on verified connections; caller SMS is not included in the pilot.",
     detail:
-      "Runs on the same discipline we sell: explicit recording policy, human handoff on every path, and an audit trail behind every automated action.",
+      "Review your business rules and fallback handling with us before connecting a live number.",
     href: ROUTES.aiReceptionist,
     linkLabel: "See the product",
   },

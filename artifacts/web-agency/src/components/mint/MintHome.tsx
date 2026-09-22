@@ -1,5 +1,7 @@
 import { usePageMeta } from "@/hooks/usePageMeta";
 import ownerPhoto from "@/assets/mint/business-owner.webp";
+import understandingPhoto from "@/assets/mint/understanding.webp";
+import websitePhoto from "@/assets/mint/website-review.webp";
 export function MintHome() {
   usePageMeta({
     title: "SiteMint Digital | Websites, AI Receptionists & Business Systems",
@@ -158,6 +160,23 @@ export function MintHome() {
           </article>
         </div>
       </section>
+      <section className="section wrap story-chapter" aria-labelledby="website-story-title">
+        <figure className="story-image">
+          <img src={websitePhoto} alt="Illustration of a business owner and designer reviewing a website on desktop and mobile" width="1536" height="1024" loading="lazy" decoding="async" />
+          <figcaption>Illustrative design review · Your business shapes the direction.</figcaption>
+        </figure>
+        <div className="story-copy">
+          <span className="tag">From first impression to first conversation</span>
+          <h2 id="website-story-title">Make it easy to see why you’re the right choice.</h2>
+          <p>A useful website answers the questions your next customer already has: what you do, who you help, and how to get started.</p>
+          <ol className="story-checkpoints">
+            <li><span>01</span><div><strong>Show the work</strong><p>Services, genuine examples and a clear sense of your business.</p></div></li>
+            <li><span>02</span><div><strong>Make the next step obvious</strong><p>A focused inquiry journey, designed for phones as well as desktops.</p></div></li>
+            <li><span>03</span><div><strong>Give every inquiry a place</strong><p>Agree where new requests go and who follows up before launch.</p></div></li>
+          </ol>
+          <a className="more" href="/websites-apps">Explore our website service</a>
+        </div>
+      </section>
       <section className="wrap">
         <div className="feature">
           <div>
@@ -216,6 +235,10 @@ export function MintHome() {
             }
           </p>
         </div>
+        <figure className="understanding-image story-image">
+          <img src={understandingPhoto} alt="Illustration of a business owner and designer discussing goals with paper wireframes at a table" width="1536" height="1024" loading="lazy" decoding="async" />
+          <figcaption>Illustrative planning session · Listen first. Build with purpose.</figcaption>
+        </figure>
         <div className="steps">
           <div className="step">
             <span>{"Step 1"}</span>

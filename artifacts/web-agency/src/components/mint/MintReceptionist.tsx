@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PublicShell } from "@/shells/PublicShell";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import ownerPhoto from "@/assets/mint/business-owner.webp";
+import focusPhoto from "@/assets/mint/business-focus.webp";
 function ScenarioContent({ selected }: { selected: string }) {
   switch (selected) {
     case "booking":
@@ -226,9 +227,9 @@ export function MintReceptionist() {
           </div>
           <div
             className="reception-photo"
-            role="img"
-            aria-label="Illustrative business owner at work"
+
           >
+            <img className="reception-scene" src={focusPhoto} alt="Illustrative shop owner focusing on her work beside a phone" width="1536" height="1024" fetchPriority="high" />
             <div className="greeting">
               <div className="phone-icon">{"☎"}</div>
               <div>

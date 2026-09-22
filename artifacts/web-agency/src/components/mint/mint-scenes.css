@@ -1,0 +1,105 @@
+/* Still-image scenes are the baseline for a later optional scroll animation.
+   Minimum height preserves content at zoom and on short/mobile viewports. */
+.mint-site {
+  --mint-header-height: 94px;
+}
+.mint-site .clarity-hero,
+.mint-site .reception-hero,
+.mint-site[data-immersive="true"] .v3m-page-hero {
+  min-height: calc(100svh - var(--mint-header-height));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  isolation: isolate;
+  margin: 0;
+}
+.mint-site .clarity-hero .hero-layout {
+  flex: 1;
+}
+.mint-site .hero-service-line {
+  flex-shrink: 0;
+}
+.mint-site .reception-photo {
+  background: #dcebdd;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.mint-site .reception-scene {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 55% center;
+}
+.mint-site .greeting {
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+}
+.mint-site .story-chapter {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: clamp(28px, 5vw, 72px);
+  align-items: center;
+}
+.mint-site .story-image {
+  margin: 0;
+  min-width: 0;
+}
+.mint-site .story-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+.mint-site .story-image figcaption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  padding-top: 12px;
+}
+.mint-site .story-copy h2 {
+  text-wrap: balance;
+}
+.mint-site .story-checkpoints {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0;
+}
+.mint-site .story-checkpoints li {
+  display: flex;
+  gap: 18px;
+  padding: 17px 0;
+  border-top: 1px solid var(--line);
+}
+.mint-site .story-checkpoints li > span {
+  color: var(--green);
+  font-size: 12px;
+  padding-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.mint-site .story-checkpoints p {
+  font-size: 14px;
+  margin: 5px 0 0;
+}
+.mint-site .understanding-image {
+  margin-bottom: 38px;
+}
+.mint-site .understanding-image img {
+  max-height: 520px;
+  object-fit: cover;
+  object-position: center 45%;
+}
+@media (min-width: 1100px) {
+  .mint-site .hero-portrait {
+    max-height: 620px;
+  }
+}
+@media (max-width: 760px) {
+  .mint-site { --mint-header-height: 80px; }
+  .mint-site .story-chapter { grid-template-columns: 1fr; }
+  .mint-site .story-copy { order: -1; }
+  .mint-site .greeting { padding: 15px; left: 12px; right: 12px; bottom: 12px; }
+  .mint-site .understanding-image img { aspect-ratio: 1.2; object-fit: cover; }
+}

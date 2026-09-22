@@ -13,8 +13,8 @@ export type ReadinessTier = "available" | "in-development" | "planned";
 
 export const READINESS: Record<ReadinessTier, { label: string; note: string }> = {
   available: {
-    label: "Available now",
-    note: "In production today.",
+    label: "Assisted pilot",
+    note: "Enabled after setup and acceptance checks for your business.",
   },
   "in-development": {
     label: "In development",
@@ -35,13 +35,13 @@ export const CAPABILITY_STATUS: Array<{
   {
     capability: "Voice receptionist",
     description:
-      "Answers calls in a natural voice, takes messages with what the caller needs, and emails you a summary. You can test it in your browser before connecting a number.",
+      "Configure and test your receptionist with our help before connecting your business number. Summary emails depend on your notification setup.",
     tier: "available",
   },
   {
     capability: "Appointment booking and team access",
     description:
-      "Books an appointment into your connected calendar once the caller confirms, and lets your team sign in with their own passwords and roles.",
+      "Connect your own calendar and verify booking during setup. Unconfirmed times remain requests. Team members use their own accounts and roles.",
     tier: "available",
   },
   {

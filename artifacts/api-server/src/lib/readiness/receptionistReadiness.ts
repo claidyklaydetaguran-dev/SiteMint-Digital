@@ -98,7 +98,7 @@ export const OVERALL_COPY: Record<OverallState, { label: string; detail: string 
   ready_to_test: { label: "Ready to test", detail: "Your receptionist is published. Talk to it in the browser before connecting a phone number." },
   ready_to_activate_phone: { label: "Ready to activate phone", detail: "Your test call worked. Connect a phone number so callers can reach it." },
   phone_connected: { label: "Phone connected", detail: "Your number is connected. Call it once to confirm a real call is answered." },
-  live_call_verified: { label: "Live call verified", detail: "A real call to your number was answered. Your receptionist is live." },
+  live_call_verified: { label: "Live call verified", detail: "A real call to your number was answered. Check current connections before relying on booking or notifications." },
   paused: { label: "Paused", detail: "Your phone number is paused, so calls are not being answered. Resume it when you're ready." },
   needs_attention: { label: "Needs attention", detail: "Something stopped working. Fix the item marked below." },
   not_checked: { label: "Not checked", detail: "SiteMint couldn't check everything just now. Try again in a moment." },
@@ -129,7 +129,7 @@ export function deriveReadiness(f: ReadinessFacts, now: Date = new Date()): Read
     check("business_name", "Business name", f.businessNamed, "Saved.", "Add your business name.", "/account/settings"),
     check("business_trade", "What your business does", f.businessTradeSet, "Saved.", "Say what your business does, so the receptionist can describe it.", "/account/settings"),
     check("timezone", "Timezone", f.timezoneSet, "Saved.", "Choose your timezone, so times are right.", "/account/settings"),
-    check("email", "Confirmed email", f.emailVerified, "Confirmed. Call summaries can reach you.", "Confirm your email address. Nothing is sent to an unconfirmed address.", "/verify-email"),
+    check("email", "Confirmed email", f.emailVerified, "Email address confirmed. This does not verify summary delivery.", "Confirm your email address. Nothing is sent to an unconfirmed address.", "/verify-email"),
   ];
 
   const greeting: ReadinessCheck[] = [

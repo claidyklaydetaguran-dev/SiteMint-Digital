@@ -429,8 +429,8 @@ function EmailComposeModal({ leadsLoad, templatesLoad, onRetry, retrying, onClos
                       <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-teal-600 hover:text-teal-800"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60"
-                      placeholder="Enter name or email" value={toSearch} onChange={e => setToSearch(e.target.value)} />
+                    <input autoFocus aria-label="Search existing contacts" className="flex-1 min-w-0 text-sm focus:outline-none placeholder:text-muted-foreground/60"
+                      placeholder="Search existing contacts" value={toSearch} onChange={e => setToSearch(e.target.value)} />
                   )}
                   <div className="ml-auto flex gap-2 text-xs text-blue-500">
                     <button onClick={() => setCcOpen(o => !o)}>CC</button>
@@ -447,11 +447,18 @@ function EmailComposeModal({ leadsLoad, templatesLoad, onRetry, retrying, onClos
                         </div>
                         <div className="text-left">
                           <p className="text-sm font-medium text-foreground">{l.name}</p>
-                          {l.phone && <p className="text-xs text-muted-foreground">{l.phone}</p>}
+                          <p className="text-xs text-muted-foreground">{l.email || "No email address saved"}</p>
                         </div>
                       </button>
                     ))}
                   </div>
+                )}
+                {leads !== null && !toLead && (
+                  <p className="mt-2 text-xs text-muted-foreground" role="status">
+                    {toSearch.trim() && toResults.length === 0
+                      ? "No matching contact. This composer sends to saved contacts; add the recipient in Contacts first."
+                      : "Choose a saved contact to select their email address."}
+                  </p>
                 )}
                 {/* Searching an unloaded list finds nobody, which reads as "you have nobody". */}
                 {leads === null && !toLead && (

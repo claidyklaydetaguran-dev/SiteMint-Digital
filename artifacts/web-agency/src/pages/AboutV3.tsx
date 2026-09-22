@@ -44,7 +44,7 @@ export default function AboutV3() {
             including our own. The discovery flow on this site is the same
             structured intake we build for clients. The automation and CRM
             we recommend runs our own follow-up. Our AI Receptionist product is
-            in private, invite-only beta. We use what we build, which keeps
+            offered through an assisted pilot. We use what we build, which keeps
             us honest about what works and what's still in progress.
           </p>
         </div>

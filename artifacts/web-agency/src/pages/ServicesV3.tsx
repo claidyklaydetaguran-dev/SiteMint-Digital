@@ -165,7 +165,10 @@ function SystemsMap() {
     // fragment must land in the address bar (replace, not push — overlay-free
     // in-page moves never add history entries).
     history.replaceState(history.state, "", `#${id}`);
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(id)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
   }
 
   return (
@@ -186,6 +189,7 @@ function SystemsMap() {
         />
         {pillars.map((p) => {
           const isActive = active === p.id;
+          const Icon = p.icon;
           return (
             <a key={p.id} href={`#${p.id}`} tabIndex={-1} className="sm-map-node">
               <circle
@@ -213,6 +217,14 @@ function SystemsMap() {
                   e.preventDefault();
                   jumpTo(p.id);
                 }}
+              />
+              <Icon
+                x={p.mapPos.x - 11}
+                y={p.mapPos.y - 11}
+                width={22}
+                height={22}
+                aria-hidden="true"
+                style={{ pointerEvents: "none", color: isActive ? "#fff" : "#173f35" }}
               />
               <text
                 x={p.mapPos.x}

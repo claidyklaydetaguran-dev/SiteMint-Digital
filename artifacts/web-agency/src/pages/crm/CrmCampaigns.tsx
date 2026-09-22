@@ -468,7 +468,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
   const [activeDiscTab, setActiveDiscTab]   = useState<DiscStyle>("Driver");
   const [testEmail, setTestEmail]           = useState("");
   const [testSending, setTestSending]       = useState(false);
-  const [testResult, setTestResult]         = useState<{ ok: boolean; message: string } | null>(null);
+  const [testResult, setTestResult]         = useState<{ ok: boolean; message: string; providerAccepted?: boolean } | null>(null);
 
   // ── Analytics ──
   const [analyticsData, setAnalyticsData]       = useState<CampaignAnalytics | null>(null);
@@ -1012,10 +1012,11 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
       const d = await r.json();
       setTestResult({
         ok: r.ok,
+        providerAccepted: r.ok && d.testMode === false,
         message: r.ok
           ? (d.testMode
               ? `Test mode — simulated send to ${testEmail} (no email actually sent).`
-              : `Test email sent to ${testEmail} ✓`)
+              : `Email provider accepted the test for ${testEmail}. Inbox delivery is not yet confirmed.`)
           : (d.error ?? "Failed to send test email"),
       });
     } catch {
@@ -3004,7 +3005,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                   const hasRecipients = selectedLeads.size > 0;
                   const hasEmail      = validEmailLeads.length > 0;
                   const hasPersonalization = hasSubject && hasBody;
-                  const testDone      = !!(testResult?.ok);
+                  const testDone      = testResult?.providerAccepted === true;
 
                   const checks: Array<{ label: string; pass: boolean; warn: boolean; detail?: string }> = [
                     { label: "Subject line",          pass: hasSubject,        warn: false },
@@ -3013,7 +3014,7 @@ export default function CrmCampaigns({ initialView = "history" }: { initialView?
                     { label: "Valid email coverage",  pass: hasEmail,          warn: !hasEmail, detail: hasRecipients ? `${validEmailLeads.length} of ${selectedLeads.size} have email` : undefined },
                     { label: "DISC personalization",  pass: hasPersonalization, warn: false },
                     ...(skippedRisk > 0 ? [{ label: `${skippedRisk} lead${skippedRisk !== 1 ? "s" : ""} may be skipped (no email)`, pass: false, warn: true }] : []),
-                    { label: "Test send completed",   pass: testDone, warn: !testDone, detail: testDone ? "Verified" : "Recommended" },
+                    { label: "Email provider acceptance", pass: testDone, warn: !testDone, detail: testDone ? "Accepted; delivery unconfirmed" : testResult?.ok ? "Simulated only" : "Not checked" },
                   ];
 
                   const hasErrors = checks.some(c => !c.pass && !c.warn);

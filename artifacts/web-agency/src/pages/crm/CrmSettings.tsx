@@ -322,7 +322,7 @@ export default function CrmSettings() {
     {
       title: "Webhook Base URL",
       status: hBaseUrl,
-      desc: hBaseUrl === "healthy" ? "CRM_BASE_URL set — Twilio can route inbound events."
+      desc: hBaseUrl === "healthy" ? "Callback base URL configured. Verify the displayed URLs against the deployed domain and provider console."
         : hBaseUrl === "action" ? "CRM_BASE_URL missing — Twilio cannot deliver SMS or calls."
         : phoneNote,
       action: hBaseUrl === "action" ? "Set CRM_BASE_URL to your deployed domain" : undefined,
@@ -1070,10 +1070,10 @@ export default function CrmSettings() {
           </div>
           <div className="space-y-3 text-sm">
             {[
-              { color: "bg-green-500", title: "CRM is protected behind admin authentication", sub: "All /api/crm/* endpoints require a valid Bearer token." },
+              { color: "bg-green-500", title: "Staff accounts and permissions", sub: "Staff use individual sign-ins. Protected CRM actions check the permissions assigned to their role." },
               { color: "bg-green-500", title: "API keys are stored as environment variables", sub: "Resend, Twilio and session secrets are never exposed to the frontend." },
-              { color: "bg-green-500", title: "Admin password is fail-closed", sub: "There is no default password. If ADMIN_PASSWORD is unset, admin login is unavailable (503) rather than guessable." },
-              { color: "bg-yellow-500", title: "One shared staff identity", sub: "Everyone signs in with the same password — per-staff accounts, roles, and password recovery are not built yet." },
+              { color: "bg-green-500", title: "Personal account security", sub: "Manage your own password and account details under My Account. Do not share a staff login." },
+              { color: "bg-yellow-500", title: "Review access before inviting staff", sub: "Manage actual accounts, invitations and roles in People. A name in a directory does not grant access." },
             ].map(({ color, title, sub }) => (
               <div key={title} className="flex items-start gap-3">
                 <div className={`w-2 h-2 rounded-full ${color} mt-1.5 shrink-0`} />
@@ -1093,26 +1093,12 @@ export default function CrmSettings() {
             <h2 className="font-semibold text-sm text-foreground">Team Members</h2>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Static directory. Team members do not have individual logins yet — task and lead
-            "Assigned" fields reference these names as plain text.
+            View current staff accounts and their access in People. Account invitations and
+            permissions are managed there; customer receptionist accounts are separate.
           </p>
-          <div className="space-y-2">
-            {[
-              { name: "Claidy Taguran", role: "Technical Director" },
-              { name: "Shasta Greene", role: "Head of Strategy" },
-              { name: "Saisa Lorraigne", role: "Project & Admin Manager" },
-            ].map(m => (
-              <div key={m.name} className="flex items-center gap-3 p-2.5 bg-muted rounded-lg">
-                <div className="w-8 h-8 bg-foreground/10 rounded-full flex items-center justify-center text-sm font-bold text-foreground shrink-0">
-                  {m.name[0]}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground break-words">{m.name}</p>
-                  <p className="text-xs text-muted-foreground break-words">{m.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <a href="/admin/crm/people" className="text-sm font-medium text-primary underline underline-offset-4">Manage staff accounts</a>
+          <span aria-hidden="true"> · </span>
+          <a href="/admin/crm/account" className="text-sm font-medium text-primary underline underline-offset-4">My account</a>
         </div>
 
       </div>

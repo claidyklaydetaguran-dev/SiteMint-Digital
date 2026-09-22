@@ -363,9 +363,9 @@ export default function Overview() {
               <div className="sd-empty">
                 <h3 className="sd-empty__title">No conversations yet</h3>
                 <p className="sd-empty__detail">
-                  When someone texts your business number, the receptionist replies and the
-                  conversation appears here. You can change what it says under Current SMS
-                  Receptionist.
+                  Messages appear here when a supported messaging channel is configured.
+                  Caller SMS is not included in the assisted pilot; review calls and
+                  appointment requests in their own sections.
                 </p>
               </div>
             ) : (

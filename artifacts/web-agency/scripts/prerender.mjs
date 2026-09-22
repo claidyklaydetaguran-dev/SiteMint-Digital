@@ -135,18 +135,28 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const ORIGIN = `http://127.0.0.1:${server.address().port}`;
 
 // ── 2 · Headless Chrome over CDP ────────────────────────────────────────
-const PORT = 9591;
 const profile = await mkdtemp(join(tmpdir(), "prerender-"));
 const chrome = spawn(
   CHROME,
-  ["--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
+  ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`,
     "--no-first-run", "--disable-gpu", "--autoplay-policy=no-user-gesture-required", "about:blank"],
   { stdio: "ignore" },
 );
 let v;
 for (let i = 0; i < 60; i++) {
-  try { v = await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json(); break; }
+  try {
+    // Read this process's private port, never attach to another build's Chrome.
+    const port = Number((await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]);
+    if (!Number.isInteger(port) || port <= 0) throw new Error("Chrome port not ready");
+    v = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(1000) })).json();
+    break;
+  }
   catch { await new Promise((r) => setTimeout(r, 250)); }
+}
+if (!v?.webSocketDebuggerUrl) {
+  chrome.kill();
+  server.close();
+  throw new Error("Prerender Chrome did not become ready; no output written.");
 }
 const ws = new WebSocket(v.webSocketDebuggerUrl);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
