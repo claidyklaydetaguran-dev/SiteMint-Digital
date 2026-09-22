@@ -55,7 +55,7 @@ export function usePageMeta({ title, description, canonicalPath }: PageMeta): vo
       el.setAttribute("content", value);
       return () => el.setAttribute("content", prev);
     };
-    const path = window.location.pathname.replace(/\/$/, "");
+    const path = (canonicalPath ?? window.location.pathname).replace(/\/$/, "");
     const restores = [
       sync('meta[property="og:title"]', title),
       sync('meta[property="og:description"]', description),

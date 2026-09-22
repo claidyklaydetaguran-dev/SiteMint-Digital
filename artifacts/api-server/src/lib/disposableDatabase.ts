@@ -20,7 +20,6 @@
  */
 
 import { sql } from "drizzle-orm";
-import { db } from "@workspace/db";
 
 /**
  * Databases a suite may wipe. Anything else is refused.
@@ -49,6 +48,9 @@ let cached: string | null = null;
 
 export async function currentDatabaseName(): Promise<string> {
   if (cached) return cached;
+  // Inspecting the allowlist must not require a configured database. Resolve
+  // the client only when checking the identity of an actual connection.
+  const { db } = await import("@workspace/db");
   const rows = await db.execute(sql`select current_database() as name`);
   // drizzle returns either rows[] or { rows: [] } depending on the driver.
   const first = (Array.isArray(rows) ? rows[0] : (rows as { rows?: unknown[] }).rows?.[0]) as
