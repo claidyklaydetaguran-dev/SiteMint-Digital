@@ -13,6 +13,22 @@ These are the intended account assignments, not a claim that accounts have been 
 
 Exact account addresses are kept in the owner's local launch notes, outside public release source.
 
+## Launch acceptance checkpoint — 2026-09-23
+
+The agreed flowcharts below remain the target. A page or implemented route is not proof of an accepted end-to-end workflow.
+
+| Journey | Current evidence | Remaining acceptance |
+| --- | --- | --- |
+| Public discovery | Expanded Mint Clarity source ac5449b is live; major public routes and homepage interactions checked | Trace an authorized inquiry into CRM without contacting unrelated recipients |
+| Staff CRM | Owner setup and authenticated settings previously verified | Director provisioning, role boundaries, contact/lead/deal/task/support writes in staging |
+| Project client portal | Live sign-in route loads | Invitation, sign-in and per-client document/ticket isolation in staging |
+| Receptionist onboarding | Live sign-in route loads; production Google project, client, API, scopes and three test users configured | Production account session, OAuth callback, calendar selection, availability and booking acceptance |
+| Call handling | Implemented provider and post-call paths; historical call evidence | Production callback destination, synchronized assistant, authorized new call and durable outcomes |
+| Email | Direct provider test accepted; director inbox receipt confirmed | Real CRM application send and post-call delivery, retries and duplicate prevention |
+| Subscription/usage | Assisted pilot uses request pricing | Cost/margin review and separately authorized payment acceptance before billing customers |
+
+Launch sequence: public presentation first; prove intake and staff follow-up; connect and verify each pilot business; enable live call handling only after provider acceptance. Google Testing access is limited to approved accounts and does not establish public OAuth verification. Test records remain in staging. Real calls, SMS and payments require their separately agreed test scope.
+
 ## 1. Product structure
 
 SiteMint Digital is a digital studio with three offers: websites and web apps, business systems, and an AI receptionist subscription. Visitors should understand the business outcome, inspect examples, and take one useful next step. Mint Clarity remains the visual identity.
