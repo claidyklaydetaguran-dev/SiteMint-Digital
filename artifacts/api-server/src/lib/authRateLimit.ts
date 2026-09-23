@@ -88,21 +88,61 @@ setInterval(() => {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
- * Derive the real client IP from X-Forwarded-For (set by Replit's reverse
- * proxy). Takes the leftmost (client-set) value from the comma-separated list.
- * Falls back to the raw socket address for local dev where no proxy is present.
+ * Number of reverse-proxy hops whose X-Forwarded-For entries may be trusted.
+ * `TRUSTED_PROXY_HOPS` when set (0–10); otherwise 1 in production (Replit's
+ * edge is always exactly one hop in front of the container) and 0 elsewhere,
+ * where no proxy exists and the socket address is the client.
+ */
+export function trustedProxyHopsForLimiters(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env["TRUSTED_PROXY_HOPS"];
+  if (raw !== undefined) {
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 && n <= 10 ? n : 0;
+  }
+  return env["NODE_ENV"] === "production" ? 1 : 0;
+}
+
+/**
+ * Pure derivation shared with the tests: the address the OUTERMOST trusted
+ * proxy observed. Each proxy appends the address it received the connection
+ * from, so only the rightmost `hops` entries were written by our own
+ * infrastructure; everything further left came from the caller and is
+ * forgeable. A chain shorter than the configured topology means the request
+ * did not traverse it, so the socket address is used instead.
+ */
+export function clientIpFromForwardedChain(
+  forwardedFor: string | string[] | undefined,
+  socketAddress: string | undefined,
+  hops: number,
+): string {
+  const fallback = socketAddress ?? "unknown";
+  if (hops === 0) return fallback;
+  const raw = Array.isArray(forwardedFor) ? forwardedFor.join(",") : forwardedFor ?? "";
+  const chain = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const idx = chain.length - hops;
+  if (idx < 0 || idx >= chain.length) return fallback;
+  return chain[idx] ?? fallback;
+}
+
+/**
+ * Derive the client IP for rate limiting.
+ *
+ * Launch security audit (2026-09-24, owner-authorised edit): the previous
+ * implementation took the LEFTMOST X-Forwarded-For value, which the caller
+ * controls, so a random header per request bypassed every limiter built on
+ * this helper (admin login, receptionist login/signup, public forms). It now
+ * uses the same trusted-hop derivation as `staffAuth.deriveClientIp`.
  *
  * Note: app.ts does NOT set `trust proxy`; IP derivation is scoped to this
  * helper so there are no side effects on req.ip / req.protocol across other
  * routes.
  */
 export function getClientIp(req: Request): string {
-  const xff = req.headers["x-forwarded-for"];
-  if (xff) {
-    const raw = Array.isArray(xff) ? xff[0]! : xff;
-    return raw.split(",")[0]!.trim();
-  }
-  return req.socket.remoteAddress ?? "unknown";
+  return clientIpFromForwardedChain(
+    req.headers["x-forwarded-for"],
+    req.socket.remoteAddress,
+    trustedProxyHopsForLimiters(),
+  );
 }
 
 /**

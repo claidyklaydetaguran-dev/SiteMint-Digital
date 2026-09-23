@@ -83,17 +83,30 @@ router.post("/discovery/submit", async (req: Request, res: Response) => {
       })
       .returning();
 
-    const emailResult = await sendFormEmails({
-      formName: "Discovery Questionnaire",
-      name,
-      email,
-      phone: phone ?? undefined,
-      company,
-      service: services.join(", ") || undefined,
-      pageUrl: req.headers.referer,
-      ip: req.ip,
-      fields: data,
-    });
+    // The lead is persisted above; a mail-layer failure (missing provider
+    // key, provider outage) must be recorded on the row, never turned into a
+    // 500 that tells the visitor their inquiry was lost (launch audit
+    // 2026-09-24: `getResend()` throws synchronously without RESEND_API_KEY).
+    let emailResult: Awaited<ReturnType<typeof sendFormEmails>>;
+    try {
+      emailResult = await sendFormEmails({
+        formName: "Discovery Questionnaire",
+        name,
+        email,
+        phone: phone ?? undefined,
+        company,
+        service: services.join(", ") || undefined,
+        pageUrl: req.headers.referer,
+        ip: getClientIp(req),
+        fields: data,
+      });
+    } catch (mailErr) {
+      emailResult = {
+        teamSent: false,
+        clientSent: false,
+        errors: [`Mail layer unavailable: ${mailErr instanceof Error ? mailErr.message : String(mailErr)}`],
+      };
+    }
 
     await db
       .update(formSubmissions)

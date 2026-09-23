@@ -28,7 +28,9 @@ import {
 import { openai } from "@workspace/integrations-openai-ai-server";
 import type { IntakeFirm, IntakeCase } from "@workspace/db";
 import { scoreIntakeCase } from "../lib/intakeScoring.js";
-import { getResend } from "../lib/email.js";
+// Launch security audit (2026-09-24, owner-authorised edit): every caller- or
+// model-derived value rendered into the notification emails is escaped.
+import { escapeHtml, getResend } from "../lib/email.js";
 import { isOptOut, isOptIn, isHelp, normalizeKeyword } from "../lib/intakeOptOut.js";
 
 const router: IRouter = Router();
@@ -70,7 +72,7 @@ const TIER_EMOJI: Record<string, string> = {
   "Needs Review":"⚠️",
 };
 
-function buildLawFirmNotificationHtml(params: {
+export function buildLawFirmNotificationHtml(params: {
   tier:             string;
   callerPhone:      string;
   firmName:         string;
@@ -97,7 +99,7 @@ function buildLawFirmNotificationHtml(params: {
   const emoji     = TIER_EMOJI[tier] ?? "";
 
   const row = (label: string, value: string | null | undefined, alt = false) =>
-    `<tr style="background:${alt ? "#f8fafc" : "#ffffff"};"><td style="padding:7px 14px;font-weight:600;color:#374151;width:200px;vertical-align:top;font-size:13px;">${label}</td><td style="padding:7px 14px;color:#111827;font-size:13px;">${value ?? "—"}</td></tr>`;
+    `<tr style="background:${alt ? "#f8fafc" : "#ffffff"};"><td style="padding:7px 14px;font-weight:600;color:#374151;width:200px;vertical-align:top;font-size:13px;">${escapeHtml(label)}</td><td style="padding:7px 14px;color:#111827;font-size:13px;">${value == null ? "—" : escapeHtml(value)}</td></tr>`;
 
   const displayDate = incidentDateNormalized
     ? new Date(incidentDateNormalized).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -108,20 +110,20 @@ function buildLawFirmNotificationHtml(params: {
   <div style="max-width:680px;margin:32px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
     <div style="background:#1e293b;padding:28px 32px;">
       <h1 style="color:#ffffff;margin:0 0 4px;font-size:22px;">New AI Intake Case</h1>
-      <p style="color:#94a3b8;margin:0;font-size:15px;">${firmName}</p>
+      <p style="color:#94a3b8;margin:0;font-size:15px;">${escapeHtml(firmName)}</p>
     </div>
     <div style="padding:24px 32px;border-bottom:1px solid #e5e7eb;">
       <div style="display:inline-flex;align-items:center;gap:10px;background:${tierColor}18;border:1.5px solid ${tierColor}55;border-radius:10px;padding:10px 20px;">
         <span style="font-size:22px;">${emoji}</span>
         <div>
           <p style="margin:0;font-size:11px;font-weight:600;color:${tierColor};text-transform:uppercase;letter-spacing:.06em;">Case Tier</p>
-          <p style="margin:0;font-size:22px;font-weight:800;color:${tierColor};">${tier}</p>
+          <p style="margin:0;font-size:22px;font-weight:800;color:${tierColor};">${escapeHtml(tier)}</p>
         </div>
       </div>
-      ${disqualifyReason ? `<p style="margin:10px 0 0;font-size:13px;color:#6b7280;">Reason: ${disqualifyReason}</p>` : ""}
+      ${disqualifyReason ? `<p style="margin:10px 0 0;font-size:13px;color:#6b7280;">Reason: ${escapeHtml(disqualifyReason)}</p>` : ""}
     </div>
     <div style="padding:24px 32px;">
-      ${summary ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px;"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.05em;">AI Case Summary</p><p style="margin:0;font-size:14px;color:#111827;line-height:1.65;">${summary}</p></div>` : ""}
+      ${summary ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px;"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.05em;">AI Case Summary</p><p style="margin:0;font-size:14px;color:#111827;line-height:1.65;">${escapeHtml(summary)}</p></div>` : ""}
       <h2 style="font-size:14px;color:#1e293b;margin:0 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Extracted Facts</h2>
       <table style="width:100%;border-collapse:collapse;">
         ${row("Caller Phone",    callerPhone)}
@@ -139,7 +141,7 @@ function buildLawFirmNotificationHtml(params: {
 </body></html>`;
 }
 
-function buildGenericNotificationHtml(params: {
+export function buildGenericNotificationHtml(params: {
   tier:            string;
   callerPhone:     string;
   firmName:        string;
@@ -157,27 +159,27 @@ function buildGenericNotificationHtml(params: {
   const emoji     = TIER_EMOJI[tier] ?? "";
 
   const row = (label: string, value: string | null | undefined, alt = false) =>
-    `<tr style="background:${alt ? "#f8fafc" : "#ffffff"};"><td style="padding:7px 14px;font-weight:600;color:#374151;width:180px;vertical-align:top;font-size:13px;">${label}</td><td style="padding:7px 14px;color:#111827;font-size:13px;">${value ?? "—"}</td></tr>`;
+    `<tr style="background:${alt ? "#f8fafc" : "#ffffff"};"><td style="padding:7px 14px;font-weight:600;color:#374151;width:180px;vertical-align:top;font-size:13px;">${escapeHtml(label)}</td><td style="padding:7px 14px;color:#111827;font-size:13px;">${value == null ? "—" : escapeHtml(value)}</td></tr>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
   <div style="max-width:680px;margin:32px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
     <div style="background:#1e293b;padding:28px 32px;">
       <h1 style="color:#ffffff;margin:0 0 4px;font-size:22px;">New AI Receptionist Inquiry</h1>
-      <p style="color:#94a3b8;margin:0;font-size:15px;">${firmName}</p>
+      <p style="color:#94a3b8;margin:0;font-size:15px;">${escapeHtml(firmName)}</p>
     </div>
     <div style="padding:24px 32px;border-bottom:1px solid #e5e7eb;">
       <div style="display:inline-flex;align-items:center;gap:10px;background:${tierColor}18;border:1.5px solid ${tierColor}55;border-radius:10px;padding:10px 20px;">
         <span style="font-size:22px;">${emoji}</span>
         <div>
           <p style="margin:0;font-size:11px;font-weight:600;color:${tierColor};text-transform:uppercase;letter-spacing:.06em;">Lead Tier</p>
-          <p style="margin:0;font-size:22px;font-weight:800;color:${tierColor};">${tier}</p>
+          <p style="margin:0;font-size:22px;font-weight:800;color:${tierColor};">${escapeHtml(tier)}</p>
         </div>
       </div>
-      ${disqualifyReason ? `<p style="margin:10px 0 0;font-size:13px;color:#6b7280;">Reason: ${disqualifyReason}</p>` : ""}
+      ${disqualifyReason ? `<p style="margin:10px 0 0;font-size:13px;color:#6b7280;">Reason: ${escapeHtml(disqualifyReason)}</p>` : ""}
     </div>
     <div style="padding:24px 32px;">
-      ${summary ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px;"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.05em;">AI Summary</p><p style="margin:0;font-size:14px;color:#111827;line-height:1.65;">${summary}</p></div>` : ""}
+      ${summary ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px;"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.05em;">AI Summary</p><p style="margin:0;font-size:14px;color:#111827;line-height:1.65;">${escapeHtml(summary)}</p></div>` : ""}
       <h2 style="font-size:14px;color:#1e293b;margin:0 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Inquiry Details</h2>
       <table style="width:100%;border-collapse:collapse;">
         ${row("Caller Phone",    callerPhone)}
@@ -388,7 +390,7 @@ router.post("/intake/sms-webhook", validateIntakeTwilioSignature, async (req: Re
     const { From, To, Body } = req.body as Record<string, string>;
 
     if (!From || !Body) {
-      req.log.warn({ body: req.body }, "[intake] Missing From or Body in webhook");
+      req.log.warn({ bodyKeys: Object.keys((req.body as Record<string, unknown>) ?? {}) }, "[intake] Missing From or Body in webhook");
       res.type("text/xml").send("<Response></Response>");
       return;
     }
