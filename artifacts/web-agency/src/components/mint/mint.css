@@ -331,7 +331,8 @@
 }
 .mint-site .mini-site .picture {
   height: 70px;
-  background: url("../../assets/mint/business-owner.webp") center 45% / cover;
+  /* 768px rendition: this is a 70px-tall thumbnail (launch audit 2026-09-24) */
+  background: url("../../assets/mint/business-owner-768.webp") center 45% / cover;
 }
 .mint-site .mini-site .mini-text {
   padding: 10px;
@@ -452,7 +453,7 @@
 }
 .mint-site .step span {
   font-size: 14px;
-  color: #529078;
+  color: var(--green); /* was #529078: 3.7:1 on the page ground, below WCAG AA (launch audit 2026-09-24) */
   display: block;
   margin-bottom: 20px;
 }
@@ -645,7 +646,7 @@
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: #577464;
+  color: #4a6558; /* was #577464: 4.2:1 on the mint caller bubble, below WCAG AA (launch audit 2026-09-24) */
   margin-bottom: 5px;
 }
 .mint-site .outcome {

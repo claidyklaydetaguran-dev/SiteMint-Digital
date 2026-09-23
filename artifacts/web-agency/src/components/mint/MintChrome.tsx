@@ -1,18 +1,38 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
+import { restartAtTop, settleRestartAtTop } from "@/lib/scrollBehavior";
 import "./mint.css";
 import "./mint-legacy.css";
 import "./mint-scenes.css";
 import "./mint-refinement.css";
 import "./mint-finish.css";
 
+/**
+ * The SiteMint Digital wordmark is the public site's refresh control (owner
+ * directive, 2026-09-24): a plain left click always reloads the homepage
+ * from the top, including mid-scroll and when already on the homepage, so
+ * the hero restarts from its first frame. Modified clicks (new tab / window)
+ * keep native link behaviour, and the href stays a real "/" for crawlers,
+ * middle-click and the context menu.
+ */
+function restartHome(event: ReactMouseEvent<HTMLAnchorElement>) {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  restartAtTop(ROUTES.home);
+}
+
 export function MintChrome({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [progress, setProgress] = useState(0);
+  // A wordmark restart from the previous document lands this load at the top.
+  useEffect(() => {
+    settleRestartAtTop();
+  }, []);
   // A static local marketing preview does not host the authenticated apps.
   // Keep sign-in on its real HTTPS origin rather than a misleading local 404.
   useEffect(() => {
@@ -87,12 +107,12 @@ export function MintChrome({ children }: { children: ReactNode }) {
       </a>
       <header ref={headerRef} data-scrolled={scrolled}>
         <span className="mint-reading-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
-        <Link className="logo" href={ROUTES.home}>
+        <a className="logo" href={ROUTES.home} onClick={restartHome}>
           <span className="mark" aria-hidden="true">
             s
           </span>
           SiteMint <small>Digital</small>
-        </Link>
+        </a>
         <button
           ref={menuRef}
           type="button"
@@ -159,9 +179,9 @@ export function MintChrome({ children }: { children: ReactNode }) {
       </main>
       <footer>
         <div className="footer-top">
-          <Link className="logo" href={ROUTES.home}>
+          <a className="logo" href={ROUTES.home} onClick={restartHome}>
             SiteMint <small>Digital</small>
-          </Link>
+          </a>
           <p>
             A clearer website.
             <br />A more connected business.

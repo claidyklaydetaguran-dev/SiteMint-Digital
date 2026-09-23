@@ -26,13 +26,36 @@ export interface FormSubmissionData {
   fields: Record<string, unknown>;
 }
 
-function formatFieldValue(val: unknown): string {
-  if (val === null || val === undefined || val === "") return "—";
-  if (Array.isArray(val)) return val.join(", ") || "—";
-  return String(val);
+/**
+ * Every value that reaches these templates was typed by an anonymous
+ * visitor (public discovery / contact / landing forms). It is rendered as
+ * text, never as markup (launch security audit, 2026-09-24): without this,
+ * a submission naming someone else's address as "email" turned SiteMint's
+ * own domain into a phishing relay, and the team inbox rendered whatever
+ * HTML the submitter chose.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function buildTeamEmailHtml(data: FormSubmissionData): string {
+/** Attribute-safe mailto target: only characters an address can contain. */
+function mailtoSafe(email: string): string {
+  return escapeHtml(email.replace(/[^A-Za-z0-9.@+_%-]/g, ""));
+}
+
+function formatFieldValue(val: unknown): string {
+  if (val === null || val === undefined || val === "") return "—";
+  if (Array.isArray(val)) return escapeHtml(val.join(", ")) || "—";
+  if (typeof val === "object") return escapeHtml(JSON.stringify(val));
+  return escapeHtml(val);
+}
+
+export function buildTeamEmailHtml(data: FormSubmissionData): string {
   const now = new Date().toLocaleString("en-US", {
     timeZone: "America/Los_Angeles",
     dateStyle: "full",
@@ -41,7 +64,7 @@ function buildTeamEmailHtml(data: FormSubmissionData): string {
 
   const fieldRows = Object.entries(data.fields)
     .map(([k, v]) => {
-      const label = k.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase());
+      const label = escapeHtml(k.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()));
       return `<tr><td style="padding:6px 12px;font-weight:600;color:#374151;width:200px;vertical-align:top;">${label}</td><td style="padding:6px 12px;color:#111827;">${formatFieldValue(v)}</td></tr>`;
     })
     .join("");
@@ -63,18 +86,18 @@ function buildTeamEmailHtml(data: FormSubmissionData): string {
         <span style="color:#ffffff;font-size:20px;font-weight:700;font-family:Georgia,serif;">SiteMint <span style="color:#94a3b8;">Digital</span></span>
       </div>
       <h1 style="color:#ffffff;margin:0 0 4px;font-size:22px;">New Website Inquiry</h1>
-      <p style="color:#94a3b8;margin:0;font-size:15px;">${data.formName}</p>
+      <p style="color:#94a3b8;margin:0;font-size:15px;">${escapeHtml(data.formName)}</p>
     </div>
     <div style="padding:28px 32px;">
       <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
         <tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;width:200px;">Date &amp; Time</td><td style="padding:6px 12px;color:#111827;">${now} PT</td></tr>
-        <tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Full Name</td><td style="padding:6px 12px;color:#111827;">${data.name}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;">Email</td><td style="padding:6px 12px;color:#111827;"><a href="mailto:${data.email}" style="color:#3b82f6;">${data.email}</a></td></tr>
-        <tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Phone</td><td style="padding:6px 12px;color:#111827;">${data.phone || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;">Company</td><td style="padding:6px 12px;color:#111827;">${data.company || "—"}</td></tr>
-        <tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Service Interested In</td><td style="padding:6px 12px;color:#111827;">${data.service || "—"}</td></tr>
-        ${data.ip ? `<tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;">Visitor IP</td><td style="padding:6px 12px;color:#111827;">${data.ip}</td></tr>` : ""}
-        ${data.pageUrl ? `<tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Page URL</td><td style="padding:6px 12px;color:#111827;">${data.pageUrl}</td></tr>` : ""}
+        <tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Full Name</td><td style="padding:6px 12px;color:#111827;">${escapeHtml(data.name)}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;">Email</td><td style="padding:6px 12px;color:#111827;"><a href="mailto:${mailtoSafe(data.email)}" style="color:#3b82f6;">${escapeHtml(data.email)}</a></td></tr>
+        <tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Phone</td><td style="padding:6px 12px;color:#111827;">${data.phone ? escapeHtml(data.phone) : "—"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;">Company</td><td style="padding:6px 12px;color:#111827;">${data.company ? escapeHtml(data.company) : "—"}</td></tr>
+        <tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Service Interested In</td><td style="padding:6px 12px;color:#111827;">${data.service ? escapeHtml(data.service) : "—"}</td></tr>
+        ${data.ip ? `<tr style="background:#f8fafc;"><td style="padding:6px 12px;font-weight:600;color:#374151;">Visitor IP</td><td style="padding:6px 12px;color:#111827;">${escapeHtml(data.ip)}</td></tr>` : ""}
+        ${data.pageUrl ? `<tr><td style="padding:6px 12px;font-weight:600;color:#374151;">Page URL</td><td style="padding:6px 12px;color:#111827;">${escapeHtml(data.pageUrl)}</td></tr>` : ""}
       </table>
 
       <h2 style="font-size:16px;color:#1e293b;margin:0 0 12px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">All Form Fields</h2>
@@ -90,7 +113,8 @@ function buildTeamEmailHtml(data: FormSubmissionData): string {
 </html>`;
 }
 
-function buildClientEmailHtml(firstName: string): string {
+export function buildClientEmailHtml(rawFirstName: string): string {
+  const firstName = escapeHtml(rawFirstName);
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/></head>

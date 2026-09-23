@@ -62,6 +62,9 @@ export const crmMessages = pgTable("crm_messages", {
 }, (table) => [
   index("ix_crm_messages_conversation").on(table.conversationId, table.createdAt),
   index("ix_crm_messages_sent_by").on(table.sentByStaffId),
+  // Push packet 0003 (2026-09-24 performance audit): the per-lead message
+  // history, which unmigrated rows (null conversation_id) can only reach by lead.
+  index("ix_crm_messages_lead_id").on(table.leadId),
 ]);
 
 export type CrmMessage = typeof crmMessages.$inferSelect;

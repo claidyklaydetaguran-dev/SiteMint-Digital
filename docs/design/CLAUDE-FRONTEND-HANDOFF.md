@@ -1,6 +1,16 @@
-# SiteMint frontend handoff — updated 2026-09-23
+# SiteMint frontend handoff — updated 2026-09-24
 
-## Latest published state — supersedes older candidate notes below
+## Launch-audit release candidate (2026-09-24) — read `LAUNCH-AUDIT-2026-09-24.md` first
+
+The canonical branch is `design/mint-clarity-public-release`; every other branch (including `main`, 499 commits behind) is contained in it. The candidate on `claude/sitemint-launch-audit-7c01bb` builds, typechecks and tests clean on Linux (web-agency 18 files / 185 tests; api-server 1,723 non-database tests; helpdesk and api-server builds; `lib/db` push-packet contract 89 checks). **Published 2026-09-24 with owner authorisation**: marketing (`release.json` → `a3e859c`) and backend (build `8ad3901e…`, branch tip `c1cc75b`) are live on `sitemintdigital.com`; the public Discovery form now persists and emails (verified with one acceptance inquiry). Full record: `LAUNCH-AUDIT-2026-09-24.md` §0a. Both Replit workspaces now carry a working GitHub `origin`, so future transfers are `git fetch` + checkout, verified by `sha256sum -c mkt/MANIFEST.sha256` (hash the bytes git stores).
+
+What changed, in one paragraph: the scroll-linked homepage hero, the demonstration autoplay and the receptionist background film now work on phones (gated only on reduced-motion/reduced-data, with 960 px renditions of the same approved films); the SiteMint Digital wordmark reloads the homepage at the top from anywhere; the receptionist hero reads "Get started" / "See how it works"; two dead anchors, three contrast defects, the unreadable 404 exits and the untitled signup page were fixed; scene and team images are responsive WebP; the never-used react-query provider is gone; the marketing server caches, negotiates brotli/gzip, revalidates with ETags and sends hardening headers; the API gained compression, security headers, HTML-escaped emails and limits on two public forms; a reviewed additive index packet (`0003`) is ready for rehearsal.
+
+**Former launch blocker, resolved 2026-09-24:** `PUBLIC_FORM_SUBMISSIONS_ENABLED=true` is now a deployment secret on Web Asset Builder and the public "Start a project" journey creates rows and sends both emails in production. Full decision table, issue register, acceptance matrix, deployment and rollback steps are in `LAUNCH-AUDIT-2026-09-24.md`.
+
+Local QA pattern used (and reusable): Linux tree `/opt/sitemint-launch` in the `Ubuntu` WSL distro with `npx -y pnpm@10.26.1`; prerender on Windows against the Linux dist; the real `mkt/marketing-server.mjs` served on loopback for browser and Lighthouse checks; PageSpeed's anonymous API quota is exhausted, use `npx lighthouse@12` locally.
+
+## Published state as of 2026-09-23 — superseded by the section above for source and candidate status
 
 The owner-authorized frontend release is published on https://sitemintdigital.com. Public release.json reports source commit `b58a537`; packaged assets are in `65155b6`, with the cross-platform checksum correction in `405a839`, on `design/mint-clarity-public-release` in GitHub.
 

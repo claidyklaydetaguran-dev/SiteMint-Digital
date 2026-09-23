@@ -279,3 +279,7 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Launch audit (2026-09-24): the 404 exits reuse .v4-btn--outline, a control designed for the retired ink-dark V4 hero, so on the Mint ground its near-white text was invisible (measured rgb(244,248,251) on #e4f2e9). Scoped to the not-found list only. */
+.mint-site .sm-notfound__exits .v4-btn--outline{color:var(--forest);border-color:var(--forest);background:#ffffffb8}
+.mint-site .sm-notfound__exits .v4-btn--outline:hover,.mint-site .sm-notfound__exits .v4-btn--outline:focus-visible{background:var(--forest);color:#fff;border-color:var(--forest)}

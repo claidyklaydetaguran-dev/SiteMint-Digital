@@ -23,12 +23,17 @@
  */
 import { createServer } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { gzipSync } from "node:zlib";
+import { brotliCompress, constants as zlibConstants, gzip } from "node:zlib";
+import { createHash } from "node:crypto";
+import { promisify } from "node:util";
 import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+
+const gzipAsync = promisify(gzip);
+const brotliAsync = promisify(brotliCompress);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
@@ -112,7 +117,7 @@ function proxy(req, res, { htmlIsMiss = false } = {}) {
     (upRes) => {
       if (htmlIsMiss && /text\/html/i.test(String(upRes.headers["content-type"] || ""))) {
         upRes.resume();
-        serveNotFound(res).catch(() => { if (!res.headersSent) res.writeHead(404); res.end(); });
+        serveNotFound(res, req).catch(() => { if (!res.headersSent) res.writeHead(404); res.end(); });
         return;
       }
       const outHeaders = {};
@@ -130,9 +135,93 @@ function proxy(req, res, { htmlIsMiss = false } = {}) {
   req.pipe(up);
 }
 
-async function serveFile(res, file, status = 200, rangeHeader) {
-  const body = await readFile(file);
-  const ext = extname(file);
+/**
+ * In-memory file cache (launch audit, 2026-09-24).
+ *
+ * The dist is immutable for the life of the process (a publish restarts it),
+ * so every file is read, hashed and compressed exactly once, off the event
+ * loop, instead of being re-read and gzipped synchronously on every request
+ * (the 2026-09-07 server blocked the loop for each 400 KB chunk and measured
+ * ~1.1 s document TTFB in Lighthouse). Entries hold the identity body plus
+ * gzip and brotli variants for compressible types; the response picks the
+ * best encoding the client accepts and carries `Vary` and a strong ETag so
+ * revalidation of `no-cache` documents answers 304 without a body.
+ *
+ * Bounded: files above CACHE_MAX_BYTES are served from disk each time and
+ * never retained (only the largest brand films exceed the limit today).
+ */
+const CACHE_MAX_BYTES = 8 * 1024 * 1024;
+const cache = new Map(); // file -> Promise<entry>
+
+function loadEntry(file) {
+  let pending = cache.get(file);
+  if (pending) return pending;
+  pending = (async () => {
+    const body = await readFile(file);
+    const ext = extname(file);
+    const entry = {
+      body,
+      ext,
+      etag: `"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`,
+      gzip: null,
+      br: null,
+    };
+    if (COMPRESSIBLE.has(ext) && body.length > 512) {
+      const [gz, br] = await Promise.all([
+        gzipAsync(body, { level: 9 }),
+        brotliAsync(body, {
+          params: {
+            [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+            [zlibConstants.BROTLI_PARAM_SIZE_HINT]: body.length,
+          },
+        }),
+      ]);
+      // Only keep a variant that actually helps.
+      if (gz.length < body.length) entry.gzip = gz;
+      if (br.length < body.length) entry.br = br;
+    }
+    if (body.length > CACHE_MAX_BYTES) cache.delete(file);
+    return entry;
+  })();
+  cache.set(file, pending);
+  pending.catch(() => cache.delete(file));
+  return pending;
+}
+
+/** Pre-warm every compressible file so the first visitor after a restart
+ *  never pays the compression cost. Runs after listen(); failures are
+ *  logged and ignored (the request path compresses lazily anyway). */
+async function warmCache(dir) {
+  let count = 0;
+  const walk = async (d) => {
+    for (const name of await readdir(d, { withFileTypes: true })) {
+      const p = join(d, name.name);
+      if (name.isDirectory()) await walk(p);
+      else if (COMPRESSIBLE.has(extname(p))) { await loadEntry(p); count++; }
+    }
+  };
+  try {
+    await walk(dir);
+    console.log(`marketing-server warmed ${count} compressible files`);
+  } catch (e) {
+    console.warn(`marketing-server warm-up skipped: ${String(e && e.message || e)}`);
+  }
+}
+
+/** Client-preferred encoding among the variants this entry actually has. */
+function chooseEncoding(acceptEncoding, entry) {
+  const accepted = String(acceptEncoding || "")
+    .split(",")
+    .map((token) => token.trim().split(";")[0].toLowerCase())
+    .filter(Boolean);
+  if (entry.br && accepted.includes("br")) return "br";
+  if (entry.gzip && (accepted.includes("gzip") || accepted.includes("*"))) return "gzip";
+  return null;
+}
+
+async function serveFile(res, file, status = 200, rangeHeader, req) {
+  const entry = await loadEntry(file);
+  const { body, ext } = entry;
   const headers = {
     "content-type": MIME[ext] ?? "application/octet-stream",
     "cache-control": file.includes("assets") && status === 200
@@ -140,7 +229,21 @@ async function serveFile(res, file, status = 200, rangeHeader) {
       : "no-cache",
     "x-content-type-options": "nosniff",
     "accept-ranges": "bytes",
+    // Baseline browser hardening for the marketing origin. The proxied
+    // application surfaces set their own headers upstream and are untouched.
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-frame-options": "SAMEORIGIN",
+    "permissions-policy": "camera=(), geolocation=(), payment=(), usb=()",
   };
+  if (status === 200) {
+    headers["etag"] = entry.etag;
+    if (req && req.headers["if-none-match"] === entry.etag) {
+      if (COMPRESSIBLE.has(ext)) headers["vary"] = "Accept-Encoding";
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+  }
   // Single-range byte serving. Safari (desktop and iOS) probes media with a
   // Range request and refuses playback when the server answers with a full
   // 200 — which is what shipped on 2026-09-07 and kept the brand films from
@@ -172,22 +275,24 @@ async function serveFile(res, file, status = 200, rangeHeader) {
     }
   }
   if (COMPRESSIBLE.has(ext)) {
-    const zipped = gzipSync(body);
-    headers["content-encoding"] = "gzip";
-    headers["content-length"] = zipped.length;
+    headers["vary"] = "Accept-Encoding";
+    const encoding = chooseEncoding(req && req.headers["accept-encoding"], entry);
+    const payload = encoding === "br" ? entry.br : encoding === "gzip" ? entry.gzip : body;
+    if (encoding) headers["content-encoding"] = encoding;
+    headers["content-length"] = payload.length;
     res.writeHead(status, headers);
-    res.end(zipped);
+    res.end(req && req.method === "HEAD" ? undefined : payload);
   } else {
     headers["content-length"] = body.length;
     res.writeHead(status, headers);
-    res.end(body);
+    res.end(req && req.method === "HEAD" ? undefined : body);
   }
 }
 
-async function serveNotFound(res) {
+async function serveNotFound(res, req) {
   const nf = join(WA_DIST, "404.html");
-  if (existsSync(nf)) { await serveFile(res, nf, 404); return; }
-  await serveFile(res, join(WA_DIST, "index.html"));
+  if (existsSync(nf)) { await serveFile(res, nf, 404, undefined, req); return; }
+  await serveFile(res, join(WA_DIST, "index.html"), 200, undefined, req);
 }
 
 createServer(async (req, res) => {
@@ -225,7 +330,7 @@ createServer(async (req, res) => {
 
     let file = join(WA_DIST, path || "index.html");
     if (existsSync(file) && (await stat(file)).isDirectory()) file = join(file, "index.html");
-    if (existsSync(file)) { await serveFile(res, file, 200, req.headers.range); return; }
+    if (existsSync(file)) { await serveFile(res, file, 200, req.headers.range, req); return; }
 
     // File-shaped requests (an extension) missing from the marketing dist
     // fall through to the upstream app: the proxied admin/dashboard/toolkit
@@ -237,16 +342,19 @@ createServer(async (req, res) => {
     // Prerendered route documents, then SPA prefixes, then the real 404.
     const clean = path.replace(/\/+$/, "");
     const routeDoc = join(WA_DIST, clean, "index.html");
-    if (clean && existsSync(routeDoc)) { await serveFile(res, routeDoc); return; }
+    if (clean && existsSync(routeDoc)) { await serveFile(res, routeDoc, 200, undefined, req); return; }
     if (SPA_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p + "/"))) {
-      await serveFile(res, join(WA_DIST, "index.html"));
+      await serveFile(res, join(WA_DIST, "index.html"), 200, undefined, req);
       return;
     }
-    await serveNotFound(res);
+    await serveNotFound(res, req);
   } catch (e) {
     if (!res.headersSent) res.writeHead(500, { "content-type": "text/plain" });
     res.end("server error");
   }
 }).listen(PORT, "0.0.0.0", () => {
   console.log(`marketing-server listening :${PORT} dist=${WA_DIST} upstream=${UPSTREAM}`);
+  // Off the request path: the port is already open, so a health probe or a
+  // first visitor is never delayed by warm-up.
+  void warmCache(WA_DIST);
 });

@@ -133,6 +133,13 @@ export const crmLeads = pgTable("crm_leads", {
   index("ix_crm_leads_assigned_to_staff_id").on(table.assignedToStaffId),
   // "who works at this company" — the company record and the contact filter.
   index("ix_crm_leads_company_id").on(table.companyId),
+  // Push packet 0003 (2026-09-24 performance audit): the hot filter columns
+  // that had no index — lookup by email (signup dedupe, inbound matching),
+  // the pipeline status filter, and the two timestamps every list sorts on.
+  index("ix_crm_leads_email").on(table.email),
+  index("ix_crm_leads_status").on(table.status),
+  index("ix_crm_leads_created_at").on(table.createdAt),
+  index("ix_crm_leads_updated_at").on(table.updatedAt),
 ]);
 
 export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({

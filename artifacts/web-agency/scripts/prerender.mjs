@@ -315,6 +315,10 @@ const SERIALIZE = `(() => {
     for (const s of v.querySelectorAll("source")) s.remove();
     v.removeAttribute("src");
     v.removeAttribute("autoplay");
+    // The snapshot is taken at desktop width, so its poster is the large
+    // rendition; the booted app re-mounts the video with the viewport's
+    // own poster (launch audit 2026-09-24: phones downloaded both).
+    v.removeAttribute("poster");
     v.setAttribute("preload", "none");
   }
   // The static document must not delay its first paint: hero ENTRANCE
@@ -327,6 +331,21 @@ const SERIALIZE = `(() => {
   document.head.appendChild(neutralize);
   for (const l of document.querySelectorAll('link[rel="preload"][as="image"]')) l.remove();
   for (const img of document.querySelectorAll("img[fetchpriority]")) img.removeAttribute("fetchpriority");
+  // Launch audit (2026-09-24): the Mint cinema hero's poster is the largest
+  // element in the first viewport on the homepage and the receptionist page,
+  // so it is the LCP candidate. index.html can no longer preload it (the
+  // file is content-hashed per build), so the snapshot carries a preload for
+  // exactly the poster this route renders. Only the FIRST cinema poster is
+  // preloaded and only when present, so other routes are untouched.
+  const cinemaPoster = document.querySelector("img.mint-cinema__media[src]");
+  if (cinemaPoster) {
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = cinemaPoster.getAttribute("src");
+    link.setAttribute("fetchpriority", "high");
+    document.head.appendChild(link);
+  }
   // Critical CSS: inline the page's matched rules and demote every
   // stylesheet link to an async load (print-media swap + noscript copy).
   const criticalCss = __CRITICAL__;

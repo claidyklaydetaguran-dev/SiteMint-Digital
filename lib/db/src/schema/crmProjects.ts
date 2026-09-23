@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, decimal, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, decimal, date, jsonb, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -60,7 +60,10 @@ export const crmProjects = pgTable("crm_projects", {
   // Structured data
   launchChecklist: jsonb("launch_checklist").$type<ChecklistItem[]>().default([]).notNull(),
   links: jsonb("links").$type<ProjectLink[]>().default([]).notNull(),
-});
+}, (table) => [
+  // Push packet 0003 (2026-09-24 performance audit): "this lead's projects".
+  index("ix_crm_projects_lead_id").on(table.leadId),
+]);
 
 export const insertCrmProjectSchema = createInsertSchema(crmProjects).omit({
   id: true, createdAt: true, updatedAt: true,

@@ -68,3 +68,62 @@ export function enableManualScrollRestoration(): void {
 export function dispatchIntroReplay(): void {
   window.dispatchEvent(new Event(INTRO_REPLAY_EVENT));
 }
+
+/**
+ * Session flag written by `restartAtTop()` and consumed by
+ * `settleRestartAtTop()` on the next document load. sessionStorage is
+ * per-tab, so a restart in one tab never moves another.
+ */
+export const RESTART_AT_TOP_KEY = "sm:restart-at-top";
+
+/**
+ * Wordmark behaviour on the public site (owner directive, 2026-09-24): the
+ * SiteMint Digital logo is the site's refresh control. Clicking it always
+ * performs a full document load of the homepage that starts at the top,
+ * even mid-scroll and even when already on the homepage, so the hero and
+ * its scroll-linked film restart from the beginning.
+ *
+ * This is a plain navigation: it never touches localStorage (Discovery
+ * drafts) or cookies (staff / portal / receptionist sessions). It is wired
+ * only into the public Mint chrome; the CRM and portal shells keep in-app
+ * routing so an unsaved form is never discarded by a header click.
+ */
+export function restartAtTop(path = "/"): void {
+  try {
+    sessionStorage.setItem(RESTART_AT_TOP_KEY, "1");
+  } catch {
+    // Storage can be unavailable (private mode, blocked storage). The
+    // navigation below still starts at the top; the flag only guards
+    // against a browser scroll restore racing our reset on the next load.
+  }
+  enableManualScrollRestoration();
+  scrollToTop();
+  const target = new URL(path, window.location.href);
+  const alreadyThere =
+    target.pathname === window.location.pathname &&
+    !window.location.search &&
+    !window.location.hash;
+  if (alreadyThere) window.location.reload();
+  else window.location.assign(target.pathname);
+}
+
+/**
+ * Runs once on public-shell mount. If the previous document asked for a
+ * restart, make sure this load starts at (0,0) even where the browser
+ * restored a scroll position before our scripts ran.
+ */
+export function settleRestartAtTop(): void {
+  let flagged = false;
+  try {
+    flagged = sessionStorage.getItem(RESTART_AT_TOP_KEY) === "1";
+    if (flagged) sessionStorage.removeItem(RESTART_AT_TOP_KEY);
+  } catch {
+    flagged = false;
+  }
+  if (!flagged) return;
+  enableManualScrollRestoration();
+  scrollToTop();
+  // Layout can still be settling (fonts, media geometry); one more reset
+  // after the first frame catches a late restore without fighting the user.
+  window.requestAnimationFrame(scrollToTop);
+}

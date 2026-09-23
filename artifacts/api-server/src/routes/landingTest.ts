@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { db, formSubmissions, landingPageViews } from "@workspace/db";
 import { eq, sql, ilike } from "drizzle-orm";
 import { sendFormEmails } from "../lib/email.js";
+import { getClientIp, landingTestIpLimiter } from "../lib/contactProtection.js";
 import { validateToken } from "../lib/admin-session.js";
 import {
   isPublicAnalyticsWritesEnabled,
@@ -37,6 +38,14 @@ router.post("/landing-test/submit", async (req: Request, res: Response) => {
     res.status(503).json({ error: PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE });
     return;
   }
+  // IP rate limit (5/hour), same pattern as /contact/submit — checked before
+  // any database write or outbound email (launch security audit 2026-09-24).
+  const ip = getClientIp(req);
+  if (landingTestIpLimiter.isOverLimit(ip)) {
+    req.log.warn({ ip }, "[landing-test] rate limit exceeded");
+    res.status(429).json({ error: "Too many attempts. Try again later." });
+    return;
+  }
   try {
     const data = req.body as Record<string, unknown>;
 
@@ -45,6 +54,7 @@ router.post("/landing-test/submit", async (req: Request, res: Response) => {
       res.status(400).json({ error: "vertical must be one of: lawyers, realtors, receptionist" });
       return;
     }
+    landingTestIpLimiter.record(ip);
 
     const name         = String(data.name         || "").trim();
     const email        = String(data.email        || "").trim();
