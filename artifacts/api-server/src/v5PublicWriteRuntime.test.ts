@@ -122,6 +122,11 @@ function request(method: string, path: string, body?: unknown, extraHeaders: Rec
 }
 
 // A second client address, so extra checks stay inside the per-address signup limit.
+// Since the 2026-09-24 launch fix a caller-written X-Forwarded-For is IGNORED
+// unless it was appended by a trusted proxy hop; this harness has no proxy, so
+// it declares one trusted hop and the single-entry header below plays the part
+// of the address that hop observed.
+process.env["TRUSTED_PROXY_HOPS"] = "1";
 const OTHER_CLIENT = { "X-Forwarded-For": "203.0.113.9" };
 const post = (path: string, body: unknown, headers?: Record<string, string>) => request("POST", path, body, headers);
 const get = (path: string, headers?: Record<string, string>) => request("GET", path, undefined, headers);
