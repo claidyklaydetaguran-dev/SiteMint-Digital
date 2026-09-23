@@ -107,8 +107,8 @@ export default function AiReceptionistDemoV5() {
               <Link href={ROUTES.aiReceptionistSignup} className="v3-btn v3-btn--outline">
                 Create account
               </Link>
-              <Link href={`${ROUTES.aiReceptionist}#preview`} className="v3-btn v3-btn--quiet">
-                Try the interactive preview
+              <Link href={`${ROUTES.aiReceptionist}#example`} className="v3-btn v3-btn--quiet">
+                Read the example conversations
               </Link>
             </div>
           </div>

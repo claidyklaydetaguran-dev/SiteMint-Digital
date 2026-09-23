@@ -13,7 +13,9 @@
 .mint-site .mint-cinema__signin{display:inline-block;margin-top:24px;color:#fff;text-underline-offset:5px;text-decoration:underline;font-size:14px}
 .mint-site .mint-cinema__foot{position:absolute;z-index:1;bottom:30px;left:clamp(24px,6vw,100px);right:clamp(24px,6vw,100px);display:flex;justify-content:space-between;gap:20px;color:#f1f7f3;font-size:13px;border-top:1px solid #ffffff40;padding-top:20px}
 .mint-site .mint-cinema__foot a{color:white}.mint-site .mint-cinema__pause{position:absolute;right:30px;top:24px;z-index:2;padding:10px 15px;border:1px solid #ffffff80;background:#16352bbb;color:white;border-radius:30px}
-@media(min-width:801px) and (prefers-reduced-motion:no-preference){.mint-site .mint-cinema--scrub{height:230svh}.mint-site .mint-cinema--scrub .mint-cinema__frame{position:sticky;top:0;height:100svh}}
+/* Scroll-linked story on every viewport that allows motion. The --scrub class is only applied once the film is mounted, so a poster-only hero (reduced motion, data saver, failed film) keeps normal flow at any width. */
+@media(prefers-reduced-motion:no-preference){.mint-site .mint-cinema--scrub{height:230svh}.mint-site .mint-cinema--scrub .mint-cinema__frame{position:sticky;top:0;height:100svh;min-height:0}}
+.mint-site .mint-cinema__media[poster]{background:transparent}
 @media(max-width:800px){.mint-site .mint-cinema__frame{min-height:calc(100svh - 72px)}.mint-site .mint-cinema__copy{padding-top:90px;padding-bottom:130px}.mint-site .mint-cinema__media{object-position:65% center}.mint-site .mint-cinema__shade{background:linear-gradient(90deg,#0a1915d9,#0a19155c),linear-gradient(0deg,#0a19159c,transparent)}.mint-site .mint-cinema__foot span{max-width:180px}.mint-site .mint-cinema .actions{align-items:stretch}.mint-site .mint-cinema .button{font-size:14px}}
 .mint-site .mint-cinema--leaf{background:#f7faf6}
 .mint-site .mint-cinema--leaf .mint-cinema__shade{background:linear-gradient(90deg,#fafcf9ed, #fafcf980 42%,transparent 65%)}
@@ -23,6 +25,9 @@
 .mint-site .mint-cinema--leaf .mint-cinema__foot{border-color:#173f3526}
 .mint-site .mint-cinema--leaf .button{background:#173f35;color:white;border-color:#173f35}
 .mint-site .mint-cinema--leaf .button.outline{background:#ffffff8c;color:#173f35;border-color:#173f3570}
-.mint-site .mint-demonstration video,.mint-site .mint-demonstration>img{display:block;width:100%;max-height:75svh;object-fit:contain;background:#edf4ef;border-radius:24px}
+.mint-site .mint-demonstration__stage{position:relative}
+.mint-site .mint-demonstration video,.mint-site .mint-demonstration__stage>img{display:block;width:100%;max-height:75svh;object-fit:contain;background:#edf4ef;border-radius:24px}
+.mint-site .mint-demonstration__play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:14px 24px;border-radius:999px;border:1px solid #ffffffb3;background:#173f35e6;color:#fff;font-size:15px;font-weight:550;box-shadow:0 12px 32px #173f3540;backdrop-filter:blur(6px)}
+.mint-site .mint-demonstration__play:hover,.mint-site .mint-demonstration__play:focus-visible{background:#173f35}
 .mint-site .mint-demonstration__caption{font-size:13px;color:#536c62;margin-top:16px}
-@media(max-width:800px){.mint-site .mint-cinema--leaf .mint-cinema__media{object-position:72% center}.mint-site .mint-cinema--leaf .mint-cinema__shade{background:linear-gradient(90deg,#fafcf9f5,#fafcf9b8 65%,#fafcf970)}.mint-site .mint-cinema--leaf h1{font-size:clamp(42px,10vw,64px)}.mint-site .mint-demonstration video,.mint-site .mint-demonstration>img{border-radius:14px}}
+@media(max-width:800px){.mint-site .mint-cinema--leaf .mint-cinema__media{object-position:72% center}.mint-site .mint-cinema--leaf .mint-cinema__shade{background:linear-gradient(90deg,#fafcf9f5,#fafcf9b8 65%,#fafcf970)}.mint-site .mint-cinema--leaf h1{font-size:clamp(42px,10vw,64px)}.mint-site .mint-demonstration video,.mint-site .mint-demonstration__stage>img{border-radius:14px}}

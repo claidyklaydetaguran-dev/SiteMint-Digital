@@ -1,9 +1,20 @@
 import { useState } from "react";
 import services from "@/assets/mint/services-scene.webp";
+import servicesSmall from "@/assets/mint/services-scene-768.webp";
 import { MintProductVisual } from "./MintProductVisual";
 import work from "@/assets/mint/work-scene.webp";
+import workSmall from "@/assets/mint/work-scene-768.webp";
 import pricing from "@/assets/mint/pricing-scene.webp";
+import pricingSmall from "@/assets/mint/pricing-scene-768.webp";
 import about from "@/assets/mint/about-scene.webp";
+import aboutSmall from "@/assets/mint/about-scene-768.webp";
+
+// Every scene ships a 768px rendition for narrow screens (launch audit,
+// 2026-09-24: Lighthouse measured the 1536px files at 371px wide on phones).
+const small: Record<string, string> = { [services]: servicesSmall, [work]: workSmall, [pricing]: pricingSmall, [about]: aboutSmall };
+const sceneSrcSet = (image: string) => `${small[image]} 768w, ${image} 1536w`;
+/** The story grid is two columns above 760px, so the figure is roughly half the 1260px wrap. */
+const sceneSizes = "(max-width: 760px) calc(100vw - 48px), min(640px, 50vw)";
 
 const stories = {
   services: { image: services, eyebrow: "A useful starting point", title: "The right pieces. In the right order.", text: "A new website, a better way to answer callers, or less manual follow-up: start with the problem that matters most. We map the journey with you before recommending the tools.", points: ["Understand your customers and daily work", "Agree what to improve first", "Connect the pieces your business actually needs"], alt: "Illustrative business owner and designer reviewing a wall of website plans" },
@@ -16,7 +27,7 @@ const stories = {
 export function MintPageStory({ kind }: { kind: keyof typeof stories }) {
   const story = stories[kind];
   return <section className="section wrap story-chapter mint-page-story">
-    {kind === "receptionist" ? <MintProductVisual /> : <figure className="story-image"><img src={story.image} alt={story.alt} width="1536" height="1024" loading="lazy" decoding="async" /><figcaption>{kind === "work" ? "Illustrative website concept" : "Illustrative business scene"}</figcaption></figure>}
+    {kind === "receptionist" ? <MintProductVisual /> : <figure className="story-image"><img src={story.image} srcSet={sceneSrcSet(story.image)} sizes={sceneSizes} alt={story.alt} width="1536" height="1024" loading="lazy" decoding="async" /><figcaption>{kind === "work" ? "Illustrative website concept" : "Illustrative business scene"}</figcaption></figure>}
     <div className="story-copy"><span className="tag">{story.eyebrow}</span><h2>{story.title}</h2><p>{story.text}</p><ol className="story-checkpoints">{story.points.map((point, i) => <li key={point}><span>0{i + 1}</span><strong>{point}</strong></li>)}</ol></div>
   </section>;
 }
@@ -33,12 +44,12 @@ export function MintServiceFinder() {
   return <section className="mint-finder section" aria-labelledby="finder-title"><div className="wrap">
     <div className="section-heading"><div><span className="tag">Start where you are</span><h2 id="finder-title">What would make your day easier?</h2></div><p>You don’t need to figure out the technology first. Choose a challenge to see a sensible starting point.</p></div>
     <div className="finder-options" aria-label="Choose a business challenge">{needs.map((item, i) => <button key={item.label} type="button" aria-pressed={selected === i} aria-controls="finder-result" onClick={() => setSelected(i)}>{item.label}<span aria-hidden="true">↗</span></button>)}</div>
-    <div className="finder-result story-chapter" id="finder-result">{selected === 1 ? <MintProductVisual /> : <figure className="story-image"><img src={need.image} alt={need.alt} width="1536" height="1024" loading="lazy" decoding="async"/><figcaption>Illustrative scenario</figcaption></figure>}<div className="story-copy" aria-live="polite" aria-atomic="true"><h3>{need.title}</h3><p>{need.copy}</p><ol className="story-checkpoints">{need.steps.map((step, i) => <li key={step}><span>0{i + 1}</span><strong>{step}</strong></li>)}</ol><a href={need.href} className="button">{need.link}</a></div></div>
+    <div className="finder-result story-chapter" id="finder-result">{selected === 1 ? <MintProductVisual /> : <figure className="story-image"><img src={need.image} srcSet={sceneSrcSet(need.image)} sizes={sceneSizes} alt={need.alt} width="1536" height="1024" loading="lazy" decoding="async"/><figcaption>Illustrative scenario</figcaption></figure>}<div className="story-copy" aria-live="polite" aria-atomic="true"><h3>{need.title}</h3><p>{need.copy}</p><ol className="story-checkpoints">{need.steps.map((step, i) => <li key={step}><span>0{i + 1}</span><strong>{step}</strong></li>)}</ol><a href={need.href} className="button">{need.link}</a></div></div>
   </div></section>;
 }
 
 export function MintLaunchJourney() {
-  return <section className="section wrap mint-launch" aria-labelledby="launch-story-title"><div className="section-heading"><div><span className="tag">Beyond a beautiful homepage</span><h2 id="launch-story-title">A good experience connects the whole journey.</h2></div><p>We plan what happens after someone clicks, calls or asks a question. Open each step to see what we consider.</p></div><div className="launch-layout"><figure className="story-image"><img src={pricing} alt="Illustrative paper plans for a connected customer journey" width="1536" height="1024" loading="lazy" decoding="async"/><figcaption>Plan the experience before adding complexity.</figcaption></figure><div className="launch-steps">
+  return <section className="section wrap mint-launch" aria-labelledby="launch-story-title"><div className="section-heading"><div><span className="tag">Beyond a beautiful homepage</span><h2 id="launch-story-title">A good experience connects the whole journey.</h2></div><p>We plan what happens after someone clicks, calls or asks a question. Open each step to see what we consider.</p></div><div className="launch-layout"><figure className="story-image"><img src={pricing} srcSet={sceneSrcSet(pricing)} sizes={sceneSizes} alt="Illustrative paper plans for a connected customer journey" width="1536" height="1024" loading="lazy" decoding="async"/><figcaption>Plan the experience before adding complexity.</figcaption></figure><div className="launch-steps">
     <details open><summary><span>01</span> Discover your business</summary><p>Visitors need to understand your offer quickly. Clear services, relevant visuals and genuine examples help them decide whether you are a fit.</p></details>
     <details><summary><span>02</span> Take a useful next step</summary><p>A focused inquiry form or a helpful call should ask for the right details and explain what happens next. Mobile users deserve the same care as desktop visitors.</p></details>
     <details><summary><span>03</span> Keep the handoff clear</summary><p>Decide who receives the request, where it is recorded and when to follow up. Bookings must distinguish confirmed appointments from requests awaiting a decision.</p></details>

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, decimal, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, decimal, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -63,7 +63,10 @@ export const crmDeals = pgTable("crm_deals", {
    */
   convertedProjectId: integer("converted_project_id"),
   convertedAt: timestamp("converted_at", { withTimezone: true }),
-});
+}, (table) => [
+  // Push packet 0003 (2026-09-24 performance audit): "this lead's deals".
+  index("ix_crm_deals_lead_id").on(table.leadId),
+]);
 
 /**
  * Why a deal was lost. A closed vocabulary, so the answers can be counted;

@@ -2,7 +2,6 @@ import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wo
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import { lazyRoute } from "@/lib/lazyRoute";
 import { useEffect } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ROUTER_BASE, ROUTES, LEGACY_APP_ROUTES, DASHBOARD_URLS } from "@/lib/routes";
@@ -147,8 +146,6 @@ const CrmOpsFirmDetail = lazyRoute(() => import("@/pages/ops/CrmOpsFirmDetail"))
 const CrmOpsIssues = lazyRoute(() => import("@/pages/ops/CrmOpsIssues"));
 const CrmOpsUsage = lazyRoute(() => import("@/pages/ops/CrmOpsUsage"));
 const CrmOpsNumbers = lazyRoute(() => import("@/pages/ops/CrmOpsNumbers"));
-
-const queryClient = new QueryClient();
 
 function CrmHomeRedirect() {
   const [, navigate] = useLocation();
@@ -310,11 +307,14 @@ function Router() {
           AI Receptionist use-cases section instead of rendering their own
           pages. Their verified ideas moved into that section's "Built for
           different businesses" content (receptionist owner). */}
+      {/* Anchor correction (launch audit, 2026-09-24): the Mint receptionist
+          page has no "use cases" anchor; its example-conversation section is
+          `#example` (MintReceptionist.tsx). */}
       <Route path={ROUTES.aiForLawyers}>
-        {() => <Redirect to={`${ROUTES.aiReceptionist}#use-cases`} />}
+        {() => <Redirect to={`${ROUTES.aiReceptionist}#example`} />}
       </Route>
       <Route path={ROUTES.aiForRealtors}>
-        {() => <Redirect to={`${ROUTES.aiReceptionist}#use-cases`} />}
+        {() => <Redirect to={`${ROUTES.aiReceptionist}#example`} />}
       </Route>
 
       {/* ── AI Receptionist ──────────────────────────────────────────────────
@@ -484,20 +484,22 @@ function Router() {
 }
 
 function App() {
+  // Launch performance audit (2026-09-24): the react-query provider was
+  // removed. No component in this app calls useQuery/useMutation (every
+  // page uses adminFetch/fetch in effects), so the provider only added
+  // ~13 KB gzipped of never-executed code to the public entry bundle.
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={ROUTER_BASE}>
-          {/* Persistent instance: the per-shell mounts remount with their route
-              (each Route renders its own shell), so their mount-skip swallows
-              the transition itself; this one survives every route change and
-              is the instance that actually resets scroll + focus. */}
-          <RouteScrollManager />
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <TooltipProvider>
+      <WouterRouter base={ROUTER_BASE}>
+        {/* Persistent instance: the per-shell mounts remount with their route
+            (each Route renders its own shell), so their mount-skip swallows
+            the transition itself; this one survives every route change and
+            is the instance that actually resets scroll + focus. */}
+        <RouteScrollManager />
+        <Router />
+      </WouterRouter>
+      <Toaster />
+    </TooltipProvider>
   );
 }
 

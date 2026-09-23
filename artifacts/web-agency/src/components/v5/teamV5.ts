@@ -12,8 +12,12 @@
 export interface TeamMemberV5 {
   name: string;
   role: string;
-  /** Public-root path to the real, owner-supplied portrait photograph. */
+  /** Public-root path to the real, owner-supplied portrait photograph
+   *  (WebP re-encode of the original file, ≤1200px on the long edge;
+   *  launch audit 2026-09-24: the PNG original was 1.8 MB per visitor). */
   photo: string;
+  /** Same photograph at ≤640px for narrow screens (srcset candidate). */
+  photoSmall: string;
   /**
    * Per-person focal point for the shared 4:3 portrait viewport (owner
    * correction, 2026-09-09): Shasta's source is 4:3 landscape and fills the
@@ -43,7 +47,8 @@ export const teamV5: TeamMemberV5[] = [
   {
     name: "Shasta Greene",
     role: "Head of Strategy",
-    photo: "/team-shasta.jpg",
+    photo: "/team-shasta.webp",
+    photoSmall: "/team-shasta-640.webp",
     portraitPosition: "50% 50%", /* 4:3 source == 4:3 frame; approved as-is */
     intro:
       "Shasta leads discovery and translates each client's vision into a practical business and digital strategy.",
@@ -62,7 +67,8 @@ export const teamV5: TeamMemberV5[] = [
   {
     name: "Claidy Taguran",
     role: "Technical Director",
-    photo: "/team-claidy.png",
+    photo: "/team-claidy.webp",
+    photoSmall: "/team-claidy-640.webp",
     portraitPosition: "50% 12%", /* 3:4 source: hold the crop window near the top — full head + headroom */
     intro:
       "Claidy leads technical planning, architecture, engineering, and implementation for every SiteMint system.",
@@ -81,7 +87,8 @@ export const teamV5: TeamMemberV5[] = [
   {
     name: "Saisa Lorraigne",
     role: "Project & Admin Manager",
-    photo: "/team-saisa.jpg",
+    photo: "/team-saisa.webp",
+    photoSmall: "/team-saisa-640.webp",
     portraitPosition: "50% 10%", /* 3:4 source: same treatment, tuned to her framing */
     intro:
       "Saisa organizes timelines, files, requirements, deliverables, meetings, approvals, and follow-ups for every project.",

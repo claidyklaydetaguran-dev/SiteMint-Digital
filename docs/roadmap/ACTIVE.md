@@ -1,5 +1,16 @@
 # Active SiteMint Delivery
 
+> **ACTIVE (2026-09-24): Launch audit and release candidate.** Owner directive
+> of 2026-09-24 (full audit, mobile hero/demo/receptionist films, wordmark
+> restart, CTA copy, performance, security, launch readiness). Canonical
+> branch: `design/mint-clarity-public-release`; candidate branch:
+> `claude/sitemint-launch-audit-7c01bb`. Authority and evidence:
+> `docs/design/LAUNCH-AUDIT-2026-09-24.md` (decision per surface, issue
+> register, acceptance matrix, deploy/rollback, owner checklist). Stop
+> conditions unchanged: no push, publish, deploy, provider activation or
+> database application without explicit owner approval. Everything below is
+> retained history.
+
 > **SUPERSEDED HEADER (2026-09-05).** The owner-directed **SiteMint V5 Brand and
 > Product Program** is the active delivery, executed on
 > `feature/ai-receptionist-private-beta-readiness`. Its authority chain is the

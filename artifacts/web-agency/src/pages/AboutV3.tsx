@@ -80,8 +80,11 @@ export default function AboutV3() {
                 <span className="sm-person-avatar">
                   <img
                     src={member.photo}
+                    srcSet={`${member.photoSmall} 640w, ${member.photo} 1200w`}
+                    sizes="(max-width: 700px) calc(100vw - 48px), 400px"
                     alt={`Portrait of ${member.name}`}
                     loading="lazy"
+                    decoding="async"
                     style={{ objectPosition: member.portraitPosition }}
                   />
                 </span>

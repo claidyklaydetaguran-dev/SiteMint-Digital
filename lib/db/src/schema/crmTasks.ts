@@ -118,6 +118,10 @@ export const crmTasks = pgTable("crm_tasks", {
   // My Day is "this person's open work, soonest first" — the query this serves.
   index("ix_crm_tasks_assignee_status_due").on(table.assignedToStaffId, table.status, table.dueDate),
   index("ix_crm_tasks_remind_at").on(table.remindAt),
+  // Push packet 0003 (2026-09-24 performance audit): "this lead's tasks" and
+  // "this project's tasks" both filtered on unindexed columns.
+  index("ix_crm_tasks_lead_id").on(table.leadId),
+  index("ix_crm_tasks_project_id").on(table.projectId),
 
   // A third value would be a third meaning nothing implements, and the reader
   // would fall back to "date" without saying so. The database refuses it.

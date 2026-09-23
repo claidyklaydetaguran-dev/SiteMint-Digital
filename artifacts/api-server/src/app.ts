@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -10,6 +11,32 @@ import { openAiUnavailableErrorHandler } from "./lib/openAiUnavailable.js";
 import { bootGate } from "./lib/bootGate.js";
 
 const app: Express = express();
+
+// Launch security audit (2026-09-24): never advertise the framework, and set
+// the baseline browser-hardening headers on every API response. The
+// Strict-Transport-Security header is added by the platform edge; a CSP is
+// not set here because the API serves JSON, not documents.
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+// Compress JSON responses (launch performance audit, 2026-09-24): the
+// platform edge was measured NOT compressing API bodies, and the CRM list
+// endpoints return hundreds of kilobytes. Threshold keeps tiny health
+// payloads untouched; the Stripe webhook below reads its raw body before
+// any response is written, so it is unaffected. Server-sent event streams
+// (copilot) are excluded: compression would buffer each chunk.
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) =>
+      !String(res.getHeader("Content-Type") ?? "").startsWith("text/event-stream") &&
+      compression.filter(req, res),
+  }),
+);
 
 app.use(
   pinoHttp({

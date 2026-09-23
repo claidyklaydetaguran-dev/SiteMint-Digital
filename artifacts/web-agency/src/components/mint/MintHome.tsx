@@ -4,7 +4,12 @@ import { MintStudioChapters } from "./MintProductVisual";
 import { MintServiceFinder, MintLaunchJourney } from "./MintStories";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import understandingPhoto from "@/assets/mint/understanding.webp";
+import understandingPhotoSmall from "@/assets/mint/understanding-768.webp";
 import websitePhoto from "@/assets/mint/website-review.webp";
+import websitePhotoSmall from "@/assets/mint/website-review-768.webp";
+
+/** Story figures sit in a two-column grid above 760px (about half the 1260px wrap). */
+const storySizes = "(max-width: 760px) calc(100vw - 48px), min(640px, 50vw)";
 export function MintHome() {
   usePageMeta({
     title: "SiteMint Digital | Websites, AI Receptionists & Business Systems",
@@ -118,7 +123,7 @@ export function MintHome() {
       <MintServiceFinder />
       <section className="section wrap story-chapter" aria-labelledby="website-story-title">
         <figure className="story-image">
-          <img src={websitePhoto} alt="Illustration of a business owner and designer reviewing a website on desktop and mobile" width="1536" height="1024" loading="lazy" decoding="async" />
+          <img src={websitePhoto} srcSet={`${websitePhotoSmall} 768w, ${websitePhoto} 1536w`} sizes={storySizes} alt="Illustration of a business owner and designer reviewing a website on desktop and mobile" width="1536" height="1024" loading="lazy" decoding="async" />
           <figcaption>Illustrative design review · Your business shapes the direction.</figcaption>
         </figure>
         <div className="story-copy">
@@ -192,7 +197,7 @@ export function MintHome() {
           </p>
         </div>
         <figure className="understanding-image story-image">
-          <img src={understandingPhoto} alt="Illustration of a business owner and designer discussing goals with paper wireframes at a table" width="1536" height="1024" loading="lazy" decoding="async" />
+          <img src={understandingPhoto} srcSet={`${understandingPhotoSmall} 768w, ${understandingPhoto} 1536w`} sizes="(max-width: 760px) calc(100vw - 48px), min(1260px, 90vw)" alt="Illustration of a business owner and designer discussing goals with paper wireframes at a table" width="1536" height="1024" loading="lazy" decoding="async" />
           <figcaption>Illustrative planning session · Listen first. Build with purpose.</figcaption>
         </figure>
         <div className="steps">

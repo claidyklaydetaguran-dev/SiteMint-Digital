@@ -72,8 +72,19 @@ export class SlidingWindowLimiter {
 
 export const contactIpLimiter = new SlidingWindowLimiter(CONTACT_IP_LIMIT, CONTACT_IP_WINDOW);
 
+/**
+ * Launch security audit (2026-09-24): POST /discovery/submit and
+ * POST /landing-test/submit had no limiter at all — only the feature flag.
+ * Each gets its own bucket (same shape as Contact's) so a flood of one form
+ * cannot lock a genuine visitor out of another.
+ */
+export const discoveryIpLimiter = new SlidingWindowLimiter(CONTACT_IP_LIMIT, CONTACT_IP_WINDOW);
+export const landingTestIpLimiter = new SlidingWindowLimiter(CONTACT_IP_LIMIT, CONTACT_IP_WINDOW);
+
 setInterval(() => {
   contactIpLimiter.purgeStale();
+  discoveryIpLimiter.purgeStale();
+  landingTestIpLimiter.purgeStale();
 }, PURGE_INTERVAL).unref();
 
 export { getClientIp };

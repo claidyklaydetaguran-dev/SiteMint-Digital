@@ -94,6 +94,41 @@ for (const index of ["uq_crm_admin_sessions_token_hash", "ix_crm_admin_sessions_
 }
 check("0001 keeps token_hash unique, as the session lookup requires", /CREATE UNIQUE INDEX IF NOT EXISTS "uq_crm_admin_sessions_token_hash"/.test(p1));
 
+// 0003: the 2026-09-24 performance-audit indexes. Every index must mirror an
+// index("...") declaration in the schema file that owns the table, and the
+// packet must stay indexes-only.
+const p3 = readFileSync(resolve(packetsDir, "0003_crm_indexes_2026_09_24.sql"), "utf8");
+const p3s = parsePacket(p3).statements;
+check("0003 has the reviewed statement count", p3s.length === 21, String(p3s.length));
+check("0003 is indexes only", p3s.every((s) => /^CREATE INDEX IF NOT EXISTS "ix_crm_/.test(s)));
+const p3Schema: Record<string, string[]> = {
+  "crmActivities.ts": ["ix_crm_activities_lead_id", "ix_crm_activities_created_at"],
+  "crmLeads.ts": ["ix_crm_leads_email", "ix_crm_leads_status", "ix_crm_leads_created_at", "ix_crm_leads_updated_at"],
+  "crmTasks.ts": ["ix_crm_tasks_lead_id", "ix_crm_tasks_project_id"],
+  "crmDeals.ts": ["ix_crm_deals_lead_id"],
+  "crmProjects.ts": ["ix_crm_projects_lead_id"],
+  "crmMessages.ts": ["ix_crm_messages_lead_id"],
+  "crmCampaigns.ts": [
+    "ix_crm_campaign_recipients_campaign_id", "ix_crm_campaign_recipients_lead_id", "ix_crm_campaign_recipients_status",
+    "ix_crm_campaign_scheduled_messages_campaign_id", "ix_crm_campaign_scheduled_messages_lead_id",
+    "ix_crm_campaign_scheduled_messages_status", "ix_crm_campaign_scheduled_messages_scheduled_at",
+    "ix_crm_campaign_steps_campaign_id",
+  ],
+  "crmBehavioralEvents.ts": ["ix_crm_behavioral_events_lead_id", "ix_crm_behavioral_events_occurred_at"],
+};
+for (const [file, indexes] of Object.entries(p3Schema)) {
+  const src = readFileSync(resolve(here, "src/schema", file), "utf8");
+  for (const index of indexes) {
+    check(`0003 creates index ${index}, which ${file} declares`, p3s.some((s) => s.includes(`"${index}"`)) && src.includes(`index("${index}")`));
+    check(`${index} fits the 63-byte identifier limit`, Buffer.byteLength(index, "utf8") <= 63);
+  }
+}
+check("0003 declares every index the schema files attribute to it", Object.values(p3Schema).flat().length === p3s.length);
+check("0003 documents the rollback for every index it creates", p3s.every((s) => {
+  const m = /"(ix_crm_[^"]+)"/.exec(s);
+  return m !== null && p3.includes(`DROP INDEX IF EXISTS "${m[1]}"`);
+}));
+
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) process.exit(1);
 console.log("All pushPacket contract tests passed.");

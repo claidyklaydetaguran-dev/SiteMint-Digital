@@ -24,6 +24,7 @@ import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import { PolicyDialog } from "@/components/legal/PolicyDialog";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import {
   detectTimezone,
   emptySignupForm,
@@ -55,6 +56,11 @@ const NEXT_STEPS = [
 ];
 
 export default function LandingReceptionistSignup() {
+  // Launch audit (2026-09-24): this route inherited the homepage <title>.
+  usePageMeta({
+    title: "Create your AI Receptionist account — SiteMint Digital",
+    description: "Set up your SiteMint AI Receptionist account. We email you a link to confirm your address, then you finish setup at your own pace.",
+  });
   const [form, setForm] = useState<SignupFormValues>(() => emptySignupForm(detectTimezone()));
   const [submitting, setSubmitting] = useState(false);
   const [outcome, setOutcome] = useState<SignupOutcome | null>(null);
