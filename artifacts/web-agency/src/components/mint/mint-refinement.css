@@ -31,3 +31,24 @@
 @keyframes mint-menu-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:800px){.mint-site .mint-work-pair,.mint-site .mint-studio-layout{grid-template-columns:1fr;gap:30px}.mint-site .product-moment{min-height:350px}.mint-site .work-site-preview{min-height:360px}}
 @media(prefers-reduced-motion:reduce){.mint-site .product-moment,.mint-site .mint-signin[open]>div{animation:none}.mint-site .logo .mark,.mint-site .work-preview-lines i,.mint-site .product-moments button{transition:none}}
+
+/* Quiet editorial navigation, with a contained active destination. */
+.mint-site>header{background:#ffffffed;border-bottom:1px solid #dbe6de;backdrop-filter:blur(16px);box-shadow:none;transition:box-shadow .2s,background .2s}.mint-site>header[data-scrolled="true"]{background:#fffffff5;box-shadow:0 8px 24px #173f3509}.mint-site>header nav>a:not(.button){padding:9px 13px;font-size:13px;border-radius:7px}.mint-site>header nav>a[aria-current=page]{background:#e4f2e9;color:#173f35}.mint-site>header nav>a:not(.button):after{display:none}.mint-site>header .button.compact{border-radius:8px;min-height:42px;padding:10px 18px}.mint-site>header .mark{border-radius:8px}.mint-site .mint-signin summary{font-size:13px;padding:9px 13px}.mint-site .hero-layout{grid-template-columns:1fr 1.15fr;gap:clamp(25px,5vw,75px)}.mint-site .mint-studio-layout .button{margin-top:24px}.mint-site .mint-studio-section{background:#f1f7f3}.mint-site .studio-responsibilities article{padding:24px 0}.mint-site .studio-responsibilities h3{font-size:20px}
+@media(max-width:1000px){.mint-site>header nav{gap:4px}.mint-site>header nav>a:not(.button){padding:9px 8px}}
+@media(max-width:800px){.mint-site .hero-layout{grid-template-columns:1fr}.mint-site>header nav>a:not(.button){padding:13px 16px;font-size:16px}.mint-site>header .mint-signin summary{font-size:16px}}
+/* Final editorial pass: real team, real projects, compact navigation. */
+.mint-site>header{transition:padding .28s ease,box-shadow .28s ease,background .28s ease;}
+.mint-site>header[data-scrolled="true"]{padding-top:10px;padding-bottom:10px;box-shadow:0 6px 28px #173f350b;background:#fffffff5;backdrop-filter:blur(16px)}
+.mint-site>header[data-scrolled="true"] .logo{font-size:20px}.mint-site>header[data-scrolled="true"] .mark{width:32px;height:32px}
+.mint-site>header[data-scrolled="true"] .button{padding-top:10px;padding-bottom:10px}
+.mint-site .mint-team-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.mint-site .mint-team-grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:20px;margin-bottom:24px}
+.mint-site .mint-team-grid h3{font-size:24px;margin:0 0 8px}.mint-site .mint-team-grid p{line-height:1.7;margin:16px 0}
+.mint-site .mint-featured-projects{display:grid;grid-template-columns:1fr 1fr;gap:32px}.mint-site .mint-featured-project{color:inherit;text-decoration:none;display:block}
+.mint-site .mint-featured-project img{width:100%;aspect-ratio:1.44;object-fit:cover;object-position:top;border-radius:20px;border:1px solid #173f3518;transition:transform .35s ease,box-shadow .35s ease}
+.mint-site .mint-featured-project:hover img{transform:translateY(-4px);box-shadow:0 18px 40px #173f3514}.mint-site .mint-featured-project h3{margin:12px 0;font-size:28px}.mint-site .mint-featured-project p{line-height:1.7}.mint-site .mint-featured-project>div{padding:24px 0}
+.mint-site .mint-image-hero{background-size:cover!important;background-position:center!important;position:relative}.mint-site .mint-image-hero .v3-lede{max-width:600px}.mint-site .mint-image-hero h1{max-width:820px}
+.mint-site .mint-cinema__pause{width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:50%}
+.mint-site section[id]{scroll-margin-top:100px}
+@media(max-width:700px){.mint-site .mint-team-grid,.mint-site .mint-featured-projects{grid-template-columns:1fr}.mint-site .mint-image-hero{background-position:65% center!important}.mint-site .mint-team-grid{gap:40px}}
+@media(prefers-reduced-motion:reduce){.mint-site>header,.mint-site .mint-featured-project img{transition:none}.mint-site .mint-featured-project:hover img{transform:none}}

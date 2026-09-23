@@ -1,3 +1,4 @@
+import mintHeroBackground from "@/assets/mint/work-hero.webp";
 import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V3 — Selected work.
@@ -373,7 +374,7 @@ export default function WorkV3() {
 
   return (
     <div className="v3-work-page sm-v5page">
-      <section className="v3m-page-hero" data-tone="porcelain">
+      <section style={{ backgroundImage: `linear-gradient(90deg, #f8fbf7f5, #f8fbf7b0 48%, #f8fbf720), url(${mintHeroBackground})` }} className="v3m-page-hero mint-image-hero" data-tone="porcelain">
         <div className="v3-container v3m-page-hero__inner v3-reveal" ref={reveal}>
           <span className="v3-eyebrow reveal-fade-up">Work</span>
           {/* Headline is the hero LCP text — left static (no mask-reveal) so

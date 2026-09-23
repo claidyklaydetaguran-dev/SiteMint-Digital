@@ -6,12 +6,30 @@ import "./mint.css";
 import "./mint-legacy.css";
 import "./mint-scenes.css";
 import "./mint-refinement.css";
+import "./mint-finish.css";
 
 export function MintChrome({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [progress, setProgress] = useState(0);
+  // A static local marketing preview does not host the authenticated apps.
+  // Keep sign-in on its real HTTPS origin rather than a misleading local 404.
+  useEffect(() => {
+    if (!["localhost", "127.0.0.1"].includes(window.location.hostname)) return;
+    const routeApp = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as Element).closest<HTMLAnchorElement>("a[href]");
+      if (!link) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin === window.location.origin && /^\/(ai-receptionist\/dashboard|admin|portal)(\/|$)/.test(url.pathname)) {
+        event.preventDefault();
+        window.location.assign(`https://sitemintdigital.com${url.pathname}${url.search}${url.hash}`);
+      }
+    };
+    document.addEventListener("click", routeApp, true);
+    return () => document.removeEventListener("click", routeApp, true);
+  }, []);
   useEffect(() => {
     const update = () => {
       setScrolled(window.scrollY > 24);
@@ -166,6 +184,7 @@ export function MintChrome({ children }: { children: ReactNode }) {
             <a href={ROUTES.adminLogin}>Staff sign in</a>
           </div>
         </div>
+        <button className="mint-back-top" type="button" onClick={() => window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })}>Back to top <span aria-hidden="true">↑</span></button>
       </footer>
     </div>
   );

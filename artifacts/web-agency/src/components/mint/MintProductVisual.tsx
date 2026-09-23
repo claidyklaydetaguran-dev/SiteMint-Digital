@@ -1,3 +1,5 @@
+import { teamV5 } from "@/components/v5/teamV5";
+import { portfolioProjects } from "@/components/platform-preview/portfolioProjects";
 import { useState } from "react";
 import { Phone, CalendarDays, ClipboardCheck, Check, ArrowRight } from "lucide-react";
 
@@ -26,10 +28,9 @@ export function MintProductVisual() {
 }
 
 export function MintStudioChapters() {
-  return <>
-    <section className="section wrap mint-work-preview" aria-labelledby="work-preview-title"><div className="section-heading"><div><span className="tag">A closer look at the work</span><h2 id="work-preview-title">Considered on the outside.<br/>Connected underneath.</h2></div><p>Explore the experiences we design: a clear first impression, a useful conversation and an organized next step.</p></div>
-      <div className="mint-work-pair"><a className="mint-work-window" href="/work"><div className="window-chrome"><span/><span/><span/><small>Website concept</small></div><div className="work-site-preview"><span>Small business, clearly presented</span><h3>Your work deserves<br/>a thoughtful home.</h3><div className="work-preview-lines"><i/><i/><i/></div><span className="work-preview-link">Explore design examples ↗</span></div></a><div><MintProductVisual/><a className="more" href="/ai-receptionist">Explore the receptionist experience</a></div></div>
-    </section>
-    <section className="mint-studio-section section" aria-labelledby="studio-title"><div className="wrap mint-studio-layout"><div><span className="tag">The people behind the process</span><h2 id="studio-title">A studio you can<br/>work with directly.</h2><p>SiteMint brings business direction and technical delivery together. You share the goal; we explain the options, shape the experience and make progress visible.</p><a href="/about" className="button outline">Get to know SiteMint</a></div><div className="studio-responsibilities"><article><span className="studio-role-symbol" aria-hidden="true">↗</span><div><h3>Business direction</h3><p>Your priorities, a clear scope and a practical conversation about what comes next.</p></div></article><article><span className="studio-role-symbol" aria-hidden="true">⌘</span><div><h3>Claidy Taguran</h3><strong>Technical Director</strong><p>The design, connections and testing that turn an agreed plan into a working experience.</p></div></article><div className="studio-promise">You review the direction before we build out the details.</div></div></div></section>
-  </>;
+ const projects = portfolioProjects.filter(p => p.id === "simply-save-solar" || p.projectName.toLowerCase().includes("onefil"));
+ return <>
+  <section className="section wrap"><div className="section-heading"><h2>Built around real businesses.</h2><p>A closer look at two projects, from the first impression to a clear next step.</p></div><div className="mint-featured-projects">{projects.map(p => <a key={p.id} href="/work" className="mint-featured-project"><img src={p.desktopAsset?.src} alt={p.desktopAsset?.alt ?? p.projectName} loading="lazy"/><div><small>{p.category}</small><h3>{p.projectName}</h3><p>{p.summary}</p><span>Explore the project</span></div></a>)}</div></section>
+  <section className="mint-studio-section section"><div className="wrap"><div className="section-heading"><h2>A studio you can work with directly.</h2><p>Strategy, engineering and project care. Meet the three people bringing your project together.</p></div><div className="mint-team-grid">{teamV5.map(m => <article key={m.name}><img src={m.photo} alt={m.name} style={{objectPosition:m.portraitPosition}} loading="lazy"/><h3>{m.name}</h3><strong>{m.role}</strong><p>{m.summary}</p><a className="more" href="/about">Meet {m.name.split(" ")[0]}</a></article>)}</div></div></section>
+ </>;
 }

@@ -1,3 +1,4 @@
+import mintHeroBackground from "@/assets/mint/pricing-hero.webp";
 import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V5 — Pricing (W-13 superseded by amendment §10; V5-BLUEPRINT §9).
@@ -287,7 +288,7 @@ export default function PricingV5() {
 
   return (
     <div className="v3-services-hub sm-v5page">
-      <section className="v3m-page-hero" data-tone="porcelain">
+      <section style={{ backgroundImage: `linear-gradient(90deg, #f8fbf7f5, #f8fbf7b0 48%, #f8fbf720), url(${mintHeroBackground})` }} className="v3m-page-hero mint-image-hero" data-tone="porcelain">
         <div
           className="v3-container v3m-page-hero__inner v3-reveal"
           ref={reveal}

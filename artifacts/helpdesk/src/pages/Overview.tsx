@@ -44,7 +44,6 @@ import {
   buildTodayFigures,
   buildUsage,
   countToday,
-  pageCopy,
   recentCalls as recentCallsOf,
   recentConversations,
   type ReceptionistState,
@@ -178,11 +177,10 @@ export default function Overview() {
 
   const nextAction = buildNextBestAction({ receptionistState: state, attentionCount: attention.length });
   const recentVoiceCalls = recentCallsOf(recentCallsQuery.items);
-  const page = pageCopy();
 
   return (
     <div className="sd-page sd-enter">
-      <PageHeader eyebrow={page.eyebrow} title={page.title} />
+      <PageHeader eyebrow="Your business workspace" title="Your day, at a glance." />
       <div className="sd-page__head" style={{ marginTop: "calc(-1 * var(--sd-space-4, 1rem))" }}>
         <span className="sd-page__meta">{todayLabel()}</span>
       </div>
@@ -247,6 +245,7 @@ export default function Overview() {
         </section>
       ) : (
         <>
+          {!DashboardPanel && <>
           <section className="sd-section" aria-labelledby="sd-today-title">
             <h2 className="sd-h2" id="sd-today-title">
               Today&rsquo;s activity
@@ -299,6 +298,7 @@ export default function Overview() {
             </div>
           </section>
 
+          </>}
           {voicePlatformEnabled && (
             <section className="sd-section" aria-labelledby="sd-calls-title">
               <div className="sd-section__head">

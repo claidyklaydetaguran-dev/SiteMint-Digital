@@ -1,9 +1,9 @@
+import { MintCinemaHero } from "./MintCinemaHero";
+import { MintReceptionistGuide } from "./MintDepthScene";
 import { MintPageStory } from "./MintStories";
 import { useState } from "react";
 import { PublicShell } from "@/shells/PublicShell";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import ownerPhoto from "@/assets/mint/business-owner.webp";
-import focusPhoto from "@/assets/mint/business-focus.webp";
 function ScenarioContent({ selected }: { selected: string }) {
   switch (selected) {
     case "booking":
@@ -189,60 +189,8 @@ export function MintReceptionist() {
   });
   return (
     <PublicShell chrome="v4" headerMode="product" routeLabel="AI Receptionist">
-      <section className="reception-hero">
-        <div className="wrap">
-          <div>
-            <span className="tag">
-              {"SiteMint AI Receptionist · Assisted pilot"}
-            </span>
-            <h1>
-              {"A helpful voice"}
-              <br />
-              {"for your business."}
-            </h1>
-            <p className="intro">
-              {
-                "Answer questions, arrange appointments and connect callers to your team. With setup handled alongside you."
-              }
-            </p>
-            <div className="actions">
-              <a className="button" href="/ai-receptionist#example">
-                {"Explore a sample call"}
-              </a>
-              <a
-                className="button outline"
-                href="/start?service=ai-receptionist"
-              >
-                {"Request pricing"}
-              </a>
-            </div>
-            <p className="fine">
-              {"Already have an account? "}
-              <a
-                className="text-button"
-                href="/ai-receptionist/dashboard/login"
-              >
-                <u>{"Sign in"}</u>
-              </a>
-            </p>
-          </div>
-          <div
-            className="reception-photo"
-
-          >
-            <img className="reception-scene" src={focusPhoto} alt="Illustrative shop owner focusing on her work beside a phone" width="1536" height="1024" fetchPriority="high" />
-            <div className="greeting">
-              <div className="phone-icon">{"☎"}</div>
-              <div>
-                {"“Thanks for calling."}
-                <br />
-                {"How can I help you today?”"}
-                <small>{"Illustrative AI greeting"}</small>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <MintCinemaHero receptionist />
+      <MintReceptionistGuide />
       <MintPageStory kind="receptionist" />
       <div className="benefit-strip wrap">
         <div>

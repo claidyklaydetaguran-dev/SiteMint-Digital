@@ -12,3 +12,6 @@
 .sd-app .sd-nav__link{border-radius:12px;transition:background .18s,color .18s}.sd-app h1{letter-spacing:-.8px}.sd-app h2{letter-spacing:-.4px}
 .si-page.si-page.si-page{--v2-color-canvas:#f5f8f3;--v2-color-surface:#fff;--v2-color-surface-accent:#e4f2e9;--v2-color-text:#203c34;--v2-color-text-muted:#566e61;--v2-color-action:#173f35;--v2-color-text-on-action:#fff;--v2-color-border:#d4e2d7;--v2-color-border-strong:#9cb8a5;--v2-navy-900:#203c34;--v2-mint-500:#28745c;--v2-mint-100:#e4f2e9;--v2-mint-mist:#e4f2e9}
 @media(prefers-reduced-motion:reduce){.sd-app .sd-nav__link{transition:none}}
+
+.sd-app .sd-page{max-width:1320px;margin-inline:auto;padding:clamp(24px,3.5vw,48px)}.sd-app .sd-navlink{border-radius:8px;margin:3px 10px;min-height:42px}.sd-app .sd-rail__grouplabel{text-transform:none;letter-spacing:0;font-size:11px}.sd-app .sd-rail__head{padding:25px 20px}.sd-app .sd-section{margin-top:28px}.sd-app .sd-section__head{margin-bottom:18px}.sd-app .sd-h2{font-size:18px}.sd-app .sd-rail__brand{font-size:17px;letter-spacing:-.4px}.sd-app .sd-page h1{font-size:clamp(28px,3vw,36px);font-weight:600}.sd-app .dash-stat{border-radius:12px;background:var(--sd-surface);box-shadow:0 3px 12px #173f3504}.sd-app .sd-empty{border-radius:12px;padding:30px;background:var(--sd-surface)}
+@media(max-width:640px){.sd-app .sd-page{padding:22px 16px}}

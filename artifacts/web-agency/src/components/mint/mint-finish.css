@@ -1,0 +1,35 @@
+/* Mint Clarity: water rings, leaf contours and considered interaction. */
+.mint-site ::selection{background:#bde6d0;color:#173f35}
+.mint-site h1,.mint-site h2{ text-wrap:balance }
+.mint-site p{ text-wrap:pretty }
+.mint-site .section-heading{position:relative}
+.mint-site .section-heading:after{content:"";display:block;width:72px;height:3px;margin-top:28px;background:#86b59c;border-radius:3px}
+.mint-site .mint-studio-section{position:relative;isolation:isolate;overflow:hidden}
+.mint-site .mint-studio-section:before{content:"";position:absolute;z-index:-1;right:-120px;top:30px;width:380px;height:380px;border:1px solid #abcdb866;border-radius:12% 88% 22% 78%;transform:rotate(-25deg);box-shadow:0 0 0 28px #b7d4c018,0 0 0 58px #b7d4c014;pointer-events:none}
+.mint-site>footer{position:relative;isolation:isolate;overflow:hidden}
+.mint-site>footer:before{content:"";position:absolute;z-index:-1;width:500px;height:160px;border:1px solid #a3c5b14d;box-shadow:0 0 0 24px #a3c5b114,0 0 0 50px #a3c5b10c;border-radius:50%;right:-150px;bottom:-65px;pointer-events:none}
+.mint-site .mint-back-top{display:flex;align-items:center;gap:14px;margin:24px 0 0 auto;border:0;background:transparent;color:var(--forest);font-size:13px;min-height:44px}
+.mint-site .mint-back-top span{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:50%;transition:transform .2s,background .2s}
+.mint-site .mint-back-top:hover span{transform:translateY(-3px);background:var(--mint)}
+.mint-site .service-visual{transition:box-shadow .25s,border-color .25s}
+.mint-site .service:focus-within .service-visual,.mint-site .service:hover .service-visual{box-shadow:0 10px 32px #173f3510;border-color:#93b9a2}
+.mint-site .more{ text-underline-offset:6px; text-decoration-color:#8dbba1 }
+.mint-site .more:hover{ text-decoration:underline }
+.mint-site .mint-team-grid article{border-bottom:1px solid var(--line);padding-bottom:22px}
+.mint-site .mint-featured-project:focus-visible{outline-offset:8px;border-radius:20px}
+.mint-site .mint-image-hero:after{content:"";position:absolute;bottom:0;left:0;right:0;height:100px;background:linear-gradient(transparent,#f9fbf8);pointer-events:none}
+.mint-site .mint-image-hero h1{line-height:1.12}
+.mint-site .mint-image-hero .v3-lede{color:#365b4c}
+.mint-site button[aria-expanded="true"]{text-decoration-color:#87b59b}
+@media(hover:hover){.mint-site .button{transition:background .2s,color .2s,box-shadow .2s,transform .2s}.mint-site .button:hover{transform:translateY(-2px);box-shadow:0 5px 15px #173f3515}.mint-site .button:active{transform:translateY(0)}}
+@supports(animation-timeline:view()){
+ @media(prefers-reduced-motion:no-preference){
+  .mint-site .section-heading:after{transform-origin:left;animation:mint-rule linear both;animation-timeline:view();animation-range:entry 0% entry 100%}
+  .mint-site .section-heading h2{animation:mint-heading linear both;animation-timeline:view();animation-range:entry 0% entry 100%}
+ }
+}
+@keyframes mint-rule{from{transform:scaleX(.15)}to{transform:scaleX(1)}}
+@keyframes mint-heading{from{transform:translateY(12px)}to{transform:translateY(0)}}
+@media(max-width:700px){.mint-site .mint-image-hero{background-position:70% center!important}.mint-site .mint-image-hero .v3-lede{background:#f9fbf8d9;border-radius:12px;padding:14px}.mint-site .mint-studio-section:before{width:240px;height:240px}.mint-site .mint-back-top{margin-left:0}}
+@media(prefers-reduced-motion:reduce){.mint-site .button,.mint-site .service-visual,.mint-site .mint-back-top span{transition:none!important;transform:none!important}}
+@media(max-width:480px){.mint-site .mint-cinema .actions{display:grid;grid-template-columns:1fr;gap:12px}.mint-site .mint-cinema .actions .button{width:100%;min-height:52px;padding:14px 20px;justify-content:center}.mint-site .mint-cinema__copy{padding-top:70px;padding-bottom:125px}.mint-site .mint-cinema__intro{font-size:16px}}

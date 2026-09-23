@@ -1,3 +1,4 @@
+import "./mint-portal.css";
 // ── M4: the customer portal's chrome ────────────────────────────────────────
 //
 // The public site's conventions, not the CRM's. No "AUTHORIZED PERSONNEL", no
@@ -131,7 +132,7 @@ export default function PortalShell({ title, children }: { title: string; childr
   const contact = state.status === "ready" ? state.data.contact : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="mint-client-portal min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Link href="/portal" className="flex min-h-11 items-center gap-2">
@@ -186,6 +187,7 @@ export default function PortalShell({ title, children }: { title: string; childr
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
+        <p className="mint-portal-kicker">Your project, clearly organized</p>
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
         <div className="mt-4 space-y-4">{children}</div>
       </main>

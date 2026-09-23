@@ -1,7 +1,8 @@
+import { MintCinemaHero } from "./MintCinemaHero";
+import { MintDemonstration } from "./MintDemonstration";
 import { MintStudioChapters } from "./MintProductVisual";
 import { MintServiceFinder, MintLaunchJourney } from "./MintStories";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import ownerPhoto from "@/assets/mint/business-owner.webp";
 import understandingPhoto from "@/assets/mint/understanding.webp";
 import websitePhoto from "@/assets/mint/website-review.webp";
 export function MintHome() {
@@ -12,56 +13,8 @@ export function MintHome() {
   });
   return (
     <>
-      <section className="clarity-hero">
-        <div className="wrap hero-layout">
-          <div className="hero-copy">
-            <span className="tag">{"A digital partner for your business"}</span>
-            <h1>{"A fresh start for your business."}</h1>
-            <p className="intro">
-              {
-                "A website that feels like you. A receptionist that helps your callers. Systems that make the day simpler."
-              }
-            </p>
-            <div className="actions">
-              <a className="button" href="/#services">
-                {"Explore our services"}
-              </a>
-              <a className="button outline" href="/discovery">
-                {"Start a project"}
-              </a>
-            </div>
-            <p className="hero-assurance">
-              {"Thoughtfully designed. Set up with you."}
-            </p>
-          </div>
-          <figure className="hero-portrait">
-            <img
-              src={ownerPhoto}
-              alt="Illustrative business owner working at her laptop in a bright studio"
-              width="1536"
-              height="1024"
-              fetchPriority="high"
-            />
-            <figcaption>
-              <span className="caption-symbol" aria-hidden="true">
-                {"✓"}
-              </span>
-              <div>
-                {"More room for what you do best."}
-                <small>{"Websites, receptionists and business systems."}</small>
-              </div>
-            </figcaption>
-          </figure>
-        </div>
-        <div className="wrap hero-service-line">
-          <span>{"One studio. Three ways to help."}</span>
-          <a href="/#services">{"Websites & web apps"}</a>
-          <a href="/ai-receptionist">{"AI receptionist"}</a>
-          <a className="text-button" href="/ai-systems">
-            {"Business systems"}
-          </a>
-        </div>
-      </section>
+      <MintCinemaHero />
+      <MintDemonstration />
       <section className="section wrap" id="services">
         <div className="section-heading">
           <h2>

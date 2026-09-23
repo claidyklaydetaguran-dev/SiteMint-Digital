@@ -199,6 +199,9 @@ export async function submitDiscoveryBrief(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildLegacyDiscoverySubmitBody(body)),
     });
+    if (res.headers.get("content-type")?.includes("text/html")) {
+      return { kind: "network_error", message: "This preview is not connected to the submission service. Your answers are saved in this browser. Please use sitemintdigital.com/discovery to send a live brief, or contact info.sitemint@gmail.com for help." };
+    }
     return await mapDiscoverySubmitResponse(res);
   } catch {
     return { kind: "network_error", message: DISCOVERY_NETWORK_ERROR };

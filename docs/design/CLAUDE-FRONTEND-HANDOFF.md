@@ -98,3 +98,13 @@ Calls, calendar booking, caller acknowledgment, notification retries, SMS, trans
 Public routes were checked at 390px for horizontal overflow and failed loaded images. Main public routes and signup/client sign-in were checked at 1440px for overflow, one h1 and broken local anchors. Mobile menu Escape returned focus to the toggle. Pricing summary was carried to Start without placing notes in the URL. No email or form submission was sent by these checks.
 
 The existing web-agency Vitest suite passed 17 files / 161 tests; TypeScript passed. Historical standalone Contract scripts are excluded by this Vitest configuration and are not claimed passing. Final build/prerender results are recorded in the release log.
+
+## September 23 homepage refinement — local candidate
+
+Owner confirmed the homepage should reuse all three existing About profiles and highlight only Simply Save Solar and OneFilAm Community. Implemented using teamV5 and portfolioProjects; real photos and project images were browser-verified loaded.
+
+Added generated decorative hero backgrounds for Services, Work, Pricing and About. Demo video plays muted when visible and pauses offscreen; reduced-motion visitors retain manual playback. Receptionist background control is an accessible play/pause icon. Header shrinks from 94px to 70px on scroll (browser verified).
+
+Validation: current web-agency build and typecheck passed; Vitest 17 files / 161 tests passed. Public prerender is tracked separately. This candidate has not been published in this pass.
+
+Local preview at port 8772 has no API proxy: /api/healthz returns HTML, while production health returns JSON. Local account links now navigate to the live HTTPS app; this is not proof of successful account authentication. Discovery now explains the disconnected preview beside Submit and preserves the browser draft. A real discovery submission and persistence check remains outstanding. Do not claim the preview form or all backend workflows are verified.

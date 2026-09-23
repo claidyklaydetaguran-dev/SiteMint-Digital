@@ -227,6 +227,7 @@ export function DiscoveryReview({
       >
         {submitting ? "Submitting…" : errorMessage ? "Try again" : "Submit Discovery Brief"}
       </Button>
+      {errorMessage && <p role="alert" className="mt-4 text-sm text-[hsl(var(--sm-color-text-primary))]">{errorMessage}</p>}
     </div>
   );
 }
