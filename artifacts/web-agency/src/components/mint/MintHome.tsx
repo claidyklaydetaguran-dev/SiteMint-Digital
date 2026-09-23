@@ -1,3 +1,4 @@
+import { MintStudioChapters } from "./MintProductVisual";
 import { MintServiceFinder, MintLaunchJourney } from "./MintStories";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import ownerPhoto from "@/assets/mint/business-owner.webp";
@@ -272,6 +273,7 @@ export function MintHome() {
         </div>
       </section>
       <MintLaunchJourney />
+      <MintStudioChapters />
       <section className="section wrap" style={{ paddingTop: "10px" }}>
         <div className="faq">
           <h2>{"A few things you might be wondering."}</h2>

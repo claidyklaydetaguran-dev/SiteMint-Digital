@@ -5,13 +5,19 @@ import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import "./mint.css";
 import "./mint-legacy.css";
 import "./mint-scenes.css";
+import "./mint-refinement.css";
 
 export function MintChrome({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [progress, setProgress] = useState(0);
   useEffect(() => {
-    const update = () => setScrolled(window.scrollY > 24);
+    const update = () => {
+      setScrolled(window.scrollY > 24);
+      const distance = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(distance > 0 ? Math.min(1, window.scrollY / distance) : 0);
+    };
     update();
     window.addEventListener("scroll", update, { passive: true });
     return () => window.removeEventListener("scroll", update);
@@ -62,6 +68,7 @@ export function MintChrome({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <header ref={headerRef} data-scrolled={scrolled}>
+        <span className="mint-reading-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
         <Link className="logo" href={ROUTES.home}>
           <span className="mark" aria-hidden="true">
             s

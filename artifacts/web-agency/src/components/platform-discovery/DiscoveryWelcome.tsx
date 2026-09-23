@@ -1,3 +1,4 @@
+import planningImage from "@/assets/mint/understanding.webp";
 import { ArrowRight, Clock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,7 +21,7 @@ const WHAT_WE_ASK = [
 
 export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: DiscoveryWelcomeProps) {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+    <div className="mint-discovery-welcome"><div className="mint-discovery-intro">
       {/* Icon badge */}
       <div
         aria-hidden="true"
@@ -120,6 +121,6 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
       <p className="mt-6 text-xs text-[hsl(var(--sm-color-text-muted))]">
         Your information is kept private and used only to prepare your proposal. We'll never share or sell your data.
       </p>
-    </div>
+    </div><aside className="mint-discovery-aside"><img src={planningImage} alt="Illustrative planning session with paper website sketches" width="1536" height="1024"/><div><span>From an idea to a clear plan</span><h2>Tell us what a better working day looks like.</h2><p>You do not need a technical brief. Start with your business, your customers and what you would like to improve.</p><ol><li>Share your starting point</li><li>Review your answers</li><li>Discuss a practical next step</li></ol><small>Illustrative planning scene</small></div></aside></div>
   );
 }

@@ -65,6 +65,7 @@ import "@/styles/v4-app.css";
 // SiteMint V5 "Signal, mint-led" retheme — token-value override one layer
 // above V4. ROLLBACK: remove this import to restore the V4 appearance.
 import "@/styles/v5-app.css";
+import "@/styles/mint-workspace.css";
 
 /**
  * The public marketing surfaces this page links back out to. Both are in the
@@ -316,8 +317,8 @@ export default function Login() {
                 ))}
               </ul>
               <p className="si-status__note">
-                Signing in opens your receptionist dashboard. Text messages to
-                callers are not part of it yet.
+                Signing in opens your receptionist dashboard. SMS needs a configured
+                number, caller consent and delivery testing before activation.
               </p>
             </aside>
           </div>

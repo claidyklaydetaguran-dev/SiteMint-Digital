@@ -1,0 +1,14 @@
+/* Mint Clarity workspace; existing component contracts and theme choice stay intact. */
+.sd-app.sd-app.sd-app{
+ --sd-canvas:#f5f8f3;--sd-surface:#fff;--sd-surface-alt:#eef4ee;--sd-surface-accent:#e4f2e9;
+ --sd-text:#203c34;--sd-text-muted:#566e61;--sd-muted-text:#566e61;--sd-border:#d4e2d7;--sd-border-strong:#9cb8a5;
+ --sd-accent:#28745c;--sd-accent-ink:#fff;--sd-accent-soft:#e4f2e9;--sd-focus-color:#28745c;
+ --sd-rail:#edf4ed;--sd-rail-text:#203c34;--sd-rail-muted:#566e61;--sd-rail-border:#d4e2d7;--sd-rail-hover:#e1ece2;--sd-rail-active:#d5e8d9;--sd-rail-accent:#226449;
+ --sd-radius-card:18px;--sd-radius-control:10px;--sd-shadow-1:0 4px 18px #173f3506;
+ --sd-warn:#805018;--sd-warn-surface:#fff8e9;--sd-warn-border:#decba5;--sd-danger:#a12d37;--sd-danger-surface:#fff3f3;--sd-danger-border:#e3bbc0;--sd-muted-surface:#edf4ed;
+ --v2-navy-900:#203c34;--v2-navy-700:#173f35;--v2-mint-500:#28745c;--v2-mint-100:#e4f2e9;--v2-mint-mist:#e4f2e9;
+}
+:where(.dark) .sd-app.sd-app.sd-app{--sd-canvas:#152b23;--sd-surface:#1d372c;--sd-surface-alt:#193126;--sd-surface-accent:#284c3a;--sd-text:#f1f7f1;--sd-text-muted:#b4cbbb;--sd-muted-text:#b4cbbb;--sd-border:#355441;--sd-border-strong:#6b937c;--sd-accent:#a8dfba;--sd-accent-ink:#173f35;--sd-accent-soft:#284c3a;--sd-rail:#10251c;--sd-rail-text:#edf5ee;--sd-rail-muted:#adc7b5;--sd-rail-border:#355441;--sd-rail-hover:#23402f;--sd-rail-active:#2b503b;--sd-rail-accent:#b8e5c7;--sd-muted-surface:#193126;--sd-focus-color:#b8e5c7;--sd-warn:#f1d29a;--sd-warn-surface:#3c3423;--sd-warn-border:#76603a;--sd-danger:#ffb5bd;--sd-danger-surface:#44292e;--sd-danger-border:#83515a}
+.sd-app .sd-nav__link{border-radius:12px;transition:background .18s,color .18s}.sd-app h1{letter-spacing:-.8px}.sd-app h2{letter-spacing:-.4px}
+.si-page.si-page.si-page{--v2-color-canvas:#f5f8f3;--v2-color-surface:#fff;--v2-color-surface-accent:#e4f2e9;--v2-color-text:#203c34;--v2-color-text-muted:#566e61;--v2-color-action:#173f35;--v2-color-text-on-action:#fff;--v2-color-border:#d4e2d7;--v2-color-border-strong:#9cb8a5;--v2-navy-900:#203c34;--v2-mint-500:#28745c;--v2-mint-100:#e4f2e9;--v2-mint-mist:#e4f2e9}
+@media(prefers-reduced-motion:reduce){.sd-app .sd-nav__link{transition:none}}

@@ -17,8 +17,8 @@ export const READINESS: Record<ReadinessTier, { label: string; note: string }> =
     note: "Enabled after setup and acceptance checks for your business.",
   },
   "in-development": {
-    label: "In development",
-    note: "Being built. Not available to customers yet.",
+    label: "Activation required",
+    note: "Requires configuration and delivery testing before activation.",
   },
   planned: {
     label: "Planned",
@@ -47,7 +47,7 @@ export const CAPABILITY_STATUS: Array<{
   {
     capability: "Text messages to callers",
     description:
-      "Confirmation texts and replies by text message. Not sent today; the receptionist never promises one.",
-    tier: "planned",
+      "SMS requires a configured number, caller consent and verified delivery before activation. It is not enabled by default.",
+    tier: "in-development",
   },
 ];

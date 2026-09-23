@@ -20,7 +20,7 @@ export type ReadinessTier = "available" | "in-development" | "planned";
 
 export const READINESS: Record<ReadinessTier, { label: string }> = {
   available: { label: "Assisted pilot" },
-  "in-development": { label: "In development" },
+  "in-development": { label: "Activation required" },
   planned: { label: "Planned" },
 };
 
@@ -32,5 +32,5 @@ export const READINESS: Record<ReadinessTier, { label: string }> = {
 export const CAPABILITY_STATUS: Array<{ capability: string; tier: ReadinessTier }> = [
   { capability: "Voice receptionist", tier: "available" },
   { capability: "Appointment booking and team access", tier: "available" },
-  { capability: "Text messages to callers", tier: "planned" },
+  { capability: "Text messages to callers", tier: "in-development" },
 ];

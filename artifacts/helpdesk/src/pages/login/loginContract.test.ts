@@ -261,7 +261,7 @@ console.log("\n--- product truth ---");
     "Appointment booking and team access",
     "Text messages to callers",
     "Assisted pilot",
-    "In development",
+    "Activation required",
     "Planned",
   ]) {
     check(`"${phrase}" matches the public site's wording`, readinessSrc.includes(`"${phrase}"`) && publicReadinessSrc.includes(`"${phrase}"`));
@@ -277,11 +277,11 @@ console.log("\n--- product truth ---");
   );
   check(
     "text messages are not marked available",
-    /\{ capability: "Text messages to callers", tier: "planned" \}/.test(readinessSrc),
+    /\{ capability: "Text messages to callers", tier: "in-development" \}/.test(readinessSrc),
   );
   check(
     "the page states plainly that text messages are not included yet",
-    pageProse.includes("Text messages to callers are not part of it yet."),
+    pageProse.includes("SMS needs a configured number, caller consent and delivery testing before activation."),
   );
   check(
     "the page states where a successful sign-in leads",

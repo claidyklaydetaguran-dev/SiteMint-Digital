@@ -24,6 +24,7 @@
  */
 
 import { Suspense, type ReactNode } from "react";
+import "@/styles/mint-operations.css";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";
@@ -48,9 +49,9 @@ export function DashboardShell({ children, routeLabel }: DashboardShellProps) {
           SiteMint Operations
         </span>
         <span className="v3o-bar__scope">
-          Internal operating environment — not a customer surface
+          Your team’s clients, projects and follow-up
         </span>
-        <span className="v3o-bar__badge">Authorized personnel</span>
+        <span className="v3o-bar__badge">Staff workspace</span>
       </div>
       <RouteErrorBoundary routeLabel={routeLabel} resetKey={location}>
         <Suspense fallback={<RouteFallback label={routeLabel ?? "Loading workspace"} />}>

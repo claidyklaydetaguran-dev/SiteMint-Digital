@@ -18,6 +18,7 @@
  */
 import "@/styles/platform-preview.css";
 import "@/components/platform-discovery/discovery-v5.css";
+import "@/components/platform-discovery/mint-discovery.css";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { PlatformDiscoveryShell } from "@/components/platform-discovery/PlatformDiscoveryShell";
 // Owner final polish (2026-09-06, Discovery brand repair): Discovery carries

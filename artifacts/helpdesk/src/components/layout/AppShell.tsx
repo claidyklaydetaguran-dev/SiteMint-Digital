@@ -65,6 +65,7 @@ import "@/styles/v4-app.css";
 // SiteMint V5 "Signal, mint-led" retheme — token-value override one layer
 // above V4. ROLLBACK: remove this import to restore the V4 appearance.
 import "@/styles/v5-app.css";
+import "@/styles/mint-workspace.css";
 
 const DESKTOP_QUERY = "(min-width: 64rem)";
 
