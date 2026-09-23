@@ -21,6 +21,7 @@ import {
 } from "./src/baseline-journals.mjs";
 
 import { spawn } from "node:child_process";
+import { connectionFingerprint } from "./src/db-target.mjs";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -268,9 +269,28 @@ await withDisposableDb("partial-destination", async (url) => {
 
 
 
+/**
+ * 2026-09-24: every migrate:* command goes through the --target guard, which
+ * refuses to guess a database and requires the caller to state the identity
+ * it expects to reach. The suite hands each case its own disposable database,
+ * so it names that database explicitly: `--target dev` (which reads the
+ * DATABASE_URL we set for the child) plus the database name and connection
+ * fingerprint of that same URL — the same claim an operator would make, made
+ * with the same helper the guard verifies against. No guard behaviour is
+ * bypassed; a wrong expectation still fails the child.
+ */
 function run(script: string, url: string): Promise<{ code: number; output: string }> {
+  const fingerprint = connectionFingerprint(url);
+  const expectDb = decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
+  // Only the guarded migrate:* commands take the target claim; `push` and
+  // `baseline:journals` read DATABASE_URL directly and reject unknown flags.
+  const targetArgs = !script.startsWith("migrate:") ? [] : [
+    "--target", "dev",
+    "--expect-db", expectDb,
+    "--expect-fingerprint", fingerprint.ok ? fingerprint.fingerprint : "unparsable",
+  ];
   return new Promise((resolve) => {
-    const child = spawn("pnpm", ["run", script], {
+    const child = spawn("pnpm", ["run", script, ...targetArgs], {
       cwd: dbPackageRoot,
       env: { ...process.env, DATABASE_URL: url },
       shell: process.platform === "win32",
