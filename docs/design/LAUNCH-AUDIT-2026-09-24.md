@@ -14,7 +14,26 @@ Observed evidence and a reviewable release candidate. This is not a launch certi
 | Client portal | **Not verified in this pass** | `/portal/sign-in` renders on the domain and rejects bad credentials (401). An invited-client session was not available. |
 | Database index packet `0003` | **Rehearsal required before production** | Additive, reviewed, contract-tested (89 checks). Must be rehearsed against a scratch copy per `lib/db/MIGRATIONS.md` before any production application. |
 
-**Do not announce a public launch until the discovery flag is on and one real submission has been seen in the CRM.**
+**Release executed later the same day (owner authorisation of 2026-09-24). The decision table above is superseded by §0a.**
+
+## 0a. Release record and evidence-based decision (2026-09-24, ~22:30–22:50 UTC)
+
+| Item | Value |
+| --- | --- |
+| Source commits | `a3e859c` (frontend + server + hardening), `1e1d162` (marketing package), `6d0b8ba` (owner-authorised protected-file fixes + discovery mail guard), `fbca269` (manifest hashed on git-stored bytes), `c1cc75b` (test models the trusted proxy hop). Branch `claude/sitemint-launch-audit-7c01bb`, pushed to GitHub. |
+| Marketing deploy (SiteMint-Digital app) | `mkt/` checked out from the branch by git (`sha256sum -c MANIFEST.sha256`: 344/344 OK), committed on the workspace branch as `46e48a9c4`, smoke-tested on :8093 (brotli, ETag, 404, health), Republished. Rollback copy `mkt.rollback-before-a3e859c` in the workspace. Live `release.json` reports `sourceCommit a3e859c`. |
+| Backend deploy (Web Asset Builder) | Workspace was on `feature/ai-receptionist-visible-progress` @ `2543c0c9` (12 local commits, 7 of 8 edited source files byte-identical to the canonical tip, the 8th a legacy file no longer routed) — preserved as `backup/replit-before-launch-2026-09-24`; checked out `c1cc75b`; `pnpm install --frozen-lockfile`; api-server, helpdesk and web-agency built explicitly in the workspace; deployment secret `PUBLIC_FORM_SUBMISSIONS_ENABLED=true` added; database-copy switch verified off; **Stripe sandbox-sync switch found ON again and turned off**; published, build `8ad3901e-cd12-4025-8176-da530c48f6b6`, no migration gate raised. |
+| Public "Start a project" journey — LIVE proof | `POST /api/discovery/submit` empty body → 400 validation (was 503). One named acceptance inquiry ("SiteMint Launch Acceptance Test", company "SiteMint Digital (internal acceptance 2026-09-23T22:46Z)", email claidyklaydetaguran@gmail.com) → 201 `id 9`. Production database (`neondb`, via the workspace's `SNAPSHOT_SOURCE`, read-only, non-PII columns): `discovery_submissions` id 9 status New, lead_score 1; `form_submissions` id 8 "Discovery Form" `email_team_sent=sent`, `email_client_sent=sent`. Acknowledgement received by claidyklaydetaguran@gmail.com from noreply@sitemintdigital.com at 22:46:42Z ("Thank You for Contacting SiteMint Digital"). Team notification to info.sitemint@gmail.com is evidenced by the `sent` status only (that mailbox was not read). |
+| Staff CRM view of the inquiry | **Not verified.** `/admin/crm/discovery` lists `discovery_submissions`, but no staff session was available to this pass; the row is confirmed in the database, not on the screen. |
+| Live gates after publish | `/api/healthz` ok, `/api/readyz` ready; no `X-Powered-By`; `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy` present; `Vary: Accept-Encoding` on API responses (compression middleware active; small bodies below the 1 KB threshold stay identity); unsigned intake SMS webhook → 403 with empty TwiML (signature enforced in production); register → 400 on empty body; contact → 400 on empty body (flag on). |
+| Local pre-release verification (scratch Postgres `crm_test`) | Validation 400; valid submission 201 + both rows; mail-layer failure recorded on the row (not a 500); forged `X-Forwarded-For` per request: 4×201 then **429**; SMS STOP → `<Response></Response>`; login limiter 10×401 then 429; api-server full suite with database: 2,330 passed / 1 failed (that test forged the header — corrected in `c1cc75b`, 157 pass on rerun); `moduleRegistration.test` fails only in the rsync'd tree that has no `.git`. |
+| Lighthouse, production, same conditions before/after | See §6 (live rows). Mobile homepage 86 → **95**, LCP 3.2 → 2.4 s, document TTFB 1,160 → 260 ms; receptionist mobile 89 → **96**; desktops 96 / 98. |
+
+**Decision — public website: LAUNCHED and verified on the domain.** **Decision — Discovery → CRM journey: LAUNCHED; persistence and both emails verified in production; the staff CRM screen itself was not opened.** Staff CRM, client portal and receptionist end-to-end use **remain unverified** (no session, no tenant, no provider activity in this pass).
+
+Security disposition of the two production-exposed findings: (1) rate-limit IP spoofing — fixed in `authRateLimit.ts` (owner-named): only the entry appended by the trusted edge counts (`TRUSTED_PROXY_HOPS`, default 1 in production); consequence: public forms submitted through the marketing proxy share the proxy's egress bucket (coarser, unforgeable); to key on the visitor address behind the proxy set `TRUSTED_PROXY_HOPS=2` on the backend deployment only after confirming direct `*.replit.app` traffic is blocked or accepted as sharing one bucket. (2) unescaped intake email — fixed in `intakeAgent.ts` (owner-named) with tests; Twilio body logging now records keys only. Twilio routing, opt-out and credentials untouched; protected-file diff limited to those two files (0 lines on every other protected file).
+
+Rollback (not needed): marketing → restore `mkt.rollback-before-a3e859c` and Republish; backend → Replit "Manage" → previous deployment `4cc08726…` (published 2026-09-23), or `git checkout backup/replit-before-launch-2026-09-24`, rebuild, Republish; secret `PUBLIC_FORM_SUBMISSIONS_ENABLED` can be removed to close the form again.
 
 ## 1. Baseline reconciliation
 
@@ -143,6 +162,17 @@ Method: Lighthouse 12, local Chrome, mobile preset (simulated 4G, 4× CPU) and d
 | Home desktop — before / after | 98 / 100 | 96 / 100 | 0.9 / 0.6 s | 0.7 / 0.5 s | 1.2 / 0.5 s | 0 / 0 | 300 ms / local |
 | Receptionist mobile — before / after | 89 / 93 | 97 / 100 | 2.7 / 2.7 s | 2.4 / 2.3 s | 5.2 / 3.0 s | 120 / 40 ms | 1,170 ms / local |
 | Receptionist desktop — before / after | 98 / 100 | 97 / 100 | 0.7 / 0.5 s | 0.6 / 0.5 s | 1.4 / 0.5 s | 0 / 0 | 310 ms / local |
+
+**Correction (2026-09-24, after release): the "after (candidate)" rows above were loopback measurements and are not comparable on TTFB/FCP/LCP. The like-for-like production comparison, same Lighthouse 12 + local Chrome + presets, both runs against `https://sitemintdigital.com`:**
+
+| Page / mode | Perf before → live | A11y | LCP | FCP | Speed Index | TBT | Doc TTFB |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Home mobile | 86 → **95** | 96 → 100 | 3.2 → 2.4 s | 2.4 → 2.1 s | 5.4 → 2.9 s | 80 → 50 ms | 1,160 → 260 ms |
+| Home desktop | 98 → 96 | 96 → 100 | 0.9 → 0.9 s | 0.7 → 0.9 s | 1.2 → 1.6 s | 0 → 0 | 300 → 260 ms |
+| Receptionist mobile | 89 → **96** | 97 → 100 | 2.7 → 2.3 s | 2.4 → 2.1 s | 5.2 → 2.9 s | 120 → 20 ms | 1,170 → 260 ms |
+| Receptionist desktop | 98 → 98 | 97 → 100 | 0.7 → 0.7 s | 0.6 → 0.7 s | 1.4 → 1.5 s | 0 → 0 | 310 → 260 ms |
+
+Desktop scores moved within run-to-run noise (±2); the mobile gains and the TTFB drop are the material result. SEO stays 69 by design (`noindex` pending legal sign-off).
 
 Transfer sizes (candidate server, brotli): homepage document 6.3 KB (was 7.9 KB gzip / 25.9 KB raw); entry script 107.8 KB (was 125.7 KB gzip of a larger bundle). Hero film on phones 0.9 MB instead of 5.5 MB; reception film 0.2 MB instead of 1.5 MB; demo film 0.9 MB instead of 4.0 MB; largest team portrait 44 KB instead of 1.8 MB; scene images 35–48 KB instead of 110–227 KB on phones. Note the homepage's mobile total weight rises (≈740 KB → ≈1.3 MB) precisely because the phone now receives the scroll-linked film the owner asked for; it does not delay LCP (unchanged 3.2 s, the poster) and is skipped entirely under reduced-data/data-saver.
 
