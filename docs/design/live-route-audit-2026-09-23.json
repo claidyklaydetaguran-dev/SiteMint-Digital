@@ -1,0 +1,191 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "title": "SiteMint Digital | Websites, AI Receptionists &amp; Business Systems",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/",
+    "privateRobots": null
+  },
+  {
+    "path": "/services",
+    "status": 200,
+    "title": "What We Build \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/services",
+    "privateRobots": null
+  },
+  {
+    "path": "/websites-apps",
+    "status": 200,
+    "title": "Websites &amp; Web Apps \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/websites-apps",
+    "privateRobots": null
+  },
+  {
+    "path": "/discovery-systems",
+    "status": 200,
+    "title": "Discovery Systems \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/discovery-systems",
+    "privateRobots": null
+  },
+  {
+    "path": "/ai-systems",
+    "status": 200,
+    "title": "AI Systems &amp; Automation \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/ai-systems",
+    "privateRobots": null
+  },
+  {
+    "path": "/ai-receptionist",
+    "status": 200,
+    "title": "AI Receptionist | SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/ai-receptionist",
+    "privateRobots": null
+  },
+  {
+    "path": "/ai-receptionist/demo",
+    "status": 200,
+    "title": "AI Receptionist Demo \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/ai-receptionist/demo",
+    "privateRobots": null
+  },
+  {
+    "path": "/pricing",
+    "status": 200,
+    "title": "Pricing \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/pricing",
+    "privateRobots": null
+  },
+  {
+    "path": "/work",
+    "status": 200,
+    "title": "Work \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/work",
+    "privateRobots": null
+  },
+  {
+    "path": "/process",
+    "status": 200,
+    "title": "Process \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/process",
+    "privateRobots": null
+  },
+  {
+    "path": "/about",
+    "status": 200,
+    "title": "Company \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/about",
+    "privateRobots": null
+  },
+  {
+    "path": "/insights",
+    "status": 200,
+    "title": "Insights \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/insights",
+    "privateRobots": null
+  },
+  {
+    "path": "/start",
+    "status": 200,
+    "title": "Start with SiteMint \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/start",
+    "privateRobots": null
+  },
+  {
+    "path": "/discovery",
+    "status": 200,
+    "title": "Start a Project \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/discovery",
+    "privateRobots": null
+  },
+  {
+    "path": "/privacy",
+    "status": 200,
+    "title": "Privacy Policy \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/privacy",
+    "privateRobots": null
+  },
+  {
+    "path": "/terms",
+    "status": 200,
+    "title": "Terms of Service \u2014 SiteMint Digital",
+    "h1": 1,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/terms",
+    "privateRobots": null
+  },
+  {
+    "path": "/robots.txt",
+    "status": 200,
+    "title": null,
+    "h1": 0,
+    "description": false,
+    "canonical": null,
+    "privateRobots": null
+  },
+  {
+    "path": "/sitemap.xml",
+    "status": 200,
+    "title": null,
+    "h1": 0,
+    "description": false,
+    "canonical": null,
+    "privateRobots": null
+  },
+  {
+    "path": "/portal/sign-in",
+    "status": 200,
+    "title": "SiteMint Digital | AI-Powered Websites &amp; Business Systems",
+    "h1": 0,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/",
+    "privateRobots": "noindex, nofollow"
+  },
+  {
+    "path": "/ai-receptionist/dashboard/login",
+    "status": 200,
+    "title": "SiteMint AI Receptionist",
+    "h1": 0,
+    "description": true,
+    "canonical": null,
+    "privateRobots": "noindex, nofollow"
+  },
+  {
+    "path": "/admin",
+    "status": 200,
+    "title": "SiteMint Digital | AI-Powered Websites &amp; Business Systems",
+    "h1": 0,
+    "description": true,
+    "canonical": "https://sitemintdigital.com/",
+    "privateRobots": "noindex, nofollow"
+  }
+]
