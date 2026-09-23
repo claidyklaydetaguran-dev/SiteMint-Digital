@@ -1,4 +1,18 @@
-# SiteMint frontend handoff — 2026-09-21
+# SiteMint frontend handoff — updated 2026-09-23
+
+## Latest published state — supersedes older candidate notes below
+
+The owner-authorized frontend release is published on https://sitemintdigital.com. Public release.json reports source commit `b58a537`; packaged assets are in `65155b6`, with the cross-platform checksum correction in `405a839`, on `design/mint-clarity-public-release` in GitHub.
+
+Public changes include the three approved videos, scroll-linked leaf hero, visible-section autoplay demo, compact navigation, icon playback controls, all three real team profiles, Simply Save Solar and OneFilAm highlights, four decorative hero backgrounds, restrained heading/hover motion, background line graphics, and reduced-motion fallbacks. Both local frontend builds and typechecks passed; public prerender produced 22 documents plus the SPA fallback. Live audit: 14 public pages returned HTTP 200 with one H1, three private entry routes returned HTTP 200, and API health returned JSON. Films loaded and all three team names were verified live. Narrow-screen CTA stacking was corrected; final mobile interaction coverage is not comprehensive.
+
+Web Asset Builder was published separately, confirmed by Replit's "Published your app" state. Build: `4cc08726-78dc-4213-bfaf-fa81e1dbd652`; deployment: `eb7f0e0b-e301-492f-a337-82ef4c7d01a1`. The authenticated receptionist Settings page was reloaded and visually verified in the light Mint workspace after publication. CRM, portal and Discovery presentation files were included; every authenticated workflow was not re-tested.
+
+The application workspace remains on `feature/ai-receptionist-visible-progress`, with rollback branch `backup/before-mint-b58a537` from baseline `bd48891a`. Only presentation files were imported: helpdesk Overview and mint-workspace.css, web-agency mint-operations.css, PortalShell.tsx/mint-portal.css, and mint-discovery.css. Two existing helpdesk compile issues were repaired in that Replit branch: nullable caller display now falls back to "Unknown caller"; VoiceModelTab uses existing findVoicePreset and handles missing presets before cost/latency components. Reconcile these changes into the next canonical branch before editing; those newer files are absent from the older local design checkout. No backend, database schema, auth or provider configuration was changed by this release. Database copying and Stripe sandbox synchronization were off when publishing.
+
+Known validation exception: Replit web-agency typecheck still reports pre-existing Discovery shared-contract mismatches (PROJECT_STAGES/projectStage/growth fields). Both application Vite builds passed, and the helpdesk typecheck passed after the two repairs. Do not report the entire Replit workspace as type-clean.
+
+Next work is functional acceptance, not another redesign: verify real Discovery submission and CRM persistence, login/recovery/invitations and tenant isolation, production phone organization/routing (609 intended production, 860 staging), actual delivery and billing, and Google access beyond approved testers. A successful page load is not evidence these workflows pass. Preserve existing user drafts at local port 8772; its preview has no backend proxy. Marketing rollback copy is `mkt.rollback-before-b58a537` in SiteMint-Digital Replit; local pre-release package is `work/mkt-before-b58a537` beside this checkout.
 
 ## Read this first
 
