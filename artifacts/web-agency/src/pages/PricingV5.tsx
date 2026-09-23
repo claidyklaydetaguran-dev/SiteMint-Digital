@@ -1,4 +1,5 @@
 import mintHeroBackground from "@/assets/mint/pricing-hero.webp";
+import { MintArrow } from "@/components/mint/MintArrow";
 import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V5 — Pricing (W-13 superseded by amendment §10; V5-BLUEPRINT §9).
@@ -267,7 +268,7 @@ function ScopeConfigurator() {
           }
         }}
       >
-        Review my project summary →
+        Review my project summary <MintArrow direction="right" size={15} />
       </Link>
       <p className="v3-body" role="status">
         {storageError

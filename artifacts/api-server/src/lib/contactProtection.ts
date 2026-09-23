@@ -57,6 +57,11 @@ export class SlidingWindowLimiter {
     return this.prune(key).length >= this.limit;
   }
 
+  /** Same window, a caller-chosen ceiling (see `publicFormLimit`). */
+  isOverLimitFor(key: string, limit: number): boolean {
+    return this.prune(key).length >= limit;
+  }
+
   record(key: string): void {
     const timestamps = this.prune(key);
     timestamps.push(this.now());
@@ -71,6 +76,23 @@ export class SlidingWindowLimiter {
 }
 
 export const contactIpLimiter = new SlidingWindowLimiter(CONTACT_IP_LIMIT, CONTACT_IP_WINDOW);
+
+/**
+ * Launch follow-up (2026-09-24): behind SiteMint's marketing proxy every
+ * visitor resolves to the proxy's egress address unless the proxy forwards a
+ * signed visitor identity (`x-sitemint-visitor`, see authRateLimit). Keys
+ * from a verified visitor are prefixed `v:` and get the normal per-visitor
+ * ceiling. While `PROXY_VISITOR_SECRET` is NOT configured on this API, the
+ * unverified key is the shared proxy bucket, so a higher interim ceiling keeps
+ * five submissions from locking every other customer out for an hour. Once
+ * the secret is configured, an unverified key can only be a direct caller
+ * and gets the strict ceiling again.
+ */
+export const PUBLIC_FORM_SHARED_BUCKET_LIMIT = 20;
+export function publicFormLimit(key: string, env: NodeJS.ProcessEnv = process.env): number {
+  if (key.startsWith("v:")) return CONTACT_IP_LIMIT;
+  return env["PROXY_VISITOR_SECRET"] ? CONTACT_IP_LIMIT : PUBLIC_FORM_SHARED_BUCKET_LIMIT;
+}
 
 /**
  * Launch security audit (2026-09-24): POST /discovery/submit and

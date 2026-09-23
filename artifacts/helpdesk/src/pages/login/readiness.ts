@@ -19,7 +19,7 @@
 export type ReadinessTier = "available" | "in-development" | "planned";
 
 export const READINESS: Record<ReadinessTier, { label: string }> = {
-  available: { label: "Assisted pilot" },
+  available: { label: "Set up with you" },
   "in-development": { label: "Activation required" },
   planned: { label: "Planned" },
 };

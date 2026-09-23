@@ -174,3 +174,45 @@ describe("7. marketing server delivery", () => {
     expect(server).toMatch(/writeHead\(206/);
   });
 });
+
+describe("8. follow-up 2026-09-24: arrows, Safari hero, proxy visitor identity", () => {
+  it("no public Mint component or page still uses a text-glyph arrow", () => {
+    const files = [
+      "src/components/mint/MintChrome.tsx", "src/components/mint/MintCinemaHero.tsx", "src/components/mint/MintStories.tsx",
+      "src/components/mint/MintReceptionist.tsx", "src/components/mint/MintDepthScene.tsx", "src/components/mint/InquiryContext.tsx",
+      "src/pages/StartV3.tsx", "src/pages/PricingV5.tsx", "src/pages/AboutV3.tsx", "src/pages/WorkV3.tsx",
+    ];
+    for (const f of files) {
+      const src = read(f).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
+      expect(src, f).not.toMatch(/[↗→↓↑]/);
+    }
+    for (const css of ["src/components/mint/mint-scenes.css", "src/components/mint/mint.css"]) {
+      expect(read(css), css).not.toMatch(/content:\s*"[↗→↓↑]"/);
+    }
+  });
+  it("the shared arrow is an inline SVG using currentColor and hidden from assistive tech", () => {
+    const arrow = read("src/components/mint/MintArrow.tsx");
+    expect(arrow).toContain('stroke="currentColor"');
+    expect(arrow).toContain('aria-hidden="true"');
+    expect(read("src/components/mint/mint-scenes.css")).toMatch(/a\.button::after[\s\S]{0,400}mask:/);
+  });
+  it("the hero primes the film for Safari and falls back to the approved frame sequence", () => {
+    expect(hero).toMatch(/film\.load\(\)/);
+    expect(hero).toMatch(/film\.play\(\)[\s\S]{0,400}film\.pause\(\)/);
+    expect(hero).toMatch(/frames\/leaf-\*\.webp/);
+    expect(hero).toMatch(/toFrames\(`play rejected/);
+    expect(hero).toMatch(/no metadata within 9s/);
+    expect(hero).toMatch(/herodebug/);
+  });
+  it("customer-facing copy no longer says pilot pricing", () => {
+    for (const f of ["src/components/mint/MintReceptionist.tsx", "src/pages/StartV3.tsx", "src/components/mint/InquiryContext.tsx", "src/components/v5/pricingTiersV5.ts", "src/components/mint/MintHome.tsx"]) {
+      expect(read(f), f).not.toMatch(/pilot pricing|Assisted pilot/i);
+    }
+    expect(receptionist).toContain('"Request pricing"');
+  });
+  it("the marketing proxy strips client copies of the visitor headers and signs its own", () => {
+    expect(server).toMatch(/key === "x-sitemint-visitor" \|\| key === "x-sitemint-visitor-sig"\) continue/);
+    expect(server).toMatch(/createHmac\("sha256", VISITOR_SECRET\)/);
+    expect(server).toMatch(/chain\[chain\.length - 1\]/);
+  });
+});

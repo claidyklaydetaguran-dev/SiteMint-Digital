@@ -26,7 +26,7 @@ import { request as httpsRequest } from "node:https";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { brotliCompress, constants as zlibConstants, gzip } from "node:zlib";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { promisify } from "node:util";
 import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -104,14 +104,41 @@ const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "p
 // `htmlIsMiss`: the upstream SPA answers unknown paths with its index.html
 // (200); for a file-shaped fallback that means "no such file", so it becomes
 // this site's real 404 rather than a stale HTML document under a .js/.map URL.
+/**
+ * Visitor identity for the upstream limiters (launch follow-up, 2026-09-24).
+ * Behind this proxy every visitor reaches the API from this server's egress
+ * address, so per-address limits collapsed into one shared bucket. The
+ * address this server's own edge observed is the RIGHTMOST X-Forwarded-For
+ * entry (Replit appends it; anything further left was written by the
+ * visitor and is forgeable). It is forwarded as `x-sitemint-visitor` with an
+ * HMAC-SHA256 signature over `PROXY_VISITOR_SECRET`; the API only honours a
+ * valid signature, and any client-supplied copy of these headers is dropped
+ * here first. Without the secret nothing is added and behaviour is unchanged.
+ */
+const VISITOR_SECRET = process.env.PROXY_VISITOR_SECRET || "";
+function observedVisitor(req) {
+  const raw = req.headers["x-forwarded-for"];
+  const chain = String(Array.isArray(raw) ? raw.join(",") : raw || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return chain.length ? chain[chain.length - 1] : (req.socket.remoteAddress || "");
+}
+
 function proxy(req, res, { htmlIsMiss = false } = {}) {
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) {
-    if (!HOP_BY_HOP.has(k.toLowerCase()) && k.toLowerCase() !== "host") headers[k] = v;
+    const key = k.toLowerCase();
+    if (HOP_BY_HOP.has(key) || key === "host" || key === "x-sitemint-visitor" || key === "x-sitemint-visitor-sig") continue;
+    headers[k] = v;
   }
   headers["host"] = UPSTREAM;
   headers["x-forwarded-host"] = String(req.headers.host || "");
   headers["x-forwarded-proto"] = "https";
+  if (VISITOR_SECRET) {
+    const visitor = observedVisitor(req).slice(0, 64);
+    if (visitor) {
+      headers["x-sitemint-visitor"] = visitor;
+      headers["x-sitemint-visitor-sig"] = createHmac("sha256", VISITOR_SECRET).update(visitor).digest("hex");
+    }
+  }
   const up = httpsRequest(
     { host: UPSTREAM, port: 443, path: req.url, method: req.method, headers },
     (upRes) => {

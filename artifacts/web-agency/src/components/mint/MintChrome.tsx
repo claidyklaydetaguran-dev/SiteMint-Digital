@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
 import { RouteScrollManager } from "@/components/v5/RouteScrollManager";
 import { restartAtTop, settleRestartAtTop } from "@/lib/scrollBehavior";
+import { MintArrow } from "./MintArrow";
 import "./mint.css";
 import "./mint-legacy.css";
 import "./mint-scenes.css";
@@ -204,7 +205,7 @@ export function MintChrome({ children }: { children: ReactNode }) {
             <a href={ROUTES.adminLogin}>Staff sign in</a>
           </div>
         </div>
-        <button className="mint-back-top" type="button" onClick={() => window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })}>Back to top <span aria-hidden="true">↑</span></button>
+        <button className="mint-back-top" type="button" onClick={() => window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })}>Back to top <span aria-hidden="true"><MintArrow direction="up" size={14} /></span></button>
       </footer>
     </div>
   );

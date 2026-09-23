@@ -45,7 +45,7 @@ export function MintDepthScene({
                 <CalendarDays size={22} />
                 <div>
                   Discovery consultation
-                  <small>Request → review → calendar</small>
+                  <small>Request, review, calendar</small>
                 </div>
                 <Check size={18} />
               </div>
@@ -161,7 +161,7 @@ export function MintReceptionistGuide() {
           Yes. Your receptionist workspace belongs to your business. You connect
           the Google account whose calendar you want to use. SiteMint’s staff
           CRM and agency project portal are separate. Calendar access for new
-          pilot customers is currently arranged during onboarding.
+          customers is arranged during setup.
         </p>
       </details>
       <details className="mint-owner-guide__faq">

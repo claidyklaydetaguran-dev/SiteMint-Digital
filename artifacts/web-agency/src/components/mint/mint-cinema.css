@@ -31,3 +31,8 @@
 .mint-site .mint-demonstration__play:hover,.mint-site .mint-demonstration__play:focus-visible{background:#173f35}
 .mint-site .mint-demonstration__caption{font-size:13px;color:#536c62;margin-top:16px}
 @media(max-width:800px){.mint-site .mint-cinema--leaf .mint-cinema__media{object-position:72% center}.mint-site .mint-cinema--leaf .mint-cinema__shade{background:linear-gradient(90deg,#fafcf9f5,#fafcf9b8 65%,#fafcf970)}.mint-site .mint-cinema--leaf h1{font-size:clamp(42px,10vw,64px)}.mint-site .mint-demonstration video,.mint-site .mint-demonstration__stage>img{border-radius:14px}}
+/* Launch follow-up 2026-09-24: Safari priming + frame-sequence fallback. The film is transparent until it has been primed (first play/pause), so the poster underneath is what paints; frames are stacked above the poster. */
+.mint-site .mint-cinema__media--pending{opacity:0}
+.mint-site .mint-cinema__frame-image{z-index:0}
+.mint-site .mint-cinema__debug{position:absolute;z-index:5;left:8px;bottom:8px;max-width:calc(100% - 16px);margin:0;padding:8px 10px;font:11px/1.35 ui-monospace,monospace;color:#e4f2e9;background:#0a1915e6;border-radius:8px;white-space:pre-wrap;word-break:break-all}
+.mint-site .mint-arrow{display:inline-block;vertical-align:-2px;flex:0 0 auto}

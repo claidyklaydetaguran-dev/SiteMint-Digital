@@ -47,6 +47,7 @@ const chromeCss = read("artifacts/web-agency/src/styles/v4-chrome.css");
 const tokensCss = read("artifacts/web-agency/src/styles/tokens-v4.css");
 const hdAppCss = read("artifacts/helpdesk/src/styles/v4-app.css");
 const shellSrc = read("artifacts/web-agency/src/shells/PublicShell.tsx");
+const mintChromeSrc = read("artifacts/web-agency/src/components/mint/MintChrome.tsx");
 const homeSrc = read("artifacts/web-agency/src/pages/HomeV4.tsx");
 const hookSrc = read("artifacts/web-agency/src/components/v4/useHashScrollV4.ts");
 const footerSrc = read("artifacts/web-agency/src/components/v4/SiteFooterV4.tsx");
@@ -83,10 +84,19 @@ console.log("2. Footer CLS lifecycle");
     "the route fallback stretches into the reserved V4 geometry",
     /\.v4-shell \.v2-route-fallback\s*\{[^}]*min-height:\s*100vh/s.test(chromeCss),
   );
+  // 2026-09-24: `PublicShell chrome="v4"` no longer renders the V4 header /
+  // footer pair itself; it delegates to the Mint chrome (Mint Clarity
+  // release). The rule is unchanged — the footer must follow <main> so a
+  // lazy route can never paint it inside the first viewport — so it is now
+  // asserted against the component that actually ships that markup.
   check(
-    "the V4 shell renders the footer after <main>, never before it",
-    shellSrc.indexOf('className="v4-shell__main"') <
-      shellSrc.indexOf("<SiteFooterV4 />"),
+    "the public shell delegates the v4 chrome to MintChrome",
+    /chrome === "v4"[\s\S]{0,120}<MintChrome>/.test(shellSrc),
+  );
+  check(
+    "the shipped public chrome renders the footer after <main>, never before it",
+    mintChromeSrc.indexOf("<main") > 0 &&
+      mintChromeSrc.indexOf("<main") < mintChromeSrc.indexOf("<footer>"),
   );
 }
 

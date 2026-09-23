@@ -364,7 +364,7 @@ export default function Overview() {
                 <h3 className="sd-empty__title">No conversations yet</h3>
                 <p className="sd-empty__detail">
                   Messages appear here when a supported messaging channel is configured.
-                  Caller SMS is not included in the assisted pilot; review calls and
+                  Caller SMS is not included yet; review calls and
                   appointment requests in their own sections.
                 </p>
               </div>

@@ -41,6 +41,14 @@ const RULES = [
       // no data and dies with the CI job. Caught by this scanner's own first
       // real run — allowlisted rather than weakening the rule.
       ".github/workflows/ci.yml",
+      // Trust-mode local scratch cluster (127.0.0.1) used by the CRM journey
+      // rehearsal script; the "password" is the throwaway role name itself.
+      "docs/crm-ops/journey.mjs",
+      // Synthetic dev/prod URLs on example.com hosts proving the --target guard
+      // never connects to the wrong database.
+      "lib/db/dbTargetContract.test.ts",
+      // Runbook prose quoting the same trust-mode local scratch cluster URL.
+      "docs/crm-ops/CONTINUATION.md",
     ]),
   },
   {

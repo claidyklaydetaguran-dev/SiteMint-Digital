@@ -255,7 +255,7 @@ export function MintHome() {
             <summary>{"How much does a project cost?"}</summary>
             <p>
               {
-                "We quote after understanding scope, integrations and support needs. Receptionist pilot pricing is available on request; no plan amounts have been finalized."
+                "We quote after understanding scope, integrations and support needs. AI receptionist pricing is by request: we review your call volume, setup and expected usage, then give you a clear quote before activation."
               }
             </p>
           </details>

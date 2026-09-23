@@ -260,7 +260,7 @@ console.log("\n--- product truth ---");
     "Voice receptionist",
     "Appointment booking and team access",
     "Text messages to callers",
-    "Assisted pilot",
+    "Set up with you",
     "Activation required",
     "Planned",
   ]) {

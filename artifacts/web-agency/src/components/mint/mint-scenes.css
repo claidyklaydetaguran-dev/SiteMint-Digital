@@ -135,13 +135,22 @@
   border-radius: 999px; gap: 14px;
   transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
 }
+/* Launch follow-up 2026-09-24: the arrow is an SVG mask filled with currentColor
+   (the U+2197 text glyph rendered as an emoji on iOS). ::before draws the circle. */
+.mint-site a.button { position: relative; }
 .mint-site a.button::after {
-  content: "↗"; display: grid; place-items: center; flex: 0 0 27px;
-  width: 27px; height: 27px; border-radius: 50%;
-  background: rgba(255,255,255,.15); transition: transform .2s ease;
+  content: ""; flex: 0 0 27px; width: 27px; height: 27px; position: relative;
+  background-color: currentColor; transition: transform .2s ease;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27M4.5 11.5 11.5 4.5M6 4.5h5.5V10%27/></svg>") center / 15px 15px no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27M4.5 11.5 11.5 4.5M6 4.5h5.5V10%27/></svg>") center / 15px 15px no-repeat;
 }
-.mint-site a.button.outline::after { background: rgba(23,63,53,.08); }
-.mint-site a.button:hover::after { transform: rotate(45deg); }
+.mint-site a.button::before {
+  content: ""; position: absolute; right: 24px; top: 50%; width: 27px; height: 27px;
+  margin-top: -13.5px; border-radius: 50%; background: rgba(255,255,255,.15); pointer-events: none;
+}
+.mint-site a.button.outline::before { background: rgba(23,63,53,.08); }
+.mint-site a.button:hover::after, .mint-site a.button:focus-visible::after { transform: rotate(45deg); }
+.mint-site a.button[aria-disabled="true"] { opacity: .55; pointer-events: none; }
 .mint-site .button:hover, .mint-site .v3-btn:hover { box-shadow: 0 5px 14px rgba(23,63,53,.12); }
 .mint-site > header nav a.button:hover { color: white; }
 .mint-site section[id] { scroll-margin-top: calc(var(--mint-header-height) + 20px); }

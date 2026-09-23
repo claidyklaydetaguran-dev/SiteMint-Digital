@@ -1,4 +1,5 @@
 import mintHeroBackground from "@/assets/mint/about-hero.webp";
+import { MintArrow } from "@/components/mint/MintArrow";
 import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V3 — About page. Company facts only; no invented team bios,
@@ -45,8 +46,8 @@ export default function AboutV3() {
             SiteMint Digital designs, builds, and runs business systems —
             including our own. The discovery flow on this site is the same
             structured intake we build for clients. The automation and CRM
-            we recommend runs our own follow-up. Our AI Receptionist product is
-            offered through an assisted pilot. We use what we build, which keeps
+            we recommend runs our own follow-up. Our AI Receptionist is
+            set up and tested with each business before it takes live calls. We use what we build, which keeps
             us honest about what works and what's still in progress.
           </p>
         </div>
@@ -109,7 +110,7 @@ export default function AboutV3() {
                     setActiveMember(member);
                   }}
                 >
-                  Meet {member.name.split(" ")[0]} →
+                  Meet {member.name.split(" ")[0]} <MintArrow direction="right" size={14} />
                 </button>
               </div>
             ))}

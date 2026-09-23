@@ -686,9 +686,13 @@ check(
   "the capability ladder is no longer duplicated on Overview",
   !pageCode.includes("CAPABILITY_STATUS") && !pageCode.includes("sd-ladder"),
 );
+// 2026-09-24 launch follow-up: the tier wording is "Set up with you" /
+// "Activation required" / "Planned" (the earlier "Available now" / "In
+// development" pair was retired on 2026-09-17; "Assisted pilot" on 2026-09-24).
+// The rule is unchanged: sign-in and the public site must agree exactly.
 for (const [tier, label] of [
-  ["available", "Available now"],
-  ["in-development", "In development"],
+  ["available", "Set up with you"],
+  ["in-development", "Activation required"],
   ["planned", "Planned"],
 ] as const) {
   const declaration = new RegExp(`"?${tier}"?:\\s*\\{[^}]*label:\\s*"${label}"`);
@@ -700,8 +704,11 @@ for (const [tier, label] of [
 check(
   "the empty state names what happens next and where to change it",
   pageCode.includes("No conversations yet") &&
-    /texts your business number/.test(pageCode) &&
-    /Current SMS\s+Receptionist/.test(pageCode),
+    // 2026-09-24: the empty state describes the messaging channel honestly
+    // (caller SMS is not included yet) and points at the calls and appointment
+    // sections that do hold the firm's activity.
+    /Caller SMS is not included yet/.test(pageCode) &&
+    /review calls and\s+appointment requests in their own sections/.test(pageCode),
 );
 
 // ─── 12. Design tokens have not drifted from the approved system ──────────

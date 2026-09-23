@@ -108,4 +108,4 @@ export const PRICING_DISCLAIMER_V5 =
 
 /** AI Receptionist is never priced on this page. */
 export const AI_RECEPTIONIST_PRICING_NOTE_V5 =
-  "Request pricing for the assisted AI Receptionist pilot. Subscription, usage and setup are discussed separately from website project pricing.";
+  "Request pricing for the AI Receptionist. We’ll review your call volume, setup and expected usage, then give you a clear quote before activation. Subscription, usage and setup are discussed separately from website project pricing.";

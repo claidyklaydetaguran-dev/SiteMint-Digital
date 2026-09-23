@@ -1,4 +1,5 @@
 import type { Request } from "express";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // ── Rate-limit constants ────────────────────────────────────────────────────────
 
@@ -125,6 +126,29 @@ export function clientIpFromForwardedChain(
 }
 
 /**
+ * Visitor identity forwarded by SiteMint's own marketing proxy (launch
+ * follow-up, 2026-09-24, owner-authorised edit). Every public visitor reaches
+ * this API through `mkt/marketing-server.mjs`, so the trusted-hop derivation
+ * below resolves them all to that proxy's egress address and they share one
+ * limiter bucket. The proxy therefore forwards the address ITS edge observed
+ * in `x-sitemint-visitor`, signed with HMAC-SHA256 over a secret both
+ * deployments hold (`PROXY_VISITOR_SECRET`). A direct caller cannot mint a
+ * valid signature, and the proxy strips any incoming copy of these headers,
+ * so the value is only ever what the proxy itself observed. Without the
+ * secret on this side the header is ignored and behaviour is unchanged.
+ */
+export function verifiedVisitorIp(req: Request, secret: string | undefined = process.env["PROXY_VISITOR_SECRET"]): string | null {
+  if (!secret) return null;
+  const visitor = req.headers["x-sitemint-visitor"];
+  const sig = req.headers["x-sitemint-visitor-sig"];
+  if (typeof visitor !== "string" || typeof sig !== "string" || !visitor || visitor.length > 64) return null;
+  const expected = createHmac("sha256", secret).update(visitor).digest("hex");
+  if (sig.length !== expected.length) return null;
+  if (!timingSafeEqual(Buffer.from(sig, "utf8"), Buffer.from(expected, "utf8"))) return null;
+  return visitor;
+}
+
+/**
  * Derive the client IP for rate limiting.
  *
  * Launch security audit (2026-09-24, owner-authorised edit): the previous
@@ -138,6 +162,8 @@ export function clientIpFromForwardedChain(
  * routes.
  */
 export function getClientIp(req: Request): string {
+  const visitor = verifiedVisitorIp(req);
+  if (visitor) return `v:${visitor}`;
   return clientIpFromForwardedChain(
     req.headers["x-forwarded-for"],
     req.socket.remoteAddress,

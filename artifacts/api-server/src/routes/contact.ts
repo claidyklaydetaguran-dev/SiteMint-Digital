@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, formSubmissions } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { sendFormEmails } from "../lib/email.js";
-import { contactIpLimiter, getClientIp, isHoneypotTripped, stripHoneypot } from "../lib/contactProtection.js";
+import { contactIpLimiter, getClientIp, isHoneypotTripped, publicFormLimit, stripHoneypot } from "../lib/contactProtection.js";
 import { validateContactSubmission } from "../lib/contactValidation.js";
 import {
   isPublicFormSubmissionsEnabled,
@@ -24,7 +24,7 @@ router.post("/contact/submit", async (req: Request, res: Response) => {
     // ── IP rate limit (5/hour) — check before recording, same pattern as
     // receptionist signup's signupIpLimiter. ─────────────────────────────
     const ip = getClientIp(req);
-    if (contactIpLimiter.isOverLimit(ip)) {
+    if (contactIpLimiter.isOverLimitFor(ip, publicFormLimit(ip))) {
       req.log.warn({ ip }, "[contact] rate limit exceeded");
       res.status(429).json({ error: "Too many attempts. Try again later." });
       return;

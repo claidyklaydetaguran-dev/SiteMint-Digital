@@ -71,13 +71,13 @@ export default function StartV3() {
             <Link
               href={
                 isReceptionist
-                  ? `${ROUTES.start}?service=ai-receptionist#pilot-pricing`
+                  ? `${ROUTES.start}?service=ai-receptionist#request-pricing`
                   : ROUTES.discovery
               }
               className="v3-btn v3-btn--primary"
             >
               {isReceptionist
-                ? "Request pilot pricing"
+                ? "Request pricing"
                 : "Begin the discovery brief"}
               <ArrowRight aria-hidden="true" size={16} />
             </Link>

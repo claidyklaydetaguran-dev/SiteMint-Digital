@@ -1,4 +1,5 @@
 import mintHeroBackground from "@/assets/mint/work-hero.webp";
+import { MintArrow } from "@/components/mint/MintArrow";
 import { MintPageStory } from "@/components/mint/MintStories";
 /**
  * Frontend V3 — Selected work.
@@ -29,9 +30,9 @@ import "@/styles/v5-pages.css";
 const productionWork = [
   {
     icon: AudioLines,
-    kicker: "Assisted pilot",
+    kicker: "Product, set up with you",
     title: "SiteMint AI Receptionist platform",
-    body: "Our receptionist product helps answer questions, capture messages, and arrange appointments. Each business joins through assisted setup and testing. Calendar booking, transfers, and notifications depend on verified connections; caller SMS is not included in the pilot.",
+    body: "Our receptionist product helps answer questions, capture messages, and arrange appointments. We help configure and test the assistant with each business before it handles live calls. Calendar booking, transfers, and notifications depend on verified connections; caller SMS is not included yet.",
     detail:
       "Review your business rules and fallback handling with us before connecting a live number.",
     href: ROUTES.aiReceptionist,
@@ -260,7 +261,7 @@ function ProjectCardBody({ project, index, onOpen }: {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Live site ↗
+            Live site <MintArrow size={14} />
           </a>
         )}
       </span>

@@ -2,6 +2,7 @@ import { MintCinemaHero } from "./MintCinemaHero";
 import { MintReceptionistGuide } from "./MintDepthScene";
 import { MintPageStory } from "./MintStories";
 import { useState } from "react";
+import { MintArrow } from "./MintArrow";
 import { PublicShell } from "@/shells/PublicShell";
 import { usePageMeta } from "@/hooks/usePageMeta";
 function ScenarioContent({ selected }: { selected: string }) {
@@ -185,7 +186,7 @@ export function MintReceptionist() {
   usePageMeta({
     title: "AI Receptionist | SiteMint Digital",
     description:
-      "Explore SiteMint’s assisted AI receptionist pilot for service businesses.",
+      "Explore SiteMint’s AI receptionist for service businesses: set up and tested with you before it takes live calls.",
   });
   return (
     <PublicShell chrome="v4" headerMode="product" routeLabel="AI Receptionist">
@@ -202,7 +203,7 @@ export function MintReceptionist() {
           {"Appointments with clarity"}
         </div>
         <div>
-          <span>{"↗"}</span>
+          <span><MintArrow size={18} /></span>
           {"Transfers to your team"}
         </div>
         <div>
@@ -415,7 +416,7 @@ export function MintReceptionist() {
             <summary>{"Will callers get an email or text?"}</summary>
             <p>
               {
-                "Caller copies depend on consent, valid contact information and the enabled channels. Email and SMS availability must be verified for the pilot before being promised."
+                "Caller copies depend on consent, valid contact information and the enabled channels. Email and SMS availability is verified during setup before being promised."
               }
             </p>
           </details>
@@ -423,7 +424,7 @@ export function MintReceptionist() {
             <summary>{"How does pricing work?"}</summary>
             <p>
               {
-                "The pilot uses request pricing. The proposal will explain the subscription, included usage, any overage charges and setup scope before you agree."
+                "Pricing is by request. We’ll review your call volume, setup and expected usage, then give you a clear quote before activation. The proposal explains the subscription, included usage, any overage charges and setup scope."
               }
             </p>
           </details>
@@ -444,7 +445,7 @@ export function MintReceptionist() {
         </p>
         <div className="actions">
           <a className="button " href="/start?service=ai-receptionist">
-            {"Request pilot pricing"}
+            {"Request pricing"}
           </a>
           <a className="button outline" href="/ai-receptionist/signup">
             {"Create an account"}

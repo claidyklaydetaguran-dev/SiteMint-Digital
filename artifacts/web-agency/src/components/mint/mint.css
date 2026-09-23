@@ -312,8 +312,9 @@
   align-items: center;
 }
 .mint-site .more:after {
-  content: "↗";
-  font-size: 18px;
+  content: ""; width: 16px; height: 16px; background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27M4.5 11.5 11.5 4.5M6 4.5h5.5V10%27/></svg>") center / 16px 16px no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27M4.5 11.5 11.5 4.5M6 4.5h5.5V10%27/></svg>") center / 16px 16px no-repeat;
 }
 .mint-site .mini-site {
   background: white;

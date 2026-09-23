@@ -3,7 +3,7 @@ import { db, discoverySubmissions, formSubmissions } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { calculateLeadScore, calculateTags, recommendPackage } from "../lib/generators.js";
 import { sendFormEmails } from "../lib/email.js";
-import { discoveryIpLimiter, getClientIp } from "../lib/contactProtection.js";
+import { discoveryIpLimiter, getClientIp, publicFormLimit } from "../lib/contactProtection.js";
 import {
   isPublicFormSubmissionsEnabled,
   PUBLIC_FORM_SUBMISSIONS_DISABLED_MESSAGE,
@@ -21,7 +21,7 @@ router.post("/discovery/submit", async (req: Request, res: Response) => {
   // IP rate limit (5/hour), same pattern as /contact/submit — checked before
   // any database write or outbound email (launch security audit 2026-09-24).
   const ip = getClientIp(req);
-  if (discoveryIpLimiter.isOverLimit(ip)) {
+  if (discoveryIpLimiter.isOverLimitFor(ip, publicFormLimit(ip))) {
     req.log.warn({ ip }, "[discovery] rate limit exceeded");
     res.status(429).json({ error: "Too many attempts. Try again later." });
     return;
