@@ -11,13 +11,14 @@ import { clientIpFromForwardedChain, trustedProxyHopsForLimiters, verifiedVisito
 import { publicFormLimit, CONTACT_IP_LIMIT, PUBLIC_FORM_SHARED_BUCKET_LIMIT } from "./contactProtection.js";
 
 describe("trustedProxyHopsForLimiters", () => {
-  it("defaults to one hop in production and none elsewhere", () => {
-    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production" })).toBe(1);
+  it("defaults to two hops in production (Google Cloud load balancer writes client,balancer) and none elsewhere", () => {
+    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production" })).toBe(2);
     expect(trustedProxyHopsForLimiters({ NODE_ENV: "development" })).toBe(0);
     expect(trustedProxyHopsForLimiters({})).toBe(0);
   });
   it("honours an explicit TRUSTED_PROXY_HOPS and rejects junk", () => {
-    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production", TRUSTED_PROXY_HOPS: "2" })).toBe(2);
+    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production", TRUSTED_PROXY_HOPS: "3" })).toBe(3);
+    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production", TRUSTED_PROXY_HOPS: "1" })).toBe(1);
     expect(trustedProxyHopsForLimiters({ NODE_ENV: "production", TRUSTED_PROXY_HOPS: "-1" })).toBe(0);
     expect(trustedProxyHopsForLimiters({ NODE_ENV: "production", TRUSTED_PROXY_HOPS: "abc" })).toBe(0);
     expect(trustedProxyHopsForLimiters({ NODE_ENV: "production", TRUSTED_PROXY_HOPS: "11" })).toBe(0);

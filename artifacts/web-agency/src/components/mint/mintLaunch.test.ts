@@ -213,6 +213,7 @@ describe("8. follow-up 2026-09-24: arrows, Safari hero, proxy visitor identity",
   it("the marketing proxy strips client copies of the visitor headers and signs its own", () => {
     expect(server).toMatch(/key === "x-sitemint-visitor" \|\| key === "x-sitemint-visitor-sig"\) continue/);
     expect(server).toMatch(/createHmac\("sha256", VISITOR_SECRET\)/);
-    expect(server).toMatch(/chain\[chain\.length - 1\]/);
+    expect(server).toMatch(/chain\.length >= 2 \? chain\[chain\.length - 2\]/);
+    expect(server).not.toMatch(/chain\[chain\.length - 1\]/);
   });
 });

@@ -90,9 +90,16 @@ setInterval(() => {
 
 /**
  * Number of reverse-proxy hops whose X-Forwarded-For entries may be trusted.
- * `TRUSTED_PROXY_HOPS` when set (0–10); otherwise 1 in production (Replit's
- * edge is always exactly one hop in front of the container) and 0 elsewhere,
- * where no proxy exists and the socket address is the client.
+ * `TRUSTED_PROXY_HOPS` when set (0–10); otherwise 2 in production and 0
+ * elsewhere, where no proxy exists and the socket address is the client.
+ *
+ * Why 2 (measured live, 2026-09-24): Replit deployments sit behind a Google
+ * Cloud HTTPS load balancer, which appends `<client-ip>,<load-balancer-ip>`
+ * to X-Forwarded-For. With one trusted hop every limiter keyed on the
+ * balancer's own address, which differs from request to request, so no
+ * caller was ever limited (23 consecutive direct posts, no 429) while the
+ * few balancer addresses that repeat could lock unrelated visitors out. The
+ * client as the balancer observed it is the SECOND entry from the right.
  */
 export function trustedProxyHopsForLimiters(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env["TRUSTED_PROXY_HOPS"];
@@ -100,7 +107,7 @@ export function trustedProxyHopsForLimiters(env: NodeJS.ProcessEnv = process.env
     const n = Number(raw);
     return Number.isInteger(n) && n >= 0 && n <= 10 ? n : 0;
   }
-  return env["NODE_ENV"] === "production" ? 1 : 0;
+  return env["NODE_ENV"] === "production" ? 2 : 0;
 }
 
 /**

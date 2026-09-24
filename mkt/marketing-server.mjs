@@ -108,9 +108,14 @@ const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "p
  * Visitor identity for the upstream limiters (launch follow-up, 2026-09-24).
  * Behind this proxy every visitor reaches the API from this server's egress
  * address, so per-address limits collapsed into one shared bucket. The
- * address this server's own edge observed is the RIGHTMOST X-Forwarded-For
- * entry (Replit appends it; anything further left was written by the
- * visitor and is forgeable). It is forwarded as `x-sitemint-visitor` with an
+ * address this server's own edge observed is the SECOND X-Forwarded-For
+ * entry from the right: Replit's Google Cloud load balancer appends
+ * `<client-ip>,<load-balancer-ip>`, so the rightmost entry is the balancer's
+ * own (per-request varying) address and anything further left was written by
+ * the visitor and is forgeable (measured live 2026-09-24; the earlier
+ * "rightmost" reading keyed every visitor on the balancer). A chain shorter
+ * than those two entries did not come through the balancer, so the socket
+ * address is used. It is forwarded as `x-sitemint-visitor` with an
  * HMAC-SHA256 signature over `PROXY_VISITOR_SECRET`; the API only honours a
  * valid signature, and any client-supplied copy of these headers is dropped
  * here first. Without the secret nothing is added and behaviour is unchanged.
@@ -119,7 +124,7 @@ const VISITOR_SECRET = process.env.PROXY_VISITOR_SECRET || "";
 function observedVisitor(req) {
   const raw = req.headers["x-forwarded-for"];
   const chain = String(Array.isArray(raw) ? raw.join(",") : raw || "").split(",").map((s) => s.trim()).filter(Boolean);
-  return chain.length ? chain[chain.length - 1] : (req.socket.remoteAddress || "");
+  return chain.length >= 2 ? chain[chain.length - 2] : (req.socket.remoteAddress || "");
 }
 
 function proxy(req, res, { htmlIsMiss = false } = {}) {
