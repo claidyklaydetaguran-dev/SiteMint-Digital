@@ -5,6 +5,7 @@
 // idempotency-by-construction are the recurring assertions.
 
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 
@@ -217,6 +218,54 @@ describe("subscription transitions (test clock)", () => {
     expect(outcome).toEqual({ applied: true, next: { state: "active", graceUntil: null } });
     expect(ok.stored).toEqual(["evt_2"]);
     expect(ok.audits).toEqual(["subscription.payment_recovered"]);
+  });
+
+  it("an event that was recorded but not applied is released, so Stripe's retry is processed", async () => {
+    // The state write throws after the ledger row was written.
+    const failing = persistence(graceRow);
+    const released: string[] = [];
+    failing.deps.releaseEvent = async (_provider, key) => {
+      released.push(key);
+    };
+    failing.deps.updateState = async () => {
+      throw new Error("db down");
+    };
+    await expect(
+      applyEventForStripeCustomer("cus_x", "payment_succeeded", failing.deps, { provider: "stripe_voice", eventKey: "evt_3" }),
+    ).rejects.toThrow("db down");
+    expect(released).toEqual(["evt_3"]);
+
+    // A lost race is not an applied event either.
+    const raced = persistence(graceRow, { updateOk: false });
+    const racedReleased: string[] = [];
+    raced.deps.releaseEvent = async (_provider, key) => {
+      racedReleased.push(key);
+    };
+    expect(await applyEventForStripeCustomer("cus_x", "payment_succeeded", raced.deps, { provider: "stripe_voice", eventKey: "evt_4" })).toEqual({
+      applied: false,
+      reason: "concurrent_change",
+    });
+    expect(racedReleased).toEqual(["evt_4"]);
+
+    // An applied event, a no-op and a true duplicate keep their ledger row.
+    for (const [row, opts, key] of [
+      [graceRow, {}, "evt_5"],
+      [{ ...graceRow, state: "active" as const, graceUntil: null }, {}, "evt_6"],
+      [graceRow, { storeInserted: false }, "evt_7"],
+    ] as const) {
+      const h = persistence(row, opts);
+      const kept: string[] = [];
+      h.deps.releaseEvent = async (_p, k) => {
+        kept.push(k);
+      };
+      await applyEventForStripeCustomer("cus_x", "payment_succeeded", h.deps, { provider: "stripe_voice", eventKey: key });
+      expect(kept).toEqual([]);
+    }
+  });
+
+  it("the webhook answers 500 on a lost race so Stripe redelivers", () => {
+    const src = readFileSync(new URL("../../routes/voiceBillingWebhook.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/outcome\.reason === "concurrent_change"\) \{[\s\S]{0,400}res\.status\(500\)/);
   });
 
   it("a throwing effect never undoes the applied state change", async () => {
