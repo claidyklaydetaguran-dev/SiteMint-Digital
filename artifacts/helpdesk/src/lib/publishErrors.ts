@@ -33,6 +33,9 @@ const ROUTE_ERROR_COPY: Record<PublishRouteErrorCode, string> = {
   local_finalize_failed: "Publishing could not be confirmed. Do not publish again.",
   unknown_publish_error: "The voice provider request failed. Please try again.",
   internal_error: "An internal error occurred. Please try again.",
+  service_not_active:
+    "Your receptionist isn't activated yet. Choose a plan in Billing, or contact SiteMint to activate it.",
+  service_access_unavailable: "We couldn't confirm your plan just now. Please try again in a moment.",
 };
 
 const GENERIC_PUBLISH_ERROR_MESSAGE = "Something went wrong while publishing. Please try again.";
@@ -60,7 +63,15 @@ export const UNCERTAIN_ROUTE_ERROR_CODES: ReadonlySet<PublishRouteErrorCode> = n
  * message when present, else a generic safe message — never a raw code or
  * raw response content.
  */
+/**
+ * Codes whose server message carries the specific reason (not activated,
+ * paused for a failed payment, cancelled). The server wording wins for these;
+ * the static copy is only the fallback when no message arrived.
+ */
+const SERVER_WORDED_CODES: ReadonlySet<PublishRouteErrorCode> = new Set(["service_not_active"]);
+
 export function publishRouteErrorMessage(code: PublishRouteErrorCode | undefined, serverMessage: string): string {
+  if (code && SERVER_WORDED_CODES.has(code) && serverMessage) return serverMessage;
   if (code && code in ROUTE_ERROR_COPY) return ROUTE_ERROR_COPY[code];
   return serverMessage || GENERIC_PUBLISH_ERROR_MESSAGE;
 }

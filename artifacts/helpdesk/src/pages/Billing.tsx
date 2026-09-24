@@ -78,6 +78,8 @@ import {
 } from "@/pages/billing/billingContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-billing.css";
+import { VoicePlanStatus } from "@/pages/billing/VoicePlanStatus";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 export default function Billing() {
   const { data: me, isLoading } = useSession();
@@ -201,6 +203,8 @@ export default function Billing() {
         </div>
       </div>
 
+      <VoicePlanStatus />
+
       {/* Two local views over the same session values. No route change, no
           request, no content that is reachable only in one of them. */}
       <div className="sb-views" role="tablist" aria-label="Billing views">
@@ -310,6 +314,7 @@ function PlanView({
       )}
 
       {eligible && checkoutEnabled() && (
+        <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can choose or change the plan." />}>
         <section className="sd-section" aria-labelledby="sb-upgrade-title">
           <div className="sd-section__head">
             <h2 className="sd-h2" id="sb-upgrade-title">{copy.heading}</h2>
@@ -344,6 +349,7 @@ function PlanView({
             </div>
           )}
         </section>
+        </OwnerOnly>
       )}
     </>
   );

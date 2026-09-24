@@ -141,6 +141,12 @@ export interface SubscriptionPersistenceDeps {
   listExpiredGrace: (now: Date) => Promise<SubscriptionRow[]>;
   /** Idempotency ledger write; false when the event was already recorded. */
   storeEventOnce: (firmId: number, provider: string, eventKey: string, eventType: string) => Promise<{ inserted: boolean }>;
+  /**
+   * Removes a ledger entry whose event was NOT applied, so the provider's
+   * retry is processed instead of being mistaken for a duplicate. Optional so
+   * existing test doubles keep compiling; production always supplies it.
+   */
+  releaseEvent?: (provider: string, eventKey: string) => Promise<void>;
   recordAudit: (firmId: number, action: string) => Promise<void>;
   openCriticalIssue: (firmId: number, code: "billing_suspended", message: string, dedupeKey: string) => Promise<void>;
   now?: () => Date;
@@ -202,6 +208,12 @@ async function productionSubscriptionDeps(): Promise<SubscriptionPersistenceDeps
         .returning({ id: providerWebhookEvents.id });
       return { inserted: result.length > 0 };
     },
+    releaseEvent: async (provider, eventKey) => {
+      const { providerWebhookEvents } = await import("@workspace/db/schema/voice");
+      await db
+        .delete(providerWebhookEvents)
+        .where(and(eq(providerWebhookEvents.provider, provider), eq(providerWebhookEvents.eventKey, eventKey)));
+    },
     recordAudit: async (firmId, action) => {
       await recordAuditEvent({ firmId, actor: "system", action });
     },
@@ -230,11 +242,26 @@ export async function applyEventForStripeCustomer(
   const resolved = deps ?? (await productionSubscriptionDeps());
   const row = await resolved.findByStripeCustomerId(stripeCustomerId);
   if (!row) return { applied: false, reason: "unknown_subscription" };
-  if (idempotency) {
-    const { inserted } = await resolved.storeEventOnce(row.firmId, idempotency.provider, idempotency.eventKey, event);
-    if (!inserted) return { applied: false, reason: "duplicate_event" };
+  if (!idempotency) return applyEventToRow(row, event, resolved);
+
+  const { inserted } = await resolved.storeEventOnce(row.firmId, idempotency.provider, idempotency.eventKey, event);
+  if (!inserted) return { applied: false, reason: "duplicate_event" };
+
+  // The ledger row is written first so two simultaneous deliveries cannot both
+  // apply. If the change itself then fails, or loses a race to another change,
+  // the event was NOT applied: remove its ledger row so the provider's retry
+  // is processed rather than dropped as a duplicate.
+  let outcome: ApplyOutcome;
+  try {
+    outcome = await applyEventToRow(row, event, resolved);
+  } catch (err) {
+    await resolved.releaseEvent?.(idempotency.provider, idempotency.eventKey).catch(() => undefined);
+    throw err;
   }
-  return applyEventToRow(row, event, resolved);
+  if (!outcome.applied && outcome.reason === "concurrent_change") {
+    await resolved.releaseEvent?.(idempotency.provider, idempotency.eventKey).catch(() => undefined);
+  }
+  return outcome;
 }
 
 async function applyEventToRow(

@@ -26,7 +26,7 @@
 
 import { Link, useParams } from "wouter";
 import { useCallback, useState, type ReactNode } from "react";
-import { useSession } from "@/hooks/useSession";
+import { useSession, useViewer } from "@/hooks/useSession";
 import { useRealCallDetail } from "@/hooks/useVoiceCalls";
 import { useInquiriesForCall } from "@/hooks/useInquiries";
 import { useContactForCall } from "@/hooks/useContacts";
@@ -235,6 +235,7 @@ function LinkedRecords({ callId }: { callId: string }) {
 }
 
 function Record({ call }: { call: RealCallDetail }) {
+  const viewer = useViewer();
   const label = stateLabel(call);
   const outcome = analysisIsAvailable(call.analysisAvailability) ? call.structuredOutcome : null;
 
@@ -287,7 +288,14 @@ function Record({ call }: { call: RealCallDetail }) {
         </dl>
       </header>
 
-      <CallRecording key={`${call.callId}:${call.artifactPolicy}`} callId={call.callId} policy={call.artifactPolicy} isFinal={call.isFinal} />
+      <CallRecording
+        key={`${call.callId}:${call.artifactPolicy}`}
+        callId={call.callId}
+        policy={call.artifactPolicy}
+        isFinal={call.isFinal}
+        deleted={call.recordingDeleted === true}
+        canDelete={viewer.isOwner}
+      />
 
       <section className="sc-doc" aria-labelledby="sc-retention">
         <h2 className="sc-doc__heading" id="sc-retention">

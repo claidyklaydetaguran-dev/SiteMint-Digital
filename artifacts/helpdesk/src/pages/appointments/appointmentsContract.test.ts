@@ -332,17 +332,22 @@ section("what a reschedule actually does to each row");
 // books nothing — so "The calendar event was updated to the new time." described
 // something that never happened, and left a business believing the new time was
 // on the calendar while it was still waiting to be approved.
+// J3: the server now books the new time before releasing the original, so a
+// success really is a booked new time — and the copy may say so, because the
+// server guarantees it (approveRequestToBooked must return "booked" first).
 {
   const detail = DETAIL.rescheduleSuccessDetail;
-  check("it says what happened to the original", /cancelled|removed/i.test(detail));
-  check("it says the replacement still needs approving", /approv/i.test(detail));
+  check("it says what happened to the original", /removed/i.test(detail));
+  check("it says the new time is booked", /booked/i.test(detail));
   check("it no longer claims an event was updated", !/updated to the new time/i.test(detail));
-  check("and it never calls the new time booked or confirmed", !/\bbooked\b|\bconfirmed\b/i.test(detail));
-  check("the title does not announce a finished reschedule", !/rescheduled/i.test(DETAIL.rescheduleSuccessTitle));
 
   const syncSrc = read("artifacts/api-server/src/lib/calendar/calendarEventSync.ts");
-  check("the server really does create a replacement request", syncSrc.includes("submitReplacement"));
-  check("and really does remove the original's event", /removeCalendarEventForRequest\(request, deps\)/.test(syncSrc));
+  const fn = syncSrc.slice(syncSrc.indexOf("export async function rescheduleBookedRequest("));
+  check("the server books the replacement before releasing the original",
+    fn.indexOf("approveRequestToBooked(firmId, replacement.publicId") > 0 &&
+      fn.indexOf("approveRequestToBooked(firmId, replacement.publicId") < fn.indexOf("deps.markRescheduled("));
+  check("and only then removes the original's event", fn.indexOf("deps.markRescheduled(") < fn.indexOf("removeCalendarEventForRequest(request, deps)"));
+  check("a replacement that is not booked leaves the original (not_confirmed)", /outcome: "not_confirmed"/.test(fn));
 }
 
 section("nothing awaiting a decision is described as booked or confirmed");

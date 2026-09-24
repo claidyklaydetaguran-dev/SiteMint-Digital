@@ -256,15 +256,14 @@ export const DETAIL = {
   reschedulePickHeading: "Pick a new time",
   reschedulePendingLabel: "Rescheduling…",
   rescheduleConfirmLabel: "Confirm new time",
-  // What the server actually does (`rescheduleBookedRequest`): it creates a
-  // NEW pending request at the new time, moves the original booked→rescheduled,
-  // and removes the original's calendar event. It updates no event and books
-  // nothing. The old sentence — "The calendar event was updated to the new
-  // time." — described none of that, and left a business believing the new
-  // time was on the calendar when it was still waiting to be approved.
-  rescheduleSuccessTitle: "New time requested",
+  // What the server does now (`rescheduleBookedRequest`): it books the new
+  // time in the calendar FIRST, and only then releases the original and removes
+  // its event. If the new time can't be booked, the original stays (reason
+  // not_confirmed). So on success the new time really is booked, and the caller
+  // is told when they agreed to texts or email.
+  rescheduleSuccessTitle: "Appointment moved",
   rescheduleSuccessDetail:
-    "The original appointment is cancelled and its calendar event removed. The new time is a request waiting for your approval — nothing is on the calendar for it until you approve it.",
+    "The new time is booked in your calendar and the original appointment's event was removed. The caller is told if they agreed to texts or email.",
   rescheduleFailedTitle: "This appointment wasn't rescheduled",
   reschedulePickDay: "Select an open day",
   rescheduleSlotsEmpty: "No times left on this day.",
@@ -355,22 +354,37 @@ const APPROVE_REASON_COPY: Record<ApproveReason, ReasonCopy> = {
       "Your calendar didn't answer, so SiteMint stopped rather than risk creating the appointment twice. Nothing was approved and nothing was retried. Run Reconcile calendar from this page to settle it, then approve again if it is still pending.",
   },
   conflict_after_write: {
-    title: "Check the connected calendar",
-    detail: "The calendar reported a conflict right after writing this event. Review the connected calendar before trying again.",
+    // What this outcome actually means: the request changed (usually it was
+    // cancelled) while the event was being written, and SiteMint removed the
+    // event again. The calendar did not report anything.
+    title: "This request changed while it was being approved",
+    detail: "It was cancelled or changed at the same moment, so SiteMint took the event back out of your calendar. Nothing was booked. Refresh to see its current state.",
+  },
+  slot_conflict: {
+    title: "That time is no longer free",
+    detail: "Something else is now in your calendar at that time. Nothing was booked. Offer the caller another time.",
+  },
+  conflict_check_failed: {
+    title: DETAIL.approveFailedTitle,
+    detail: "SiteMint couldn't read your calendar to check that time is still free, so nothing was booked. Try again in a moment.",
   },
 };
 
 const CANCEL_REASON_COPY: Record<CancelReason, ReasonCopy> = {
   not_found: { title: "This request is gone", detail: "It may have already been cancelled or removed elsewhere." },
   not_booked: { title: DETAIL.cancelFailedTitle, detail: "This appointment isn't booked, so it can't be cancelled this way. The list has been refreshed." },
-  conflict: { title: "Check the connected calendar", detail: "The calendar reported a conflict while cancelling. Review the connected calendar." },
+  conflict: { title: "This appointment changed at the same moment", detail: "It was cancelled or changed elsewhere while you were cancelling it. Refresh to see its current state." },
 };
 
 const RESCHEDULE_REASON_COPY: Record<RescheduleReason, ReasonCopy> = {
   not_found: { title: "This request is gone", detail: "It may have already been cancelled or removed elsewhere." },
   not_booked: { title: DETAIL.rescheduleFailedTitle, detail: "This appointment isn't booked, so it can't be rescheduled this way." },
   slot_unavailable: { title: "That time is no longer available", detail: "Pick another time to continue." },
-  conflict: { title: "Check the connected calendar", detail: "The calendar reported a conflict while rescheduling. Review the connected calendar." },
+  not_confirmed: {
+    title: "The new time couldn't be confirmed",
+    detail: "SiteMint couldn't book the new time in your calendar, so the original appointment is unchanged and still in your calendar. Try again, or pick another time.",
+  },
+  conflict: { title: "This appointment changed at the same moment", detail: "It was cancelled or changed elsewhere while you were moving it, so the new time was released. Refresh to see its current state." },
 };
 
 const RECONCILE_REASON_COPY: Record<ReconcileReason, ReasonCopy> = {

@@ -61,8 +61,9 @@ eq("a malformed period is returned verbatim, never guessed at", periodLabel("gar
 
 section("Paused wording is exact");
 
-eq("the paused sentence matches the approved copy exactly", COPY.pausedTitle, "Your receptionist is paused because the current usage limit was reached.");
-eq("the paused action is exactly one action", COPY.pausedAction, "Contact SiteMint to continue");
+// J8: nothing pauses service at the limit, so the page must not claim it did.
+eq("the over-limit sentence says calls are still answered, never that service paused", COPY.pausedTitle, "You have used all the minutes included in your plan this month. Your receptionist is still answering calls.");
+eq("the over-limit action is exactly one action", COPY.pausedAction, "Contact SiteMint about extra minutes");
 check("the paused action is a mailto link", COPY.pausedMailto.startsWith("mailto:"));
 
 section("One support address");

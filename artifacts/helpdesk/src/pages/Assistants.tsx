@@ -77,6 +77,7 @@ import {
 } from "@/pages/assistants/assistantsContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-signin.css";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 type ViewMode = "cards" | "table";
 type StatusFilter = "all" | AssistantStatus;
@@ -226,6 +227,7 @@ function RowActions({
         {LIST.open}
         <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
       </button>}
+<OwnerOnly>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -251,6 +253,7 @@ function RowActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+</OwnerOnly>
     </div>
   );
 }
@@ -452,10 +455,12 @@ export default function Assistants() {
           singleAssistant ? (
             <p style={{ ...MUTED, marginTop: 0 }}>{LIST.contactToAddAnother}</p>
           ) : (
-            <Button onClick={() => navigate(NEW_PATH)}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              {LIST.newAssistant}
-            </Button>
+            <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can create or change the receptionist." />}>
+              <Button onClick={() => navigate(NEW_PATH)}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {LIST.newAssistant}
+              </Button>
+            </OwnerOnly>
           )
         }
       />
@@ -539,12 +544,14 @@ export default function Assistants() {
         <div className="sd-empty">
           <h3 className="sd-empty__title">{LIST.emptyTitle}</h3>
           <p className="sd-empty__detail">{LIST.emptyDetail}</p>
-          <p style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
-            <Button onClick={() => navigate(NEW_PATH)}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              {LIST.newAssistant}
-            </Button>
-          </p>
+          <OwnerOnly>
+            <p style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
+              <Button onClick={() => navigate(NEW_PATH)}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {LIST.newAssistant}
+              </Button>
+            </p>
+          </OwnerOnly>
         </div>
       )}
 

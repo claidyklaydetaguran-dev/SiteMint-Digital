@@ -190,7 +190,8 @@ describe("what each role may do", () => {
       ["PATCH", "/receptionist/contacts/:id"],
       ["POST", "/receptionist/calendar/requests/:publicId/approve"],
       ["POST", "/receptionist/support/requests"],
-      ["POST", "/receptionist/voice/assistants/:id/browser-test-session"],
+      // The browser test session is a GET (a read staff may make); there was never a POST route.
+      ["GET", "/receptionist/voice/assistants/:id/browser-test-session"],
     ] as const) {
       expect(accessDecision(method, path, staff), `${method} ${path}`).toBe("allow");
     }

@@ -38,6 +38,7 @@ import type { ExtractedAssistantPublishConfig, PublishFirstMessageMode, RuntimeC
 import { createProductionVoiceProvider } from "./providerFactory.js";
 import { buildPublishRouteError, type PublishRouteError, type PublishRouteErrorCode } from "./publishHttpErrors.js";
 import type { PublishSyncErrorCode } from "./types.js";
+import { loadRecordingControls } from "../voiceRecording/recordingControls.js";
 
 /** Route error codes that are also valid database sync-error codes — the only codes this service ever persists via recordPublishError/recordPublishUncertain. */
 type PersistableFailureCode = Extract<PublishRouteErrorCode, PublishSyncErrorCode>;
@@ -140,6 +141,29 @@ export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   repository: voiceAssistantRepository,
   clock: systemClock,
 };
+
+/**
+ * Whether STEP 1 of publishAssistant would pass right now: the same flag and
+ * the same server-owned loaders, with no claim, no database write and no
+ * provider request. Readiness uses it so the dashboard never tells an owner
+ * to publish while publishing would answer `publish_disabled`.
+ */
+export function isPublishConfigurationReady(
+  deps: Pick<PublishServiceDependencies, "isEnabled" | "loadCatalog" | "loadArtifactPolicy" | "loadServerConfig" | "loadToolsConfig" | "loadCallPolicy"> = defaultPublishServiceDependencies,
+): boolean {
+  if (!deps.isEnabled()) return false;
+  try {
+    deps.loadCatalog();
+    deps.loadArtifactPolicy();
+    loadRecordingControls();
+    const serverConfig = (deps.loadServerConfig ?? loadVoiceServerConfigFromEnv)();
+    (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig, process.env);
+    (deps.loadCallPolicy ?? loadVoiceCallPolicyFromEnv)();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const UNCERTAIN_PROVIDER_CODES: ReadonlySet<VoiceProviderErrorCode> = new Set([
   "TIMEOUT",
@@ -391,6 +415,9 @@ export async function publishAssistant(
   // way for a policy validated here to differ from the one that is sent.
   try {
     deps.loadArtifactPolicy();
+    // J6: recording on without its disclosure, retention and access rule is
+    // a configuration that must not publish at all.
+    loadRecordingControls();
   } catch {
     return failure("publish_disabled");
   }

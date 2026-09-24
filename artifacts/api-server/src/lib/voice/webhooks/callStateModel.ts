@@ -135,6 +135,8 @@ export interface StoredVapiEvent {
 
 export interface RealCallRecord {
   callId: string;
+  /** J6: set once this call's recording and transcript were deleted (by the business or by retention). */
+  recordingDeletedAt?: Date;
   assistantId: string | undefined;
   provider: "vapi";
   /** Always "vapi_twilio" — a real-call record can never claim Demo Mode or vice versa. */

@@ -46,8 +46,10 @@ export const COPY = {
   channelUnreported: "Call type not reported",
   channelsUnavailable: "A breakdown by call type isn't available for this period.",
 
-  pausedTitle: "Your receptionist is paused because the current usage limit was reached.",
-  pausedAction: "Contact SiteMint to continue",
+  // Nothing stops calls when the included minutes run out (no code path
+  // pauses a number for usage), so the page must not say it has paused.
+  pausedTitle: "You have used all the minutes included in your plan this month. Your receptionist is still answering calls.",
+  pausedAction: "Contact SiteMint about extra minutes",
   // The same address Support shows — see pages/support/supportContract.ts.
   pausedMailto: supportMailto("Usage limit reached"),
 } as const;

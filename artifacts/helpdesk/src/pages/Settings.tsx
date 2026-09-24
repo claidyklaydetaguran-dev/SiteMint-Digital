@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "wouter";
 import { ArrowRight } from "lucide-react";
-import { useSession, useLogout, SESSION_KEY } from "@/hooks/useSession";
+import { useSession, useLogout, useViewer, SESSION_KEY } from "@/hooks/useSession";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchBusinessProfile, readBusinessProfile, updateAccountProfile, changePassword, changeAccountEmail } from "@/lib/accountApi";
 import {
@@ -56,6 +56,7 @@ import {
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-settings.css";
 import "@/styles/v2-signin.css";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 const EMPTY_PROFILE_FORM: ProfileFormValues = {
   name: "",
@@ -76,6 +77,7 @@ function browserTimezone(): string {
 
 export default function Settings() {
   const { data: me, isLoading } = useSession();
+  const viewer = useViewer();
   const [, navigate] = useLocation();
   const [searchParams] = useSearchParams();
   const logout = useLogout();
@@ -326,6 +328,7 @@ export default function Settings() {
             Business profile
           </h2>
         </div>
+        <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can change the business profile." />}>
         <form className="si-form" onSubmit={handleProfileSubmit} noValidate>
           {profileError && (
             <div className="si-alert" role="alert">
@@ -451,6 +454,7 @@ export default function Settings() {
             {saveButtonLabel(saveState)}
           </button>
         </form>
+        </OwnerOnly>
       </section>
 
       {/* Change password (S-2). */}
@@ -460,6 +464,7 @@ export default function Settings() {
         ever sent to an unverified address, so a business whose address cannot
         receive mail hears nothing from the product at all.
       */}
+      {viewer.accountHolder && (
       <section className="sd-section" aria-labelledby="sg-email-title">
         <div className="sd-section__head">
           <div>
@@ -522,6 +527,7 @@ export default function Settings() {
         </form>
         <Link href={EMAIL_CHANGE.verifyHref} className="sd-link">{EMAIL_CHANGE.verifyLinkLabel}</Link>
       </section>
+      )}
 
       <section className="sd-section" aria-labelledby="sg-password-title">
         <div className="sd-section__head">

@@ -67,6 +67,13 @@ router.post("/voice/billing/webhook", async (req: Request, res: Response) => {
       { eventType: event["type"], applied: outcome.applied, reason: outcome.applied ? undefined : outcome.reason },
       "[voice billing] event processed",
     );
+    if (!outcome.applied && outcome.reason === "concurrent_change") {
+      // Another change landed between our read and our write. The ledger row
+      // was released, so answering 500 makes Stripe redeliver and the retry
+      // is applied to the fresh state instead of being lost.
+      res.status(500).json({ error: "Retry" });
+      return;
+    }
     res.status(200).json({ received: true });
   } catch (err) {
     req.log.error({ errorClass: err instanceof Error ? err.name : "unknown" }, "[voice billing] event failed");

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 // width rule and sized itself to its longest option — ~150px past a 375px
 // screen (measured on staging). Every selector in it is `.si-` scoped.
 import "@/styles/v2-signin.css";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): React.ReactElement | null {
   const queryClient = useQueryClient();
@@ -72,9 +73,11 @@ export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): Re
           {needsPermission ? CALENDAR_PICKER.needsPermissionDetail : CALENDAR_PICKER.unavailableDetail}
         </p>
         {needsPermission && (
-          <Button type="button" variant="outline" onClick={onReconnect}>
-            {CALENDAR_PICKER.needsPermissionAction}
-          </Button>
+          <OwnerOnly>
+            <Button type="button" variant="outline" onClick={onReconnect}>
+              {CALENDAR_PICKER.needsPermissionAction}
+            </Button>
+          </OwnerOnly>
         )}
       </section>
     );
@@ -105,6 +108,7 @@ export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): Re
         ))}
       </select>
 
+      <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can choose which calendar is used." />}>
       <Button
         type="button"
         onClick={() => { if (chosen) save.mutate(chosen); }}
@@ -116,6 +120,7 @@ export function CalendarPicker({ onReconnect }: { onReconnect: () => void }): Re
       >
         {save.isPending ? CALENDAR_PICKER.savePending : CALENDAR_PICKER.save}
       </Button>
+      </OwnerOnly>
 
       {saved && (
         <div className="sd-note" role="status">

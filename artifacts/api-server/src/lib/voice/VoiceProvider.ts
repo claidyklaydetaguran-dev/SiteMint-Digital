@@ -77,6 +77,14 @@ export interface VoiceProvider {
   getCallRecording?(providerCallId: string): Promise<{ url: string } | undefined>;
 
   /**
+   * Deletes one call's stored artifacts (recording, transcript, logs) at the
+   * provider. "not_found" means the provider holds nothing for that id — the
+   * goal state, so callers treat it as done. Throws on any other failure;
+   * a deletion that did not happen must never be reported as one.
+   */
+  deleteCallArtifacts?(providerCallId: string): Promise<"deleted" | "not_found">;
+
+  /**
    * Points one telephone number at one assistant, or at nothing.
    *
    * This is the write that makes a number actually ring. Recording an

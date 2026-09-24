@@ -192,6 +192,37 @@ describe("an uncertain calendar write", () => {
   });
 });
 
+describe("two approvals of the same request", () => {
+  it("the loser keeps the event the winner stamped, and reports booked", async () => {
+    const h = deps({ write: { ok: false, reason: "uncertain" }, lookup: { ok: true, eventId: "evt_shared" }, markBookedOk: false });
+    let reads = 0;
+    const original = h.deps.findRequest;
+    h.deps.findRequest = async (firmId: number, publicId: string) => {
+      reads += 1;
+      const row = await original(firmId, publicId);
+      // First read: still pending. After the lost stamp: the other approval
+      // booked it with the same event.
+      return reads === 1 ? row : ({ ...(row as object), status: "booked", providerEventId: "evt_shared" } as never);
+    };
+    const outcome = await approveRequestToBooked(FIRM, PUBLIC_ID, h.deps);
+    expect(outcome).toBe("booked");
+    expect(h.deletes).toEqual([]);
+  });
+
+  it("an event stamped to a different id is still removed", async () => {
+    const h = deps({ write: { ok: true, eventId: "evt_mine" }, markBookedOk: false });
+    let reads = 0;
+    const original = h.deps.findRequest;
+    h.deps.findRequest = async (firmId: number, publicId: string) => {
+      reads += 1;
+      const row = await original(firmId, publicId);
+      return reads === 1 ? row : ({ ...(row as object), status: "booked", providerEventId: "evt_other" } as never);
+    };
+    expect(await approveRequestToBooked(FIRM, PUBLIC_ID, h.deps)).toBe("conflict_after_write");
+    expect(h.deletes).toEqual(["evt_mine"]);
+  });
+});
+
 describe("which provider answers count as unresolved", () => {
   it("treats a thrown transport, a timeout, rate limiting and 5xx as unknown", () => {
     for (const status of [0, 408, 429, 500, 502, 503, 504]) {

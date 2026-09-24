@@ -9,7 +9,7 @@
 
 import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { voiceContacts, voiceCallLinks, voiceCallReviews, voiceSmsConsents, voiceMessages } from "@workspace/db/schema/voice";
+import { voiceContacts, voiceCallLinks, voiceCallReviews, voiceSmsConsents, voiceMessages, voiceSmsInbound } from "@workspace/db/schema/voice";
 import { intakeConversations } from "@workspace/db/schema";
 import { schedulingAppointmentRequests } from "@workspace/db/schema/scheduling";
 import { listRealCallsForFirm } from "../voice/webhooks/realCallsRepository.js";
@@ -27,6 +27,8 @@ export interface ContactListItem {
   optedOut: boolean;
   callCount: number;
   conversationCount: number;
+  /** J4: texts from this contact nobody at the business has opened yet. */
+  unreadTexts: number;
 }
 
 const MAX_LIMIT = 100;
@@ -78,6 +80,12 @@ export async function listContactsForFirm(
         SELECT COUNT(*) FROM ${intakeConversations}
         WHERE ${intakeConversations.firmId} = ${voiceContacts.firmId} AND ${intakeConversations.callerPhone} = ${voiceContacts.phoneE164}
       )::int`,
+      unreadTexts: sql<number>`(
+        SELECT COUNT(*) FROM ${voiceSmsInbound}
+        WHERE ${voiceSmsInbound.firmId} = ${voiceContacts.firmId}
+          AND ${voiceSmsInbound.fromE164} = ${voiceContacts.phoneE164}
+          AND ${voiceSmsInbound.readAt} IS NULL
+      )::int`,
       optedOut: sql<boolean>`EXISTS (
         SELECT 1 FROM ${voiceSmsConsents}
         WHERE ${voiceSmsConsents.firmId} = ${voiceContacts.firmId}
@@ -116,6 +124,7 @@ export async function listContactsForFirm(
     optedOut: r.optedOut,
     callCount: r.callCount,
     conversationCount: r.conversationCount,
+    unreadTexts: r.unreadTexts,
   }));
 }
 
@@ -274,6 +283,9 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
       optedOut: optedOutRow.length > 0,
       callCount: callCountRow?.count ?? 0,
       conversationCount: conversationRows.length,
+      // The detail page reads the thread itself (GET .../texts); the count
+      // here only keeps the shape shared with the list.
+      unreadTexts: 0,
       createdAt: contact.createdAt.toISOString(),
     },
     calls: callLinkRows.map((c) => ({ callId: c.callId, startedAt: c.createdAt.toISOString(), state: callStateById.get(c.callId) ?? "unknown" })),

@@ -241,7 +241,7 @@ check("the shared barrel derives 84 base tables", BARREL.length === 84, `${BARRE
 // (+scheduling_date_exceptions), voice 0011 (+voice_business_profiles).
 // 36: voice 0013 (+voice_support_requests, +voice_support_messages).
 // 37: voice 0014 (+voice_policy_acceptances).
-check("the committed migrations derive 37 domain tables", DOMAIN.length === 37, `${DOMAIN.length}`);
+check("the committed migrations derive 38 domain tables", DOMAIN.length === 38, `${DOMAIN.length}`);
 check(
   // 84 barrel + 36 domain. Both sides of the merge that produced this line were
   // wrong about it, each being right only about its own half: the CRM line
@@ -250,8 +250,9 @@ check(
   // still reading 83 barrel. Summing the two claims is what this pin exists to
   // prevent, so this number is taken from running the contract, not from adding.
   // 121: voice 0014 added voice_policy_acceptances (84 barrel + 37 domain).
-  "the application owns exactly 121 public tables",
-  APPLICATION.length === 121,
+  // 122: voice 0015 added voice_sms_inbound (84 barrel + 38 domain).
+  "the application owns exactly 122 public tables",
+  APPLICATION.length === 122,
   `${APPLICATION.length}`,
 );
 check(

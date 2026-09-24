@@ -11,6 +11,7 @@ import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliati
 import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
 import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
 import { startGraceExpirySweep } from "./lib/voiceBilling/subscriptionState.js";
+import { startRecordingRetentionSweep } from "./lib/voiceRecording/recordingDeletion.js";
 import { logEnvContractFindings } from "./lib/envContract.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
@@ -111,6 +112,12 @@ function startBackgroundWorkers(): void {
   startVoiceDigestSchedule(24 * 60 * 60_000, {
     logger: (event, meta) => logger.info(meta, event),
   } as Parameters<typeof startVoiceDigestSchedule>[1]);
+  // J6: recording retention (hourly). Inert unless recording is on with a
+  // valid retention period.
+  startRecordingRetentionSweep(60 * 60_000, {
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
+  });
   // P8: dunning-window expiry (hourly tick), same reconciliation flag.
   startGraceExpirySweep(60 * 60_000, {
     logger: (event, meta) => logger.info(meta, event),

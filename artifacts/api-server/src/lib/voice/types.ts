@@ -127,8 +127,11 @@ export interface VoicePhoneNumberRecord {
  *   unknown    — a transfer happened and then nothing conclusive arrived.
  *                The honest answer, and a common one for a blind transfer.
  *   none       — no transfer was involved in this call.
+ *   declined   — the assistant asked, and SiteMint put nobody through: no
+ *                consented contact, outside the contact's hours, or transfers
+ *                not switched on. The caller was offered a message instead.
  */
-export type TransferOutcomeState = "none" | "requested" | "accepted" | "connected" | "failed" | "unknown";
+export type TransferOutcomeState = "none" | "requested" | "accepted" | "connected" | "failed" | "unknown" | "declined";
 
 export interface TransferOutcome {
   state: TransferOutcomeState;

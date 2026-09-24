@@ -242,7 +242,7 @@ export function callerAckDedupeKey(messageId: number): string {
  */
 export function callerAppointmentAckDedupeKey(
   requestPublicId: string,
-  stage: "pending" | "booked",
+  stage: "pending" | "booked" | "declined" | "cancelled" | "rescheduled",
 ): string {
   return `caller_ack:appointment:${requestPublicId}:${stage}`;
 }

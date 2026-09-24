@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchContactTexts,
+  type ContactText,
   fetchContactDetail,
   fetchContactForCall,
   fetchContacts,
@@ -41,6 +43,17 @@ export function useContactDetail(id: string | undefined) {
   return useQuery<ContactDetailResponse | undefined>({
     queryKey: resolved ? [ROOT, "detail", firmId, id] : UNRESOLVED_SESSION_KEY,
     queryFn: () => fetchContactDetail(id as string),
+    enabled: resolved,
+  });
+}
+
+/** J4: the texts between the business's voice number and one contact. */
+export function useContactTexts(id: string | undefined) {
+  const firmId = useAuthenticatedFirmId();
+  const resolved = firmId !== undefined && id !== undefined;
+  return useQuery<{ items: ContactText[]; count: number; unread: number }>({
+    queryKey: resolved ? [ROOT, "texts", firmId, id] : UNRESOLVED_SESSION_KEY,
+    queryFn: () => fetchContactTexts(id as string),
     enabled: resolved,
   });
 }

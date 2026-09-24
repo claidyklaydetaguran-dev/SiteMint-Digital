@@ -49,6 +49,54 @@ router.get("/receptionist/contacts/:id", requireReceptionistAuth, async (req: Re
   }
 });
 
+// ── GET /api/receptionist/contacts/:id/texts ─────────────────────────────────
+// J4: the texts between the business's voice number and this contact, oldest
+// first, with each outbound text's send and delivery state. Firm-scoped
+// through the contact: another firm's contact id is a 404.
+
+router.get("/receptionist/contacts/:id/texts", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid contact id." });
+    return;
+  }
+  try {
+    const detail = await getContactDetailForFirm(req.firmId!, id);
+    if (!detail) {
+      res.status(404).json({ error: "Contact not found." });
+      return;
+    }
+    const { listTextThread } = await import("../lib/voiceSms/textThread.js");
+    const items = await listTextThread(req.firmId!, detail.contact.phone);
+    res.json({ items, count: items.length, unread: items.filter((m) => m.unread).length });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[contacts] texts failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /api/receptionist/contacts/:id/texts/read ───────────────────────────
+
+router.post("/receptionist/contacts/:id/texts/read", requireReceptionistAuth, async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid contact id." });
+    return;
+  }
+  try {
+    const detail = await getContactDetailForFirm(req.firmId!, id);
+    if (!detail) {
+      res.status(404).json({ error: "Contact not found." });
+      return;
+    }
+    const { markTextThreadRead } = await import("../lib/voiceSms/textThread.js");
+    res.json({ ok: true, marked: await markTextThreadRead(req.firmId!, detail.contact.phone) });
+  } catch (err) {
+    req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[contacts] mark texts read failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── POST /api/receptionist/contacts ───────────────────────────────────────────
 
 router.post("/receptionist/contacts", requireReceptionistAuth, async (req: Request, res: Response) => {

@@ -437,6 +437,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "DELETE /api/receptionist/account/members/:id": "session",
   "DELETE /api/receptionist/calendar/connection": "session",
   "DELETE /api/receptionist/voice/assistants/:id": "session",
+  "DELETE /api/receptionist/voice/calls/:callId/recording": "session",
   "DELETE /api/receptionist/voice/calls/:callId/review": "session",
   "DELETE /api/receptionist/voice/transfer-contacts/:id": "session",
   "DELETE /api/receptionist/voice/transfer-destinations/:id": "session",
@@ -625,6 +626,7 @@ export const ROUTE_SECURITY_MANIFEST: Record<string, Protection> = {
   "PUT /api/receptionist/availability/public-link": "session",
   "PUT /api/receptionist/onboarding": "session",
   "PUT /api/receptionist/voice/calls/:callId/review": "session",
+  "POST /api/receptionist/contacts/:id/texts/read": "session",
 };
 
 /**

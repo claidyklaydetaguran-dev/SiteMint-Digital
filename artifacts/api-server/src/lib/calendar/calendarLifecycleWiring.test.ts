@@ -510,23 +510,11 @@ describe("booked cancel", () => {
   });
 });
 
+// The confirm-first ordering (the original survives until the new time is
+// booked) is covered with a multi-row harness in rescheduleKeepsOriginal.test.ts.
 describe("booked reschedule", () => {
   const NEW_START = new Date("2026-09-14T19:00:00.000Z");
 
-  it("creates the replacement, marks the old row rescheduled, and removes only the old event", async () => {
-    const h = bookedHarness();
-    const result = await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps);
-    expect(result.outcome).toBe("rescheduled");
-    expect(result.calendar).toBe("deleted");
-    expect(result.replacement?.startUtc).toEqual(NEW_START);
-    expect(h.row.status).toBe("rescheduled");
-    expect(h.row.providerEventId).toBeNull();
-    expect(h.deletes).toEqual(["evt-1"]);
-    // The replacement books later through the normal approve path — nothing
-    // here may write an event.
-    expect(h.inserts).toBe(0);
-    expect(h.replacements).toEqual([{ publicId: "99999999-8888-4777-8666-555555555555", status: "pending_review" }]);
-  });
 
   it("an unavailable slot changes nothing at all", async () => {
     const h = bookedHarness({ replacementOk: false });
@@ -536,12 +524,6 @@ describe("booked reschedule", () => {
     expect(h.replacements).toHaveLength(0);
   });
 
-  it("a lost race discards the replacement and leaves the winner's state untouched", async () => {
-    const h = bookedHarness({ transitionReturns: false });
-    expect((await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps)).outcome).toBe("conflict");
-    expect(h.deletes).toHaveLength(0);
-    expect(h.replacements).toEqual([{ publicId: "99999999-8888-4777-8666-555555555555", status: "cancelled" }]);
-  });
 
   it("refuses cross-firm and non-booked rows with zero side effects", async () => {
     const foreign = bookedHarness();
@@ -556,13 +538,4 @@ describe("booked reschedule", () => {
     }
   });
 
-  it("a provider delete failure degrades to an issue; the reschedule itself stands", async () => {
-    const h = bookedHarness({ deleteResult: { ok: false, reason: "provider_error" } });
-    const result = await rescheduleBookedRequest(1, h.row.publicId, NEW_START, h.deps);
-    expect(result.outcome).toBe("rescheduled");
-    expect(result.calendar).toBe("failed");
-    expect(h.row.status).toBe("rescheduled");
-    expect(h.row.providerEventId).toBe("evt-1");
-    expect(h.issues).toEqual(["calendar_sync_failed"]);
-  });
 });

@@ -16,6 +16,11 @@ import {
   buildBrowserTestSessionError,
   type BrowserTestSessionError,
 } from "../lib/voiceAssistants/browserTestSession.js";
+import {
+  resolveServiceAccess,
+  SERVICE_ACCESS_MESSAGES,
+  SERVICE_NOT_ACTIVE_CODE,
+} from "../lib/voiceBilling/serviceAccess.js";
 
 const router = Router();
 
@@ -186,6 +191,30 @@ function assertEmptyPublishBody(body: unknown): void {
   }
 }
 
+// Publishing, synchronizing and browser test calls spend provider time for
+// this business, so each is refused until the business is activated
+// (lib/voiceBilling/serviceAccess.ts). Returns true when the request was
+// answered here. A failure to read the subscription refuses too.
+async function refusedWithoutServiceAccess(req: Request, res: Response, operation: string): Promise<boolean> {
+  try {
+    const access = await resolveServiceAccess(req.firmId!);
+    if (access.allowed) return false;
+    res.status(403).json({
+      error: { code: SERVICE_NOT_ACTIVE_CODE, message: SERVICE_ACCESS_MESSAGES[access.reason], retryable: false },
+    });
+    return true;
+  } catch (err) {
+    req.log.error(
+      { operation, firmId: req.firmId, category: "service_access_unreadable", errorClass: safeErrorClassName(err) },
+      "[receptionist] service access could not be read",
+    );
+    res.status(503).json({
+      error: { code: "service_access_unavailable", message: "We couldn't confirm your plan just now. Please try again in a moment.", retryable: true },
+    });
+    return true;
+  }
+}
+
 router.post(
   "/receptionist/voice/assistants/:id/publish",
   requireReceptionistAuth,
@@ -206,6 +235,8 @@ router.post(
       sendPublishError(res, buildPublishRouteError("internal_error"));
       return;
     }
+
+    if (await refusedWithoutServiceAccess(req, res, "publish")) return;
 
     try {
       const result = await publishAssistant(req.firmId!, assistantId);
@@ -263,6 +294,8 @@ router.post(
       return;
     }
 
+    if (await refusedWithoutServiceAccess(req, res, "sync")) return;
+
     try {
       const result = await synchronizePublishedAssistant(req.firmId!, assistantId);
       if (result.ok) {
@@ -313,6 +346,8 @@ router.get(
     // ordinary Start Browser Test never discards a working token. The
     // replacement is scoped identically — there is no fallback to a broader key.
     const replaceExistingToken = req.query["replace"] === "1";
+
+    if (await refusedWithoutServiceAccess(req, res, "browser_test_session")) return;
 
     try {
       const result = await getBrowserTestSession(

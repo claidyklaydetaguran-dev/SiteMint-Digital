@@ -103,6 +103,14 @@ export interface ToolSchedulingDeps {
    */
   confirmRequest?: (firmId: number, publicId: string) => Promise<string>;
   /**
+   * Cancels a BOOKED appointment and removes its calendar event — the same
+   * service the dashboard's Cancel calls for a booked row. The pending-row
+   * cancel above cannot touch a booked row, so without this a caller could
+   * never cancel or move an appointment the office had confirmed. Answers
+   * "cancelled", or anything else when nothing changed.
+   */
+  cancelBookedRequest?: (firmId: number, publicId: string) => Promise<string>;
+  /**
    * V7: persists a message for the business. Resolves only on a durable write;
    * anything else must reject, because the spoken confirmation is emitted
    * strictly after this resolves.
@@ -169,8 +177,13 @@ export interface ToolSchedulingDeps {
 async function defaultDeps(): Promise<ToolSchedulingDeps> {
   const repo = await import("../../scheduling/schedulingRepository.js");
   const issues = await import("../../voiceIssues/voiceIssueService.js");
+  // The business's connected calendar, exactly as the dashboard and the public
+  // booking page read it. Without it a caller could be offered, and booked
+  // into, a time the owner's Google Calendar already has taken.
+  const { getFreeBusyProvider } = await import("../../calendar/index.js");
+  const freeBusy = getFreeBusyProvider();
   return {
-    getDayAvailability: (firmId, dateKey, typeId, now) => repo.getDayAvailability(firmId, dateKey, typeId, now),
+    getDayAvailability: (firmId, dateKey, typeId, now) => repo.getDayAvailability(firmId, dateKey, typeId, now, freeBusy),
     getSchedulingContext: async (firmId) => {
       const config = await repo.buildAvailabilityConfig(firmId);
       return {
@@ -178,13 +191,10 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
         types: config.appointmentTypes.map((t) => ({ id: t.id, name: t.name, durationMin: t.durationMin })),
       };
     },
-    findRequestByPublicId: async (firmId, publicId) => {
-      const rows = await repo.listAppointmentRequests(firmId);
-      return rows.find((r) => r.publicId === publicId);
-    },
+    findRequestByPublicId: (firmId, publicId) => repo.findAppointmentRequestByPublicId(firmId, publicId),
     submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId, providerCallId) =>
       repo.submitAppointmentRequest(
-        firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, undefined, toolCallId, providerCallId,
+        firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, freeBusy, toolCallId, providerCallId,
       ),
     cancelAppointmentRequestByPublicId: (firmId, publicId) => repo.cancelAppointmentRequestByPublicId(firmId, publicId),
     // The dashboard's Approve, called from the call instead of from a click.
@@ -197,6 +207,11 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
       // path and the dashboard path are the same code with the same gates.
       const { calendarSyncDeps } = await import("../../calendar/calendarSyncDeps.js");
       return sync.approveRequestToBooked(firmId, publicId, calendarSyncDeps());
+    },
+    cancelBookedRequest: async (firmId, publicId) => {
+      const sync = await import("../../calendar/calendarEventSync.js");
+      const { calendarSyncDeps } = await import("../../calendar/calendarSyncDeps.js");
+      return (await sync.cancelBookedRequest(firmId, publicId, calendarSyncDeps())).outcome;
     },
     enqueueBookingConfirmation: async (input) => {
       const outbox = await import("../../voiceSms/outboxService.js");
@@ -386,13 +401,13 @@ async function runBookAppointment(
     args.appointmentTypeId,
     startUtc,
     { name: args.customerName, phone: args.customerPhone ?? null, email: args.customerEmail ?? null },
-    // Text messages are deferred: no SMS consent is recorded from a call.
-    // Email consent is recorded only when the caller heard the address read
-    // back and asked to be written to — the schema refuses the flag without an
-    // address, and this refuses it without both.
+    // Text and email consent are recorded only on the caller's explicit yes,
+    // with the number or address read back to them — the schema refuses
+    // either flag without its contact detail, and this refuses it without
+    // both.
     {
       phoneConsent: true,
-      smsConsent: false,
+      smsConsent: args.smsConsent === true && typeof args.customerPhone === "string",
       emailConsent: args.emailConfirmed === true && typeof args.customerEmail === "string",
     },
     now,
@@ -432,15 +447,20 @@ async function runBookAppointment(
   // P5: consent-gated confirmation text (best-effort; the outbox enforces
   // consent and the send-time flag — a failure here never fails the booking).
   try {
-    await deps.enqueueBookingConfirmation?.({
-      firmId,
-      rawPhone: args.customerPhone ?? null,
-      requestPublicId: result.request.publicId,
-      spokenSummary: confirmed
-        ? `Your appointment is confirmed — reference ${result.request.publicId}. Reply STOP to opt out.`
-        : `Your appointment request is in — reference ${result.request.publicId}. The office will confirm shortly. Reply STOP to opt out.`,
-      callerConsented: false, // texts are deferred; nothing is sent from a call
-    });
+    if (args.smsConsent === true && typeof args.customerPhone === "string") {
+      // Carriers expect the sender named in the message itself.
+      const sender = ((await deps.loadBusinessName?.(firmId).catch(() => "")) || "").trim().slice(0, 60);
+      const prefix = sender ? `${sender}: ` : "";
+      await deps.enqueueBookingConfirmation?.({
+        firmId,
+        rawPhone: args.customerPhone,
+        requestPublicId: result.request.publicId,
+        spokenSummary: confirmed
+          ? `${prefix}Your appointment is confirmed. Reference ${result.request.publicId}. Reply STOP to opt out.`
+          : `${prefix}We have your appointment request. The office will confirm shortly. Reference ${result.request.publicId}. Reply STOP to opt out.`,
+        callerConsented: true,
+      });
+    }
   } catch {
     // outbox unavailability must not undo a successful booking
   }
@@ -469,6 +489,19 @@ async function runCancelAppointment(
   args: CancelAppointmentArgs,
   deps: ToolSchedulingDeps,
 ): Promise<string> {
+  const existing = await deps.findRequestByPublicId(firmId, args.requestId);
+  if (existing?.status === "booked") {
+    if (!deps.cancelBookedRequest) return "I can't cancel a confirmed appointment on this call. Take a message and the office will cancel it.";
+    const outcome = await deps.cancelBookedRequest(firmId, args.requestId);
+    return outcome === "cancelled"
+      ? "The appointment is cancelled and taken out of the calendar."
+      : "I couldn't cancel it just now. Take a message so the office can cancel it — do not tell the caller it is cancelled.";
+  }
+  // A repeated delivery of a cancel that already worked: say so, rather than
+  // "couldn't find", which would make the caller think it never happened.
+  if (existing && (existing.status === "cancelled" || existing.status === "rescheduled")) {
+    return "That appointment is already cancelled.";
+  }
   const cancelled = await deps.cancelAppointmentRequestByPublicId(firmId, args.requestId);
   return cancelled
     ? "The appointment is cancelled."
@@ -524,6 +557,34 @@ async function runRescheduleAppointment(
     return LIVE_STATUSES.has(created.request.status)
       ? `Already moved — this is the same change, not another one. New reference id ${created.request.publicId}. Repeat what you already told the caller; do not say it is confirmed.`
       : "That change didn't go through, and the original appointment is unchanged. The office can help.";
+  }
+
+  // A confirmed original is only given up for a confirmed replacement.
+  // Releasing it for a time that is merely requested would leave the caller
+  // with nothing if the office declines the new one.
+  if (old.status === "booked") {
+    const newConfirmed =
+      deps.confirmRequest !== undefined && deps.cancelBookedRequest !== undefined
+        ? (await deps.confirmRequest(firmId, created.request.publicId).catch(() => "failed")) === "booked"
+        : false;
+    if (!newConfirmed) {
+      await deps.cancelAppointmentRequestByPublicId(firmId, created.request.publicId);
+      return "I couldn't confirm the new time on this call, so the caller keeps their current appointment. Take a message with the time they'd prefer and the office will move it.";
+    }
+    const released = await deps.cancelBookedRequest!(firmId, args.requestId);
+    if (released !== "cancelled") {
+      // The new time is confirmed but the old one could not be released:
+      // tell the truth and let the office tidy the calendar.
+      await deps.openIssue?.({
+        firmId,
+        level: "warning",
+        code: "tool_execution_failed",
+        message: "A caller moved a confirmed appointment on a call, but the original time could not be released. Cancel the original from Appointments.",
+        dedupeKey: `reschedule-release:${args.requestId}`,
+      }).catch(() => undefined);
+    }
+    await enqueueCallerAppointmentAck(firmId, created.request, true, deps);
+    return `Moved and confirmed in the calendar. New reference id ${created.request.publicId}. Tell the caller the new time is booked.`;
   }
 
   const cancelledOld = await deps.cancelAppointmentRequestByPublicId(firmId, args.requestId);

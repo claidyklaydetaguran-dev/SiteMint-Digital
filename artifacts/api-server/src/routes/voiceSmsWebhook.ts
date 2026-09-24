@@ -12,6 +12,7 @@ import {
   classifyInboundKeyword,
   isVoiceSmsEnabled,
   loadVoiceSmsConfig,
+  resolveVoiceSmsPublicOrigin,
   verifyTwilioSignature,
   type VoiceSmsConfig,
 } from "../lib/voiceSms/smsCore.js";
@@ -54,7 +55,8 @@ function requireVerified(req: Request, res: Response): { config: VoiceSmsConfig;
     return undefined;
   }
   const params = paramsOf(req);
-  const url = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+  const origin = resolveVoiceSmsPublicOrigin();
+  const url = origin ? `${origin}${req.originalUrl}` : `${req.protocol}://${req.get("host")}${req.originalUrl}`;
   const signature = req.get("x-twilio-signature");
   if (!verifyTwilioSignature(config.authToken, url, params, signature ?? undefined)) {
     req.log.warn("[voice sms] signature verification failed");
@@ -108,7 +110,29 @@ router.post("/voice/sms/inbound", async (req: Request, res: Response) => {
     await recordConsent(ownerFirmId, from.e164, "granted", "sms_start");
     req.log.info({ firmId: ownerFirmId }, "[voice sms] START recorded");
   }
-  // Everything else: no auto-conversation on the voice number in this phase.
+  // J4: keep the text itself, so a caller who answers a confirmation with a
+  // question is seen. The provider's message id makes a redelivery a no-op;
+  // a message without one is acted on above but cannot be stored safely.
+  // Storage failure never changes the STOP/START outcome recorded above.
+  const sid = params["MessageSid"] ?? params["SmsSid"];
+  if (typeof sid === "string" && sid.length >= 10 && sid.length <= 64 && to) {
+    try {
+      const { storeInboundText, ensureTextContact } = await import("../lib/voiceSms/textThread.js");
+      await ensureTextContact(ownerFirmId, from.e164);
+      await storeInboundText({
+        firmId: ownerFirmId,
+        fromE164: from.e164,
+        toE164: to.e164,
+        body: params["Body"] ?? "",
+        providerMessageSid: sid,
+        keyword,
+      });
+    } catch (err) {
+      req.log.error({ firmId: ownerFirmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[voice sms] inbound text not stored");
+    }
+  }
+  // No auto-reply from the voice number: HELP and STOP replies come from the
+  // carrier's own opt-out handling, and a person answers everything else.
   res.type("text/xml").send(EMPTY_TWIML);
 });
 

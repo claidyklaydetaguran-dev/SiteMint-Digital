@@ -1475,7 +1475,8 @@ check(
 );
 check(
   "a missing or invalid policy fails the publish",
-  /deps\.loadArtifactPolicy\(\);\s*\} catch \{\s*return failure\("publish_disabled"\);/.test(publishServiceSrc),
+  // J6 adds the recording controls to the same pre-claim try-block.
+  /deps\.loadArtifactPolicy\(\);(\s*\/\/[^\n]*)*\s*loadRecordingControls\(\);\s*\} catch \{\s*return failure\("publish_disabled"\);/.test(publishServiceSrc),
 );
 check(
   "the policy is never accepted from a request body or a persisted config",

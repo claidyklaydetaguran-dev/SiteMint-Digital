@@ -39,7 +39,9 @@ export const voiceContacts = pgTable("voice_contacts", {
   uniqueIndex("uq_voice_contacts_firm_phone").on(table.firmId, table.phoneE164),
   index("ix_voice_contacts_firm_last_seen").on(table.firmId, table.lastSeenAt),
   check("ck_voice_contacts_phone_shape", sql`${table.phoneE164} ~ '^\\+[1-9][0-9]{6,14}$'`),
-  check("ck_voice_contacts_origin", sql`${table.origin} IN ('call', 'manual')`),
+  // 0015: 'text' — someone who first reached the business by texting its
+  // voice number, so their replies have a contact to belong to.
+  check("ck_voice_contacts_origin", sql`${table.origin} IN ('call', 'manual', 'text')`),
   check("ck_voice_contacts_email_length", sql`${table.email} IS NULL OR char_length(${table.email}) BETWEEN 3 AND 254`),
   check("ck_voice_contacts_notes_length", sql`${table.notes} IS NULL OR char_length(${table.notes}) <= 2000`),
 ]);
@@ -110,7 +112,9 @@ export const voiceSmsOutbox = pgTable("voice_sms_outbox", {
   uniqueIndex("uq_voice_sms_outbox_dedupe").on(table.dedupeKey),
   index("ix_voice_sms_outbox_firm_status").on(table.firmId, table.status),
   index("ix_voice_sms_outbox_provider_sid").on(table.providerMessageSid),
-  check("ck_voice_sms_outbox_kind", sql`${table.kind} IN ('booking_confirmation', 'missed_call_followup')`),
+  // 0015: appointment_update — the business approved, cancelled or moved an
+  // appointment from the dashboard and the caller had agreed to texts.
+  check("ck_voice_sms_outbox_kind", sql`${table.kind} IN ('booking_confirmation', 'missed_call_followup', 'appointment_update')`),
   check(
     "ck_voice_sms_outbox_status",
     sql`${table.status} IN ('queued', 'sending', 'sent', 'failed', 'blocked_no_consent')`,
@@ -119,3 +123,38 @@ export const voiceSmsOutbox = pgTable("voice_sms_outbox", {
 ]);
 
 export type VoiceSmsOutboxRow = typeof voiceSmsOutbox.$inferSelect;
+
+// 0015: texts callers send TO a voice number. STOP/START/HELP were acted on
+// but nothing else was kept, so a caller who answered a confirmation with a
+// question was never seen. One row per provider message: the provider's
+// message id is unique, which makes a redelivered webhook a no-op. Firm-owned
+// like every voice table; the business is resolved from the number the text
+// was sent to, never from anything in the message.
+export const voiceSmsInbound = pgTable("voice_sms_inbound", {
+  id:                 serial("id").primaryKey(),
+  firmId:             integer("firm_id")
+                        .notNull()
+                        .references(() => intakeFirms.id, { onDelete: "cascade" }),
+  fromE164:           text("from_e164").notNull(),
+  toE164:             text("to_e164").notNull(),
+  body:               text("body").notNull(),
+  providerMessageSid: text("provider_message_sid").notNull(),
+  /** How the channel classified it: stop | start | help | other. */
+  keyword:            text("keyword").notNull(),
+  /** When someone at the business opened it; null while unread. */
+  readAt:             timestamp("read_at", { withTimezone: true }),
+  receivedAt:         timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt:          timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:          timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("uq_voice_sms_inbound_provider_sid").on(table.providerMessageSid),
+  index("ix_voice_sms_inbound_firm_from_received").on(table.firmId, table.fromE164, table.receivedAt),
+  index("ix_voice_sms_inbound_firm_unread").on(table.firmId, table.readAt),
+  check("ck_voice_sms_inbound_from_shape", sql`${table.fromE164} ~ '^\\+[1-9][0-9]{6,14}$'`),
+  check("ck_voice_sms_inbound_to_shape", sql`${table.toE164} ~ '^\\+[1-9][0-9]{6,14}$'`),
+  check("ck_voice_sms_inbound_keyword", sql`${table.keyword} IN ('stop', 'start', 'help', 'other')`),
+  check("ck_voice_sms_inbound_body_length", sql`char_length(${table.body}) <= 1600`),
+  check("ck_voice_sms_inbound_sid_shape", sql`char_length(${table.providerMessageSid}) BETWEEN 10 AND 64`),
+]);
+
+export type VoiceSmsInboundRow = typeof voiceSmsInbound.$inferSelect;

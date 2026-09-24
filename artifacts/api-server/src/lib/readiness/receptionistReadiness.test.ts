@@ -170,3 +170,39 @@ describe("overall state", () => {
     expect(derive(blank).checkedAt).toBe(NOW.toISOString());
   });
 });
+
+describe("publishing that would be refused", () => {
+  it("a business without an active plan is told to activate, not to publish", () => {
+    const r = derive({ ...configured, serviceAccess: "not_activated" });
+    expect(r.state).toBe("not_activated");
+    const published = checkOf({ ...configured, serviceAccess: "not_activated" }, "published");
+    expect(published.state).toBe("attention");
+    expect(published.detail).toMatch(/Not activated yet/);
+    expect(published.fixPath).toBe("/account/billing");
+    expect(r.next).toEqual({ label: "Fix: Published", path: "/account/billing" });
+  });
+
+  it("a suspended or cancelled plan says why, even when already published", () => {
+    const suspended = checkOf({ ...configured, published: true, inSync: true, serviceAccess: "suspended" }, "published");
+    expect(suspended.detail).toMatch(/payment/);
+    expect(derive({ ...configured, published: true, inSync: true, serviceAccess: "canceled" }).state).toBe("not_activated");
+  });
+
+  it("publishing switched off for the platform names SiteMint, not the receptionist setup", () => {
+    const c = checkOf({ ...configured, publishAvailable: false }, "published");
+    expect(c.state).toBe("attention");
+    expect(c.detail).toMatch(/contact SiteMint/);
+    expect(c.detail).not.toBe("Publish your receptionist.");
+  });
+
+  it("an active plan with publishing available changes nothing", () => {
+    const before = derive(configured);
+    const after = derive({ ...configured, serviceAccess: "active", publishAvailable: true });
+    expect(after.state).toBe(before.state);
+    expect(checkOf({ ...configured, serviceAccess: "active", publishAvailable: true }, "published").detail).toBe("Publish your receptionist.");
+  });
+
+  it("an unreadable plan or configuration is not treated as a refusal", () => {
+    expect(derive({ ...configured, serviceAccess: null, publishAvailable: null }).state).toBe(derive(configured).state);
+  });
+});

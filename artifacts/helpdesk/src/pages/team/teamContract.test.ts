@@ -174,6 +174,55 @@ check("nothing claims last-seen or activity per member", strings.every((s) => !/
 eq("team sign-in is recorded as available", TEAM_SIGN_IN_AVAILABLE, true);
 check("nothing still says team members cannot sign in", strings.every((x) => !/cannot sign in|labels for now/i.test(x)));
 
+// ── J8: owner-only actions are not shown to staff ────────────────────────────
+// Each action below is refused for staff by the server (it is not in the API's
+// STAFF_WRITES list). The dashboard must not offer it to them either: every one
+// sits inside an <OwnerOnly> block. A needle outside any block fails.
+{
+  const insideOwnerOnly = (src: string, needle: string): boolean => {
+    const at = src.indexOf(needle);
+    if (at < 0) return false;
+    const open = src.lastIndexOf("<OwnerOnly", at);
+    const close = src.lastIndexOf("</OwnerOnly>", at);
+    return open > close;
+  };
+  const cases: Array<[string, string, string]> = [
+    ["artifacts/helpdesk/src/pages/Settings.tsx", "onSubmit={handleProfileSubmit}", "business profile save"],
+    ["artifacts/helpdesk/src/pages/Assistants.tsx", "<DropdownMenuTrigger asChild>", "duplicate / delete an assistant"],
+    ["artifacts/helpdesk/src/pages/Assistants.tsx", "onClick={() => navigate(NEW_PATH)}", "create an assistant"],
+    ["artifacts/helpdesk/src/pages/AssistantBuilder.tsx", "onClick={openPublishDialog}", "publish"],
+    ["artifacts/helpdesk/src/pages/AssistantBuilder.tsx", "onClick={openSyncDialog}", "apply changes"],
+    ["artifacts/helpdesk/src/pages/AssistantBuilder.tsx", "onClick={handleSave}", "save the assistant"],
+    ["artifacts/helpdesk/src/pages/Calendar.tsx", "onClick={handleConnect}", "connect a calendar"],
+    ["artifacts/helpdesk/src/pages/Calendar.tsx", "{CONNECT.disconnectLabel}", "disconnect the calendar"],
+    ["artifacts/helpdesk/src/pages/calendar/CalendarPicker.tsx", "save.mutate(chosen)", "choose the calendar"],
+    ["artifacts/helpdesk/src/pages/Appointments.tsx", "handleReconcile(); }}", "reconcile the calendar"],
+    ["artifacts/helpdesk/src/pages/PhoneNumber.tsx", "{COPY.pauseLabel}", "pause the number"],
+    ["artifacts/helpdesk/src/pages/PhoneNumber.tsx", "onClick={handleUnpause}", "resume the number"],
+    ["artifacts/helpdesk/src/pages/TransferContacts.tsx", "{COPY.removeLabel}", "remove a transfer contact"],
+    ["artifacts/helpdesk/src/pages/TransferContacts.tsx", "{COPY.editLabel}", "edit a transfer contact"],
+    ["artifacts/helpdesk/src/components/booking/AvailabilitySettingsForm.tsx", "onClick={handleSave}", "save hours and booking rules"],
+    ["artifacts/helpdesk/src/components/booking/AvailabilitySettingsForm.tsx", "PUBLIC_LINK.enableLabel", "turn the public booking link on"],
+    ["artifacts/helpdesk/src/pages/Billing.tsx", "onClick={onUpgrade}", "start a checkout"],
+  ];
+  for (const [file, needle, what] of cases) {
+    check(`staff are not offered: ${what}`, insideOwnerOnly(read(file), needle));
+  }
+  const settings = read("artifacts/helpdesk/src/pages/Settings.tsx");
+  check(
+    "only the business's main account is offered the sign-in address change",
+    /\{viewer\.accountHolder && \(\s*<section className="sd-section" aria-labelledby="sg-email-title">/.test(settings),
+  );
+  const ownerOnly = read("artifacts/helpdesk/src/components/common/OwnerOnly.tsx");
+  check("nothing is rendered while the viewer is still unknown", /if \(viewer\.role === null\) return null;/.test(ownerOnly));
+  // The API's list of what staff MAY do stays the authority: none of the actions
+  // hidden above appears in it.
+  const roles = read("artifacts/api-server/src/lib/receptionistRoles.ts");
+  for (const route of ["PUT /receptionist/account/profile", "POST /receptionist/voice/assistants/:id/publish", "POST /receptionist/voice/numbers/:id/pause"]) {
+    check(`the server also refuses staff: ${route}`, !roles.includes(`"${route}"`));
+  }
+}
+
 console.log(`\n${passed} passed, ${failures.length} failed.`);
 if (failures.length > 0) {
   console.log("\nFailures:");

@@ -13,6 +13,7 @@ import {
   submitAppointmentRequest,
   listAppointmentRequests,
   cancelAppointmentRequestByPublicId,
+  findAppointmentRequestByPublicId,
   saveAvailabilitySettings,
   getSerializedAvailabilitySettings,
   setPublicSlug,
@@ -26,6 +27,7 @@ import { parseDateKey } from "../lib/scheduling/zonedTime.js";
 import { getFreeBusyProvider } from "../lib/calendar/index.js";
 import { removeCalendarEventForRequest } from "../lib/calendar/calendarEventSync.js";
 import { calendarSyncDeps } from "../lib/calendar/calendarSyncDeps.js";
+import { notifyCallerBestEffort } from "../lib/scheduling/callerUpdates.js";
 import type { SchedulingAppointmentRequest } from "@workspace/db/schema/scheduling";
 
 /**
@@ -512,7 +514,7 @@ router.post("/receptionist/availability/requests/:publicId/cancel", requireRecep
     // Read the row BEFORE cancelling: the cancel clears the status we would
     // otherwise use to find the event, and the provider ids live on this row.
     // Firm-scoped, so a foreign publicId is simply absent.
-    const before = (await listAppointmentRequests(firmId)).find((r) => r.publicId === publicId);
+    const before = await findAppointmentRequestByPublicId(firmId, publicId);
 
     const cancelled = await cancelAppointmentRequestByPublicId(firmId, publicId);
     if (!cancelled) {
@@ -536,6 +538,10 @@ router.post("/receptionist/availability/requests/:publicId/cancel", requireRecep
         );
       }
     }
+    // A request the business will not take: the caller hears it was not
+    // confirmed (only if they agreed to texts or email). A held/pending row
+    // was never promised, so this is "declined", not "cancelled".
+    await notifyCallerBestEffort(firmId, before, { stage: "declined" }, (meta, msg) => req.log.info(meta, msg));
     res.json({ ok: true, calendar });
   } catch (err) {
     req.log.error({ err, firmId: req.firmId }, "[receptionist] failed to cancel appointment request");

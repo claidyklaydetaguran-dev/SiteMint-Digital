@@ -42,6 +42,7 @@ import {
   isSupportedVoicePreset,
   lastSyncedNote,
 } from "@/pages/assistants/assistantsContract";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 export type { BuilderTabProps } from "@/pages/assistant-builder/BuilderShell";
 
@@ -750,9 +751,19 @@ export default function AssistantBuilder() {
           publicKey: session.publicKey,
         });
       })
-      .catch(() => {
-        // Never surfaces the response body: it could carry provider text.
-        setTestSessionError(BROWSER_TEST_SESSION_ERROR);
+      .catch((err: unknown) => {
+        // Never surfaces the response body: it could carry provider text. The
+        // one exception is the plan check, whose fixed server wording says
+        // why (not activated, paused for payment, cancelled).
+        const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
+        setTestSessionError(
+          // The message is already bounded and sanitized by the API client.
+          // Deliberately not routed through the publish copy table, which a
+          // build with publishing off must not ship.
+          (apiErr?.code === "service_not_active" || apiErr?.code === "service_access_unavailable") && apiErr.message
+            ? apiErr.message
+            : BROWSER_TEST_SESSION_ERROR,
+        );
       })
       .finally(() => {
         testInFlightRef.current = false;
@@ -883,13 +894,15 @@ export default function AssistantBuilder() {
         contentDisabled={publishMutation.isPending || browserTest.isActive}
         publishControl={
           publishInBuild ? (
-            <PublishButton
-              ref={publishButtonRef}
-              eligible={publishEligible}
-              pending={publishMutation.isPending}
-              disabledReason={publishDisabledReason()}
-              onClick={openPublishDialog}
-            />
+            <OwnerOnly>
+              <PublishButton
+                ref={publishButtonRef}
+                eligible={publishEligible}
+                pending={publishMutation.isPending}
+                disabledReason={publishDisabledReason()}
+                onClick={openPublishDialog}
+              />
+            </OwnerOnly>
           ) : undefined
         }
         testControl={
@@ -904,13 +917,15 @@ export default function AssistantBuilder() {
           ) : undefined
         }
         syncControl={syncInBuild ? (
-          <SyncAssistantButton
-            ref={syncButtonRef}
-            eligible={syncEligible}
-            pending={syncMutation.isPending}
-            disabledReason={syncDisabledReason}
-            onClick={openSyncDialog}
-          />
+          <OwnerOnly>
+            <SyncAssistantButton
+              ref={syncButtonRef}
+              eligible={syncEligible}
+              pending={syncMutation.isPending}
+              disabledReason={syncDisabledReason}
+              onClick={openSyncDialog}
+            />
+          </OwnerOnly>
         ) : undefined}
         testPanel={
           browserTestInBuild ? (
@@ -1066,14 +1081,16 @@ export default function AssistantBuilder() {
                 </p>
               )}
             </div>
-            <Button onClick={handleSave} disabled={saveDisabled}>
-              {updateMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Save className="h-4 w-4" aria-hidden="true" />
-              )}
-              {updateMutation.isPending ? SAVE.saving : SAVE.save}
-            </Button>
+            <OwnerOnly fallback={<StaffReadOnlyNote text="You can look and run a browser test. Only an owner of this business can save, publish or apply changes." />}>
+              <Button onClick={handleSave} disabled={saveDisabled}>
+                {updateMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Save className="h-4 w-4" aria-hidden="true" />
+                )}
+                {updateMutation.isPending ? SAVE.saving : SAVE.save}
+              </Button>
+            </OwnerOnly>
           </div>
         }
       />

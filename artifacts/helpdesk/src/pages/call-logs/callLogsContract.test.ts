@@ -162,19 +162,22 @@ section("Premise — what the voice-calls API actually offers");
 
 const ROUTER_CALLS = routeSrc.match(/router\.(get|post|put|patch|delete)\("([^"]+)"/g) ?? [];
 
-eq("the voice-calls router exposes four authenticated read endpoints", ROUTER_CALLS.length, 4);
+// J6 added exactly one writer: an owner deleting one call's recording.
+eq("the voice-calls router exposes four reads and one recording delete", ROUTER_CALLS.length, 5);
 
-check(
-  "every voice-calls endpoint is a GET — the API this route reads has no writer",
-  ROUTER_CALLS.every((c) => c.startsWith("router.get(")),
+eq(
+  "the only non-GET endpoint is the recording delete",
+  ROUTER_CALLS.filter((c) => !c.startsWith("router.get(")),
+  ['router.delete("/receptionist/voice/calls/:callId/recording"'],
 );
 
 eq(
-  "the router includes the owned-call recording read",
+  "the router includes the owned-call recording read and delete",
   ROUTER_CALLS.map((c) => /"([^"]+)"/.exec(c)![1]).sort(),
   [
     "/receptionist/voice/calls",
     "/receptionist/voice/calls/:callId",
+    "/receptionist/voice/calls/:callId/recording",
     "/receptionist/voice/calls/:callId/recording",
     "/receptionist/voice/provider-status",
   ],
@@ -182,8 +185,7 @@ eq(
 
 check(
   "every voice-calls endpoint requires a receptionist session",
-  (routeSrc.match(/router\.get\(/g) ?? []).length ===
-    (routeSrc.match(/requireReceptionistAuth/g) ?? []).length - 1,
+  ROUTER_CALLS.length === (routeSrc.match(/requireReceptionistAuth/g) ?? []).length - 1,
 );
 
 check(

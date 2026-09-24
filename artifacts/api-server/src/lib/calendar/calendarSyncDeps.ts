@@ -20,7 +20,8 @@ import {
 import { GoogleCalendarEventWriter } from "./eventWriter.js";
 import { getActiveConnection, touchFreebusy, updateAccessToken } from "./calendarConnectionsRepository.js";
 import {
-  listAppointmentRequests,
+  findAppointmentRequestByPublicId,
+  countConflictsForRequest,
   submitAppointmentRequest,
   cancelAppointmentRequestByPublicId,
 } from "../scheduling/schedulingRepository.js";
@@ -43,8 +44,8 @@ export function calendarSyncDeps(): BookedLifecycleDeps {
   return {
     getActiveConnection,
     writer: new GoogleCalendarEventWriter({ updateAccessToken }),
-    findRequest: async (firmId, publicId) =>
-      (await listAppointmentRequests(firmId)).find((r) => r.publicId === publicId),
+    findRequest: findAppointmentRequestByPublicId,
+    countConflicts: (firmId, request) => countConflictsForRequest(firmId, request, new Date(), getFreeBusyProvider()),
     markBooked: markBookedInDb,
     // A successful write is evidence the connection works, and is recorded as
     // such. Without it the Calendar page goes on saying "Connected, not yet

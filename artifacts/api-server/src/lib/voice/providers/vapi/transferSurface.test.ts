@@ -14,7 +14,7 @@ const contract = readFileSync(
   "utf8",
 );
 
-const STATES = ["none", "requested", "accepted", "connected", "failed", "unknown"];
+const STATES = ["none", "requested", "accepted", "connected", "failed", "unknown", "declined"];
 
 describe("transfer copy", () => {
   it("has wording for every state the server can produce", () => {
@@ -30,8 +30,11 @@ describe("transfer copy", () => {
   });
 
   it("explains that an unknown outcome is a limit, not a fault", () => {
-    expect(contract).toMatch(/the assistant leaves it/i);
-    expect(contract).toMatch(/most this can honestly say/i);
+    // Warm transfer (J5): a missed contact brings the assistant back; after a
+    // handover nothing more is observable, and the copy says exactly that.
+    expect(contract).toMatch(/hands the call over and leaves it/i);
+    expect(contract).toMatch(/see whether the two of you spoke/i);
+    expect(contract).toMatch(/comes back on the line and offers to take a message/i);
   });
 
   it("keeps the blind-transfer limitation stated", () => {

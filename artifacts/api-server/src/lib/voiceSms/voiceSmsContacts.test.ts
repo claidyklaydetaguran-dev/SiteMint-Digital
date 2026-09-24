@@ -155,7 +155,9 @@ describe("twilio signature + inbound keywords", () => {
     expect(classifyInboundKeyword(" STOP ")).toBe("stop");
     expect(classifyInboundKeyword("unsubscribe")).toBe("stop");
     expect(classifyInboundKeyword("Start")).toBe("start");
-    expect(classifyInboundKeyword("yes")).toBe("start");
+    // J4: "yes" is conversation, not consent — it must not re-subscribe an opted-out caller.
+    expect(classifyInboundKeyword("yes")).toBe("other");
+    expect(classifyInboundKeyword("HELP")).toBe("help");
     expect(classifyInboundKeyword("please stop calling")).toBe("other");
     expect(classifyInboundKeyword(undefined)).toBe("other");
   });
