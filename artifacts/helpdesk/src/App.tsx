@@ -205,9 +205,9 @@ function Router() {
 
             <Route path={ROUTES.availability} component={Availability} />
             <Route path={ROUTES.appointmentTypes}>
-              {/* Availability reads its initial tab from `?tab=types` — see
-                  `pages/availability/availabilityContract.ts`. */}
-              {() => <InSpaRedirect to={`${ROUTES.availability}?tab=types`} />}
+              {/* The Appointment types tab of Availability, at its own address
+                  so the navigation and title name it (was a ?tab=types redirect). */}
+              {() => <Availability initialTab="types" />}
             </Route>
             <Route path={ROUTES.calendar} component={Calendar} />
             <Route path={ROUTES.appointments} component={Appointments} />
