@@ -8,7 +8,7 @@ vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
 
 import { readFileSync } from "node:fs";
 import { composeRecordedGreeting, isPastRetention, loadRecordingControls, mayPlayRecording } from "./recordingControls.js";
-import { deleteCallRecording, runRecordingRetentionOnce, type RetentionSweepDeps } from "./recordingDeletion.js";
+import { deleteCallRecording, runRecordingRetentionOnce, type RecordingDeletionDeps, type RetentionSweepDeps } from "./recordingDeletion.js";
 import { extractPublishableAssistantConfig } from "../voicePublishing/persistedConfigMapper.js";
 import { describeEnvContract } from "../envContract.js";
 
@@ -90,9 +90,7 @@ describe("the disclosure is the first thing said", () => {
 describe("deleting one call's recording", () => {
   const baseDeps = () => {
     const order: string[] = [];
-    return {
-      order,
-      deps: {
+    const deps: RecordingDeletionDeps = {
         deleteAtProvider: async (id: string) => {
           order.push("provider:" + id);
           return "deleted" as const;
@@ -104,8 +102,8 @@ describe("deleting one call's recording", () => {
         audit: async (_f: number, _id: string, reason: string) => {
           order.push("audit:" + reason);
         },
-      },
     };
+    return { order, deps };
   };
 
   it("deletes at the provider first, then scrubs here, then audits", async () => {

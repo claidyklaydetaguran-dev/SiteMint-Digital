@@ -57,24 +57,27 @@ is fixed or closed.
 |---|---|---|---|---|---|
 | C-0 | C | 1/7 | Nothing tied publishing or browser test calls to a plan: with open registration any sign-up could publish and start paid test calls once publishing is configured | code + production flags | Fixed on branch: `VOICE_SERVICE_ACCESS_REQUIRED` gate (publish, sync, browser test) + readiness `not_activated` |
 | C-0b | H | 1/8 | Production publish always fails (`publish_disabled`, missing VOICE_ARTIFACT_POLICY) while Setup tells the owner to publish | production flags + code | Fixed on branch: readiness names the real blocker; config pending |
-| C-1 | C | 3 | Voice booking path never checks Google busy times (`toolDispatcher.ts` passes no calendar provider); approval never re-checks | audit | Open |
-| C-2 | C | 3 | Overlapping bookings with different start times can both succeed (lock keyed on exact start, no overlap constraint) | audit | Open |
-| C-3 | C | 4 | No caller text can ever be sent: `callerConsented: false` hard-coded; consent never captured | audit | Open |
-| C-4 | C | 7/8 | Usage page can say "paused because the usage limit was reached" when nothing pauses service | audit | Open |
-| H-1 | H | 3 | Callers cannot cancel/reschedule a booked appointment and are told the reference wasn't found | audit | Open |
-| H-2 | H | 3 | Two simultaneous approvals can delete the only Google event while the row stays booked | audit | Open |
+| C-1 | C | 3 | Voice booking path never checked Google busy times (`toolDispatcher.ts` passed no calendar provider) | audit, confirmed in code | Fixed on branch (9c794879): offered times and the in-lock re-check both merge the connected calendar; dashboard approval still does not re-check (M-5) |
+| C-2 | C | 3 | Overlapping bookings with different start times could both succeed (lock keyed on exact start) | audit, confirmed in code | Fixed on branch (9c794879): one booking lock per business; real-DB race test pending |
+| C-3 | C | 4 | No caller text could ever be sent: consent was never captured on a call | audit, confirmed in code | Fixed on branch: `smsConsent` on book_appointment, true only on the caller's yes at a read-back number; live send blocked on owner (voice Twilio credentials, recipient, cap) |
+| C-4 | C | 7/8 | Usage page said "paused because the usage limit was reached" when nothing pauses service | audit, confirmed | Fixed on branch: says minutes used up, calls still answered |
+| H-1 | H | 3 | Callers could not cancel/move a booked appointment ("reference not found") | audit, confirmed | Fixed on branch: booked cancel via the calendar service; a move releases the original only after the new time is confirmed |
+| H-2 | H | 3 | Two simultaneous approvals could delete the only Google event while the row stayed booked | audit, confirmed | Fixed on branch: the loser keeps an event the winner stamped |
 | H-3 | H | 3 | Owner approve/cancel/reschedule never notifies the caller | audit | Open |
 | H-4 | H | 3 | Owner reschedule frees the old time and deletes its event before the new time is confirmed | audit | Open |
-| H-5 | H | 5 | Refused transfers are recorded as "unknown" instead of "refused, message offered" | audit | Open |
-| H-6 | H | 5 | Blind transfer: busy/no-answer loses the caller, no message taken | audit | Open |
-| H-7 | H | 7 | Voice billing webhook records the event id before applying it: a failed apply makes Stripe's retry a "duplicate" and the event is lost | audit | Open |
+| H-5 | H | 5 | Refused transfers were recorded as "unknown" | audit, confirmed | Fixed on branch: new `declined` state, "Not put through", with the reason |
+| H-6 | H | 5 | Blind transfer: busy/no-answer lost the caller | audit, confirmed | Fixed on branch: provider warm transfer with a fallback that keeps the assistant on the line; needs the live transfer test |
+| H-7 | H | 7 | Voice billing webhook lost an event whose apply failed | audit, confirmed | Fixed on branch: ledger row released; a lost race answers 500 |
 | H-8 | H | 7 | Checkout (`receptionistBilling.ts`, protected) never creates the voice subscription; "Paid" never reflects grace/suspended/cancelled | audit | Open (protected file: owner must name it to change) |
-| H-9 | H | 4 | No HELP reply; "yes" re-subscribes an opted-out caller; no status callback requested; no send cap | audit | Open |
-| H-10 | H | 4 | Voice SMS webhook signature URL built from `req.protocol` without trust proxy — real Twilio requests may 401 | audit | Open |
+| H-9 | H | 4 | "yes" re-subscribed an opted-out caller; no status callback; no send cap | audit, confirmed | Fixed on branch: START/UNSTOP only; StatusCallback per send; daily caps 20/business, 100/total (defaults); HELP left to Twilio's built-in opt-out replies |
+| H-10 | H | 4 | Voice SMS signature URL was built from the request protocol behind the TLS proxy | audit, confirmed | Fixed on branch: verified against VOICE_SMS_PUBLIC_ORIGIN / the VOICE_SERVER_URL origin |
 | M-1 | M | 8 | Staff see owner-only controls on several pages and learn only from a 403 | audit | Open |
 | M-2 | M | 3 | `findRequest` scans only the 200 newest requests | audit | Open |
 | M-3 | M | 3 | Expired holds are never expired | audit | Open |
 | M-4 | M | 5 | Deprecated `/receptionist/voice/transfer-destinations` routes still live | audit | Open |
+| M-5 | M | 3 | Dashboard approval of an older pending request does not re-check the calendar | audit | Open |
+| M-6 | M | 6 | No recording retention, deletion or access rule existed | audit, confirmed | Fixed on branch: required disclosure/retention/access when policy is `full`; owner Delete; hourly retention sweep. Production stays `none` |
+| M-7 | M | 4 | Inbound replies other than STOP/START are not stored or shown | audit | Open (needs a table: reviewed migration) |
 
 ## 4. Owner decisions (asked only when a test is ready)
 
