@@ -66,13 +66,13 @@ export default function AdminLogin() {
     : Lock;
 
   return (
-    <div className="min-h-screen bg-foreground flex items-center justify-center px-4">
+    <div className="min-h-screen ops-auth flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-10">
           <SiteMintLogo variant="ops" iconSize={36} />
         </div>
 
-        <div className="bg-background rounded-xl p-8 shadow-2xl border border-white/10">
+        <div className="ops-auth__card bg-background rounded-xl p-8 border border-border">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
               <Icon className="w-5 h-5 text-primary" />

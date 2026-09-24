@@ -25,6 +25,8 @@
 
 import { Suspense, type ReactNode } from "react";
 import "@/styles/mint-operations.css";
+// SiteMint Workspace for staff (Mint Clarity) — the authoritative CRM layer.
+import "@/styles/crm-workspace.css";
 import { useLocation } from "wouter";
 import { RouteErrorBoundary } from "@/components/route/RouteErrorBoundary";
 import { RouteFallback } from "@/components/route/RouteFallback";

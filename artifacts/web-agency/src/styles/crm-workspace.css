@@ -1,0 +1,424 @@
+/**
+ * SiteMint Workspace for staff — the Mint Clarity design layer for the CRM
+ * (2026-09-24). Scoped to `.v2-dashboard-shell`, imported last by the CRM's
+ * DashboardShell, so the public site is untouched.
+ *
+ * Same identity as the customer workspace (helpdesk styles/workspace.css):
+ * warm white canvas, soft mint surfaces, deep forest text and actions,
+ * restrained accents, DM Sans. Staff views stay denser than the customer
+ * workspace, so sizes are a step smaller.
+ *
+ * How it works: the CRM is written in Tailwind utilities, and Tailwind emits
+ * every colour utility as `var(--color-<hue>-<shade>)`. Re-pointing those
+ * variables inside this scope folds the scattered decorative hues into four
+ * families without touching 37,000 lines of markup:
+ *
+ *   mint   (teal, emerald, green, cyan, lime)   brand and positive states
+ *   sage   (blue, sky, indigo, violet, purple,  informational states, so
+ *           fuchsia, pink)                        status distinctions survive
+ *   amber  (amber, orange, yellow)              attention
+ *   red    (unchanged)                           danger
+ *   and the neutral palettes become the green-grey of the brand.
+ */
+
+.v2-dashboard-shell.v2-dashboard-shell.v2-dashboard-shell,
+body:has(.v2-dashboard-shell) {
+  /* Mint Clarity */
+  --cw-forest: #173f35;
+  --cw-forest-hover: #275b49;
+  --cw-ink: #203c34;
+  --cw-green: #28745c;
+  --cw-muted: #5a7066;
+  --cw-faint: #7d9188;
+  --cw-line: #dbe6de;
+  --cw-line-strong: #c2d5c8;
+  --cw-canvas: #f9fbf8;
+  --cw-rail: #f2f7f1;
+  --cw-surface: #ffffff;
+  --cw-surface-soft: #f4f8f3;
+  --cw-mint: #e4f2e9;
+  --cw-mint-strong: #cfe8d8;
+  --cw-shadow: 0 1px 2px rgb(23 63 53 / 0.04), 0 10px 26px -18px rgb(23 63 53 / 0.18);
+
+  /* shadcn roles */
+  --background: 100 23% 98%;
+  --foreground: 163 30% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 163 30% 18%;
+  --card-border: 137 17% 88%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 163 30% 18%;
+  --primary: 164 46% 17%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 142 30% 92%;
+  --secondary-foreground: 164 46% 17%;
+  --muted: 105 20% 96%;
+  --muted-foreground: 153 11% 38%;
+  --accent: 142 30% 92%;
+  --accent-foreground: 164 46% 17%;
+  --border: 137 17% 88%;
+  --input: 138 17% 80%;
+  --ring: 161 49% 31%;
+  --crm-sidebar: 105 24% 96%;
+  --crm-header: 0 0% 100%;
+  --crm-content: 100 23% 98%;
+
+  /* mint family */
+  --cw-m50: #f3f9f5; --cw-m100: #e4f2e9; --cw-m200: #cfe8d8; --cw-m300: #a9d3b9; --cw-m400: #6fb391;
+  --cw-m500: #3e9978; --cw-m600: #28745c; --cw-m700: #22654f; --cw-m800: #1d5242; --cw-m900: #173f35; --cw-m950: #0f2b24;
+  /* sage family */
+  --cw-s50: #f4f7f6; --cw-s100: #e8eeec; --cw-s200: #d3dfdb; --cw-s300: #b3c6c0; --cw-s400: #8aa59c;
+  --cw-s500: #6a877d; --cw-s600: #54706a; --cw-s700: #445c56; --cw-s800: #384b47; --cw-s900: #2d3c39; --cw-s950: #1c2624;
+  /* amber family */
+  --cw-a50: #fdf8ec; --cw-a100: #fbefd2; --cw-a200: #f5dca3; --cw-a300: #ecc26e; --cw-a400: #dfa443;
+  --cw-a500: #c9892a; --cw-a600: #a86d1d; --cw-a700: #86541a; --cw-a800: #6c441a; --cw-a900: #5a3a19; --cw-a950: #3a2410;
+  /* green-grey neutrals */
+  --cw-g50: #f7f9f7; --cw-g100: #eef2ef; --cw-g200: #dfe6e1; --cw-g300: #c7d2ca; --cw-g400: #9aa9a0;
+  --cw-g500: #6f7f76; --cw-g600: #56655d; --cw-g700: #435048; --cw-g800: #2f3a34; --cw-g900: #1f2823; --cw-g950: #121815;
+
+  font-family: "DM Sans", "DM Sans Fallback", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+  color: var(--cw-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tailwind palette remap. One block per shade keeps it scannable. Also set on
+   body while the staff shell is mounted, so dialogs, menus and toasts that
+   render in a portal outside the shell inherit the same palette. */
+.v2-dashboard-shell.v2-dashboard-shell.v2-dashboard-shell,
+body:has(.v2-dashboard-shell) {
+  --color-teal-50: var(--cw-m50); --color-teal-100: var(--cw-m100); --color-teal-200: var(--cw-m200); --color-teal-300: var(--cw-m300); --color-teal-400: var(--cw-m400); --color-teal-500: var(--cw-m500); --color-teal-600: var(--cw-m600); --color-teal-700: var(--cw-m700); --color-teal-800: var(--cw-m800); --color-teal-900: var(--cw-m900); --color-teal-950: var(--cw-m950);
+  --color-emerald-50: var(--cw-m50); --color-emerald-100: var(--cw-m100); --color-emerald-200: var(--cw-m200); --color-emerald-300: var(--cw-m300); --color-emerald-400: var(--cw-m400); --color-emerald-500: var(--cw-m500); --color-emerald-600: var(--cw-m600); --color-emerald-700: var(--cw-m700); --color-emerald-800: var(--cw-m800); --color-emerald-900: var(--cw-m900); --color-emerald-950: var(--cw-m950);
+  --color-green-50: var(--cw-m50); --color-green-100: var(--cw-m100); --color-green-200: var(--cw-m200); --color-green-300: var(--cw-m300); --color-green-400: var(--cw-m400); --color-green-500: var(--cw-m500); --color-green-600: var(--cw-m600); --color-green-700: var(--cw-m700); --color-green-800: var(--cw-m800); --color-green-900: var(--cw-m900); --color-green-950: var(--cw-m950);
+  --color-cyan-50: var(--cw-m50); --color-cyan-100: var(--cw-m100); --color-cyan-200: var(--cw-m200); --color-cyan-300: var(--cw-m300); --color-cyan-400: var(--cw-m400); --color-cyan-500: var(--cw-m500); --color-cyan-600: var(--cw-m600); --color-cyan-700: var(--cw-m700); --color-cyan-800: var(--cw-m800); --color-cyan-900: var(--cw-m900); --color-cyan-950: var(--cw-m950);
+  --color-lime-50: var(--cw-m50); --color-lime-100: var(--cw-m100); --color-lime-200: var(--cw-m200); --color-lime-300: var(--cw-m300); --color-lime-400: var(--cw-m400); --color-lime-500: var(--cw-m500); --color-lime-600: var(--cw-m600); --color-lime-700: var(--cw-m700); --color-lime-800: var(--cw-m800); --color-lime-900: var(--cw-m900); --color-lime-950: var(--cw-m950);
+
+  --color-blue-50: var(--cw-s50); --color-blue-100: var(--cw-s100); --color-blue-200: var(--cw-s200); --color-blue-300: var(--cw-s300); --color-blue-400: var(--cw-s400); --color-blue-500: var(--cw-s500); --color-blue-600: var(--cw-s600); --color-blue-700: var(--cw-s700); --color-blue-800: var(--cw-s800); --color-blue-900: var(--cw-s900); --color-blue-950: var(--cw-s950);
+  --color-sky-50: var(--cw-s50); --color-sky-100: var(--cw-s100); --color-sky-200: var(--cw-s200); --color-sky-300: var(--cw-s300); --color-sky-400: var(--cw-s400); --color-sky-500: var(--cw-s500); --color-sky-600: var(--cw-s600); --color-sky-700: var(--cw-s700); --color-sky-800: var(--cw-s800); --color-sky-900: var(--cw-s900); --color-sky-950: var(--cw-s950);
+  --color-indigo-50: var(--cw-s50); --color-indigo-100: var(--cw-s100); --color-indigo-200: var(--cw-s200); --color-indigo-300: var(--cw-s300); --color-indigo-400: var(--cw-s400); --color-indigo-500: var(--cw-s500); --color-indigo-600: var(--cw-s600); --color-indigo-700: var(--cw-s700); --color-indigo-800: var(--cw-s800); --color-indigo-900: var(--cw-s900); --color-indigo-950: var(--cw-s950);
+  --color-violet-50: var(--cw-s50); --color-violet-100: var(--cw-s100); --color-violet-200: var(--cw-s200); --color-violet-300: var(--cw-s300); --color-violet-400: var(--cw-s400); --color-violet-500: var(--cw-s500); --color-violet-600: var(--cw-s600); --color-violet-700: var(--cw-s700); --color-violet-800: var(--cw-s800); --color-violet-900: var(--cw-s900); --color-violet-950: var(--cw-s950);
+  --color-purple-50: var(--cw-s50); --color-purple-100: var(--cw-s100); --color-purple-200: var(--cw-s200); --color-purple-300: var(--cw-s300); --color-purple-400: var(--cw-s400); --color-purple-500: var(--cw-s500); --color-purple-600: var(--cw-s600); --color-purple-700: var(--cw-s700); --color-purple-800: var(--cw-s800); --color-purple-900: var(--cw-s900); --color-purple-950: var(--cw-s950);
+  --color-fuchsia-50: var(--cw-s50); --color-fuchsia-100: var(--cw-s100); --color-fuchsia-200: var(--cw-s200); --color-fuchsia-300: var(--cw-s300); --color-fuchsia-400: var(--cw-s400); --color-fuchsia-500: var(--cw-s500); --color-fuchsia-600: var(--cw-s600); --color-fuchsia-700: var(--cw-s700); --color-fuchsia-800: var(--cw-s800); --color-fuchsia-900: var(--cw-s900); --color-fuchsia-950: var(--cw-s950);
+  --color-pink-50: var(--cw-s50); --color-pink-100: var(--cw-s100); --color-pink-200: var(--cw-s200); --color-pink-300: var(--cw-s300); --color-pink-400: var(--cw-s400); --color-pink-500: var(--cw-s500); --color-pink-600: var(--cw-s600); --color-pink-700: var(--cw-s700); --color-pink-800: var(--cw-s800); --color-pink-900: var(--cw-s900); --color-pink-950: var(--cw-s950);
+
+  --color-amber-50: var(--cw-a50); --color-amber-100: var(--cw-a100); --color-amber-200: var(--cw-a200); --color-amber-300: var(--cw-a300); --color-amber-400: var(--cw-a400); --color-amber-500: var(--cw-a500); --color-amber-600: var(--cw-a600); --color-amber-700: var(--cw-a700); --color-amber-800: var(--cw-a800); --color-amber-900: var(--cw-a900); --color-amber-950: var(--cw-a950);
+  --color-orange-50: var(--cw-a50); --color-orange-100: var(--cw-a100); --color-orange-200: var(--cw-a200); --color-orange-300: var(--cw-a300); --color-orange-400: var(--cw-a400); --color-orange-500: var(--cw-a500); --color-orange-600: var(--cw-a600); --color-orange-700: var(--cw-a700); --color-orange-800: var(--cw-a800); --color-orange-900: var(--cw-a900); --color-orange-950: var(--cw-a950);
+  --color-yellow-50: var(--cw-a50); --color-yellow-100: var(--cw-a100); --color-yellow-200: var(--cw-a200); --color-yellow-300: var(--cw-a300); --color-yellow-400: var(--cw-a400); --color-yellow-500: var(--cw-a500); --color-yellow-600: var(--cw-a600); --color-yellow-700: var(--cw-a700); --color-yellow-800: var(--cw-a800); --color-yellow-900: var(--cw-a900); --color-yellow-950: var(--cw-a950);
+
+  --color-gray-50: var(--cw-g50); --color-gray-100: var(--cw-g100); --color-gray-200: var(--cw-g200); --color-gray-300: var(--cw-g300); --color-gray-400: var(--cw-g400); --color-gray-500: var(--cw-g500); --color-gray-600: var(--cw-g600); --color-gray-700: var(--cw-g700); --color-gray-800: var(--cw-g800); --color-gray-900: var(--cw-g900); --color-gray-950: var(--cw-g950);
+  --color-slate-50: var(--cw-g50); --color-slate-100: var(--cw-g100); --color-slate-200: var(--cw-g200); --color-slate-300: var(--cw-g300); --color-slate-400: var(--cw-g400); --color-slate-500: var(--cw-g500); --color-slate-600: var(--cw-g600); --color-slate-700: var(--cw-g700); --color-slate-800: var(--cw-g800); --color-slate-900: var(--cw-g900); --color-slate-950: var(--cw-g950);
+  --color-zinc-50: var(--cw-g50); --color-zinc-100: var(--cw-g100); --color-zinc-200: var(--cw-g200); --color-zinc-300: var(--cw-g300); --color-zinc-400: var(--cw-g400); --color-zinc-500: var(--cw-g500); --color-zinc-600: var(--cw-g600); --color-zinc-700: var(--cw-g700); --color-zinc-800: var(--cw-g800); --color-zinc-900: var(--cw-g900); --color-zinc-950: var(--cw-g950);
+  --color-neutral-50: var(--cw-g50); --color-neutral-100: var(--cw-g100); --color-neutral-200: var(--cw-g200); --color-neutral-300: var(--cw-g300); --color-neutral-400: var(--cw-g400); --color-neutral-500: var(--cw-g500); --color-neutral-600: var(--cw-g600); --color-neutral-700: var(--cw-g700); --color-neutral-800: var(--cw-g800); --color-neutral-900: var(--cw-g900); --color-neutral-950: var(--cw-g950);
+  --color-stone-50: var(--cw-g50); --color-stone-100: var(--cw-g100); --color-stone-200: var(--cw-g200); --color-stone-300: var(--cw-g300); --color-stone-400: var(--cw-g400); --color-stone-500: var(--cw-g500); --color-stone-600: var(--cw-g600); --color-stone-700: var(--cw-g700); --color-stone-800: var(--cw-g800); --color-stone-900: var(--cw-g900); --color-stone-950: var(--cw-g950);
+}
+
+/* ── Environment strip ───────────────────────────────────────────────────── */
+
+.v2-dashboard-shell.v2-dashboard-shell.v2-dashboard-shell .v3o-bar {
+  min-height: 30px;
+  background: var(--cw-mint);
+  color: var(--cw-ink);
+  border-bottom: 1px solid var(--cw-mint-strong);
+  font-size: 12px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.v2-dashboard-shell .bg-crm-header {
+  height: 60px;
+  background: var(--cw-surface);
+  border-bottom: 1px solid var(--cw-line);
+  color: var(--cw-ink);
+}
+.v2-dashboard-shell .bg-crm-header [class*="text-white"] {
+  color: var(--cw-muted);
+}
+.v2-dashboard-shell .bg-crm-header button:hover [class*="text-white"],
+.v2-dashboard-shell .bg-crm-header button:hover {
+  color: var(--cw-ink);
+}
+.v2-dashboard-shell .bg-crm-header input {
+  height: 38px;
+  border: 1px solid var(--cw-line);
+  border-radius: 10px;
+  background: var(--cw-surface-soft);
+  color: var(--cw-ink);
+  font-size: 14px;
+}
+.v2-dashboard-shell .bg-crm-header input::placeholder {
+  color: var(--cw-faint);
+}
+.v2-dashboard-shell .bg-crm-header input:focus {
+  background: var(--cw-surface);
+  border-color: var(--cw-green);
+  box-shadow: 0 0 0 3px rgb(40 116 92 / 0.16);
+  outline: none;
+}
+.v2-dashboard-shell .bg-crm-header button[class*="rounded"] {
+  color: var(--cw-muted);
+}
+.v2-dashboard-shell .bg-crm-header button[class*="rounded"]:hover {
+  background: var(--cw-mint);
+  color: var(--cw-forest);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+
+.v2-dashboard-shell .bg-crm-sidebar {
+  background: var(--cw-rail);
+  border-right: 1px solid var(--cw-line);
+}
+.v2-dashboard-shell .crm-sidenav {
+  padding: 12px 10px;
+  gap: 6px;
+}
+.v2-dashboard-shell .crm-navgroup__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cw-faint);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.v2-dashboard-shell .crm-navgroup__toggle:hover {
+  color: var(--cw-ink);
+  background: var(--cw-mint);
+}
+.v2-dashboard-shell .crm-navgroup[data-active="true"] .crm-navgroup__toggle {
+  color: var(--cw-forest);
+}
+.v2-dashboard-shell .crm-navgroup__icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+}
+.v2-dashboard-shell .crm-navgroup__label {
+  flex: 1 1 auto;
+  text-align: left;
+}
+.v2-dashboard-shell .crm-navgroup__chevron {
+  width: 13px;
+  height: 13px;
+  transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+.v2-dashboard-shell .crm-navgroup__toggle[aria-expanded="false"] .crm-navgroup__chevron {
+  transform: rotate(-90deg);
+}
+.v2-dashboard-shell .crm-navgroup__items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px;
+}
+.v2-dashboard-shell .crm-navitem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 7px 10px 7px 12px;
+  border-radius: 9px;
+  color: var(--cw-ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+.v2-dashboard-shell .crm-navitem:hover {
+  background: var(--cw-mint);
+}
+.v2-dashboard-shell .crm-navitem__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--cw-muted);
+}
+.v2-dashboard-shell .crm-navitem__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v2-dashboard-shell .crm-navitem__ext {
+  width: 12px;
+  height: 12px;
+  color: var(--cw-faint);
+}
+.v2-dashboard-shell .crm-navitem[data-active="true"] {
+  background: var(--cw-surface);
+  color: var(--cw-forest);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--cw-line), 0 1px 2px rgb(23 63 53 / 0.06);
+}
+.v2-dashboard-shell .crm-navitem[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--cw-forest);
+}
+.v2-dashboard-shell .crm-navitem[data-active="true"] .crm-navitem__icon {
+  color: var(--cw-forest);
+}
+.v2-dashboard-shell .crm-navitem[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.v2-dashboard-shell .crm-navitem__soon {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--cw-mint);
+  color: var(--cw-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.v2-dashboard-shell [data-testid="crm-sidebar-nav"] [class*="text-white"] {
+  color: var(--cw-muted);
+}
+
+/* ── Content area and page rhythm ────────────────────────────────────────── */
+
+.v2-dashboard-shell .bg-crm-content,
+.v2-dashboard-shell main {
+  background: var(--cw-canvas);
+}
+.v2-dashboard-shell main h1 {
+  font-family: inherit;
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--cw-ink);
+}
+.v2-dashboard-shell main h2 {
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  color: var(--cw-ink);
+}
+.v2-dashboard-shell main h1 + p,
+.v2-dashboard-shell main h1 ~ p.text-muted-foreground {
+  color: var(--cw-muted);
+}
+
+/* Breadcrumb trail above each page */
+.v2-dashboard-shell nav[aria-label="Breadcrumb"] {
+  font-size: 12.5px;
+  color: var(--cw-muted);
+}
+.v2-dashboard-shell nav[aria-label="Breadcrumb"] span:last-child {
+  color: var(--cw-ink);
+  font-weight: 600;
+}
+
+/* Cards: one radius, one border, one soft shadow. */
+.v2-dashboard-shell main .rounded-xl.border,
+.v2-dashboard-shell main .rounded-2xl.border,
+.v2-dashboard-shell main .rounded-lg.border.bg-card,
+.v2-dashboard-shell main .bg-card.border {
+  border-color: var(--cw-line);
+  border-radius: 14px;
+  box-shadow: var(--cw-shadow);
+}
+
+/* Tables: calm headers, comfortable rows, readable on any width. */
+.v2-dashboard-shell main table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.v2-dashboard-shell main thead th {
+  background: var(--cw-surface-soft);
+  color: var(--cw-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--cw-line);
+}
+.v2-dashboard-shell main tbody tr {
+  transition: background-color 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+.v2-dashboard-shell main tbody tr:hover {
+  background: var(--cw-surface-soft);
+}
+.v2-dashboard-shell main tbody td {
+  border-bottom: 1px solid var(--cw-line);
+}
+
+/* Form controls */
+.v2-dashboard-shell main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.v2-dashboard-shell main select,
+.v2-dashboard-shell main textarea {
+  border-color: var(--cw-line-strong);
+  border-radius: 9px;
+  color: var(--cw-ink);
+}
+.v2-dashboard-shell main input:focus-visible,
+.v2-dashboard-shell main select:focus-visible,
+.v2-dashboard-shell main textarea:focus-visible {
+  outline: none;
+  border-color: var(--cw-green);
+  box-shadow: 0 0 0 3px rgb(40 116 92 / 0.16);
+}
+
+/* Primary actions are forest; nothing else competes. */
+.v2-dashboard-shell .bg-primary {
+  background-color: var(--cw-forest);
+}
+.v2-dashboard-shell .hover\:bg-primary\/90:hover {
+  background-color: var(--cw-forest-hover);
+}
+
+/* Focus ring everywhere in the staff workspace */
+.v2-dashboard-shell :focus-visible {
+  outline: 3px solid var(--cw-green);
+  outline-offset: 2px;
+}
+
+/* ── Sign-in and activation (light, matching the public auth pages) ─────── */
+
+.v2-dashboard-shell .ops-auth {
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, rgb(207 232 216 / 0.7), transparent 70%),
+    var(--cw-canvas);
+}
+.v2-dashboard-shell .ops-auth__card {
+  border-color: var(--cw-line);
+  border-radius: 18px;
+  box-shadow: 0 2px 4px rgb(23 63 53 / 0.04), 0 24px 48px -28px rgb(23 63 53 / 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-dashboard-shell *,
+  .v2-dashboard-shell *::before,
+  .v2-dashboard-shell *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+/* ── Page width consistency ──────────────────────────────────────────────
+   Some CRM pages centred a narrow column while the rest used the full width,
+   so the title jumped left and right between screens. The outermost
+   max-width container of a page now starts at the same left edge as every
+   other page and shares one generous maximum. Overlays (fixed containers)
+   are excluded, so dialogs keep their own centring and width. */
+.v2-dashboard-shell main .mx-auto[class*="max-w-"]:not(main .mx-auto[class*="max-w-"] *):not(.fixed *):not([role="dialog"] *) {
+  max-width: min(100%, 1320px);
+  margin-left: 0;
+  margin-right: auto;
+}

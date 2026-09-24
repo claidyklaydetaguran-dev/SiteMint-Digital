@@ -11,6 +11,8 @@ interface SiteMintLogoProps {
    */
   variant?: "dark" | "light" | "ops";
   showText?: boolean;
+  /** "ops" on a dark surface (legacy Discovery portal header): light wordmark. */
+  onDark?: boolean;
   iconSize?: number;
   className?: string;
 }
@@ -18,11 +20,46 @@ interface SiteMintLogoProps {
 export function SiteMintLogo({
   variant = "dark",
   showText = true,
+  onDark = false,
   iconSize = 32,
   className = "",
 }: SiteMintLogoProps) {
   const isDark = variant === "dark";
   const isOps = variant === "ops";
+
+  // The staff workspace uses the approved Mint Clarity mark from the public
+  // site: a forest square with an "S", beside an ink wordmark. The previous
+  // "ops" rendering printed the wordmark in the background colour, which was
+  // invisible once the CRM header became light.
+  if (isOps) {
+    return (
+      <div className={`flex items-center gap-2.5 ${className}`}>
+        <span
+          aria-hidden="true"
+          style={{
+            display: "inline-grid",
+            placeItems: "center",
+            width: Math.max(iconSize + 10, 28),
+            height: Math.max(iconSize + 10, 28),
+            borderRadius: 8,
+            background: onDark ? "#e4f2e9" : "#173f35",
+            color: onDark ? "#173f35" : "#f9fbf8",
+            fontWeight: 700,
+            fontSize: Math.round(Math.max(iconSize + 10, 28) * 0.5),
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          S
+        </span>
+        {showText && (
+          <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.02em", color: onDark ? "#f9fbf8" : "#203c34", lineHeight: 1 }}>
+            SiteMint <span style={{ fontWeight: 500, color: onDark ? "#b9ddc9" : "#5a7066" }}>Operations</span>
+          </span>
+        )}
+      </div>
+    );
+  }
   const structuralFill = isOps ? "var(--sm-teal-900, #173642)" : "#1e293b";
   const accentFill = isOps ? "var(--sm-mint-500, #32C5D2)" : "#34d399";
 

@@ -377,8 +377,7 @@ export default function CrmLeads() {
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
                       isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
-                    }`}>
-                    <span className="text-sm shrink-0">{list.emoji}</span>
+                    }`}>
                     <span className="flex-1 truncate">{list.label}</span>
                     {/* No badge at all when the contacts never arrived — a "0" here was the lie. */}
                     {count !== null && count > 0 && (
@@ -399,8 +398,7 @@ export default function CrmLeads() {
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
                       isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
-                    }`}>
-                    <span className="text-sm shrink-0">{list.emoji}</span>
+                    }`}>
                     <span className="flex-1 truncate">{list.label}</span>
                     {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
@@ -420,8 +418,7 @@ export default function CrmLeads() {
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
                       isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
-                    }`}>
-                    <span className="text-sm shrink-0">{list.emoji}</span>
+                    }`}>
                     <span className="flex-1 truncate">{list.label}</span>
                     {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
@@ -445,7 +442,7 @@ export default function CrmLeads() {
               </button>
             )}
             <h1 className="text-base font-bold text-foreground">
-              {activeList.emoji} {activeList.label}
+              {activeList.label}
             </h1>
             {/* The count exists only when the contacts did. */}
             <span className="text-xs text-muted-foreground">

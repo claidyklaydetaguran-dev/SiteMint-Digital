@@ -141,13 +141,13 @@ const TEAM_DENIED =
 
 /** Stage colours for the pipeline chart (mint/ocean family, not decoration). */
 const STAGE_FILL: Record<string, string> = {
-  Lead: "#0ea5e9",
-  Qualified: "#14b8a6",
-  Proposal: "#f59e0b",
+  Lead: "#8aa59c",
+  Qualified: "#3e9978",
+  Proposal: "#173f35",
 };
-const STAGE_FILL_FALLBACK = "#14b8a6";
-const CHART_GRID = "#CFE7EA";
-const CHART_TICK = "#4A6472";
+const STAGE_FILL_FALLBACK = "#3e9978";
+const CHART_GRID = "#dbe6de";
+const CHART_TICK = "#5a7066";
 
 const SELECT =
   "px-2.5 py-1.5 text-xs border border-input rounded-lg bg-white text-foreground " +
@@ -901,7 +901,7 @@ export default function CrmExecutiveDashboard() {
                             width={52}
                             tickFormatter={(v: number) => money(v)}
                           />
-                          <Tooltip cursor={{ fill: "#EDF9FA" }} content={<StageTooltip />} />
+                          <Tooltip cursor={{ fill: "#f4f8f3" }} content={<StageTooltip />} />
                           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                             {chartData.map((row) => (
                               <Cell key={row.stage} fill={STAGE_FILL[row.stage] ?? STAGE_FILL_FALLBACK} />

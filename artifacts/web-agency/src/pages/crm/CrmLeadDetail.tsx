@@ -2315,7 +2315,7 @@ export default function CrmLeadDetail() {
       {/* ═══════════════════════════════════════════════════════════════════ */}
 
       {/* ── Call Modal ─── */}
-      <Modal open={openModal === "call"} onClose={() => setOpenModal(null)} title="📞 Initiate Bridge Call">
+      <Modal open={openModal === "call"} onClose={() => setOpenModal(null)} title="Initiate Bridge Call">
         <div className="px-5 py-4 space-y-4">
           {!lead.phone ? (
             <div className="flex items-start gap-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -2347,7 +2347,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── Call Log Modal ─── */}
-      <Modal open={openModal === "calllog"} onClose={() => setOpenModal(null)} title="📋 Log Call Outcome">
+      <Modal open={openModal === "calllog"} onClose={() => setOpenModal(null)} title="Log Call Outcome">
         <div className="px-5 py-4 space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
             Call initiated to <strong>{lead.name}</strong>. Log the outcome below.
@@ -2394,7 +2394,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── Log Activity Modal ─── */}
-      <Modal open={openModal === "logact"} onClose={() => { setOpenModal(null); setShowFollowUpPrompt(false); }} title="✏️ Log Activity">
+      <Modal open={openModal === "logact"} onClose={() => { setOpenModal(null); setShowFollowUpPrompt(false); }} title="Log Activity">
         <div className="px-5 py-4 space-y-4">
           {showFollowUpPrompt ? (
             <>
@@ -2492,7 +2492,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── SMS Modal ─── */}
-      <Modal open={openModal === "text"} onClose={() => setOpenModal(null)} title="💬 Send SMS">
+      <Modal open={openModal === "text"} onClose={() => setOpenModal(null)} title="Send SMS">
         <div className="px-5 py-4 space-y-3">
           {!lead.phone ? (
             <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -2539,7 +2539,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── Email Modal ─── */}
-      <Modal open={openModal === "email"} onClose={() => setOpenModal(null)} title="✉️ Send Email">
+      <Modal open={openModal === "email"} onClose={() => setOpenModal(null)} title="Send Email">
         <div className="px-5 py-4 space-y-3">
           {emailTestMode && (
             <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
@@ -2593,7 +2593,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── Note Modal ─── */}
-      <Modal open={openModal === "note"} onClose={() => setOpenModal(null)} title="📝 Add Note">
+      <Modal open={openModal === "note"} onClose={() => setOpenModal(null)} title="Add Note">
         <div className="px-5 py-4 space-y-3">
           <textarea
             className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
@@ -2613,7 +2613,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── Task Modal ─── */}
-      <Modal open={openModal === "task"} onClose={() => setOpenModal(null)} title="✅ Add Task">
+      <Modal open={openModal === "task"} onClose={() => setOpenModal(null)} title="Add Task">
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -2657,7 +2657,7 @@ export default function CrmLeadDetail() {
       </Modal>
 
       {/* ── Status Modal ─── */}
-      <Modal open={openModal === "status"} onClose={() => setOpenModal(null)} title="🔄 Update Status">
+      <Modal open={openModal === "status"} onClose={() => setOpenModal(null)} title="Update Status">
         <div className="px-5 py-4">
           <p className="text-xs text-muted-foreground mb-3">
             Current:&nbsp;
