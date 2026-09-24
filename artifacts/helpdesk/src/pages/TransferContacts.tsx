@@ -55,6 +55,7 @@ import {
   timeValueToMinutes,
 } from "@/pages/transfer-contacts/transferContactsContract";
 import "@/styles/v2-dashboard.css";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 /**
  * Calling codes offered in the country selector. Deliberately a short, explicit
@@ -230,9 +231,11 @@ export default function TransferContacts() {
           <p className="sd-page__meta">{PAGE.detail}</p>
         </div>
         {form === null && (
-          <Button type="button" onClick={() => setForm(emptyForm())}>
-            {COPY.addLabel}
-          </Button>
+          <OwnerOnly>
+            <Button type="button" onClick={() => setForm(emptyForm())}>
+              {COPY.addLabel}
+            </Button>
+          </OwnerOnly>
         )}
       </div>
 
@@ -508,9 +511,11 @@ export default function TransferContacts() {
         <div className="sd-empty">
           <h3 className="sd-empty__title">{COPY.emptyTitle}</h3>
           <p className="sd-empty__detail">{COPY.emptyDetail}</p>
-          <Button type="button" className="mt-3" onClick={() => setForm(emptyForm())}>
-            {COPY.addLabel}
-          </Button>
+          <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can add or change transfer contacts." />}>
+            <Button type="button" className="mt-3" onClick={() => setForm(emptyForm())}>
+              {COPY.addLabel}
+            </Button>
+          </OwnerOnly>
         </div>
       )}
 
@@ -596,6 +601,7 @@ export default function TransferContacts() {
                   </div>
                 )}
 
+                <OwnerOnly>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -653,6 +659,7 @@ export default function TransferContacts() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
+                </OwnerOnly>
               </div>
             </li>
           ))}

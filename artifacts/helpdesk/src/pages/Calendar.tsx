@@ -43,6 +43,7 @@ import {
   HEALTH_UNREADABLE,
 } from "@/pages/calendar/calendarContract";
 import "@/styles/v2-dashboard.css";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 export default function CalendarPage() {
   const { data: me, isLoading: sessionLoading } = useSession();
@@ -189,9 +190,11 @@ export default function CalendarPage() {
             </div>
           )}
 
-          <Button type="button" onClick={handleConnect} disabled={view === "connecting"} aria-busy={view === "connecting"}>
-            {view === "connecting" ? CONNECT.connectingLabel : CONNECT.connectLabel}
-          </Button>
+          <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can connect a calendar." />}>
+            <Button type="button" onClick={handleConnect} disabled={view === "connecting"} aria-busy={view === "connecting"}>
+              {view === "connecting" ? CONNECT.connectingLabel : CONNECT.connectLabel}
+            </Button>
+          </OwnerOnly>
         </section>
       )}
 
@@ -293,6 +296,7 @@ export default function CalendarPage() {
             </div>
           )}
 
+          <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can change or disconnect the calendar." />}>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button type="button" variant="outline">{CONNECT.disconnectLabel}</Button>
@@ -314,6 +318,7 @@ export default function CalendarPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </OwnerOnly>
         </section>
       )}
     </div>

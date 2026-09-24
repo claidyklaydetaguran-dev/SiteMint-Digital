@@ -61,6 +61,7 @@ import {
   type PublicLinkKnownState,
   type PublicLinkState,
 } from "@/pages/availability/availabilityContract";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 type SaveState = "idle" | "pending" | "saved" | "invalid" | "failed";
 
@@ -189,11 +190,13 @@ export function AvailabilitySettingsForm({
 
   const saveBar = (
     <>
+      <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can change hours, appointment types and booking rules." />}>
       <div className="sa-save">
         <button type="button" className="sa-button sa-button--primary" onClick={handleSave} disabled={save === "pending"} aria-busy={save === "pending"}>
           {save === "pending" ? SETTINGS.savePendingLabel : SETTINGS.saveLabel}
         </button>
       </div>
+      </OwnerOnly>
       <div className="sa-announce" ref={resultRef} tabIndex={-1} role="status" aria-live="polite" hidden={save === "idle" || save === "pending"}>
         {save === "saved" && (
           <div className="sa-notice" data-tone="ok">
@@ -725,6 +728,7 @@ function PublicLink() {
       <p className="sa-section__help">{PUBLIC_LINK.detail}</p>
       {known === "unknown" && <p className="sa-section__help">{PUBLIC_LINK.unknownDetail}</p>}
 
+      <OwnerOnly>
       <div className="sa-link__actions" role="group" aria-label={PUBLIC_LINK.commandsLabel}>
         {actions.enable && (
           <button type="button" className="sa-button" onClick={() => set(true)} disabled={pending !== null} aria-busy={pending === true}>
@@ -737,6 +741,7 @@ function PublicLink() {
           </button>
         )}
       </div>
+      </OwnerOnly>
 
       <div className="sa-announce" role="status" aria-live="polite" hidden={state === "unknown" || state === "pending"}>
         {failed && (

@@ -23,6 +23,7 @@ import { COPY, PAGE, numberViewState } from "@/pages/phone-number/phoneNumberCon
 import { NumberSetupRequest } from "@/pages/phone-number/NumberSetupRequest";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-phone-number.css";
+import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 export default function PhoneNumber() {
   const { data: me, isLoading: sessionLoading } = useSession();
@@ -125,6 +126,7 @@ export default function PhoneNumber() {
             </div>
           )}
 
+          <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can pause or resume the number." />}>
           <div className="mt-3">
             {view === "assigned" ? (
               <AlertDialog>
@@ -150,6 +152,7 @@ export default function PhoneNumber() {
               </Button>
             )}
           </div>
+          </OwnerOnly>
         </section>
       )}
     </div>

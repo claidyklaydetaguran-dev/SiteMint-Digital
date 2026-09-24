@@ -37,6 +37,7 @@ import {
 } from "@/pages/appointments/appointmentsContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-appointments.css";
+import { OwnerOnly } from "@/components/common/OwnerOnly";
 
 export default function Appointments() {
   const { data: me, isLoading } = useSession();
@@ -104,6 +105,7 @@ export default function Appointments() {
           >
             {ADD.openLabel}
           </button>
+          <OwnerOnly>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" size="icon" aria-label="More actions">
@@ -111,11 +113,14 @@ export default function Appointments() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <OwnerOnly>
               <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReconcile(); }} disabled={reconcileMutation.isPending}>
                 {reconcileMutation.isPending ? REQUESTS.reconcilePendingLabel : REQUESTS.reconcileLabel}
               </DropdownMenuItem>
+              </OwnerOnly>
             </DropdownMenuContent>
           </DropdownMenu>
+          </OwnerOnly>
         </div>
       </div>
 

@@ -61,7 +61,6 @@ const STAFF_WRITES = new Set<string>([
   "POST /receptionist/calendar/requests/:publicId/approve",
   "POST /receptionist/calendar/requests/:publicId/cancel",
   "POST /receptionist/calendar/requests/:publicId/reschedule",
-  "POST /receptionist/voice/assistants/:id/browser-test-session",
   "POST /receptionist/support/requests",
   "POST /receptionist/support/requests/:id/messages",
   "POST /receptionist/support/requests/:id/close",
