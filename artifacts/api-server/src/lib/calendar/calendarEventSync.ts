@@ -160,8 +160,16 @@ export async function approveRequestToBooked(
 
   const stamped = await deps.markBooked(firmId, request.id, eventId, connection.calendarId);
   if (!stamped) {
-    // The row changed underneath us — undo the event so nothing orphaned
-    // blocks the firm's calendar.
+    // The row changed underneath us. Two approvals of the same request (a
+    // double click, or the owner approving while the call confirms) write
+    // the same iCalUID, so both hold the SAME event: if the other one stamped
+    // it, this event is the booking and deleting it would leave a booked row
+    // with nothing in the calendar. Only an event nobody owns is undone.
+    const now = await deps.findRequest(firmId, publicId).catch(() => undefined);
+    if (now?.status === "booked" && now.providerEventId === eventId) {
+      deps.logger?.("calendar_event_booked_by_concurrent_approval", { firmId, requestId: request.id });
+      return "booked";
+    }
     await deps.writer.deleteEvent(connection, eventId);
     return "conflict_after_write";
   }
