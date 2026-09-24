@@ -122,6 +122,23 @@ is fixed or closed.
 
 Rollback: in the workspace `git checkout main` (= 7dd0b854), rebuild api-server, remove the rows above, Publish.
 
+## 3b. Release 2 runbook (d2ab383a) — what is done and what waits for the owner
+
+Done (session 2): the Web Asset Builder workspace is on `release/operational-0925` = d2ab383a with the API dist built (`voice_sms_inbound` present in the bundle); backup ref `backup/before-operational-0925` = the 7dd0b854 tree. Production database read-only check: `neondb`, voice journal **15** rows (0000–0014), no `voice_sms_inbound`; 2 businesses, 1 assistant, 0 texts, 0 contacts. Deployment secrets unchanged (an unsaved form row was cancelled; rows only persist on Publish).
+
+Order (each step waits for the one before):
+
+1. **Owner approval needed** (CLAUDE.md: no migration against production without it). Back up, then apply voice 0015 to production and to the workspace database, so Replit's publish-time schema diff is empty:
+   - `pg_dump -Fc "$SNAPSHOT_SOURCE" -f ~/backups/pre-0015-prod.dump` (outside the repository), row counts recorded;
+   - `cd lib/db && PROD_DATABASE_URL="$SNAPSHOT_SOURCE" node ./src/db-identity.mjs --target prod`, then `PROD_DATABASE_URL="$SNAPSHOT_SOURCE" pnpm run migrate:voice --target prod --expect-db neondb --expect-fingerprint <printed> --confirm prod`;
+   - `pnpm run migrate:voice --target dev --expect-db heliumdb --expect-fingerprint 7d15e87d6b1b`;
+   - verify: journal 16 on both, `voice_sms_inbound` present, counts unchanged.
+2. **Deployment settings** (Adjust settings → Production app secrets): the §3a table. Not added: VOICE_SMS_*, VOICE_TWILIO_*, VOICE_CHECKOUT_PLAN_CODE, STRIPE_RECEPTIONIST_PRICE_ID, any recording setting.
+3. **Publish**: check the Stripe sandbox-sync and database-copy switches are off first; the Generated-migrations gate must be empty.
+4. **Post-publish verification** (Claude): readiness shows the new wording; an unsigned webhook gets 401; activate SiteMint's pilot plan (operator route); publish the managed assistant; read the Vapi assistant back (server URL, credential, tools, `artifactPlan` all off); a signed synthetic webhook proves the secret matches.
+
+Rollback: Publish from `backup/before-operational-0925` after rebuilding the API dist; remove the §3a rows. 0015 may stay (additive, unused by the old code) or be reversed with `lib/db/drizzle/voice-rollback/0015_rollback.sql` and clearing its journal row.
+
 ## 4. Owner decisions (asked only when a test is ready)
 
 Collected here; each is asked with the exact setting or test attached.
