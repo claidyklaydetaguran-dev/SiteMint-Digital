@@ -203,7 +203,7 @@ function Router() {
             <Route path={ROUTES.overview} component={Overview} />
             <Route path={ROUTES.setup} component={Setup} />
 
-            <Route path={ROUTES.availability} component={Availability} />
+            <Route path={ROUTES.availability}>{() => <Availability />}</Route>
             <Route path={ROUTES.appointmentTypes}>
               {/* The Appointment types tab of Availability, at its own address
                   so the navigation and title name it (was a ?tab=types redirect). */}
