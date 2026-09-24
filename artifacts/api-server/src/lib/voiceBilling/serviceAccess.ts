@@ -77,7 +77,7 @@ export async function resolveServiceAccess(
 
 export const SERVICE_ACCESS_MESSAGES: Record<ServiceAccessDenial, string> = {
   not_activated: "Your receptionist isn't activated yet. Choose a plan in Billing, or contact SiteMint to activate it.",
-  suspended: "Your receptionist is paused because a payment didn't go through. Update your payment in Billing to turn it back on.",
+  suspended: "Your receptionist is paused because a payment didn't go through. Contact SiteMint to turn it back on.",
   canceled: "Your plan is cancelled, so your receptionist is off. Choose a plan in Billing to turn it back on.",
 };
 

@@ -283,6 +283,9 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
       optedOut: optedOutRow.length > 0,
       callCount: callCountRow?.count ?? 0,
       conversationCount: conversationRows.length,
+      // The detail page reads the thread itself (GET .../texts); the count
+      // here only keeps the shape shared with the list.
+      unreadTexts: 0,
       createdAt: contact.createdAt.toISOString(),
     },
     calls: callLinkRows.map((c) => ({ callId: c.callId, startedAt: c.createdAt.toISOString(), state: callStateById.get(c.callId) ?? "unknown" })),

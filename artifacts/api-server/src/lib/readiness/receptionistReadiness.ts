@@ -138,7 +138,7 @@ function check(key: string, label: string, fact: Fact, doneDetail: string, todoD
 // which would send the owner to a button that answers with a refusal.
 const SERVICE_DETAIL: Record<"not_activated" | "suspended" | "canceled", string> = {
   not_activated: "Not activated yet. Choose a plan in Billing, or contact SiteMint to activate your receptionist.",
-  suspended: "Paused because a payment didn’t go through. Update your payment in Billing to turn it back on.",
+  suspended: "Paused because a payment didn’t go through. Contact SiteMint to turn it back on.",
   canceled: "Your plan is cancelled, so your receptionist is off. Choose a plan in Billing to turn it back on.",
 };
 

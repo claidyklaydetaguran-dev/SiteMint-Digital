@@ -78,6 +78,7 @@ import {
 } from "@/pages/billing/billingContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-billing.css";
+import { VoicePlanStatus } from "@/pages/billing/VoicePlanStatus";
 
 export default function Billing() {
   const { data: me, isLoading } = useSession();
@@ -200,6 +201,8 @@ export default function Billing() {
           <p className="sb-lede">{page.detail}</p>
         </div>
       </div>
+
+      <VoicePlanStatus />
 
       {/* Two local views over the same session values. No route change, no
           request, no content that is reachable only in one of them. */}

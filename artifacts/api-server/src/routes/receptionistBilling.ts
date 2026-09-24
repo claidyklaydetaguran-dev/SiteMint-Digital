@@ -5,12 +5,34 @@ import { intakeFirms } from "@workspace/db/schema";
 import Stripe from "stripe";
 import { getUncachableStripeClient } from "../lib/stripeClient.js";
 import { requireReceptionistAuth } from "../lib/receptionistAuth.js";
+import {
+  activateVoicePlanFromCheckout,
+  loadCheckoutPlanCode,
+  mapReceptionistStripeEvent,
+  productionCheckoutActivationDeps,
+  RECEPTIONIST_STRIPE_LEDGER,
+} from "../lib/voiceBilling/checkoutActivation.js";
+import { applyEventForStripeCustomer } from "../lib/voiceBilling/subscriptionState.js";
 
 const router = Router();
 
-// ── Helper: derive app base URL from REPLIT_DOMAINS ──────────────────────────
+// ── Helper: the public origin the customer returns to after checkout ─────────
+//
+// J7: the dashboard origin (VOICE_DASHBOARD_BASE_URL, e.g.
+// https://sitemintdigital.com) comes first. The customer's session cookie
+// belongs to that origin; sending them back to the deployment's own
+// *.replit.app domain returned them signed out.
 
 function getAppBaseUrl(): string {
+  const dashboard = process.env["VOICE_DASHBOARD_BASE_URL"];
+  if (dashboard) {
+    try {
+      const u = new URL(dashboard.trim());
+      if (u.protocol === "https:") return u.origin;
+    } catch {
+      /* fall through */
+    }
+  }
   const domain = process.env["REPLIT_DOMAINS"]?.split(",")[0];
   if (domain) return `https://${domain}`;
   return "http://localhost:" + (process.env["PORT"] ?? "8080");
@@ -24,7 +46,9 @@ router.post(
   requireReceptionistAuth,
   async (req: Request, res: Response) => {
     const priceId = process.env["STRIPE_RECEPTIONIST_PRICE_ID"];
-    if (!priceId) {
+    // J7: a checkout must activate a voice plan. Without the plan it would
+    // take the customer's money and leave the receptionist switched off.
+    if (!priceId || loadCheckoutPlanCode() === null) {
       res.status(500).json({ error: "Billing is not configured yet" });
       return;
     }
@@ -69,8 +93,10 @@ router.post(
         customer:   stripeCustomerId,
         mode:       "subscription",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${base}/ai-receptionist/dashboard/billing?upgraded=1`,
-        cancel_url:  `${base}/ai-receptionist/dashboard/billing`,
+        client_reference_id: String(firm.id),
+        subscription_data: { metadata: { intake_firm_id: String(firm.id) } },
+        success_url: `${base}/ai-receptionist/dashboard/account/billing?upgraded=1`,
+        cancel_url:  `${base}/ai-receptionist/dashboard/account/billing`,
       });
 
       res.json({ url: session.url });
@@ -156,6 +182,20 @@ async function handleStripeEvent(
         break;
       }
 
+      // J7: activate the voice plan the checkout paid for. Ledgered by event
+      // id, so a redelivery activates nothing twice; before the plan_tier
+      // skip below, so an already-"paid" firm still gets its plan.
+      const planCode = loadCheckoutPlanCode();
+      if (planCode) {
+        const activation = await activateVoicePlanFromCheckout(
+          { firmId: firm.id, stripeCustomerId: customerId, planCode, eventId: event.id },
+          await productionCheckoutActivationDeps(),
+        );
+        req.log.info({ firmId: firm.id, ...activation }, "[receptionist] webhook: voice plan activation");
+      } else {
+        req.log.error({ firmId: firm.id }, "[receptionist] webhook: paid checkout with no voice plan configured");
+      }
+
       // Idempotent — skip if already paid
       if (firm.planTier === "paid") {
         req.log.info({ firmId: firm.id }, "[receptionist] webhook: already paid, skipping");
@@ -198,6 +238,10 @@ async function handleStripeEvent(
       const sub        = event.data.object as Stripe.Subscription;
       const customerId = sub.customer as string;
 
+      // J7: the voice plan is cancelled first, independently of the legacy
+      // plan_tier below — whose "already trial" skip must not skip this.
+      await applyVoiceSubscriptionEvent(event, customerId, req);
+
       const [firm] = await db
         .select({ id: intakeFirms.id, planTier: intakeFirms.planTier })
         .from(intakeFirms)
@@ -223,8 +267,36 @@ async function handleStripeEvent(
       break;
     }
 
+    // J7: the payment lifecycle of the voice plan — failed payment starts the
+    // grace period, a later success recovers it, a resumed subscription
+    // reactivates it. The state machine owns what each one means.
+    case "invoice.payment_failed":
+    case "invoice.payment_succeeded":
+    case "customer.subscription.resumed": {
+      const object = event.data.object as { customer?: unknown };
+      const customerId = typeof object.customer === "string" ? object.customer : null;
+      if (customerId) await applyVoiceSubscriptionEvent(event, customerId, req);
+      break;
+    }
+
     default:
       req.log.info({ eventType: event.type }, "[receptionist] webhook: unhandled event type");
+  }
+}
+
+// J7: moves the voice subscription mapped to this Stripe customer. Ledgered
+// by event id; a lost race throws so the webhook answers 500 and Stripe
+// redelivers onto the fresh state.
+async function applyVoiceSubscriptionEvent(event: Stripe.Event, customerId: string, req: Request): Promise<void> {
+  const mapped = mapReceptionistStripeEvent(event.type);
+  if (!mapped) return;
+  const outcome = await applyEventForStripeCustomer(customerId, mapped, undefined, {
+    provider: RECEPTIONIST_STRIPE_LEDGER,
+    eventKey: event.id,
+  });
+  req.log.info({ eventType: event.type, applied: outcome.applied, reason: outcome.applied ? undefined : outcome.reason }, "[receptionist] webhook: voice subscription event");
+  if (!outcome.applied && outcome.reason === "concurrent_change") {
+    throw new Error("voice subscription changed concurrently; retry");
   }
 }
 

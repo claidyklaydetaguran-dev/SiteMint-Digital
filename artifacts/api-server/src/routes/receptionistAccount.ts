@@ -455,7 +455,24 @@ router.get("/receptionist/account/subscription", requireReceptionistAuth, async 
     } catch {
       entitlements = { source: "none" as const }; // malformed catalog is an ops problem, not a customer-visible error
     }
-    res.json({ entitlements });
+    // J7: the voice plan's real state, so Billing can say "active",
+    // "payment failed — grace until …", "paused" or "cancelled" instead of the
+    // legacy trial/paid label, and whether the receptionist may run.
+    const { db } = await import("@workspace/db");
+    const { voiceSubscriptions } = await import("@workspace/db/schema/voice");
+    const { eq } = await import("drizzle-orm");
+    const [row] = await db
+      .select({ planCode: voiceSubscriptions.planCode, state: voiceSubscriptions.state, graceUntil: voiceSubscriptions.graceUntil })
+      .from(voiceSubscriptions)
+      .where(eq(voiceSubscriptions.firmId, req.firmId!))
+      .limit(1);
+    const { resolveServiceAccess } = await import("../lib/voiceBilling/serviceAccess.js");
+    const access = await resolveServiceAccess(req.firmId!).catch(() => null);
+    res.json({
+      entitlements,
+      subscription: row ? { planCode: row.planCode, state: row.state, graceUntil: row.graceUntil ? row.graceUntil.toISOString() : null } : null,
+      serviceAccess: access === null ? "unknown" : access.allowed ? "active" : access.reason,
+    });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[account] subscription read failed");
     res.status(500).json({ error: "Internal error" });

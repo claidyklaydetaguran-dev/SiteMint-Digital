@@ -67,7 +67,7 @@ router.get("/receptionist/contacts/:id/texts", requireReceptionistAuth, async (r
       return;
     }
     const { listTextThread } = await import("../lib/voiceSms/textThread.js");
-    const items = await listTextThread(req.firmId!, detail.contact.phoneE164);
+    const items = await listTextThread(req.firmId!, detail.contact.phone);
     res.json({ items, count: items.length, unread: items.filter((m) => m.unread).length });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[contacts] texts failed");
@@ -90,7 +90,7 @@ router.post("/receptionist/contacts/:id/texts/read", requireReceptionistAuth, as
       return;
     }
     const { markTextThreadRead } = await import("../lib/voiceSms/textThread.js");
-    res.json({ ok: true, marked: await markTextThreadRead(req.firmId!, detail.contact.phoneE164) });
+    res.json({ ok: true, marked: await markTextThreadRead(req.firmId!, detail.contact.phone) });
   } catch (err) {
     req.log.error({ firmId: req.firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[contacts] mark texts read failed");
     res.status(500).json({ error: "Internal error" });

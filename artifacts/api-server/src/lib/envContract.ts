@@ -93,6 +93,7 @@ const CONFIGS: Array<[string, string, string]> = [
   ["VOICE_ALERTS_FROM", "P7", "Alert sender address"],
   ["VOICE_ALERTS_TO", "P7", "Operator alert inbox"],
   ["VOICE_PLAN_CATALOG_JSON", "P8", "Plan entitlement catalog"],
+  ["VOICE_CHECKOUT_PLAN_CODE", "J7", "Voice plan a completed Stripe checkout activates (must be in VOICE_PLAN_CATALOG_JSON); unset = checkout refuses, so no one pays for a receptionist that stays off"],
   ["VOICE_DEFAULT_PLAN_CODE", "P8", "Default plan for firms without a subscription"],
   ["VOICE_BILLING_GRACE_DAYS", "P8", "Dunning window (default 7, bounded 1-60)"],
   ["GOOGLE_OAUTH_REDIRECT_URI", "P4", "OAuth redirect (must be this API's /callback)"],

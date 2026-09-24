@@ -482,3 +482,43 @@ export function pageCopy(): PageCopy {
 
 /** Shown while the session is still resolving. */
 export const LOADING_MESSAGE = "Loading billing information…";
+
+/* ── J7: the receptionist plan ─────────────────────────────────────────────── */
+
+export interface VoiceSubscriptionView {
+  subscription?: { planCode: string; state: string; graceUntil: string | null } | null;
+  serviceAccess?: "active" | "not_activated" | "suspended" | "canceled" | "unknown";
+}
+
+function day(iso: string | null): string {
+  if (!iso) return "soon";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "soon" : new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(d);
+}
+
+/** What the plan state means for the receptionist, in words. Never "active" without the server saying so. */
+export function voicePlanStatusCopy(view: VoiceSubscriptionView): { title: string; detail: string; tone: "live" | "attention" | "off" } {
+  const sub = view.subscription ?? null;
+  const state = sub?.state;
+  if (state === "active") {
+    return { title: "Active", detail: "Your receptionist is activated and can answer calls.", tone: "live" };
+  }
+  if (state === "grace") {
+    return {
+      title: "Payment failed",
+      detail: `Your last payment didn’t go through. Your receptionist keeps working until ${day(sub!.graceUntil)}. Contact SiteMint before then so it isn’t paused.`,
+      tone: "attention",
+    };
+  }
+  if (state === "suspended") {
+    return { title: "Paused", detail: "Your receptionist is paused because a payment didn’t go through. Contact SiteMint to turn it back on.", tone: "attention" };
+  }
+  if (state === "canceled") {
+    return { title: "Cancelled", detail: "Your plan is cancelled, so your receptionist is off. Choose a plan to turn it back on.", tone: "off" };
+  }
+  if (view.serviceAccess === "active") {
+    // Enforcement is off for this workspace: nothing blocks the receptionist.
+    return { title: "No plan required", detail: "Your receptionist isn’t tied to a plan on this workspace.", tone: "live" };
+  }
+  return { title: "Not activated", detail: "Your receptionist isn’t activated yet. Choose a plan, or contact SiteMint to activate it.", tone: "off" };
+}
