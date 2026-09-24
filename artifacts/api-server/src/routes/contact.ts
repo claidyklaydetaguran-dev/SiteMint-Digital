@@ -33,7 +33,20 @@ router.post("/contact/submit", async (req: Request, res: Response) => {
 
     // ── Honeypot — silently-populated field means a bot, not a human. ────
     if (isHoneypotTripped(data)) {
-      req.log.warn({ ip }, "[contact] honeypot tripped");
+      // Forwarding-chain diagnostics (2026-09-24): the trusted-hop count for the
+      // limiter key is derived from what the platform actually appends, so a
+      // tripped honeypot also records the raw chain, the socket peer and the
+      // names (never values) of the client-address headers present. Private
+      // deployment logs only; this branch already logs the derived key.
+      req.log.warn(
+        {
+          ip,
+          forwardedFor: req.headers["x-forwarded-for"] ?? null,
+          socketAddress: req.socket.remoteAddress ?? null,
+          addressHeaders: Object.keys(req.headers).filter((h) => /forward|real-ip|client-ip|connecting|via|proto|replit/i.test(h)),
+        },
+        "[contact] honeypot tripped",
+      );
       res.status(400).json({ error: "Unable to process this submission." });
       return;
     }
