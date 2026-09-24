@@ -457,6 +457,7 @@ const HEADLINES: Record<string, string> = {
   phone_connected: "Phone number connected",
   live_call_verified: "Answering calls",
   paused: "Your receptionist is paused",
+  not_activated: "Your receptionist isn't activated yet",
   needs_attention: "Something needs your attention",
   not_checked: "Status not checked",
 };

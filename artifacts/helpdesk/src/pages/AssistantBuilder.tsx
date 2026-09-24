@@ -750,9 +750,16 @@ export default function AssistantBuilder() {
           publicKey: session.publicKey,
         });
       })
-      .catch(() => {
-        // Never surfaces the response body: it could carry provider text.
-        setTestSessionError(BROWSER_TEST_SESSION_ERROR);
+      .catch((err: unknown) => {
+        // Never surfaces the response body: it could carry provider text. The
+        // one exception is the plan check, whose fixed server wording says
+        // why (not activated, paused for payment, cancelled).
+        const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
+        setTestSessionError(
+          apiErr?.code === "service_not_active" || apiErr?.code === "service_access_unavailable"
+            ? publishRouteErrorMessage(apiErr.code, apiErr.message)
+            : BROWSER_TEST_SESSION_ERROR,
+        );
       })
       .finally(() => {
         testInFlightRef.current = false;

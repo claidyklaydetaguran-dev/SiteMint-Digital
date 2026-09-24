@@ -52,6 +52,20 @@ export interface ReadinessFacts {
    */
   platformDisabled?: Array<"scheduling" | "transfer" | "messages">;
 
+  /**
+   * Whether publishing would pass its server configuration check right now
+   * (publishService.isPublishConfigurationReady). False means pressing
+   * Publish would be refused however the receptionist is set up. Optional:
+   * absent means "not known".
+   */
+  publishAvailable?: boolean | null;
+  /**
+   * Why this business may not run a receptionist yet
+   * (voiceBilling/serviceAccess.ts), or "active". Optional: absent means
+   * "not known".
+   */
+  serviceAccess?: "active" | "not_activated" | "suspended" | "canceled" | null;
+
   published: Fact;
   /** The provider is running what is saved. */
   inSync: Fact;
@@ -89,6 +103,7 @@ export type OverallState =
   | "phone_connected"
   | "live_call_verified"
   | "paused"
+  | "not_activated"
   | "needs_attention"
   | "not_checked";
 
@@ -108,6 +123,7 @@ export const OVERALL_COPY: Record<OverallState, { label: string; detail: string 
   phone_connected: { label: "Phone connected", detail: "Your number is connected. Call it once to confirm a real call is answered." },
   live_call_verified: { label: "Live call verified", detail: "A real call to your number was answered. Check current connections before relying on booking or notifications." },
   paused: { label: "Paused", detail: "Your phone number is paused, so calls are not being answered. Resume it when you're ready." },
+  not_activated: { label: "Not activated", detail: "Your receptionist is saved, but it can't go live until your plan is active." },
   needs_attention: { label: "Needs attention", detail: "Something stopped working. Fix the item marked below." },
   not_checked: { label: "Not checked", detail: "SiteMint couldn't check everything just now. Try again in a moment." },
 };
@@ -115,6 +131,31 @@ export const OVERALL_COPY: Record<OverallState, { label: string; detail: string 
 function check(key: string, label: string, fact: Fact, doneDetail: string, todoDetail: string, fixPath: string | null): ReadinessCheck {
   if (fact === null) return { key, label, state: "not_checked", detail: "Not checked — SiteMint couldn't read this just now.", fixPath };
   return fact ? { key, label, state: "done", detail: doneDetail, fixPath: null } : { key, label, state: "todo", detail: todoDetail, fixPath };
+}
+
+// Publishing can be refused for reasons the receptionist's own setup cannot
+// fix. Say so on the Published check instead of "Publish your receptionist",
+// which would send the owner to a button that answers with a refusal.
+const SERVICE_DETAIL: Record<"not_activated" | "suspended" | "canceled", string> = {
+  not_activated: "Not activated yet. Choose a plan in Billing, or contact SiteMint to activate your receptionist.",
+  suspended: "Paused because a payment didn’t go through. Update your payment in Billing to turn it back on.",
+  canceled: "Your plan is cancelled, so your receptionist is off. Choose a plan in Billing to turn it back on.",
+};
+
+function publishBlocker(f: ReadinessFacts): ReadinessCheck | null {
+  if (f.serviceAccess && f.serviceAccess !== "active") {
+    return { key: "published", label: "Published", state: "attention", detail: SERVICE_DETAIL[f.serviceAccess], fixPath: "/account/billing" };
+  }
+  if (f.published !== true && f.publishAvailable === false) {
+    return {
+      key: "published",
+      label: "Published",
+      state: "attention",
+      detail: "Publishing isn’t switched on for your workspace yet — contact SiteMint to enable it. Your receptionist stays saved.",
+      fixPath: "/account/support",
+    };
+  }
+  return null;
 }
 
 function stepState(checks: ReadinessCheck[]): "done" | "attention" | "not_checked" | "incomplete" {
@@ -180,8 +221,11 @@ export function deriveReadiness(f: ReadinessFacts, now: Date = new Date()): Read
   ];
 
   const errored = f.assistantErrored === true;
+  const blocked = publishBlocker(f);
   const testing: ReadinessCheck[] = [
-    errored
+    blocked
+      ? blocked
+      : errored
       ? { key: "published", label: "Published", state: "attention", detail: "The last publish failed. Open your receptionist and publish again.", fixPath: "/assistants" }
       : f.published === true && f.inSync === false
         ? { key: "published", label: "Published", state: "attention", detail: "You have changes that aren't live yet. Publish to apply them.", fixPath: "/assistants" }
@@ -225,6 +269,7 @@ export function deriveReadiness(f: ReadinessFacts, now: Date = new Date()): Read
 
   let state: OverallState;
   if (f.phoneState === "paused") state = "paused";
+  else if (f.serviceAccess && f.serviceAccess !== "active") state = "not_activated";
   else if (firstAttention) state = "needs_attention";
   else if (f.liveCallCompleted === true && f.phoneState === "assigned") state = "live_call_verified";
   else if (f.phoneState === "assigned" && f.published === true) state = "phone_connected";

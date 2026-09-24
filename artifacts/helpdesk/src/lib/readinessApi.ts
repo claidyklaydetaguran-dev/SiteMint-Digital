@@ -17,6 +17,7 @@ export type OverallState =
   | "phone_connected"
   | "live_call_verified"
   | "paused"
+  | "not_activated"
   | "needs_attention"
   | "not_checked";
 
@@ -88,6 +89,7 @@ export function overallTone(state: OverallState): "live" | "ready" | "working" |
     case "setting_up":
       return "working";
     case "paused":
+    case "not_activated":
     case "needs_attention":
       return "warning";
     case "not_checked":

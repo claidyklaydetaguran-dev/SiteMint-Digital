@@ -109,7 +109,7 @@ type RailTone = "live" | "progress" | "attention" | "neutral";
 function railStatus(readiness: Readiness | undefined): { label: string; tone: RailTone } {
   if (!readiness) return { label: "Status not checked", tone: "neutral" };
   if (readiness.state === "live_call_verified") return { label: readiness.label, tone: "live" };
-  if (readiness.state === "needs_attention" || readiness.state === "paused") return { label: readiness.label, tone: "attention" };
+  if (readiness.state === "needs_attention" || readiness.state === "paused" || readiness.state === "not_activated") return { label: readiness.label, tone: "attention" };
   if (readiness.state === "not_checked") return { label: readiness.label, tone: "neutral" };
   return { label: readiness.label, tone: "progress" };
 }

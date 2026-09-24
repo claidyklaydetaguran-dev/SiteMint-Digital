@@ -147,6 +147,8 @@ export const PUBLISH_ROUTE_ERROR_CODES = [
   "local_finalize_failed",
   "unknown_publish_error",
   "internal_error",
+  "service_not_active",
+  "service_access_unavailable",
 ] as const;
 
 export type PublishRouteErrorCode = (typeof PUBLISH_ROUTE_ERROR_CODES)[number];

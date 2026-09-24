@@ -38,6 +38,11 @@ export async function loadReadinessFacts(firmId: number): Promise<ReadinessFacts
     }),
     attempt(async () => (await import("../voicePublishing/runtimeCatalog.js")).loadRuntimeCatalogFromEnv()),
   ]);
+  const [publishAvailable, access] = await Promise.all([
+    attempt(async () => (await import("../voicePublishing/publishService.js")).isPublishConfigurationReady()),
+    attempt(async () => (await import("../voiceBilling/serviceAccess.js")).resolveServiceAccess(firmId)),
+  ]);
+  const serviceAccess: ReadinessFacts["serviceAccess"] = access === null ? null : access.allowed ? "active" : access.reason;
 
   // The receptionist a business is working on: the most recently changed one.
   const latest = assistants?.items.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
@@ -108,6 +113,8 @@ export async function loadReadinessFacts(firmId: number): Promise<ReadinessFacts
     booking,
     bookingGap,
     platformDisabled,
+    publishAvailable,
+    serviceAccess,
     calendarState: calendar ? calendar.state : null,
     transfer,
     published: assistants ? latest?.status === "published" : null,

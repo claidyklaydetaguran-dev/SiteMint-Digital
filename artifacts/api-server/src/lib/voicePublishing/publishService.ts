@@ -141,6 +141,28 @@ export const defaultPublishServiceDependencies: PublishServiceDependencies = {
   clock: systemClock,
 };
 
+/**
+ * Whether STEP 1 of publishAssistant would pass right now: the same flag and
+ * the same server-owned loaders, with no claim, no database write and no
+ * provider request. Readiness uses it so the dashboard never tells an owner
+ * to publish while publishing would answer `publish_disabled`.
+ */
+export function isPublishConfigurationReady(
+  deps: Pick<PublishServiceDependencies, "isEnabled" | "loadCatalog" | "loadArtifactPolicy" | "loadServerConfig" | "loadToolsConfig" | "loadCallPolicy"> = defaultPublishServiceDependencies,
+): boolean {
+  if (!deps.isEnabled()) return false;
+  try {
+    deps.loadCatalog();
+    deps.loadArtifactPolicy();
+    const serverConfig = (deps.loadServerConfig ?? loadVoiceServerConfigFromEnv)();
+    (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig, process.env);
+    (deps.loadCallPolicy ?? loadVoiceCallPolicyFromEnv)();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const UNCERTAIN_PROVIDER_CODES: ReadonlySet<VoiceProviderErrorCode> = new Set([
   "TIMEOUT",
   "NETWORK_ERROR",

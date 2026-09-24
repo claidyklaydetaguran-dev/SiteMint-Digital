@@ -97,7 +97,7 @@ const CHIP_TONE: Record<Tone, StatusTone> = { live: "live", progress: "next", at
 function overallTone(r: Readiness | undefined): Tone {
   if (!r) return "neutral";
   if (r.state === "live_call_verified") return "live";
-  if (r.state === "needs_attention" || r.state === "paused") return "attention";
+  if (r.state === "needs_attention" || r.state === "paused" || r.state === "not_activated") return "attention";
   if (r.state === "not_checked") return "neutral";
   return "progress";
 }
