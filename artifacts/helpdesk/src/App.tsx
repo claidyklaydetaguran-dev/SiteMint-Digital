@@ -1,48 +1,288 @@
-import { useEffect } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { useEffect, lazy, Suspense } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation, useParams } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ComingSoon } from "@/components/common/ComingSoon";
+import { VoiceUnavailable } from "@/components/common/VoiceUnavailable";
+import { NAV_GROUPS } from "@/lib/nav";
+import { voicePlatformEnabled } from "@/lib/featureFlags";
+import { ROUTER_BASE, ROUTES, VOICE_CAPABILITY_PATHS } from "@/lib/routes";
+import { voiceRoutePages, AssistantSessionGuardGate } from "@/routes/voiceRoutes";
+import { DashboardShell } from "@/shells/DashboardShell";
+import { AuthShell } from "@/shells/AuthShell";
+import { PublicShell } from "@/shells/PublicShell";
 
-import Login from "@/pages/Login";
-import Overview from "@/pages/Overview";
-import Inbox from "@/pages/Inbox";
-import AgentConfig from "@/pages/AgentConfig";
-import Contacts from "@/pages/Contacts";
-import ContactDetail from "@/pages/ContactDetail";
-import Settings from "@/pages/Settings";
-import Billing from "@/pages/Billing";
+/**
+ * Frontend V2 Phase 1 — route-level code splitting.
+ *
+ * The dashboard previously shipped as a single chunk: 17 direct page imports,
+ * zero lazy boundaries. Every page is now `lazy()`, imported inline at its own
+ * call site (never through a barrel, which would defeat the split) — except the
+ * voice-platform pages, whose imports live behind the AR-001J build boundary so
+ * that a default-gated build does not emit them at all.
+ *
+ * Route paths, ordering, auth behaviour, and the voice-platform gating follow
+ * the 2026-09 owner replan (D-2 navigation) — see `lib/routes.ts` and
+ * `lib/nav.ts`. Scheduling (Availability, Appointment Types, Calendar,
+ * Appointments, Test Booking) is deliberately **not** behind the voice gate
+ * (owner decision B-1): those pages are imported inline below, alongside every
+ * other always-on page. Only Assistant, Calls, Phone Number, Usage and Issues
+ * still come from the `voiceRoutePages` build boundary.
+ */
+
+const Login = lazy(() => import("@/pages/Login"));
+const PublicSchedule = lazy(() => import("@/pages/PublicSchedule"));
+const PasswordReset = lazy(() => import("@/pages/PasswordReset"));
+const PasswordResetComplete = lazy(() => import("@/pages/PasswordResetComplete"));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
+const AcceptInvitation = lazy(() => import("@/pages/AcceptInvitation"));
+
+const Overview = lazy(() => import("@/pages/Overview"));
+const Setup = lazy(() => import("@/pages/Setup"));
+
+const Availability = lazy(() => import("@/pages/Availability"));
+const Calendar = lazy(() => import("@/pages/Calendar"));
+const Appointments = lazy(() => import("@/pages/Appointments"));
+const TestBooking = lazy(() => import("@/pages/TestBooking"));
+
+const Inbox = lazy(() => import("@/pages/Inbox"));
+const Contacts = lazy(() => import("@/pages/Contacts"));
+const ContactDetail = lazy(() => import("@/pages/ContactDetail"));
+
+const AgentConfig = lazy(() => import("@/pages/AgentConfig"));
+
+const Billing = lazy(() => import("@/pages/Billing"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Team = lazy(() => import("@/pages/Team"));
+const Support = lazy(() => import("@/pages/Support"));
+
+// The nine voice-platform pages are the one exception, and AR-001J is why:
+// an `import()` written here is emitted by every build, so a default-gated
+// build shipped chunks it could never load. They come from the build boundary
+// instead, which removes their imports from the graph — see routes/voiceRoutes.
+const {
+  Assistants,
+  AssistantCreate,
+  AssistantBuilderNew,
+  AssistantBuilder,
+  Calls,
+  CallDetail,
+  Inquiries,
+  PhoneNumber,
+  TransferContacts,
+  Usage,
+  Issues,
+} = voiceRoutePages;
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient();
 
+/**
+ * The query string a legacy path arrived with, or "".
+ *
+ * These redirects used to drop it, which silently broke every flow that
+ * returns to the dashboard with a result in the URL — the Google Calendar
+ * callback's `?calendar=connected` among them, which landed on `/settings` and
+ * was discarded before any component could read it.
+ */
+function currentSearch(): string {
+  return typeof window === "undefined" ? "" : window.location.search;
+}
+
+function withSearch(to: string): string {
+  const search = currentSearch();
+  // A destination that carries its own query wins — it was written
+  // deliberately, and merging two query strings is not this helper's job.
+  return search !== "" && !to.includes("?") ? `${to}${search}` : to;
+}
+
 function InSpaRedirect({ to }: { to: string }) {
   const [, navigate] = useLocation();
-  useEffect(() => { navigate(to, { replace: true }); }, []);
+  useEffect(() => { navigate(withSearch(to), { replace: true }); }, []);
   return null;
 }
+
+/** Preserves the `:id` param — and the query string — across a legacy-path redirect. */
+function InSpaRedirectToId({ base }: { base: string }) {
+  const params = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate(withSearch(`${base}/${params.id}`), { replace: true }); }, []);
+  return null;
+}
+
+/**
+ * The same, but carrying any `?query` the incoming link held. Email links can
+ * arrive with tracking or campaign parameters appended, and dropping them
+ * silently changes the address the reader actually opened.
+ */
+function InSpaRedirectToIdKeepingQuery({ base }: { base: string }) {
+  const params = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    navigate(`${base}/${params.id}${search}`, { replace: true });
+  }, []);
+  return null;
+}
+
+// Mounted at the app root, independent of route, so it observes every
+// session transition (login, logout, expiry, firm switch). Loaded through
+// the voice build boundary so the assistants API graph stays out of a
+// gated-out entry chunk — see routes/voiceRoutes.ts.
+
+// Voice-platform destinations only get a route when the flag is on; when
+// off, direct navigation falls through to NotFound instead of exposing a
+// half-built surface.
+const comingSoonRoutes = voicePlatformEnabled
+  ? NAV_GROUPS.flatMap((group) => group.items).filter(
+      (item) => item.href && (item.state === "comingSoon" || item.state === "advanced"),
+    )
+  : [];
+
+// R1: when the voice platform flag is off, the live voice paths get an
+// intentional capability state instead of the 404. The paths come from the
+// always-bundled route table — deliberately NOT from the voice nav metadata,
+// which the AR-001M content boundary forbids a disabled build from emitting.
+const voiceUnavailablePaths = voicePlatformEnabled
+  ? []
+  : VOICE_CAPABILITY_PATHS;
 
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={Login} />
+      <Route path={ROUTES.login}>
+        {() => (
+          <AuthShell>
+            <Login />
+          </AuthShell>
+        )}
+      </Route>
+      <Route path={ROUTES.passwordReset}>
+        {() => (
+          <AuthShell routeLabel="Password reset">
+            <PasswordReset />
+          </AuthShell>
+        )}
+      </Route>
+      <Route path={ROUTES.passwordResetComplete}>
+        {() => (
+          <AuthShell routeLabel="Password reset">
+            <PasswordResetComplete />
+          </AuthShell>
+        )}
+      </Route>
+      <Route path={ROUTES.verifyEmail}>
+        {() => (
+          <AuthShell routeLabel="Email verification">
+            <VerifyEmail />
+          </AuthShell>
+        )}
+      </Route>
+      <Route path={ROUTES.acceptInvitation}>
+        {() => (
+          <AuthShell routeLabel="Team invitation">
+            <AcceptInvitation />
+          </AuthShell>
+        )}
+      </Route>
+      {/* Public, unauthenticated scheduling page — no dashboard chrome, no session cookie required. */}
+      <Route path={ROUTES.publicSchedule}>
+        {() => (
+          <PublicShell routeLabel="This booking page">
+            {/* PublicSchedule reads `:slug` itself via useRoute — it takes no props. */}
+            <PublicSchedule />
+          </PublicShell>
+        )}
+      </Route>
       <Route>
-        <AppLayout>
+        <DashboardShell>
           <Switch>
-            <Route path="/" component={Overview} />
-            <Route path="/conversations" component={Inbox} />
-            <Route path="/receptionist" component={AgentConfig} />
-            <Route path="/contacts" component={Contacts} />
-            <Route path="/contacts/:id" component={ContactDetail} />
-            <Route path="/deploy">
-              {() => <InSpaRedirect to="/receptionist" />}
+            <Route path={ROUTES.overview} component={Overview} />
+            <Route path={ROUTES.setup} component={Setup} />
+
+            <Route path={ROUTES.availability} component={Availability} />
+            <Route path={ROUTES.appointmentTypes}>
+              {/* Availability reads its initial tab from `?tab=types` — see
+                  `pages/availability/availabilityContract.ts`. */}
+              {() => <InSpaRedirect to={`${ROUTES.availability}?tab=types`} />}
             </Route>
-            <Route path="/settings" component={Settings} />
-            <Route path="/billing" component={Billing} />
+            <Route path={ROUTES.calendar} component={Calendar} />
+            <Route path={ROUTES.appointments} component={Appointments} />
+            <Route path={ROUTES.testBooking} component={TestBooking} />
+
+            <Route path={ROUTES.conversations} component={Inbox} />
+            <Route path={ROUTES.contacts} component={Contacts} />
+            <Route path={ROUTES.contactDetail} component={ContactDetail} />
+
+            <Route path={ROUTES.sms} component={AgentConfig} />
+
+            <Route path={ROUTES.billing} component={Billing} />
+            <Route path={ROUTES.settings} component={Settings} />
+            <Route path={ROUTES.team} component={Team} />
+            <Route path={ROUTES.support} component={Support} />
+
+            {voicePlatformEnabled && (
+              <>
+                <Route path={ROUTES.assistants} component={Assistants} />
+                <Route path={ROUTES.assistantNew} component={AssistantCreate} />
+                <Route path={ROUTES.assistantNewTab} component={AssistantBuilderNew} />
+                <Route path={ROUTES.assistantDetail} component={AssistantBuilder} />
+                <Route path={ROUTES.calls} component={Calls} />
+                <Route path={ROUTES.callDetail} component={CallDetail} />
+                <Route path={ROUTES.inquiries} component={Inquiries} />
+                <Route path={ROUTES.phoneNumber} component={PhoneNumber} />
+                <Route path={ROUTES.transferContacts} component={TransferContacts} />
+                <Route path={ROUTES.usage} component={Usage} />
+                <Route path={ROUTES.issues} component={Issues} />
+              </>
+            )}
+
+            {/* Legacy redirects: every path a pre-replan build could reach
+                still lands somewhere real, so no bookmark or external link
+                404s. `replace: true` (in InSpaRedirect) keeps the old path out
+                of browser history. */}
+            <Route path="/conversations">{() => <InSpaRedirect to={ROUTES.conversations} />}</Route>
+            <Route path="/contacts">{() => <InSpaRedirect to={ROUTES.contacts} />}</Route>
+            <Route path="/contacts/:id">{() => <InSpaRedirectToId base={ROUTES.contacts} />}</Route>
+            <Route path="/receptionist">{() => <InSpaRedirect to={ROUTES.sms} />}</Route>
+            <Route path="/deploy">{() => <InSpaRedirect to={ROUTES.sms} />}</Route>
+            <Route path="/settings">{() => <InSpaRedirect to={ROUTES.settings} />}</Route>
+            <Route path="/billing">{() => <InSpaRedirect to={ROUTES.billing} />}</Route>
+            <Route path="/appointments">{() => <InSpaRedirect to={ROUTES.appointments} />}</Route>
+            <Route path="/logs">{() => <InSpaRedirect to={ROUTES.calls} />}</Route>
+            <Route path="/logs/:id">{() => <InSpaRedirectToId base={ROUTES.calls} />}</Route>
+            {/* Post-call emails sent before the link was corrected point at
+                `/calls/:id`, which matched no route. They keep working. */}
+            <Route path="/calls/:id">{() => <InSpaRedirectToIdKeepingQuery base={ROUTES.calls} />}</Route>
+
+            {/* R1 capability states: when the voice platform is NOT enabled, the
+                live voice paths render a neutral capability state instead of
+                the 404. Navigation visibility still follows the committed
+                policy (nothing appears in the rail), no action is exposed, no
+                backend enablement is implied — and the page stays inside the
+                AR-001M content boundary: no voice-gated labels, descriptions,
+                nav-only hrefs, or gated-only icons enter the disabled bundle. */}
+            {voiceUnavailablePaths.map((path) => (
+              <Route key={path} path={path}>
+                <VoiceUnavailable />
+              </Route>
+            ))}
+            {comingSoonRoutes.map((item) => (
+              <Route key={item.key} path={item.href!}>
+                <ComingSoon
+                  title={item.label}
+                  description={item.description}
+                  icon={item.icon}
+                  availability={item.availability}
+                />
+              </Route>
+            ))}
             <Route component={NotFound} />
           </Switch>
-        </AppLayout>
+        </DashboardShell>
       </Route>
     </Switch>
   );
@@ -50,14 +290,23 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            {voicePlatformEnabled && (
+              <Suspense fallback={null}>
+                <AssistantSessionGuardGate />
+              </Suspense>
+            )}
+            <WouterRouter base={ROUTER_BASE}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }
 

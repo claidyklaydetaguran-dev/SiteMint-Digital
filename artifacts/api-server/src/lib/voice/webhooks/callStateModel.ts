@@ -1,0 +1,338 @@
+// Milestone 2 foundation: normalizes raw Vapi server messages (as stored,
+// one row per event, in provider_webhook_events) into a single honest call
+// record. This is a pure, DB-free fold — the caller supplies the events for
+// one call id already loaded from storage.
+
+import type { ParsedVapiMessage, VapiCallStatus } from "./vapiServerMessage.js";
+import type { TransferOutcome } from "../types.js";
+import { deriveVapiTransferOutcome } from "../providers/vapi/transferOutcome.js";
+import {
+  parseStructuredOutcome,
+  type StructuredOutcome,
+  type StructuredOutcomeAvailability,
+} from "./structuredOutcome.js";
+
+export const INTERNAL_CALL_STATES = [
+  "queued",
+  "ringing",
+  "connecting",
+  "in_progress",
+  "completed",
+  "failed",
+  "no_answer",
+  "busy",
+  "canceled",
+  "provider_error",
+] as const;
+
+export type InternalCallState = (typeof INTERNAL_CALL_STATES)[number];
+
+const TERMINAL_STATES: ReadonlySet<InternalCallState> = new Set([
+  "completed",
+  "failed",
+  "no_answer",
+  "busy",
+  "canceled",
+  "provider_error",
+]);
+
+/**
+ * Maps Vapi's in-call status to an internal state. "ended" alone is
+ * ambiguous — Vapi's `endedReason` (present on the end-of-call-report /
+ * final status-update) is what actually distinguishes a normal hangup from
+ * no-answer, busy, or a provider-side failure, so this never labels a call
+ * "completed" from a bare `status: "ended"` with no reason attached.
+ */
+export function mapVapiStatusToInternalState(
+  status: VapiCallStatus | undefined,
+  endedReason: string | undefined,
+): InternalCallState {
+  switch (status) {
+    case "queued":
+      return "queued";
+    case "ringing":
+      return "ringing";
+    case "forwarding":
+      return "connecting";
+    case "in-progress":
+      return "in_progress";
+    case "ended": {
+      const reason = (endedReason ?? "").toLowerCase();
+      if (!reason) return "completed";
+      if (reason.includes("no-answer") || reason.includes("no_answer")) return "no_answer";
+      if (reason.includes("busy")) return "busy";
+      if (reason.includes("canceled") || reason.includes("cancelled")) return "canceled";
+      if (reason.includes("error") || reason.includes("failed") || reason.includes("pipeline")) {
+        return "provider_error";
+      }
+      // customer-ended-call, assistant-ended-call, assistant-said-goodbye,
+      // silence-timed-out, etc. — a normal, non-error completion.
+      return "completed";
+    }
+    default:
+      return "queued";
+  }
+}
+
+export function callStateLabel(state: InternalCallState): string {
+  switch (state) {
+    case "queued": return "Queued";
+    case "ringing": return "Ringing";
+    case "connecting": return "Connecting";
+    case "in_progress": return "In progress";
+    case "completed": return "Completed";
+    case "failed": return "Failed";
+    case "no_answer": return "No answer";
+    case "busy": return "Busy";
+    case "canceled": return "Canceled";
+    case "provider_error": return "Provider error";
+  }
+}
+
+/** Never displays more than the last 4 digits of a caller-supplied number. */
+export function maskCallerNumber(number: string | undefined): string {
+  if (!number) return "Unknown";
+  const digits = number.replace(/\D/g, "");
+  if (digits.length < 4) return "Unknown";
+  return `•••• ${digits.slice(-4)}`;
+}
+
+/** How a call reached the assistant. */
+export type CallChannel = "telephone" | "browser" | "unknown";
+
+/**
+ * Classifies a call from the strongest evidence held. The provider's own call
+ * type decides first. Without one, a phone-number id or a customer number means
+ * the call arrived by telephone. With neither, the answer is 'unknown': a call
+ * is never labelled a browser test merely because caller details are missing,
+ * because a telephone caller who withholds their number looks exactly like that.
+ */
+export function deriveCallChannel(callType: string | undefined, reachedViaNumber: boolean): CallChannel {
+  if (callType === "webCall") return "browser";
+  if (callType === "inboundPhoneCall" || callType === "outboundPhoneCall") return "telephone";
+  return reachedViaNumber ? "telephone" : "unknown";
+}
+
+/**
+ * Call ids in this namespace are events SiteMint generates to exercise its own
+ * pipeline. The provider issues UUIDs, and webhook events must carry our
+ * signature, so no caller or customer can produce one: the marker is trustworthy
+ * precisely because only we can send it. Synthetic events are labelled as such
+ * everywhere and are never metered as usage.
+ */
+export const SYNTHETIC_QA_CALL_ID_PREFIX = "sitemint-qa-";
+
+export function isSyntheticQaCallId(callId: string): boolean {
+  return callId.startsWith(SYNTHETIC_QA_CALL_ID_PREFIX);
+}
+
+export interface StoredVapiEvent {
+  type: ParsedVapiMessage["type"];
+  message: ParsedVapiMessage;
+  /** provider_webhook_events.created_at — the order events were received in. */
+  createdAt: Date;
+}
+
+export interface RealCallRecord {
+  callId: string;
+  assistantId: string | undefined;
+  provider: "vapi";
+  /** Always "vapi_twilio" — a real-call record can never claim Demo Mode or vice versa. */
+  source: "vapi_twilio";
+  state: InternalCallState;
+  /** True once any terminal state has been observed for this call. */
+  isFinal: boolean;
+  callerNumberDisplay: string;
+  /** True only when a customer number was actually received; `callerNumberDisplay` is a placeholder otherwise. */
+  callerNumberKnown: boolean;
+  /**
+   * True when any event carried a phone-number id or a customer number — the
+   * call reached us by telephone. A browser (web) call carries neither. A
+   * withheld caller ID still arrives on a phone number, so it stays true.
+   */
+  reachedViaNumber: boolean;
+  /** The provider's call type ("webCall", "inboundPhoneCall", …) when any event carried one. */
+  callType: string | undefined;
+  /** See `deriveCallChannel`. */
+  channel: CallChannel;
+  /** A SiteMint-generated QA event, never a real call. See `isSyntheticQaCallId`. */
+  synthetic: boolean;
+  firstEventAt: Date;
+  lastEventAt: Date;
+  endedAt: Date | undefined;
+  durationSec: number | undefined;
+  endedReason: string | undefined;
+  transcript: string | undefined;
+  summary: string | undefined;
+  /**
+   * "unavailable" is the honest default for every call that predates
+   * analysisPlan configuration, or where Vapi simply hasn't attached
+   * structured data yet — never confused with a valid "not requested"
+   * result. "invalid" (provider data present but failed validation) reads
+   * identically to "unavailable" everywhere outside diagnostics/logs.
+   */
+  analysisAvailability: StructuredOutcomeAvailability;
+  structuredOutcome: StructuredOutcome | undefined;
+  /** True once an end-of-call-report event was observed for this call — reconciliation flags final calls that never got one. */
+  hasEndOfCallReport: boolean;
+  /**
+   * Duration as reported by the provider (end-of-call-report boundaries or
+   * an explicit durationSeconds), when available. `durationSec` remains the
+   * receipt-time approximation; metering must prefer this field.
+   */
+  providerDurationSec: number | undefined;
+  /**
+   * What is known about handing this caller to a person. Derived from the
+   * same stored events, so it needs no table of its own and cannot drift
+   * from the call it describes.
+   */
+  transfer: TransferOutcome;
+}
+
+/**
+ * Folds every stored event for one call id into a single record. Processes
+ * events in the order they were received (createdAt) but never lets an
+ * out-of-order, non-terminal status-update regress a call that has already
+ * reached a terminal state — the terminal state and its endedReason /
+ * transcript / summary are sticky once observed, while later-arriving
+ * additive fields (a transcript or analysis that lands after the ended
+ * event) still get merged in rather than discarded.
+ */
+export function foldEventsIntoCallRecord(
+  callId: string,
+  events: readonly StoredVapiEvent[],
+): RealCallRecord | null {
+  if (events.length === 0) return null;
+
+  const ordered = [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  let assistantId: string | undefined;
+  let callerNumberDisplay = "Unknown";
+  let callerNumberKnown = false;
+  let reachedViaNumber = false;
+  let callType: string | undefined;
+  let state: InternalCallState = "queued";
+  let isFinal = false;
+  let endedReason: string | undefined;
+  let transcript: string | undefined;
+  let summary: string | undefined;
+  let analysisAvailability: StructuredOutcomeAvailability = "unavailable";
+  let structuredOutcome: StructuredOutcome | undefined;
+  let endedAt: Date | undefined;
+  let hasEndOfCallReport = false;
+  let providerDurationSec: number | undefined;
+
+  const firstEventAt = ordered[0]!.createdAt;
+  let lastEventAt = firstEventAt;
+
+  for (const event of ordered) {
+    const { message } = event;
+    if (message.call.assistantId) assistantId = message.call.assistantId;
+    if (message.call.customerNumber) {
+      callerNumberDisplay = maskCallerNumber(message.call.customerNumber);
+      callerNumberKnown = true;
+      reachedViaNumber = true;
+    }
+    if (message.call.phoneNumberId) reachedViaNumber = true;
+    if (message.call.callType) callType = message.call.callType;
+    lastEventAt = event.createdAt;
+
+    if (message.type === "status-update" && message.status) {
+      const next = mapVapiStatusToInternalState(message.status, message.endedReason);
+      if (!isFinal) {
+        state = next;
+        if (TERMINAL_STATES.has(next)) {
+          isFinal = true;
+          endedAt = event.createdAt;
+          if (message.endedReason) endedReason = message.endedReason;
+        }
+      }
+      // Once final, further status-update events are ignored for `state`
+      // itself (Vapi does not un-end a call), but assistantId/caller number
+      // above are still refreshed defensively.
+    }
+
+    if (message.type === "end-of-call-report") {
+      // The authoritative terminal record. Always wins over a prior
+      // provisional status-update guess, including endedReason.
+      hasEndOfCallReport = true;
+      if (message.durationSeconds !== undefined) {
+        providerDurationSec = Math.round(message.durationSeconds);
+      } else if (message.startedAtIso && message.endedAtIso) {
+        const span = (Date.parse(message.endedAtIso) - Date.parse(message.startedAtIso)) / 1000;
+        if (Number.isFinite(span) && span >= 0) providerDurationSec = Math.round(span);
+      }
+      isFinal = true;
+      endedAt = endedAt ?? event.createdAt;
+      if (message.endedReason) endedReason = message.endedReason;
+      state = mapVapiStatusToInternalState("ended", message.endedReason);
+      if (message.transcript) transcript = message.transcript;
+      if (message.summary) summary = message.summary;
+
+      // Analysis often isn't ready on the first end-of-call-report delivery
+      // (Vapi: "triggered in the background... typically completes within a
+      // few seconds") — a later redelivery with genuine structured data
+      // upgrades an "unavailable"/"invalid" result, but a stale/duplicate
+      // redelivery can never regress an already-"available" outcome back
+      // down (see eventKey.ts for why a content-updated redelivery isn't
+      // deduped away before it ever reaches this fold).
+      const parsedOutcome = parseStructuredOutcome(message.analysis);
+      if (parsedOutcome.availability === "available") {
+        analysisAvailability = "available";
+        structuredOutcome = parsedOutcome.outcome;
+      } else if (analysisAvailability !== "available") {
+        analysisAvailability = parsedOutcome.availability;
+      }
+    }
+
+    if (message.type === "hang" && !isFinal) {
+      isFinal = true;
+      state = "provider_error";
+      endedAt = event.createdAt;
+    }
+
+    // A transcript/summary can also ride in on a plain status-update in some
+    // Vapi configurations — never overwrite an already-populated value with
+    // an empty one from an earlier event.
+    if (message.transcript && !transcript) transcript = message.transcript;
+    if (message.summary && !summary) summary = message.summary;
+  }
+
+  const durationSec = endedAt
+    ? Math.max(0, Math.round((endedAt.getTime() - firstEventAt.getTime()) / 1000))
+    : undefined;
+
+  return {
+    callId,
+    assistantId,
+    provider: "vapi",
+    source: "vapi_twilio",
+    state,
+    isFinal,
+    callerNumberDisplay,
+    callerNumberKnown,
+    reachedViaNumber,
+    callType,
+    channel: deriveCallChannel(callType, reachedViaNumber),
+    synthetic: isSyntheticQaCallId(callId),
+    firstEventAt,
+    lastEventAt,
+    endedAt,
+    durationSec,
+    endedReason,
+    transcript,
+    summary,
+    analysisAvailability,
+    structuredOutcome,
+    hasEndOfCallReport,
+    providerDurationSec,
+    // Derived from the same events, so the transfer answer and the call it
+    // belongs to can never disagree. `requestedByUs` is the presence of the
+    // destination request WE answered; the provider's acknowledgement is a
+    // separate, weaker signal and is ranked as such.
+    transfer: deriveVapiTransferOutcome({
+      requestedByUs: ordered.some((e) => e.message.type === "transfer-destination-request"),
+      events: ordered.map((e) => e.message),
+    }),
+  };
+}

@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
-import { LEAD_STATUSES, LEAD_STATUS_STYLES, type LeadStatus } from "@/lib/crmTaxonomy";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus, type LeadStatus } from "@/lib/crmTaxonomy";
+import { adminFetch } from "@/lib/adminFetch";
 
 const STAGES: readonly LeadStatus[] = LEAD_STATUSES;
 
@@ -18,7 +17,7 @@ const stageHeaderColors: Record<string,string> = Object.fromEntries(
   LEAD_STATUSES.map(s => [s, LEAD_STATUS_STYLES[s].header]),
 );
 
-const priorityDot: Record<string,string> = { High:"bg-red-500",Medium:"bg-yellow-500",Low:"bg-gray-400" };
+const priorityDot: Record<string,string> = { High:"bg-red-500",Medium:"bg-yellow-500",Low:"bg-muted-foreground/50" };
 
 interface Lead {
   id:number; name:string; company?:string; email:string; priority:string;
@@ -26,27 +25,39 @@ interface Lead {
 }
 
 export default function CrmPipeline() {
-  const [, navigate] = useLocation();
   const [pipeline, setPipeline] = useState<Record<string,Lead[]>>({});
   const [loading, setLoading] = useState(true);
   const [movingId, setMovingId] = useState<number|null>(null);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const r = await fetch("/api/crm/pipeline", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const d = await r.json() as { pipeline: Record<string,Lead[]> };
-    setPipeline(d.pipeline || {});
-    setLoading(false);
-  }, [navigate]);
+    setLoadError("");
+    try {
+      const r = await adminFetch("/api/crm/pipeline");
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const d = await r.json() as { pipeline: Record<string,Lead[]> };
+      // O-3: the API buckets by raw stored status; fold legacy keys into the
+      // canonical taxonomy so every lead lands in exactly one visible column.
+      const merged: Record<string, Lead[]> = {};
+      for (const [rawStatus, leads] of Object.entries(d.pipeline || {})) {
+        const key = normalizeLeadStatus(rawStatus);
+        merged[key] = [...(merged[key] ?? []), ...(Array.isArray(leads) ? leads : [])];
+      }
+      setPipeline(merged);
+    } catch {
+      setLoadError("Couldn't load the pipeline. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const moveLead = async (leadId: number, newStatus: string) => {
     setMovingId(leadId);
-    await fetch(`/api/crm/leads/${leadId}`, {
+    await adminFetch(`/api/crm/leads/${leadId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
     setMovingId(null);
@@ -59,6 +70,15 @@ export default function CrmPipeline() {
     <CrmLayout>
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+      </div>
+    </CrmLayout>
+  );
+
+  if (loadError) return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground font-medium">{loadError}</p>
+        <button onClick={load} className="text-sm border border-input rounded-lg px-4 py-1.5 hover:bg-accent transition-colors">Retry</button>
       </div>
     </CrmLayout>
   );
@@ -77,7 +97,7 @@ export default function CrmPipeline() {
             {STAGES.map(stage => {
               const leads = pipeline[stage] || [];
               return (
-                <div key={stage} className={`w-56 bg-white rounded-xl border-2 border-t-4 border-gray-200 shadow-sm flex flex-col ${stageColors[stage]}`}>
+                <div key={stage} className={`w-56 bg-white rounded-xl border-2 border-t-4 border-border shadow-sm flex flex-col ${stageColors[stage]}`}>
                   <div className={`px-3 py-2 rounded-t-lg flex items-center justify-between ${stageHeaderColors[stage]}`}>
                     <span className="text-xs font-bold uppercase tracking-wide">{stage}</span>
                     <span className="text-xs font-bold">{leads.length}</span>
@@ -95,10 +115,10 @@ export default function CrmPipeline() {
                         status: stage,
                       });
                       return (
-                      <div key={lead.id} className={`bg-white rounded-lg border border-gray-200 p-2.5 hover:shadow-sm transition-shadow ${movingId===lead.id?"opacity-50":""}`}>
+                      <div key={lead.id} className={`bg-white rounded-lg border border-border p-2.5 hover:shadow-sm transition-shadow ${movingId===lead.id?"opacity-50":""}`}>
                         <div className="flex items-start justify-between gap-1">
                           <p className="text-xs font-semibold text-foreground leading-tight">{lead.name}</p>
-                          <div className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${priorityDot[lead.priority]||"bg-gray-400"}`} />
+                          <div className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${priorityDot[lead.priority]||"bg-muted-foreground/50"}`} />
                         </div>
                         {lead.company && <p className="text-xs text-muted-foreground mt-0.5 truncate">{lead.company}</p>}
                         {lead.estimatedValue && <p className="text-xs text-green-700 font-medium mt-1">${Number(lead.estimatedValue).toLocaleString()}</p>}
@@ -123,7 +143,7 @@ export default function CrmPipeline() {
                           </Link>
                           <div className="ml-auto">
                             <select
-                              className="text-xs py-0.5 pl-1 pr-5 border border-gray-200 rounded focus:outline-none bg-white text-muted-foreground"
+                              className="text-xs py-0.5 pl-1 pr-5 border border-input rounded focus:outline-none bg-white text-muted-foreground"
                               value={stage}
                               onChange={e => moveLead(lead.id, e.target.value)}
                               disabled={movingId === lead.id}

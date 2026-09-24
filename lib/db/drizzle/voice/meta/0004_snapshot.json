@@ -1,0 +1,1443 @@
+{
+  "id": "0221362d-2b8e-4c90-aac0-5f72cf8bfa14",
+  "prevId": "b7ff4275-d1d6-42d4-85d3-268b414d5133",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.voice_assistants": {
+      "name": "voice_assistants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "template_key": {
+          "name": "template_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_assistant_id": {
+          "name": "provider_assistant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_error": {
+          "name": "sync_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publish_attempt_id": {
+          "name": "publish_attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publish_started_at": {
+          "name": "publish_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_config_hash": {
+          "name": "provider_config_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_sync_attempt_id": {
+          "name": "provider_sync_attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_sync_started_at": {
+          "name": "provider_sync_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_sync_error": {
+          "name": "provider_sync_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ix_voice_assistants_firm_id_status": {
+          "name": "ix_voice_assistants_firm_id_status",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_assistants_firm_id_updated_at": {
+          "name": "ix_voice_assistants_firm_id_updated_at",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_assistants_status_publish_started_at": {
+          "name": "ix_voice_assistants_status_publish_started_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "publish_started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_voice_assistants_provider_assistant_id": {
+          "name": "uq_voice_assistants_provider_assistant_id",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider_assistant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"voice_assistants\".\"provider\" IS NOT NULL AND \"voice_assistants\".\"provider_assistant_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_assistants_provider_sync_started_at": {
+          "name": "ix_voice_assistants_provider_sync_started_at",
+          "columns": [
+            {
+              "expression": "provider_sync_started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_assistants_firm_id_intake_firms_id_fk": {
+          "name": "voice_assistants_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_assistants",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_assistants_status": {
+          "name": "ck_voice_assistants_status",
+          "value": "\"voice_assistants\".\"status\" IN ('draft', 'publishing', 'published', 'error', 'publish_uncertain')"
+        },
+        "ck_voice_assistants_sync_error_length": {
+          "name": "ck_voice_assistants_sync_error_length",
+          "value": "\"voice_assistants\".\"sync_error\" IS NULL OR char_length(\"voice_assistants\".\"sync_error\") <= 500"
+        },
+        "ck_voice_assistants_publish_invariants": {
+          "name": "ck_voice_assistants_publish_invariants",
+          "value": "\n      (\"voice_assistants\".\"status\" = 'draft'\n        AND \"voice_assistants\".\"provider\" IS NULL\n        AND \"voice_assistants\".\"provider_assistant_id\" IS NULL\n        AND \"voice_assistants\".\"publish_attempt_id\" IS NULL\n        AND \"voice_assistants\".\"publish_started_at\" IS NULL)\n      OR (\"voice_assistants\".\"status\" = 'publishing'\n        AND \"voice_assistants\".\"publish_attempt_id\" IS NOT NULL\n        AND \"voice_assistants\".\"publish_started_at\" IS NOT NULL\n        AND \"voice_assistants\".\"provider\" IS NULL\n        AND \"voice_assistants\".\"provider_assistant_id\" IS NULL\n        AND \"voice_assistants\".\"sync_error\" IS NULL)\n      OR (\"voice_assistants\".\"status\" = 'published'\n        AND \"voice_assistants\".\"provider\" IS NOT NULL\n        AND btrim(\"voice_assistants\".\"provider\") <> ''\n        AND \"voice_assistants\".\"provider_assistant_id\" IS NOT NULL\n        AND btrim(\"voice_assistants\".\"provider_assistant_id\") <> ''\n        AND \"voice_assistants\".\"publish_attempt_id\" IS NULL\n        AND \"voice_assistants\".\"publish_started_at\" IS NULL\n        AND \"voice_assistants\".\"sync_error\" IS NULL)\n      OR (\"voice_assistants\".\"status\" = 'error'\n        AND \"voice_assistants\".\"provider\" IS NULL\n        AND \"voice_assistants\".\"provider_assistant_id\" IS NULL\n        AND \"voice_assistants\".\"publish_attempt_id\" IS NULL\n        AND \"voice_assistants\".\"publish_started_at\" IS NULL\n        AND \"voice_assistants\".\"sync_error\" IS NOT NULL\n        AND btrim(\"voice_assistants\".\"sync_error\") <> '')\n      OR (\"voice_assistants\".\"status\" = 'publish_uncertain'\n        AND \"voice_assistants\".\"publish_attempt_id\" IS NULL\n        AND \"voice_assistants\".\"publish_started_at\" IS NULL\n        AND \"voice_assistants\".\"sync_error\" IS NOT NULL\n        AND btrim(\"voice_assistants\".\"sync_error\") <> ''\n        AND (\n          (\"voice_assistants\".\"provider\" IS NULL AND \"voice_assistants\".\"provider_assistant_id\" IS NULL)\n          OR (\n            \"voice_assistants\".\"provider\" IS NOT NULL AND btrim(\"voice_assistants\".\"provider\") <> ''\n            AND \"voice_assistants\".\"provider_assistant_id\" IS NOT NULL AND btrim(\"voice_assistants\".\"provider_assistant_id\") <> ''\n          )\n        ))\n    "
+        },
+        "ck_voice_assistants_provider_sync_error_length": {
+          "name": "ck_voice_assistants_provider_sync_error_length",
+          "value": "\"voice_assistants\".\"provider_sync_error\" IS NULL OR char_length(\"voice_assistants\".\"provider_sync_error\") <= 100"
+        },
+        "ck_voice_assistants_provider_config_hash_shape": {
+          "name": "ck_voice_assistants_provider_config_hash_shape",
+          "value": "\"voice_assistants\".\"provider_config_hash\" IS NULL OR \"voice_assistants\".\"provider_config_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "ck_voice_assistants_provider_sync_attempt": {
+          "name": "ck_voice_assistants_provider_sync_attempt",
+          "value": "\n      (\"voice_assistants\".\"provider_sync_attempt_id\" IS NULL AND \"voice_assistants\".\"provider_sync_started_at\" IS NULL)\n      OR (\"voice_assistants\".\"provider_sync_attempt_id\" IS NOT NULL AND \"voice_assistants\".\"provider_sync_started_at\" IS NOT NULL)\n    "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.provider_webhook_events": {
+      "name": "provider_webhook_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ix_provider_webhook_events_firm_id_created_at": {
+          "name": "ix_provider_webhook_events_firm_id_created_at",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_provider_webhook_events_firm_id_processed_at": {
+          "name": "ix_provider_webhook_events_firm_id_processed_at",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "processed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_provider_webhook_events_provider_event_key": {
+          "name": "uq_provider_webhook_events_provider_event_key",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "provider_webhook_events_firm_id_intake_firms_id_fk": {
+          "name": "provider_webhook_events_firm_id_intake_firms_id_fk",
+          "tableFrom": "provider_webhook_events",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.voice_issues": {
+      "name": "voice_issues",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context": {
+          "name": "context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ix_voice_issues_firm_id_resolved_at": {
+          "name": "ix_voice_issues_firm_id_resolved_at",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "resolved_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_issues_firm_id_created_at": {
+          "name": "ix_voice_issues_firm_id_created_at",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_issues_firm_id_code": {
+          "name": "ix_voice_issues_firm_id_code",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_issues_firm_id_intake_firms_id_fk": {
+          "name": "voice_issues_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_issues",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_issues_level": {
+          "name": "ck_voice_issues_level",
+          "value": "\"voice_issues\".\"level\" IN ('info', 'warning', 'error', 'critical')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.voice_call_links": {
+      "name": "voice_call_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "call_id": {
+          "name": "call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_voice_call_links_firm_call": {
+          "name": "uq_voice_call_links_firm_call",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "call_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_call_links_contact": {
+          "name": "ix_voice_call_links_contact",
+          "columns": [
+            {
+              "expression": "contact_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_call_links_firm_id_intake_firms_id_fk": {
+          "name": "voice_call_links_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_call_links",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "voice_call_links_contact_id_voice_contacts_id_fk": {
+          "name": "voice_call_links_contact_id_voice_contacts_id_fk",
+          "tableFrom": "voice_call_links",
+          "tableTo": "voice_contacts",
+          "columnsFrom": [
+            "contact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.voice_contacts": {
+      "name": "voice_contacts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone_e164": {
+          "name": "phone_e164",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intake_conversation_id": {
+          "name": "intake_conversation_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_call_id": {
+          "name": "last_call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_voice_contacts_firm_phone": {
+          "name": "uq_voice_contacts_firm_phone",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "phone_e164",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_contacts_firm_last_seen": {
+          "name": "ix_voice_contacts_firm_last_seen",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "last_seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_contacts_firm_id_intake_firms_id_fk": {
+          "name": "voice_contacts_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_contacts",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_contacts_phone_shape": {
+          "name": "ck_voice_contacts_phone_shape",
+          "value": "\"voice_contacts\".\"phone_e164\" ~ '^\\+[1-9][0-9]{6,14}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.voice_sms_consents": {
+      "name": "voice_sms_consents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone_e164": {
+          "name": "phone_e164",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_voice_sms_consents_firm_phone": {
+          "name": "uq_voice_sms_consents_firm_phone",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "phone_e164",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_sms_consents_firm_id_intake_firms_id_fk": {
+          "name": "voice_sms_consents_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_sms_consents",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_sms_consents_status": {
+          "name": "ck_voice_sms_consents_status",
+          "value": "\"voice_sms_consents\".\"status\" IN ('granted', 'stopped')"
+        },
+        "ck_voice_sms_consents_source": {
+          "name": "ck_voice_sms_consents_source",
+          "value": "\"voice_sms_consents\".\"source\" IN ('booking_consent', 'sms_start', 'sms_stop', 'operator')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.voice_sms_outbox": {
+      "name": "voice_sms_outbox",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_e164": {
+          "name": "to_e164",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "dedupe_key": {
+          "name": "dedupe_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_message_sid": {
+          "name": "provider_message_sid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivery_status": {
+          "name": "delivery_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_voice_sms_outbox_dedupe": {
+          "name": "uq_voice_sms_outbox_dedupe",
+          "columns": [
+            {
+              "expression": "dedupe_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_sms_outbox_firm_status": {
+          "name": "ix_voice_sms_outbox_firm_status",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_sms_outbox_provider_sid": {
+          "name": "ix_voice_sms_outbox_provider_sid",
+          "columns": [
+            {
+              "expression": "provider_message_sid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_sms_outbox_firm_id_intake_firms_id_fk": {
+          "name": "voice_sms_outbox_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_sms_outbox",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_sms_outbox_kind": {
+          "name": "ck_voice_sms_outbox_kind",
+          "value": "\"voice_sms_outbox\".\"kind\" IN ('booking_confirmation', 'missed_call_followup')"
+        },
+        "ck_voice_sms_outbox_status": {
+          "name": "ck_voice_sms_outbox_status",
+          "value": "\"voice_sms_outbox\".\"status\" IN ('queued', 'sending', 'sent', 'failed', 'blocked_no_consent')"
+        },
+        "ck_voice_sms_outbox_body_length": {
+          "name": "ck_voice_sms_outbox_body_length",
+          "value": "char_length(\"voice_sms_outbox\".\"body\") <= 640"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.voice_numbers": {
+      "name": "voice_numbers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_e164": {
+          "name": "phone_e164",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acquisition": {
+          "name": "acquisition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_number_id": {
+          "name": "provider_number_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'inventory'"
+        },
+        "assigned_assistant_id": {
+          "name": "assigned_assistant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paused_reason": {
+          "name": "paused_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_voice_numbers_phone": {
+          "name": "uq_voice_numbers_phone",
+          "columns": [
+            {
+              "expression": "phone_e164",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_voice_numbers_provider_number_id": {
+          "name": "uq_voice_numbers_provider_number_id",
+          "columns": [
+            {
+              "expression": "provider_number_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_voice_numbers_one_assigned_per_firm": {
+          "name": "uq_voice_numbers_one_assigned_per_firm",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"voice_numbers\".\"state\" = 'assigned'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_numbers_firm_state": {
+          "name": "ix_voice_numbers_firm_state",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_numbers_firm_id_intake_firms_id_fk": {
+          "name": "voice_numbers_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_numbers",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "voice_numbers_assigned_assistant_id_voice_assistants_id_fk": {
+          "name": "voice_numbers_assigned_assistant_id_voice_assistants_id_fk",
+          "tableFrom": "voice_numbers",
+          "tableTo": "voice_assistants",
+          "columnsFrom": [
+            "assigned_assistant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_numbers_phone_shape": {
+          "name": "ck_voice_numbers_phone_shape",
+          "value": "\"voice_numbers\".\"phone_e164\" ~ '^\\+[1-9][0-9]{6,14}$'"
+        },
+        "ck_voice_numbers_acquisition": {
+          "name": "ck_voice_numbers_acquisition",
+          "value": "\"voice_numbers\".\"acquisition\" IN ('twilio_byo', 'vapi_native')"
+        },
+        "ck_voice_numbers_state": {
+          "name": "ck_voice_numbers_state",
+          "value": "\"voice_numbers\".\"state\" IN ('inventory', 'assigned', 'paused', 'released')"
+        },
+        "ck_voice_numbers_inventory_unowned": {
+          "name": "ck_voice_numbers_inventory_unowned",
+          "value": "(\"voice_numbers\".\"state\" = 'inventory') = (\"voice_numbers\".\"firm_id\" IS NULL)"
+        },
+        "ck_voice_numbers_assigned_has_assistant": {
+          "name": "ck_voice_numbers_assigned_has_assistant",
+          "value": "\"voice_numbers\".\"state\" <> 'assigned' OR \"voice_numbers\".\"assigned_assistant_id\" IS NOT NULL"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.voice_transfer_destinations": {
+      "name": "voice_transfer_destinations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone_e164": {
+          "name": "phone_e164",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 100
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "business_hours_only": {
+          "name": "business_hours_only",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_voice_transfer_destinations_firm_phone": {
+          "name": "uq_voice_transfer_destinations_firm_phone",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "phone_e164",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_voice_transfer_destinations_firm_active": {
+          "name": "ix_voice_transfer_destinations_firm_active",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "voice_transfer_destinations_firm_id_intake_firms_id_fk": {
+          "name": "voice_transfer_destinations_firm_id_intake_firms_id_fk",
+          "tableFrom": "voice_transfer_destinations",
+          "tableTo": "intake_firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_voice_transfer_destinations_phone_shape": {
+          "name": "ck_voice_transfer_destinations_phone_shape",
+          "value": "\"voice_transfer_destinations\".\"phone_e164\" ~ '^\\+[1-9][0-9]{6,14}$'"
+        },
+        "ck_voice_transfer_destinations_label_length": {
+          "name": "ck_voice_transfer_destinations_label_length",
+          "value": "char_length(\"voice_transfer_destinations\".\"label\") BETWEEN 1 AND 80"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

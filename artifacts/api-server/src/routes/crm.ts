@@ -1,34 +1,165 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES } from "@workspace/db";
+import { db, crmLeads, crmActivities, crmTasks, crmEmailTemplates, discoverySubmissions, crmDeals, crmTransactions, TRANSACTION_METHODS, TRANSACTION_RECEIVED_STATUS, crmCampaigns, crmCampaignRecipients, crmCampaignEvents, crmMessages, crmBehavioralEvents, crmCampaignSteps, crmCampaignScheduledMessages, CRM_STATUSES, CRM_PRIORITIES, CRM_SOURCES, intakeFirms, isCrmTaskDueKind, crmContactMerges, crmCompanies } from "@workspace/db";
+import { voiceSignupJobs } from "@workspace/db/schema/voice";
 import type { InsertCrmBehavioralEvent } from "@workspace/db";
 import type { CrmLead, DiscoverySubmission } from "@workspace/db";
-import { eq, desc, and, gte, lte, lt, or, ilike, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, lte, lt, or, ilike, isNull, sql, inArray, getTableColumns, type SQL } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
+import { loadOwnerCandidates, resolveAssignmentFields } from "../lib/leadAssignee.js";
+import { explainOwnerMatch, matchOwner, ownerKey, trimOwnerValue } from "../lib/leadOwnerRules.js";
+import { positiveId, readCompanyIdChange } from "../lib/companies.js";
+import { coerceEnum, LEGACY_STATUS } from "../lib/contactImport.js";
+import { fireAutomation } from "../lib/automationTriggers.js";
+import { syncTaskReminder } from "../lib/crmScheduler.js";
+import { isOverdueInZone, AUTOMATION_FALLBACK_TIMEZONE } from "../lib/automationSweep.js";
 import { getResend } from "../lib/email.js";
+// Every CRM send goes through this seam. It is what keeps a test run out of a
+// real mailbox — while CRM_EMAIL_TEST_MODE is anything but the exact string
+// "false", nothing is handed to the provider at all — and it is what classifies
+// an outcome honestly, including the unknown one that must never be retried.
+import { staffMailBlockedReason, trySendStaffMail } from "../lib/staffMail.js";
+import { emailRef, emailRefTags } from "../lib/emailRefs.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 import { normalizePhone } from "../lib/twilio.js";
 import { getSchedulerStatus, processScheduledMessages } from "../lib/campaignScheduler.js";
-import { stampReplyAndStop } from "../lib/sequenceReply.js";
 import { getUncachableStripeClient } from "../lib/stripeClient.js";
 
 const router: IRouter = Router();
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const token = auth.substring(7);
-  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+// Every route below names the permission it needs — `requireCrmAuth("…")` —
+// rather than sharing one gate that asked only "is this a staff session".
+//
+// It used to share one. `const requireAdmin = requireCrmAuth()` guarded 56
+// routes here, and holding a session was the whole test. Measured in a browser
+// on 2026-09-16 with `leads.read` revoked on the signed-in account, GET
+// /crm/leads still returned every contact; so did /crm/deals. The unguarded set
+// also included /crm/campaigns/:id/test-send, /crm/campaigns/queue/:id/send-now,
+// /crm/campaigns/scheduler/run and /crm/deals/:id/transactions/stripe-checkout —
+// bulk customer contact and money, reachable by anyone who could sign in.
+//
+// The permission names follow what the newer files already decided: money is
+// deals.read / deals.write (crmBilling.ts treats quotes, invoices and payments
+// that way), automation is settings.*, customer contact is communications.*,
+// and reading the team's task queue is tasks.read.team. `campaigns.send` is the
+// line the operations_manager role deliberately does not cross.
+//
+// `requireCrmAuth` still accepts a per-person staff session first and falls back
+// to the legacy shared bearer while CRM_LEGACY_BEARER_ENABLED is not "false";
+// the route-security manifest still classes these routes "admin", because that
+// records WHICH credential may reach them, not what it may then do.
+// Held by routes/crmPermissionEnforcement.test.ts, which crosses each line.
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
-  await db.insert(crmActivities).values({ leadId, type, title, description, metadata });
+/**
+ * The label a timeline entry is attributed to.
+ *
+ * A staff session names the person. The legacy shared bearer token genuinely
+ * is an anonymous administrator, so "admin" there is accurate rather than a
+ * placeholder — and it disappears on its own once the shared token is retired.
+ */
+function actorLabel(req: Request): string {
+  const s = req.staffAuth?.staff;
+  return s ? (s.displayName || s.email) : "admin";
 }
 
+/**
+ * Writes one lead-timeline entry, attributed to whoever is actually signed in.
+ *
+ * `created_by` has a column default of the literal string "admin" and nothing
+ * ever overrode it, so every note, status change, task and email on every lead
+ * was recorded as having been done by "admin". With three people sharing the
+ * CRM that makes the timeline unable to answer the one question it exists to
+ * answer. The request is a parameter for exactly this reason: there is no
+ * ambient actor, so it has to be passed.
+ */
+async function logActivity(
+  req: Request, leadId: number, type: string, title: string,
+  description?: string, metadata?: Record<string, unknown>,
+) {
+  await db.insert(crmActivities).values({
+    leadId, type, title, description, metadata, createdBy: actorLabel(req),
+  });
+}
+
+/**
+ * True when a Postgres foreign-key violation names this constraint.
+ *
+ * Walks the `cause` chain because drizzle wraps the driver error in a
+ * `DrizzleQueryError` whose own message is the SQL, not the violation — the
+ * same shape `isUniqueViolation` in crmMarketing.ts handles.
+ */
+function violatesForeignKey(err: unknown, constraint: string): boolean {
+  let cursor: unknown = err;
+  for (let depth = 0; cursor && typeof cursor === "object" && depth < 6; depth += 1) {
+    const e = cursor as { code?: unknown; constraint?: unknown; message?: unknown; cause?: unknown };
+    if (e.code === "23503" && (e.constraint === constraint || String(e.message ?? "").includes(constraint))) return true;
+    cursor = e.cause;
+  }
+  return false;
+}
+
+// ── Settings status ───────────────────────────────────────────────────────────
+// Read-only truth for the Settings page. Email test mode lives only in the
+// CRM_EMAIL_TEST_MODE env var (every send path checks it directly); the UI
+// must display the server's value, never a client-side toggle.
+router.get("/crm/settings/status", requireCrmAuth("settings.read"), (_req: Request, res: Response) => {
+  res.json({ emailTestMode: process.env.CRM_EMAIL_TEST_MODE !== "false" });
+});
+
+// ── Receptionist signup-job visibility (read-only) ───────────────────────────
+// The registration → CRM pipeline (integration-owned, lib/signupPipeline) can
+// permanently fail a job after 5 attempts, and until now nothing surfaced
+// that: a firm whose CRM link failed simply never appeared in the CRM. This
+// route only SELECTs — retrying/fixing jobs stays with the pipeline owner.
+//
+// Permission: `settings.read`, not this file's bare signed-in check. It is a
+// job queue's health (attempts, retry state, last error) — the same class of
+// operational read as `/crm/operations/jobs` — and it renders on the
+// Receptionist Accounts page beside `/admin/receptionist-accounts`, which asks
+// for the same grant, so the two halves of one page cannot disagree about who
+// may see them. Every role holds it; the legacy bearer is unaffected.
+router.get("/crm/receptionist-signup-jobs", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: voiceSignupJobs.id,
+        firmId: voiceSignupJobs.firmId,
+        firmName: intakeFirms.name,
+        kind: voiceSignupJobs.kind,
+        status: voiceSignupJobs.status,
+        attempts: voiceSignupJobs.attempts,
+        maxAttempts: voiceSignupJobs.maxAttempts,
+        lastError: voiceSignupJobs.lastError,
+        nextAttemptAt: voiceSignupJobs.nextAttemptAt,
+        createdAt: voiceSignupJobs.createdAt,
+        updatedAt: voiceSignupJobs.updatedAt,
+        crmLeadId: sql<number | null>`(${voiceSignupJobs.result} ->> 'crmLeadId')::int`,
+      })
+      .from(voiceSignupJobs)
+      .leftJoin(intakeFirms, eq(voiceSignupJobs.firmId, intakeFirms.id))
+      .orderBy(desc(voiceSignupJobs.updatedAt))
+      .limit(200);
+
+    const failed = rows.filter(r => r.status === "permanently_failed");
+    res.json({
+      jobs: rows,
+      summary: {
+        total: rows.length,
+        permanentlyFailed: failed.length,
+        retryScheduled: rows.filter(r => r.status === "retry_scheduled").length,
+        pending: rows.filter(r => r.status === "pending" || r.status === "processing").length,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching receptionist signup jobs");
+    res.status(500).json({ error: "Failed to fetch signup jobs" });
+  }
+});
+
 // ── Dashboard Stats ───────────────────────────────────────────────────────────
-router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/stats", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -76,7 +207,7 @@ router.get("/crm/stats", requireAdmin, async (req: Request, res: Response) => {
 // only supplies its inputs; step computation happens client-side via the
 // existing pure computeWorkflowSteps(). Static route — must stay above the
 // "/crm/leads/:id" route group.
-router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/intelligence/automation-queue", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db
       .select({
@@ -136,23 +267,55 @@ router.get("/crm/intelligence/automation-queue", requireAdmin, async (req: Reque
 });
 
 // ── Leads list ────────────────────────────────────────────────────────────────
-router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
-    const { search, status, priority, source } = req.query as Record<string, string>;
-    const conditions = [];
+    const { search, status, priority, source, companyId } = req.query as Record<string, string>;
+    // A contact that has been merged into another one is not part of the book
+    // any more. It is RETAINED rather than deleted (destroying a contact needs
+    // `leads.delete`, which is owner-only), so the list has to exclude it here
+    // or a merge would visibly do nothing. `crm_contact_merges.merged_lead_id`
+    // is unique, which is what keeps this a plain NOT EXISTS.
+    const conditions: SQL[] = [
+      sql`NOT EXISTS (SELECT 1 FROM ${crmContactMerges} m WHERE m.merged_lead_id = ${crmLeads.id})`,
+    ];
     if (search) {
       conditions.push(or(
         ilike(crmLeads.name, `%${search}%`),
         ilike(crmLeads.email, `%${search}%`),
         ilike(crmLeads.company, `%${search}%`),
         ilike(crmLeads.phone, `%${search}%`),
-      ));
+        // M7: a contact whose own company text is blank is still findable by
+        // the company they are linked to.
+        ilike(crmCompanies.name, `%${search}%`),
+      )!);
     }
     if (status) conditions.push(eq(crmLeads.status, status));
     if (priority) conditions.push(eq(crmLeads.priority, priority));
     if (source) conditions.push(eq(crmLeads.source, source));
+    // M7: "who works at this company", and its negation. A value that is
+    // neither an id nor "none" is refused rather than ignored — silently
+    // returning the whole book for a bad filter is how a list lies.
+    if (companyId !== undefined && companyId !== "") {
+      if (companyId === "none") {
+        conditions.push(isNull(crmLeads.companyId));
+      } else {
+        const linkedTo = positiveId(companyId);
+        if (linkedTo === null) {
+          res.status(400).json({ error: "companyId must be a company's id, or \"none\" for contacts with no company." });
+          return;
+        }
+        conditions.push(eq(crmLeads.companyId, linkedTo));
+      }
+    }
 
-    const leads = await db.select().from(crmLeads)
+    // The company's NAME travels with every contact, so the list can show the
+    // company record rather than only the typed text.
+    const leads = await db.select({
+      ...getTableColumns(crmLeads),
+      companyName: crmCompanies.name,
+      companyArchivedAt: crmCompanies.archivedAt,
+    }).from(crmLeads)
+      .leftJoin(crmCompanies, eq(crmCompanies.id, crmLeads.companyId))
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(crmLeads.createdAt));
     res.json({ leads });
@@ -162,11 +325,70 @@ router.get("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+// ── The lead vocabularies, decided at the door ────────────────────────────────
+//
+// `status`, `priority` and `source` are enumerations, and all three were written
+// with `String(data.x)` and no check at all. Measured 2026-09-16: a POST with
+// status "not-a-real-status" returned 201 and STORED it verbatim, and the lead
+// then appeared in NO pipeline column — the board groups by CRM_STATUSES, so a
+// value outside that set is filed nowhere and reachable nowhere. Priority and
+// source stored their nonsense the same way.
+//
+// The update door was the worse of the two: it also wrote a "status_changed"
+// activity naming the bad value and fired `lead_status_changed` carrying it, so
+// a single bad write propagated into the contact's history and into automation
+// rules rather than merely sitting mis-filed.
+//
+// Legacy spellings are MAPPED, not refused, because they are real: the locked
+// `leadScore.ts` engine still branches on "Contacted", "Negotiating" and
+// "Nurture", and older exports carry them. The map is the CSV importer's own
+// (`lib/contactImport.ts`), reused rather than copied — the vocabulary already
+// had three copies, and a fourth is how they drift apart.
+//
+// Anything else is refused, naming the values that are accepted. A CSV row is a
+// bulk action where filing it and reporting the substitution is kinder; a single
+// API write is one caller making one mistake, and saying so is the honest answer.
+const LEAD_ENUMS = [
+  { field: "status", valid: new Set<string>(CRM_STATUSES), legacy: LEGACY_STATUS, all: CRM_STATUSES as readonly string[] },
+  { field: "priority", valid: new Set<string>(CRM_PRIORITIES), legacy: null, all: CRM_PRIORITIES as readonly string[] },
+  { field: "source", valid: new Set<string>(CRM_SOURCES), legacy: null, all: CRM_SOURCES as readonly string[] },
+] as const;
+
+type LeadEnumResult =
+  | { kind: "ok"; values: Record<string, string> }
+  | { kind: "error"; field: string; error: string };
+
+function readLeadEnums(data: Record<string, unknown>): LeadEnumResult {
+  const values: Record<string, string> = {};
+  for (const spec of LEAD_ENUMS) {
+    const raw = data[spec.field];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const { value } = coerceEnum(String(raw), spec.valid, spec.legacy);
+    if (value === null) {
+      return {
+        kind: "error",
+        field: spec.field,
+        error: `"${String(raw)}" is not a ${spec.field} this CRM uses. One of: ${spec.all.join(" · ")}.`,
+      };
+    }
+    values[spec.field] = value;
+  }
+  return { kind: "ok", values };
+}
+
 // ── Create lead ───────────────────────────────────────────────────────────────
-router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const data = req.body as Record<string, unknown>;
     if (!data.name || !data.email) { res.status(400).json({ error: "Name and email are required" }); return; }
+
+    const enums = readLeadEnums(data);
+    if (enums.kind === "error") { res.status(400).json({ error: enums.error, field: enums.field }); return; }
+
+    // M6: the owner is written as both columns, decided in one place — the
+    // picker's staff id, or a name resolved once through the matching rules.
+    const owner = await resolveAssignmentFields(data);
+    if (owner.kind === "error") { res.status(400).json({ error: owner.error }); return; }
 
     const [lead] = await db.insert(crmLeads).values({
       name: String(data.name),
@@ -174,11 +396,12 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
       company: data.company ? String(data.company) : undefined,
       phone: data.phone ? String(data.phone) : undefined,
       website: data.website ? String(data.website) : undefined,
-      source: data.source ? String(data.source) : "Manual Entry",
+      source: enums.values["source"] ?? "Manual Entry",
       serviceInterest: data.serviceInterest ? String(data.serviceInterest) : undefined,
-      status: data.status ? String(data.status) : "New Inquiry",
-      priority: data.priority ? String(data.priority) : "Medium",
-      assignedTo: data.assignedTo ? String(data.assignedTo) : undefined,
+      status: enums.values["status"] ?? "New Inquiry",
+      priority: enums.values["priority"] ?? "Medium",
+      assignedTo: owner.kind === "set" ? owner.assignedTo : undefined,
+      assignedToStaffId: owner.kind === "set" ? owner.assignedToStaffId : undefined,
       tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
       notes: data.notes ? String(data.notes) : undefined,
       estimatedValue: data.estimatedValue ? String(data.estimatedValue) : undefined,
@@ -186,7 +409,9 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
       nextFollowUpAt: data.nextFollowUpAt ? new Date(String(data.nextFollowUpAt)) : undefined,
     }).returning();
 
-    await logActivity(lead.id, "lead_created", `Lead created: ${lead.name}`, `Source: ${lead.source}`);
+    await logActivity(req, lead.id, "lead_created", `Lead created: ${lead.name}`, `Source: ${lead.source}`);
+    // Best-effort; a rule fault must never fail the capture itself.
+    fireAutomation({ trigger: "lead_created", payload: { recordId: lead.id } });
     res.status(201).json({ lead });
   } catch (err) {
     req.log.error({ err }, "Error creating lead");
@@ -195,19 +420,44 @@ router.post("/crm/leads", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Get lead ──────────────────────────────────────────────────────────────────
-router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
-    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+    // M7: the linked company travels with the contact, so the record shows the
+    // company as a link rather than an id. `companyName` is the same field the
+    // contact list carries, so both surfaces read it the same way.
+    const [row] = await db.select({
+      ...getTableColumns(crmLeads),
+      companyName: crmCompanies.name,
+      companyDomain: crmCompanies.domain,
+      companyWebsite: crmCompanies.website,
+      companyArchivedAt: crmCompanies.archivedAt,
+    }).from(crmLeads)
+      .leftJoin(crmCompanies, eq(crmCompanies.id, crmLeads.companyId))
+      .where(eq(crmLeads.id, id));
+    if (!row) { res.status(404).json({ error: "Lead not found" }); return; }
+    const { companyDomain, companyWebsite, ...lead } = row;
+    const linkedCompany = lead.companyId != null
+      ? {
+        id: lead.companyId, name: lead.companyName, domain: companyDomain,
+        website: companyWebsite, archivedAt: lead.companyArchivedAt,
+      }
+      : null;
 
-    const [activities, tasks] = await Promise.all([
+    const [activities, tasks, mergedInto] = await Promise.all([
       db.select().from(crmActivities).where(eq(crmActivities.leadId, id)).orderBy(desc(crmActivities.createdAt)),
       db.select().from(crmTasks).where(eq(crmTasks.leadId, id)).orderBy(desc(crmTasks.createdAt)),
+      // A merged-away contact is hidden from the list but still reachable by
+      // id, because old links, bookmarks and audit entries point at it. Saying
+      // so beats a page that looks like an ordinary contact whose history has
+      // mysteriously moved somewhere else.
+      db.select({ primaryLeadId: crmContactMerges.primaryLeadId, mergedAt: crmContactMerges.createdAt,
+        mergedByLabel: crmContactMerges.mergedByLabel })
+        .from(crmContactMerges).where(eq(crmContactMerges.mergedLeadId, id)).limit(1),
     ]);
 
-    res.json({ lead, activities, tasks });
+    res.json({ lead, activities, tasks, mergedInto: mergedInto[0] ?? null, linkedCompany });
   } catch (err) {
     req.log.error({ err }, "Error fetching lead");
     res.status(500).json({ error: "Failed to fetch lead" });
@@ -215,7 +465,7 @@ router.get("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) =
 });
 
 // ── Update lead ───────────────────────────────────────────────────────────────
-router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -224,11 +474,73 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
 
     const data = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    const fields = ["name","company","email","website","source","serviceInterest",
-      "priority","assignedTo","notes","estimatedValue","packageType",
+
+    // The three enumerations are decided before anything else is copied, so a
+    // refused value stops the write instead of reaching the row, the activity
+    // log and the automation rules.
+    const enums = readLeadEnums(data);
+    if (enums.kind === "error") { res.status(400).json({ error: enums.error, field: enums.field }); return; }
+    for (const [f, v] of Object.entries(enums.values)) updates[f] = v;
+
+    const fields = ["name","company","email","website","serviceInterest",
+      "notes","estimatedValue","packageType",
       "discoveryFormStatus","proposalStatus","sowStatus"];
     for (const f of fields) {
       if (data[f] !== undefined) updates[f] = data[f];
+    }
+
+    // ── M7: the company link ────────────────────────────────────────────────
+    //
+    // Decided and validated before anything is written. `leads.write` is
+    // asserted here rather than on the route, because this route's legacy gate
+    // is signed-in-only and every other field keeps that behaviour; the legacy
+    // shared bearer carries no grants to check and keeps the access it had.
+    // `company` (the typed text) is untouched by this: a contact can be linked
+    // to "Acme Ltd" while its text still says whatever was recorded.
+    const companyChange = readCompanyIdChange(data);
+    if (companyChange.kind === "invalid") {
+      res.status(400).json({ error: companyChange.error, field: "companyId" });
+      return;
+    }
+    const companyChanging = companyChange.kind === "set" && companyChange.companyId !== existing.companyId;
+    let nextCompany: { id: number; name: string } | null = null;
+    let previousCompanyName: string | null = null;
+    if (companyChanging && companyChange.kind === "set") {
+      if (req.staffAuth && !req.staffAuth.permissions.has("leads.write")) {
+        res.status(403).json({ error: "You do not have permission to change contacts.", permission: "leads.write" });
+        return;
+      }
+      if (companyChange.companyId !== null) {
+        const [target] = await db.select({
+          id: crmCompanies.id, name: crmCompanies.name, archivedAt: crmCompanies.archivedAt,
+        }).from(crmCompanies).where(eq(crmCompanies.id, companyChange.companyId)).limit(1);
+        if (!target) { res.status(400).json({ error: "That company does not exist.", field: "companyId" }); return; }
+        if (target.archivedAt) {
+          res.status(409).json({
+            code: "company_archived",
+            error: `${target.name} is archived. Restore it before linking people to it.`,
+            field: "companyId",
+          });
+          return;
+        }
+        nextCompany = { id: target.id, name: target.name };
+      }
+      if (existing.companyId !== null) {
+        const [before] = await db.select({ name: crmCompanies.name })
+          .from(crmCompanies).where(eq(crmCompanies.id, existing.companyId)).limit(1);
+        previousCompanyName = before?.name ?? null;
+      }
+      updates["companyId"] = companyChange.companyId;
+    }
+    // M6: the owner is never copied from the body as a bare column. Both owner
+    // columns come from one decision — the picker's staff id, or a name resolved
+    // through the matching rules — so they cannot drift apart, and a new name
+    // never leaves the previous owner's id behind.
+    const owner = await resolveAssignmentFields(data, existing);
+    if (owner.kind === "error") { res.status(400).json({ error: owner.error }); return; }
+    if (owner.kind === "set") {
+      updates["assignedTo"] = owner.assignedTo;
+      updates["assignedToStaffId"] = owner.assignedToStaffId;
     }
     // Normalize phone to E.164 before storing; preserve null/empty as-is
     if (data.phone !== undefined) {
@@ -240,24 +552,55 @@ router.patch("/crm/leads/:id", requireAdmin, async (req: Request, res: Response)
     if (data.lastContactedAt !== undefined) updates.lastContactedAt = data.lastContactedAt ? new Date(String(data.lastContactedAt)) : null;
 
     const prevStatus = existing.status;
-    if (data.status !== undefined && data.status !== prevStatus) {
-      updates.status = data.status;
-      await logActivity(id, "status_changed", `Status changed to ${data.status}`, `From: ${prevStatus} → To: ${data.status}`, { from: prevStatus, to: data.status });
+    const nextStatus = enums.values["status"];
+    if (nextStatus !== undefined && nextStatus !== prevStatus) {
+      updates.status = nextStatus;
+      await logActivity(req, id, "status_changed", `Status changed to ${nextStatus}`, `From: ${prevStatus} → To: ${nextStatus}`, { from: prevStatus, to: nextStatus });
+      fireAutomation({ trigger: "lead_status_changed", payload: { recordId: id, from: prevStatus ?? null, to: nextStatus } });
     }
     if (data.nextFollowUpAt !== undefined && String(data.nextFollowUpAt) !== String(existing.nextFollowUpAt)) {
-      await logActivity(id, "follow_up_changed", `Follow-up set for ${new Date(String(data.nextFollowUpAt)).toLocaleDateString()}`);
+      await logActivity(req, id, "follow_up_changed", `Follow-up set for ${new Date(String(data.nextFollowUpAt)).toLocaleDateString()}`);
     }
 
     const [updated] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
+
+    // M7: linking somebody to their employer is a change worth seeing on the
+    // contact's own timeline and in the audit trail — it is how the company
+    // record came to have the people it has.
+    if (companyChanging) {
+      const linked = nextCompany !== null;
+      await logActivity(
+        req, id,
+        linked ? "company_linked" : "company_unlinked",
+        linked ? `Linked to ${nextCompany!.name}` : `Unlinked from ${previousCompanyName ?? `company #${existing.companyId}`}`,
+        linked && previousCompanyName ? `Previously linked to ${previousCompanyName}.` : undefined,
+        { companyId: nextCompany?.id ?? null, previousCompanyId: existing.companyId },
+      );
+      await auditAction(
+        req,
+        linked ? "contact.company.linked" : "contact.company.unlinked",
+        `lead:${id} company:${linked ? nextCompany!.id : existing.companyId}`,
+      );
+    }
+
     res.json({ lead: updated });
   } catch (err) {
+    // The company was deleted between the check above and this write. It is a
+    // stale screen, not a server fault, and it says which.
+    if (violatesForeignKey(err, "crm_leads_company_id_crm_companies_id_fk")) {
+      res.status(409).json({
+        code: "company_gone",
+        error: "That company was deleted while you were editing this contact. Reload and choose another.",
+      });
+      return;
+    }
     req.log.error({ err }, "Error updating lead");
     res.status(500).json({ error: "Failed to update lead" });
   }
 });
 
 // ── Delete lead ───────────────────────────────────────────────────────────────
-router.delete("/crm/leads/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/leads/:id", requireCrmAuth("leads.delete"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -265,6 +608,8 @@ router.delete("/crm/leads/:id", requireAdmin, async (req: Request, res: Response
     await db.delete(crmActivities).where(eq(crmActivities.leadId, id));
     const [deleted] = await db.delete(crmLeads).where(eq(crmLeads.id, id)).returning();
     if (!deleted) { res.status(404).json({ error: "Lead not found" }); return; }
+    // Full access is still logged access: record who destroyed the record.
+    await auditAction(req, "lead.deleted", `lead:${id} ${deleted.name ?? ""}`.trim());
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error deleting lead");
@@ -273,7 +618,7 @@ router.delete("/crm/leads/:id", requireAdmin, async (req: Request, res: Response
 });
 
 // ── Add note ──────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/notes", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -286,7 +631,7 @@ router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Resp
     const timestamp = new Date().toLocaleString();
     const appended = existing.notes ? `${existing.notes}\n\n[${timestamp}] ${note}` : `[${timestamp}] ${note}`;
     await db.update(crmLeads).set({ notes: appended, updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "note_added", "Note added", note.substring(0, 120));
+    await logActivity(req, id, "note_added", "Note added", note.substring(0, 120));
     res.json({ ok: true, notes: appended });
   } catch (err) {
     req.log.error({ err }, "Error adding note");
@@ -295,7 +640,7 @@ router.post("/crm/leads/:id/notes", requireAdmin, async (req: Request, res: Resp
 });
 
 // ── Activities (manual creation) ──────────────────────────────────────────────
-router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/activities", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -324,12 +669,28 @@ router.post("/crm/leads/:id/activities", requireAdmin, async (req: Request, res:
 });
 
 // ── Tasks ──────────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/tasks", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
     const data = req.body as Record<string, unknown>;
     if (!data.title) { res.status(400).json({ error: "Title is required" }); return; }
+
+    // M2: same task system as Operations/My Day — a task raised from a lead is
+    // assigned to a real person and gets a reminder, rather than landing in a
+    // queue nobody owns.
+    const staff = req.staffAuth?.staff;
+    const assignedToStaffId = Number.isFinite(Number(data.assignedToStaffId))
+      ? Number(data.assignedToStaffId)
+      : staff?.id ?? null;
+
+    // Same two words the Operations route accepts, refused the same way. The
+    // lead screen only ever collects a day, so it says nothing and gets the
+    // column default; a client that does say something must mean one of them.
+    if (data.dueKind !== undefined && !isCrmTaskDueKind(data.dueKind)) {
+      res.status(400).json({ error: 'A due date is either "date" (a day) or "time" (a moment). Nothing else.' });
+      return;
+    }
 
     const [task] = await db.insert(crmTasks).values({
       leadId: id,
@@ -337,10 +698,17 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
       title: String(data.title),
       description: data.description ? String(data.description) : undefined,
       dueDate: data.dueDate ? new Date(String(data.dueDate)) : undefined,
+      dueKind: isCrmTaskDueKind(data.dueKind) ? data.dueKind : undefined,
+      remindAt: data.remindAt ? new Date(String(data.remindAt)) : undefined,
+      priority: data.priority ? String(data.priority) : undefined,
+      assignedToStaffId,
+      createdByStaffId: staff?.id ?? null,
+      createdBy: staff?.displayName ?? staff?.email ?? "admin",
       status: "pending",
     }).returning();
 
-    await logActivity(id, "task_created", `Task created: ${task.title}`, `Type: ${task.type}`);
+    await syncTaskReminder(task.id);
+    await logActivity(req, id, "task_created", `Task created: ${task.title}`, `Type: ${task.type}`);
     res.status(201).json({ task });
   } catch (err) {
     req.log.error({ err }, "Error creating task");
@@ -348,7 +716,7 @@ router.post("/crm/leads/:id/tasks", requireAdmin, async (req: Request, res: Resp
   }
 });
 
-router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/tasks/:id", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -356,18 +724,40 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (data.status !== undefined) {
       updates.status = data.status;
-      if (data.status === "completed") updates.completedAt = new Date();
+      if (data.status === "completed") {
+        updates.completedAt = new Date();
+        // M2: record WHO completed it, not just that it happened.
+        updates.completedByStaffId = req.staffAuth?.staff.id ?? null;
+      } else {
+        updates.completedAt = null;
+        updates.completedByStaffId = null;
+      }
     }
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
     if (data.dueDate !== undefined) updates.dueDate = data.dueDate ? new Date(String(data.dueDate)) : null;
+    if (data.dueKind !== undefined) {
+      // The column is NOT NULL, so there is no "clear it" here — only the two
+      // meanings, or a refusal.
+      if (!isCrmTaskDueKind(data.dueKind)) {
+        res.status(400).json({ error: 'A due date is either "date" (a day) or "time" (a moment). Nothing else.' });
+        return;
+      }
+      updates.dueKind = data.dueKind;
+    }
+    if (data.remindAt !== undefined) updates.remindAt = data.remindAt ? new Date(String(data.remindAt)) : null;
     if (data.type !== undefined) updates.type = data.type;
 
     const [updated] = await db.update(crmTasks).set(updates).where(eq(crmTasks.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Task not found" }); return; }
 
+    // Completing or rescheduling here must cancel/move the pending reminder,
+    // exactly as it does on the Operations route — one task system, one
+    // reconcile.
+    await syncTaskReminder(id);
+
     if (data.status === "completed" && updated.leadId != null) {
-      await logActivity(updated.leadId, "task_completed", `Task completed: ${updated.title}`);
+      await logActivity(req, updated.leadId, "task_completed", `Task completed: ${updated.title}`);
     }
     res.json({ task: updated });
   } catch (err) {
@@ -376,7 +766,7 @@ router.patch("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.delete("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/tasks/:id", requireCrmAuth("tasks.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -390,23 +780,34 @@ router.delete("/crm/tasks/:id", requireAdmin, async (req: Request, res: Response
 });
 
 // ── All tasks (for tasks page) ────────────────────────────────────────────────
-router.get("/crm/tasks", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/tasks", requireCrmAuth("tasks.read.team"), async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const tasks = await db.select({
       id: crmTasks.id, leadId: crmTasks.leadId, type: crmTasks.type,
       title: crmTasks.title, description: crmTasks.description,
-      dueDate: crmTasks.dueDate, status: crmTasks.status,
+      dueDate: crmTasks.dueDate, dueKind: crmTasks.dueKind, status: crmTasks.status,
       completedAt: crmTasks.completedAt, createdAt: crmTasks.createdAt,
       leadName: crmLeads.name, leadCompany: crmLeads.company,
     }).from(crmTasks).leftJoin(crmLeads, eq(crmTasks.leadId, crmLeads.id))
       .orderBy(crmTasks.dueDate);
 
-    // Auto-mark overdue
-    const overdueTasks = tasks.filter(t => t.status === "pending" && t.dueDate && new Date(t.dueDate) < now);
-    if (overdueTasks.length) {
+    // Auto-mark overdue, by the one shared rule rather than a bare `due_date <
+    // now()`. That comparison stamped every date-only task "overdue" one minute
+    // into the day it was due — the false alarm this whole distinction exists
+    // to stop — and it stamped it on a GET, so the label stuck.
+    //
+    // This list has no person in it, so the zone is the same fallback the sweep
+    // names when a record has no owner. My Day, which does know whose task it
+    // is, answers in that person's zone and is the surface to believe.
+    const overdueIds = tasks
+      .filter(t => t.status === "pending" && t.dueDate
+        && isOverdueInZone(AUTOMATION_FALLBACK_TIMEZONE, t.dueDate, t.dueKind, now))
+      .map(t => t.id);
+    if (overdueIds.length) {
       await db.update(crmTasks).set({ status: "overdue" })
-        .where(and(eq(crmTasks.status, "pending"), lt(crmTasks.dueDate!, now)));
+        .where(inArray(crmTasks.id, overdueIds));
+      for (const t of tasks) if (overdueIds.includes(t.id)) t.status = "overdue";
     }
 
     res.json({ tasks });
@@ -417,32 +818,170 @@ router.get("/crm/tasks", requireAdmin, async (req: Request, res: Response) => {
 });
 
 // ── Send email ────────────────────────────────────────────────────────────────
-router.post("/crm/leads/:id/email", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/email", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-    const { subject, body, testMode } = req.body as { subject?: string; body?: string; testMode?: boolean };
+    const { subject, body, testMode, cc, bcc } = req.body as {
+      subject?: string; body?: string; testMode?: boolean;
+      cc?: string | string[]; bcc?: string | string[];
+    };
     if (!subject || !body) { res.status(400).json({ error: "Subject and body are required" }); return; }
+
+    // The compose modal has had working CC and BCC inputs all along and posted
+    // what was typed into them. Nothing here read those fields, so the sender
+    // was told "Email sent!" while the people they copied were never on it.
+    // Honour them, and refuse an address that is not one rather than dropping
+    // it silently — which is the failure being fixed.
+    const parseRecipients = (v: string | string[] | undefined): string[] =>
+      (Array.isArray(v) ? v : String(v ?? "").split(/[,;]/))
+        .map((s) => s.trim()).filter(Boolean);
+    const ccList = parseRecipients(cc);
+    const bccList = parseRecipients(bcc);
+    const invalid = [...ccList, ...bccList].filter((a) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a));
+    if (invalid.length > 0) {
+      res.status(400).json({ error: `Not a valid email address: ${invalid.join(", ")}` });
+      return;
+    }
 
     const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
     if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
 
-    const isTestMode = testMode !== false && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const {
+      isSuppressed, replyToAddress, recordOutboundForLoopControl,
+    } = await import("../lib/inboundEmail.js");
+    const { ensureConversation, refreshConversationRollups } = await import("../lib/conversations.js");
 
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [lead.email],
-        subject,
-        html: body.replace(/\n/g, "<br>"),
+    // Somebody who hard-bounced or reported us as spam must not be mailed
+    // again. Continuing to send to a complainer damages deliverability for
+    // every other client, so this is refused rather than warned about.
+    const blocked = await isSuppressed(lead.email);
+    if (blocked.suppressed) {
+      res.status(409).json({ error: blocked.reason, suppressed: true });
+      return;
+    }
+
+    // The conversation this belongs to, so the sent message is part of a
+    // thread rather than a loose activity row, and so the reply has somewhere
+    // to come back to.
+    const conversation = await ensureConversation({
+      channel: "email", provider: "resend",
+      contactId: lead.id, externalAddress: lead.email, externalName: lead.name,
+      subject,
+    });
+
+    if (conversation) {
+      const loop = await recordOutboundForLoopControl(conversation.id);
+      if (!loop.allowed) {
+        res.status(429).json({ error: loop.reason, loopProtection: true });
+        return;
+      }
+    }
+
+    // Replies come back to an address carrying this conversation's token,
+    // which is what makes an inbound reply attributable to a thread without
+    // trusting the sender header.
+    const replyTo = conversation ? await replyToAddress(conversation.id) : null;
+
+    // Test mode is the SERVER's decision, not the caller's.
+    //
+    // The old rule was `testMode !== false && CRM_EMAIL_TEST_MODE !== "false"`,
+    // so a request that simply said `testMode: false` reached a real mailbox on
+    // a server whose test mode was still on. `trySendStaffMail` hands nothing
+    // to the provider while test mode is on, whatever the body asks for, and
+    // `testMode` in the request is now ignored rather than obeyed.
+    void testMode;
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+
+    // The message row is written BEFORE the send and settled after it. Two
+    // reasons, and the second is the important one: a process that dies
+    // mid-send leaves a visible "Sending" rather than no record at all, and the
+    // send can carry a tag naming this row — which is what lets a later
+    // delivery event reach it even when the outcome is never learned here.
+    const who = actorLabel(req);
+    const [recorded] = conversation
+      ? await db.insert(crmMessages).values({
+          leadId: lead.id,
+          conversationId: conversation.id,
+          direction: "outbound",
+          channel: "email",
+          subject,
+          body,
+          fromNumber: process.env.RESEND_FROM_EMAIL ?? null,
+          toNumber: lead.email,
+          sentByStaffId: req.staffAuth?.staff.id ?? null,
+          sentByLabel: req.staffAuth?.staff ? who : null,
+          origin: req.staffAuth?.staff ? "staff" : "legacy",
+          status: "sending",
+          metadata: { cc: ccList, bcc: bccList, replyTo },
+        }).returning()
+      : [undefined];
+
+    const outcome = await trySendStaffMail({
+      to: lead.email,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+      ...(ccList.length ? { cc: ccList } : {}),
+      ...(bccList.length ? { bcc: bccList } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      ...(recorded ? { tags: emailRefTags(emailRef("message", recorded.id)) } : {}),
+    });
+
+    // `uncertain` is its own state and is never written as a failure: the
+    // message may be in their inbox, and a thread that says "not sent" is how a
+    // second copy gets sent.
+    const messageStatus = outcome.sent ? "sent"
+      : outcome.failure === "not_configured" ? (simulating ? "test_mode" : "not_sent")
+      : outcome.failure === "uncertain" ? "uncertain"
+      : "failed";
+
+    if (recorded && conversation) {
+      await db.update(crmMessages).set({
+        status: messageStatus,
+        providerMessageId: outcome.sent ? outcome.providerId : null,
+        metadata: {
+          cc: ccList, bcc: bccList, replyTo,
+          testMode: simulating,
+          ...(outcome.sent ? {} : { failure: outcome.failure, reason: outcome.reason.slice(0, 300) }),
+        },
+      }).where(eq(crmMessages.id, recorded.id));
+      await refreshConversationRollups(conversation.id);
+    }
+
+    if (!outcome.sent && !simulating) {
+      // Not sent, and which of the two reasons it was decides what the sender
+      // should do next — so it is said rather than flattened into one 500.
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false,
+        error: outcome.failure === "uncertain"
+          ? "The mail provider never confirmed this message, so whether it arrived is genuinely unknown. Check with them before sending it again — a second attempt may put a second copy in their inbox."
+          : outcome.reason,
+        failure: outcome.failure,
+        uncertain: outcome.failure === "uncertain",
+        messageId: recorded?.id ?? null,
       });
+      return;
     }
 
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "email_sent", `Email sent: ${subject}`, isTestMode ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`, { subject, testMode: isTestMode });
+    // The body used to be discarded, so the Email Activity tab could show that
+    // an email happened but never what it said. Keep it with the entry.
+    await logActivity(
+      req, id, "email_sent", `Email sent: ${subject}`,
+      simulating ? "[TEST MODE - not actually sent]" : `To: ${lead.email}`,
+      {
+        subject, body, testMode: simulating,
+        to: lead.email,
+        // BCC is recorded internally because the team needs to know who was
+        // copied; it is never echoed to a recipient.
+        ...(ccList.length ? { cc: ccList } : {}),
+        ...(bccList.length ? { bcc: bccList } : {}),
+      },
+    );
 
-    res.json({ ok: true, testMode: isTestMode });
+    res.json({ ok: true, testMode: simulating, cc: ccList, bcc: bccList, messageId: recorded?.id ?? null });
   } catch (err) {
     req.log.error({ err }, "Error sending email");
     res.status(500).json({ error: "Failed to send email" });
@@ -450,7 +989,7 @@ router.post("/crm/leads/:id/email", requireAdmin, async (req: Request, res: Resp
 });
 
 // ── Email Templates ───────────────────────────────────────────────────────────
-router.get("/crm/email-templates", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/email-templates", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   try {
     const templates = await db.select().from(crmEmailTemplates).orderBy(crmEmailTemplates.name);
     res.json({ templates });
@@ -459,7 +998,7 @@ router.get("/crm/email-templates", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.post("/crm/email-templates", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/email-templates", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const { name, type, subject, body } = req.body as Record<string, string>;
     if (!name || !subject || !body) { res.status(400).json({ error: "Name, subject, and body are required" }); return; }
@@ -470,7 +1009,7 @@ router.post("/crm/email-templates", requireAdmin, async (req: Request, res: Resp
   }
 });
 
-router.put("/crm/email-templates/:id", requireAdmin, async (req: Request, res: Response) => {
+router.put("/crm/email-templates/:id", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -485,7 +1024,7 @@ router.put("/crm/email-templates/:id", requireAdmin, async (req: Request, res: R
   }
 });
 
-router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/email-templates/:id", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -497,7 +1036,7 @@ router.delete("/crm/email-templates/:id", requireAdmin, async (req: Request, res
 });
 
 // ── Communications — Email Activity ──────────────────────────────────────────
-router.get("/crm/communications/email-activity", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/communications/email-activity", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const activities = await db
@@ -539,7 +1078,7 @@ router.get("/crm/communications/email-activity", requireAdmin, async (req: Reque
 
 // ── Campaign CRUD ─────────────────────────────────────────────────────────────
 
-router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const list = await db.select().from(crmCampaigns).orderBy(desc(crmCampaigns.updatedAt));
     // Attach recipient counts
@@ -556,7 +1095,7 @@ router.get("/crm/campaigns", requireAdmin, async (req: Request, res: Response) =
   }
 });
 
-router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const { name, subject, body, status, type, objective, toneProfile, description, stopOnReply, autoSend } = req.body as Record<string, unknown>;
     if (!name || !subject || !body) {
@@ -586,11 +1125,11 @@ router.post("/crm/campaigns", requireAdmin, async (req: Request, res: Response) 
 
 // ── Scheduler status & manual trigger (static — before /:id) ─────────────────
 
-router.get("/crm/campaigns/scheduler/status", requireAdmin, (_req: Request, res: Response) => {
+router.get("/crm/campaigns/scheduler/status", requireCrmAuth("campaigns.read"), (_req: Request, res: Response) => {
   res.json(getSchedulerStatus());
 });
 
-router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, res: Response) => {
+router.post("/crm/campaigns/scheduler/run", requireCrmAuth("campaigns.send"), async (_req: Request, res: Response) => {
   try {
     const result = await processScheduledMessages();
     res.json({ ok: true, ...result });
@@ -601,7 +1140,7 @@ router.post("/crm/campaigns/scheduler/run", requireAdmin, async (_req: Request, 
 
 // ── Campaign Scheduled Message Queue (static routes — must come before /:id) ──
 
-router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/queue", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const { status, campaignId } = req.query as Record<string, string>;
     const conditions = [];
@@ -638,7 +1177,7 @@ router.get("/crm/campaigns/queue", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -653,6 +1192,23 @@ router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reques
       updates.status = status;
     }
     if (!Object.keys(updates).length) { res.status(400).json({ error: "No fields to update" }); return; }
+
+    // Releasing a HELD message is a person deciding to send something the
+    // scheduler deliberately stopped — a backlog too old to go out on its own.
+    // The decision is stamped, so the next tick sends it instead of holding it
+    // again, which would make the release appear to do nothing.
+    const [current] = await db.select().from(crmCampaignScheduledMessages)
+      .where(eq(crmCampaignScheduledMessages.id, messageId));
+    if (!current) { res.status(404).json({ error: "Message not found" }); return; }
+    if (current.status === "held" && (status === "scheduled" || status === "queued")) {
+      updates.metadata = {
+        ...(current.metadata ?? {}),
+        releasedFromHoldAt: new Date().toISOString(),
+        releasedBy: actorLabel(req),
+      };
+      updates.lastError = null;
+    }
+
     const [msg] = await db.update(crmCampaignScheduledMessages)
       .set(updates)
       .where(eq(crmCampaignScheduledMessages.id, messageId))
@@ -665,7 +1221,7 @@ router.patch("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reques
   }
 });
 
-router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/queue/:messageId/send-now", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -674,7 +1230,9 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req
       .from(crmCampaignScheduledMessages)
       .where(eq(crmCampaignScheduledMessages.id, messageId));
     if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
-    if (!["scheduled","queued"].includes(msg.status)) {
+    // `held` is sendable from here on purpose: a person pressing Send Now on a
+    // message the scheduler held IS the review the hold was asking for.
+    if (!["scheduled","queued","held"].includes(msg.status)) {
       res.status(400).json({ error: "Message is not in a sendable state" }); return;
     }
     if (msg.channel !== "email") {
@@ -690,29 +1248,58 @@ router.post("/crm/campaigns/queue/:messageId/send-now", requireAdmin, async (req
         .where(eq(crmCampaignScheduledMessages.id, messageId));
       res.status(400).json({ error: "No valid email address" }); return;
     }
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    let resendId: string | null = null;
-    if (!isTestMode) {
-      const resend = getResend();
-      const { data } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [lead.email],
-        subject: msg.subject ?? "(no subject)",
-        html: (msg.body ?? "").replace(/\n/g, "<br>"),
-      });
-      resendId = data?.id ?? null;
+    // Claim it first. Without this, the scheduler tick can pick up the same
+    // due message while this request is sending it, and the recipient gets two.
+    const claimed = await db.update(crmCampaignScheduledMessages)
+      .set({ status: "sending" })
+      .where(and(
+        eq(crmCampaignScheduledMessages.id, messageId),
+        inArray(crmCampaignScheduledMessages.status, ["scheduled", "queued", "held"]),
+      ))
+      .returning({ id: crmCampaignScheduledMessages.id });
+    if (claimed.length === 0) {
+      res.status(409).json({ error: "This message is already being sent." });
+      return;
     }
+
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to: lead.email,
+      subject: msg.subject ?? "(no subject)",
+      text: msg.body ?? "",
+      html: (msg.body ?? "").replace(/\n/g, "<br>"),
+      tags: emailRefTags(emailRef("sequence_message", msg.id)),
+    });
+
+    if (outcome.sent || simulating) {
+      await db.update(crmCampaignScheduledMessages)
+        .set({
+          status: "sent", sentAt: new Date(), lastError: null,
+          resendEmailId: outcome.sent ? outcome.providerId : null,
+        })
+        .where(eq(crmCampaignScheduledMessages.id, messageId));
+      res.json({ ok: true, testMode: simulating });
+      return;
+    }
+
+    // Recorded under the class the answer actually supports. An `uncertain:`
+    // prefix is what stops anybody re-queuing a message that may already have
+    // arrived, and it is what a later `delivered` event upgrades.
     await db.update(crmCampaignScheduledMessages)
-      .set({ status: "sent", sentAt: new Date(), resendEmailId: resendId })
+      .set({ status: "failed", lastError: `${outcome.failure}: ${outcome.reason}`.slice(0, 500) })
       .where(eq(crmCampaignScheduledMessages.id, messageId));
-    res.json({ ok: true, testMode: isTestMode });
+    res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+      ok: false, error: outcome.reason, failure: outcome.failure,
+      uncertain: outcome.failure === "uncertain",
+    });
   } catch (err) {
     req.log.error({ err }, "Error sending scheduled message");
     res.status(500).json({ error: "Failed to send message" });
   }
 });
 
-router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/queue/:messageId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const messageId = Number(req.params.messageId);
     if (isNaN(messageId)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -728,7 +1315,7 @@ router.delete("/crm/campaigns/queue/:messageId", requireAdmin, async (req: Reque
 
 // ── Bulk reschedule: shift all scheduled/queued messages for a lead ───────────
 // Static path (/leads/:leadId/reschedule) — placed before /:id group per rule #8
-router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/leads/:leadId/reschedule", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const leadId = Number(req.params.leadId);
     if (isNaN(leadId)) { res.status(400).json({ error: "Invalid leadId" }); return; }
@@ -773,7 +1360,7 @@ router.post("/crm/campaigns/leads/:leadId/reschedule", requireAdmin, async (req:
 
 // ── Campaign CRUD (parameterized routes) ──────────────────────────────────────
 
-router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -802,7 +1389,7 @@ router.get("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respons
   }
 });
 
-router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -829,7 +1416,7 @@ router.patch("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/:id", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -842,7 +1429,7 @@ router.delete("/crm/campaigns/:id", requireAdmin, async (req: Request, res: Resp
 });
 
 // Replace all recipients for a campaign (upsert pattern)
-router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/recipients", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -881,7 +1468,7 @@ router.post("/crm/campaigns/:id/recipients", requireAdmin, async (req: Request, 
 });
 
 // Per-campaign test send (uses persisted campaign data)
-router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/test-send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -893,19 +1480,25 @@ router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, r
     const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
     if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [to],
-        subject: `[TEST] ${campaign.subject}`,
-        html: campaign.body.replace(/\n/g, "<br>"),
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to,
+      subject: `[TEST] ${campaign.subject}`,
+      text: campaign.body,
+      html: campaign.body.replace(/\n/g, "<br>"),
+    });
+
+    if (!outcome.sent && !simulating) {
+      req.log.warn({ to, campaignId: id, failure: outcome.failure }, "Campaign test email not sent");
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false, error: outcome.reason, failure: outcome.failure, to,
       });
+      return;
     }
 
-    req.log.info({ to, campaignId: id, testMode: isTestMode }, "Campaign test email dispatched");
-    res.json({ ok: true, testMode: isTestMode, to });
+    req.log.info({ to, campaignId: id, testMode: simulating }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: simulating, to });
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
@@ -914,7 +1507,7 @@ router.post("/crm/campaigns/:id/test-send", requireAdmin, async (req: Request, r
 
 // ── Campaign Test Send ────────────────────────────────────────────────────────
 // Sends a single test email to a manually specified address — NOT to leads.
-router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/test-send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const { to, subject, body } = req.body as { to?: string; subject?: string; body?: string };
     if (!to || !subject || !body) {
@@ -925,19 +1518,25 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
       res.status(400).json({ error: "Invalid test email address" }); return;
     }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
-    if (!isTestMode) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-        to: [to],
-        subject: `[TEST] ${subject}`,
-        html: body.replace(/\n/g, "<br>"),
+    const simulating = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const outcome = await trySendStaffMail({
+      to,
+      subject: `[TEST] ${subject}`,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+    });
+
+    if (!outcome.sent && !simulating) {
+      req.log.warn({ to, failure: outcome.failure }, "Campaign test email not sent");
+      res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+        ok: false, error: outcome.reason, failure: outcome.failure, to,
       });
+      return;
     }
 
-    req.log.info({ to, testMode: isTestMode }, "Campaign test email dispatched");
-    res.json({ ok: true, testMode: isTestMode, to });
+    req.log.info({ to, testMode: simulating }, "Campaign test email dispatched");
+    res.json({ ok: true, testMode: simulating, to });
   } catch (err) {
     req.log.error({ err }, "Error sending campaign test email");
     res.status(500).json({ error: "Failed to send test email" });
@@ -945,7 +1544,7 @@ router.post("/crm/campaigns/test-send", requireAdmin, async (req: Request, res: 
 });
 
 // ── Campaign Analytics ────────────────────────────────────────────────────────
-router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/analytics", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1080,7 +1679,7 @@ router.get("/crm/campaigns/:id/analytics", requireAdmin, async (req: Request, re
 // ── Campaign Sequence Funnel ──────────────────────────────────────────────────
 // Per-step delivery funnel for nurture/drip campaigns.
 // Works for broadcast too (returns empty steps array).
-router.get("/crm/campaigns/:id/funnel", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/funnel", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1171,7 +1770,7 @@ router.get("/crm/campaigns/:id/funnel", requireAdmin, async (req: Request, res: 
 
 // ── Campaign Send Execution ───────────────────────────────────────────────────
 // Sends to all selected recipients one at a time, tracks status per recipient.
-router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/send", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1197,7 +1796,10 @@ router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: R
       res.status(400).json({ error: "No recipients saved for this campaign" }); return;
     }
 
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    // Decided by the seam, not by this route: while CRM_EMAIL_TEST_MODE is
+    // anything other than the exact string "false", nothing is handed over.
+    const isTestMode = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
     const results: Array<{ recipientId: number; leadId: number; email: string; status: string; error?: string }> = [];
     let sent = 0, failed = 0, skipped = 0;
 
@@ -1221,33 +1823,39 @@ router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: R
       const subject = r.personalizedSubject ?? campaign.subject;
       const body    = r.personalizedBody   ?? campaign.body;
 
-      let resendEmailId: string | null = null;
-      try {
-        if (!isTestMode) {
-          const resend = getResend();
-          const { data } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-            to: [r.leadEmail],
-            subject,
-            html: body.replace(/\n/g, "<br>"),
-          });
-          // 200 ms rate-limit guard between live sends
-          await new Promise(resolve => setTimeout(resolve, 200));
-          resendEmailId = data?.id ?? null;
-        }
+      const outcome = await trySendStaffMail({
+        to: r.leadEmail,
+        subject,
+        text: body,
+        html: body.replace(/\n/g, "<br>"),
+        tags: emailRefTags(emailRef("campaign_recipient", r.id)),
+      });
+      // The same 200 ms gap between live sends as before: the provider rate
+      // limits, and a burst is what trips it.
+      if (outcome.sent) await new Promise(resolve => setTimeout(resolve, 200));
+
+      if (outcome.sent || isTestMode) {
         await db.update(crmCampaignRecipients)
-          .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId })
+          .set({
+            status: "sent", sentAt: new Date(), lastError: null,
+            resendEmailId: outcome.sent ? outcome.providerId : null,
+          })
           .where(eq(crmCampaignRecipients.id, r.id));
         results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "sent" });
         sent++;
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : "Unknown send error";
-        await db.update(crmCampaignRecipients)
-          .set({ status: "failed", lastError: errMsg })
-          .where(eq(crmCampaignRecipients.id, r.id));
-        results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: errMsg });
-        failed++;
+        continue;
       }
+
+      // Stored under the class the answer actually supports. An `uncertain:`
+      // outcome may already be in somebody's inbox, so it is never described
+      // as not sent, and nothing re-queues it by itself — a later `delivered`
+      // event is what resolves it.
+      const recordedError = `${outcome.failure}: ${outcome.reason}`.slice(0, 500);
+      await db.update(crmCampaignRecipients)
+        .set({ status: "failed", lastError: recordedError })
+        .where(eq(crmCampaignRecipients.id, r.id));
+      results.push({ recipientId: r.id, leadId: r.leadId, email: r.leadEmail, status: "failed", error: recordedError });
+      failed++;
     }
 
     // Mark campaign as archived if fully sent
@@ -1264,7 +1872,7 @@ router.post("/crm/campaigns/:id/send", requireAdmin, async (req: Request, res: R
 });
 
 // Resend to a single failed or skipped recipient
-router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireCrmAuth("campaigns.send"), async (req: Request, res: Response) => {
   try {
     const id          = Number(req.params.id);
     const recipientId = Number(req.params.recipientId);
@@ -1295,155 +1903,45 @@ router.post("/crm/campaigns/:id/recipients/:recipientId/resend", requireAdmin, a
 
     const subject = r.personalizedSubject ?? campaign.subject;
     const body    = r.personalizedBody   ?? campaign.body;
-    const isTestMode = process.env.CRM_EMAIL_TEST_MODE !== "false";
+    const isTestMode = staffMailBlockedReason() !== null
+      && process.env.CRM_EMAIL_TEST_MODE !== "false";
 
-    let resendEmailIdSingle: string | null = null;
-    try {
-      if (!isTestMode) {
-        const resend = getResend();
-        const { data } = await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL ?? "SiteMint Digital Solutions <noreply@sitemintdigital.com>",
-          to: [r.leadEmail],
-          subject,
-          html: body.replace(/\n/g, "<br>"),
-        });
-        resendEmailIdSingle = data?.id ?? null;
-      }
+    const outcome = await trySendStaffMail({
+      to: r.leadEmail,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+      tags: emailRefTags(emailRef("campaign_recipient", r.id)),
+    });
+
+    if (outcome.sent || isTestMode) {
       await db.update(crmCampaignRecipients)
-        .set({ status: "sent", sentAt: new Date(), lastError: null, resendEmailId: resendEmailIdSingle })
+        .set({
+          status: "sent", sentAt: new Date(), lastError: null,
+          resendEmailId: outcome.sent ? outcome.providerId : null,
+        })
         .where(eq(crmCampaignRecipients.id, recipientId));
       req.log.info({ campaignId: id, recipientId, testMode: isTestMode }, "Recipient resent");
       res.json({ ok: true, status: "sent", testMode: isTestMode, email: r.leadEmail });
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : "Unknown send error";
-      await db.update(crmCampaignRecipients)
-        .set({ status: "failed", lastError: errMsg })
-        .where(eq(crmCampaignRecipients.id, recipientId));
-      res.status(500).json({ ok: false, status: "failed", error: errMsg });
+      return;
     }
+
+    const recordedError = `${outcome.failure}: ${outcome.reason}`.slice(0, 500);
+    await db.update(crmCampaignRecipients)
+      .set({ status: "failed", lastError: recordedError })
+      .where(eq(crmCampaignRecipients.id, recipientId));
+    res.status(outcome.failure === "not_configured" ? 503 : 502).json({
+      ok: false, status: "failed", error: outcome.reason, failure: outcome.failure,
+      uncertain: outcome.failure === "uncertain",
+    });
   } catch (err) {
     req.log.error({ err }, "Error resending to recipient");
     res.status(500).json({ error: "Failed to resend" });
   }
 });
 
-// ── Resend Webhook ────────────────────────────────────────────────────────────
-// Public endpoint — no admin auth. Signature verified via svix (RESEND_WEBHOOK_SECRET).
-router.post("/crm/webhooks/resend", async (req: Request, res: Response) => {
-  try {
-    const secret = process.env.RESEND_WEBHOOK_SECRET;
-    if (!secret) {
-      req.log.warn("RESEND_WEBHOOK_SECRET not set — webhook endpoint disabled");
-      res.status(500).json({ error: "Webhook not configured — RESEND_WEBHOOK_SECRET is missing" });
-      return;
-    }
-
-    // req.body is a Buffer thanks to express.raw() mounted in app.ts for this path
-    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body);
-
-    // Verify Resend webhook signature using svix
-    let payload: Record<string, unknown>;
-    try {
-      const { Webhook } = await import("svix");
-      const wh = new Webhook(secret);
-      payload = wh.verify(rawBody, {
-        "svix-id":        req.headers["svix-id"] as string,
-        "svix-timestamp": req.headers["svix-timestamp"] as string,
-        "svix-signature": req.headers["svix-signature"] as string,
-      }) as Record<string, unknown>;
-    } catch (verifyErr) {
-      req.log.warn({ err: verifyErr }, "Resend webhook signature verification failed");
-      res.status(400).json({ error: "Invalid webhook signature" });
-      return;
-    }
-
-    // Map Resend event type → internal event_type
-    const RESEND_EVENT_MAP: Record<string, string> = {
-      "email.opened":          "opened",
-      "email.clicked":         "clicked",
-      "email.bounced":         "bounced",
-      "email.delivery_failed": "failed",
-      "email.complained":      "complained",
-    };
-    const resendEventType = (payload.type as string) ?? "";
-    const eventType = RESEND_EVENT_MAP[resendEventType];
-    if (!eventType) {
-      // Unknown event type — ack but ignore
-      res.json({ ok: true, ignored: true, reason: "unknown_event_type" });
-      return;
-    }
-
-    // Extract Resend email id from payload data
-    const data = (payload.data as Record<string, unknown>) ?? {};
-    const resendEmailId = (data.email_id as string) ?? null;
-    if (!resendEmailId) {
-      res.json({ ok: true, ignored: true, reason: "no_email_id" });
-      return;
-    }
-
-    // Find matching recipient (include leadId so we can do sequence reply logic)
-    const [recipient] = await db
-      .select({ id: crmCampaignRecipients.id, campaignId: crmCampaignRecipients.campaignId, leadId: crmCampaignRecipients.leadId })
-      .from(crmCampaignRecipients)
-      .where(eq(crmCampaignRecipients.resendEmailId, resendEmailId))
-      .limit(1);
-
-    if (!recipient) {
-      res.json({ ok: true, ignored: true, reason: "no_matching_recipient" });
-      return;
-    }
-
-    // Determine occurred_at from payload if available
-    const occurredAt = data.created_at ? new Date(data.created_at as string) : new Date();
-
-    // Application-level dedup for opened/clicked — Resend retries can send duplicates
-    const errorReason = (data.reason as string) ?? (data.error as string) ?? null;
-    if (eventType === "opened" || eventType === "clicked") {
-      const [existing] = await db
-        .select({ id: crmCampaignEvents.id })
-        .from(crmCampaignEvents)
-        .where(and(
-          eq(crmCampaignEvents.campaignRecipientId, recipient.id),
-          eq(crmCampaignEvents.eventType, eventType),
-        ))
-        .limit(1);
-      if (existing) {
-        req.log.info({ recipientId: recipient.id, eventType }, "Duplicate webhook event skipped");
-        res.json({ ok: true, eventType, recipientId: recipient.id, deduplicated: true });
-        return;
-      }
-    }
-
-    await db.insert(crmCampaignEvents).values({
-      campaignRecipientId: recipient.id,
-      eventType,
-      occurredAt,
-      metadata: { resendEventType, resendEmailId, raw: data },
-    });
-
-    // For bounce / failure / complaint: update recipient status
-    if (eventType === "bounced" || eventType === "failed" || eventType === "complained") {
-      await db.update(crmCampaignRecipients)
-        .set({ status: "failed", lastError: errorReason ?? `${resendEventType} via webhook` })
-        .where(eq(crmCampaignRecipients.id, recipient.id));
-    }
-
-    // For complaint (spam report): also stop all active sequences for this lead immediately
-    if (eventType === "complained" && recipient.leadId) {
-      await stampReplyAndStop(recipient.leadId, "email", { resendEventType, resendEmailId });
-      req.log.info({ leadId: recipient.leadId }, "Sequences stopped due to spam complaint");
-    }
-
-    req.log.info({ recipientId: recipient.id, eventType, resendEmailId }, "Resend webhook event recorded");
-    res.json({ ok: true, eventType, recipientId: recipient.id });
-  } catch (err) {
-    req.log.error({ err }, "Error processing Resend webhook");
-    res.status(500).json({ error: "Internal error processing webhook" });
-  }
-});
-
 // ── CSV Import ────────────────────────────────────────────────────────────────
-router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: "No rows provided" }); return; }
@@ -1460,6 +1958,14 @@ router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => 
 
     let created = 0, skippedDuplicates = 0, invalid = 0;
     const errors: { rowIndex: number; message: string }[] = [];
+
+    // M6: owner names resolve through the same rules as every other write
+    // (lib/leadOwnerRules.ts) — staff read once, each name decided once — and a
+    // name that resolves to nobody is REPORTED in the response, never guessed.
+    const ownerCandidates = await loadOwnerCandidates();
+    const unresolvedOwners = new Map<string, {
+      value: string; rows: number; reason: "no_match" | "ambiguous"; explanation: string;
+    }>();
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -1480,6 +1986,8 @@ router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => 
       const estimatedValue = rawEv && !isNaN(parseFloat(rawEv)) ? String(parseFloat(rawEv)) : null;
       const rawTags = (row.tags || row.Tags || "").trim();
       const tags = rawTags ? rawTags.split(",").map((t: string) => t.trim()).filter(Boolean) : [];
+      const ownerText = trimOwnerValue(row.assignedTo || row.assigned_to || row["Assigned To"] || "");
+      const ownerMatch = ownerText ? matchOwner(ownerText, ownerCandidates) : null;
 
       try {
         const [lead] = await db.insert(crmLeads).values({
@@ -1492,20 +2000,37 @@ router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => 
           serviceInterest: (row.serviceInterest || row.service_interest || row["Service Interest"] || "").trim() || undefined,
           status: normSt(row.status || row.Status),
           priority: normPr(row.priority || row.Priority),
-          assignedTo: (row.assignedTo || row.assigned_to || row["Assigned To"] || "").trim() || undefined,
+          assignedTo: ownerText || undefined,
+          assignedToStaffId: ownerMatch?.outcome === "matched" ? ownerMatch.staffId : undefined,
           notes: (row.notes || row.Notes || "").trim() || undefined,
           tags,
           estimatedValue,
         }).returning();
-        await logActivity(lead.id, "lead_imported", `Imported from CSV: ${lead.name}`, "Lead imported through CRM Import page.");
+        await logActivity(req, lead.id, "lead_imported", `Imported from CSV: ${lead.name}`, "Lead imported through CRM Import page.");
         created++;
+        if (ownerMatch && ownerMatch.outcome !== "matched") {
+          const key = ownerKey(ownerText);
+          const seen = unresolvedOwners.get(key);
+          if (seen) seen.rows += 1;
+          else unresolvedOwners.set(key, {
+            value: ownerText, rows: 1,
+            reason: ownerMatch.outcome === "ambiguous" ? "ambiguous" : "no_match",
+            explanation: explainOwnerMatch(ownerText, ownerMatch, ownerCandidates),
+          });
+        }
       } catch (e) {
         invalid++;
         errors.push({ rowIndex: i, message: `Insert failed: ${String(e).slice(0, 80)}` });
       }
     }
 
-    res.json({ created, skippedDuplicates, invalid, errors: errors.slice(0, 20) });
+    res.json({
+      created, skippedDuplicates, invalid, errors: errors.slice(0, 20),
+      // Contacts created carrying an owner name that matched nobody, or more
+      // than one person. They have no person as owner until somebody decides,
+      // on Admin → Unmapped lead owners.
+      unresolvedOwners: [...unresolvedOwners.values()],
+    });
   } catch (err) {
     req.log.error({ err }, "Error importing CSV");
     res.status(500).json({ error: "Failed to import" });
@@ -1513,7 +2038,7 @@ router.post("/crm/import", requireAdmin, async (req: Request, res: Response) => 
 });
 
 // ── Import from discovery submissions ─────────────────────────────────────────
-router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import-discovery", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const submissions = await db.select().from(discoverySubmissions);
     let imported = 0, skipped = 0;
@@ -1542,7 +2067,7 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
         discoveryFormStatus: "Completed",
       }).returning();
 
-      await logActivity(lead.id, "lead_imported", `Imported from discovery form`, `Original submission ID: ${sub.id}`);
+      await logActivity(req, lead.id, "lead_imported", `Imported from discovery form`, `Original submission ID: ${sub.id}`);
       imported++;
     }
 
@@ -1554,7 +2079,7 @@ router.post("/crm/import-discovery", requireAdmin, async (req: Request, res: Res
 });
 
 // ── Single submission import ───────────────────────────────────────────────────
-router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/import-discovery/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const subId = Number(req.params.id);
     if (!subId) { res.status(400).json({ error: "Invalid submission id" }); return; }
@@ -1599,6 +2124,7 @@ router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res:
     }).returning();
 
     await logActivity(
+      req,
       lead.id,
       "lead_imported",
       "Imported from Discovery Portal",
@@ -1618,7 +2144,7 @@ router.post("/crm/import-discovery/:id", requireAdmin, async (req: Request, res:
 });
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
-router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals/stats", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const deals = await db.select().from(crmDeals);
     const wonDeals = deals.filter(d => d.stage === "Won");
@@ -1630,7 +2156,7 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
 
     // Total Revenue reflects real money in (crm_transactions), not the deal
     // stage flip — a deal marked "Won" with no completed transaction contributes $0.
-    const completedTxns = await db.select().from(crmTransactions).where(eq(crmTransactions.status, "completed"));
+    const completedTxns = await db.select().from(crmTransactions).where(eq(crmTransactions.status, TRANSACTION_RECEIVED_STATUS));
     const totalRevenue = completedTxns.reduce((s, t) => s + Number(t.amount), 0);
 
     const stageOrder = ["Lead", "Qualified", "Proposal", "Won", "Lost"];
@@ -1667,7 +2193,7 @@ router.get("/crm/deals/stats", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const deals = await db.select().from(crmDeals).orderBy(desc(crmDeals.createdAt));
     const leadsMap = new Map<number, string>();
@@ -1684,7 +2210,7 @@ router.get("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number>;
     if (!name) { res.status(400).json({ error: "Name is required" }); return; }
@@ -1703,7 +2229,7 @@ router.post("/crm/deals", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/deals/:id", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const { name, value, stage, closeDate, notes, leadId } = req.body as Record<string, string | number | null>;
@@ -1723,10 +2249,11 @@ router.patch("/crm/deals/:id", requireAdmin, async (req: Request, res: Response)
   }
 });
 
-router.delete("/crm/deals/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/deals/:id", requireCrmAuth("deals.delete"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     await db.delete(crmDeals).where(eq(crmDeals.id, id));
+    await auditAction(req, "deal.deleted", `deal:${id}`);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error deleting deal");
@@ -1735,9 +2262,76 @@ router.delete("/crm/deals/:id", requireAdmin, async (req: Request, res: Response
 });
 
 // ── Deal Transactions (real money in — never inferred from stage) ────────────
+
+/**
+ * Every transaction in one query, with its deal and client joined and paged
+ * server-side.
+ *
+ * The Transactions screen previously fetched all deals and then issued one
+ * request per deal — a fan-out that grew with the business and re-sorted the
+ * whole history in the browser. Filtering and paging belong here.
+ */
+router.get("/crm/transactions", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const limit = Math.min(Math.max(Number(q["limit"]) || 50, 1), 200);
+    const offset = Math.max(Number(q["offset"]) || 0, 0);
+
+    const conditions = [
+      ...(q["status"] ? [eq(crmTransactions.status, q["status"])] : []),
+      ...(q["method"] ? [eq(crmTransactions.method, q["method"])] : []),
+      ...(q["from"] ? [gte(crmTransactions.receivedAt, new Date(q["from"]))] : []),
+      ...(q["to"] ? [lte(crmTransactions.receivedAt, new Date(`${q["to"]}T23:59:59.999Z`))] : []),
+    ];
+    const where = conditions.length ? and(...conditions) : undefined;
+
+    const [rows, [countRow], [totals]] = await Promise.all([
+      db.select({
+        transaction: crmTransactions,
+        dealName: crmDeals.name,
+        dealStage: crmDeals.stage,
+        leadId: crmDeals.leadId,
+        clientName: crmLeads.name,
+        clientCompany: crmLeads.company,
+      })
+        .from(crmTransactions)
+        .leftJoin(crmDeals, eq(crmTransactions.dealId, crmDeals.id))
+        .leftJoin(crmLeads, eq(crmDeals.leadId, crmLeads.id))
+        .where(where)
+        .orderBy(desc(crmTransactions.receivedAt), desc(crmTransactions.id))
+        .limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(crmTransactions).where(where),
+      // Totals are computed across the whole filtered set, not just this page —
+      // a page total would be a different and misleading number.
+      db.select({
+        received: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = ${TRANSACTION_RECEIVED_STATUS}), 0)`,
+        pending: sql<string>`coalesce(sum(${crmTransactions.amount}) filter (where ${crmTransactions.status} = 'pending'), 0)`,
+      }).from(crmTransactions).where(where),
+    ]);
+
+    res.json({
+      transactions: rows.map((r) => ({
+        ...r.transaction,
+        dealName: r.dealName, dealStage: r.dealStage, leadId: r.leadId,
+        clientName: r.clientName, clientCompany: r.clientCompany,
+      })),
+      total: Number(countRow?.count ?? 0),
+      totals: {
+        received: Number(totals?.received ?? 0),
+        pending: Number(totals?.pending ?? 0),
+        basis: "Sums cover every transaction matching the current filters, not only the visible page.",
+      },
+      limit, offset,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching transactions");
+    res.status(500).json({ error: "Failed to fetch transactions" });
+  }
+});
+
 const MANUAL_METHODS = TRANSACTION_METHODS.filter(m => m !== "stripe");
 
-router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals/:id/transactions/manual", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
@@ -1767,7 +2361,7 @@ router.post("/crm/deals/:id/transactions/manual", requireAdmin, async (req: Requ
   }
 });
 
-router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/deals/:id/transactions/stripe-checkout", requireCrmAuth("deals.write"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, dealId));
@@ -1814,7 +2408,7 @@ router.post("/crm/deals/:id/transactions/stripe-checkout", requireAdmin, async (
   }
 });
 
-router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/deals/:id/transactions", requireCrmAuth("deals.read"), async (req: Request, res: Response) => {
   try {
     const dealId = Number(req.params.id);
     const transactions = await db.select().from(crmTransactions)
@@ -1828,7 +2422,7 @@ router.get("/crm/deals/:id/transactions", requireAdmin, async (req: Request, res
 });
 
 // ── Pipeline (same as leads but grouped by status) ────────────────────────────
-router.get("/crm/pipeline", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/pipeline", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db.select().from(crmLeads).orderBy(desc(crmLeads.updatedAt));
     const pipeline = Object.fromEntries(CRM_STATUSES.map(s => [s, leads.filter(l => l.status === s)]));
@@ -1859,10 +2453,15 @@ function crmLeadToSubmission(lead: CrmLead): DiscoverySubmission {
     phone: lead.phone ?? null,
     industry: null,
     serviceInterest: lead.serviceInterest ?? null,
-    budget: "5k-10k",
-    timeline: "flexible",
-    decisionMaker: "just-me",
-    leadScore: 5,
+    // These were hardcoded to "5k-10k" / "flexible" / "just-me" / 5, which put
+    // invented budget, timeline, decision-maker and lead-score figures into a
+    // document sent to a client. A lead carries none of that information, so it
+    // stays unspecified and the generator renders it as "Not specified" rather
+    // than guessing on the client's behalf.
+    budget: null,
+    timeline: null,
+    decisionMaker: null,
+    leadScore: 0,
     tags: lead.tags,
     status: "CRM Lead",
     recommendedPackage: lead.packageType ?? null,
@@ -1888,7 +2487,7 @@ function crmLeadToSubmission(lead: CrmLead): DiscoverySubmission {
 
 // ── Sales Workspace: Proposal ─────────────────────────────────────────────────
 
-router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/proposal/generate", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1905,7 +2504,7 @@ router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Reques
 
     const newStatus = lead.proposalStatus === "Not Started" ? "Draft" : lead.proposalStatus;
     await db.update(crmLeads).set({ generatedProposal: html, proposalStatus: newStatus, updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "proposal_generated", "Proposal generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
+    await logActivity(req, id, "proposal_generated", "Proposal generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
     req.log.info({ id }, "Proposal generated for CRM lead");
     res.json({ proposal: html });
   } catch (err) {
@@ -1914,7 +2513,7 @@ router.post("/crm/leads/:id/proposal/generate", requireAdmin, async (req: Reques
   }
 });
 
-router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/proposal", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1932,7 +2531,7 @@ router.patch("/crm/leads/:id/proposal", requireAdmin, async (req: Request, res: 
 
 // ── Sales Workspace: Scope of Work ────────────────────────────────────────────
 
-router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/sow/generate", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1949,7 +2548,7 @@ router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, re
 
     const newStatus = lead.sowStatus === "Not Started" ? "Draft" : lead.sowStatus;
     await db.update(crmLeads).set({ generatedSow: html, sowStatus: newStatus, updatedAt: new Date() }).where(eq(crmLeads.id, id));
-    await logActivity(id, "sow_generated", "Scope of Work generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
+    await logActivity(req, id, "sow_generated", "Scope of Work generated", lead.discoverySubmissionId ? "Generated from discovery submission" : "Generated from CRM lead data");
     req.log.info({ id }, "SOW generated for CRM lead");
     res.json({ sow: html });
   } catch (err) {
@@ -1958,7 +2557,7 @@ router.post("/crm/leads/:id/sow/generate", requireAdmin, async (req: Request, re
   }
 });
 
-router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/sow", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -1980,7 +2579,7 @@ router.patch("/crm/leads/:id/sow", requireAdmin, async (req: Request, res: Respo
 // Org-wide feed of recent behavioral events across all leads, for the
 // Behavioral Intelligence dashboard. Static route — must stay above
 // the "/crm/leads/:id/behavioral-events" route group.
-router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/behavioral-events", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 1000, 2000);
     const events = await db
@@ -2006,7 +2605,7 @@ router.get("/crm/behavioral-events", requireAdmin, async (req: Request, res: Res
 
 // GET /crm/leads/:id/behavioral-events
 // Returns all behavioral events for a lead, newest first.
-router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id/behavioral-events", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2029,7 +2628,7 @@ router.get("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request
 // Body: { eventType, label?, dClientIntent?, dUrgency?, dTrust?,
 //         dProjectReadiness?, dBudgetConfidence?, dCommunicationScore?,
 //         dReferralProbability?, metadata?, occurredAt? }
-router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/behavioral-events", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2072,7 +2671,7 @@ router.post("/crm/leads/:id/behavioral-events", requireAdmin, async (req: Reques
 
 // DELETE /crm/leads/:id/behavioral-events/:eventId
 // Removes a single behavioral event (manual correction).
-router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/leads/:id/behavioral-events/:eventId", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const leadId  = Number(req.params.id);
     const eventId = Number(req.params.eventId);
@@ -2089,7 +2688,7 @@ router.delete("/crm/leads/:id/behavioral-events/:eventId", requireAdmin, async (
 
 // ── Campaign Steps CRUD ───────────────────────────────────────────────────────
 
-router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/steps", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2105,7 +2704,7 @@ router.get("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: R
   }
 });
 
-router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/steps", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2147,7 +2746,7 @@ router.post("/crm/campaigns/:id/steps", requireAdmin, async (req: Request, res: 
   }
 });
 
-router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id/steps/:stepId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
@@ -2187,7 +2786,7 @@ router.patch("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Reque
   }
 });
 
-router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/campaigns/:id/steps/:stepId", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id     = Number(req.params.id);
     const stepId = Number(req.params.stepId);
@@ -2203,7 +2802,7 @@ router.delete("/crm/campaigns/:id/steps/:stepId", requireAdmin, async (req: Requ
 
 // ── Campaign Sequence Enrollment ──────────────────────────────────────────────
 
-router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/:id/enroll", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -2283,7 +2882,7 @@ router.post("/crm/campaigns/:id/enroll", requireAdmin, async (req: Request, res:
 
 // ── Campaign Recipient Enrollment Status ──────────────────────────────────────
 
-router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/campaigns/:id/recipients/:rid/status", requireCrmAuth("campaigns.write"), async (req: Request, res: Response) => {
   try {
     const id  = Number(req.params.id);
     const rid = Number(req.params.rid);
@@ -2317,7 +2916,7 @@ router.patch("/crm/campaigns/:id/recipients/:rid/status", requireAdmin, async (r
 
 // ── Campaign Activity Feed ────────────────────────────────────────────────────
 
-router.get("/crm/campaigns/:id/activity", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/campaigns/:id/activity", requireCrmAuth("campaigns.read"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }

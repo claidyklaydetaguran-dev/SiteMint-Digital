@@ -1,21 +1,15 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import {
   db, discoverySubmissions, crmLeads, crmActivities, crmTasks, crmProjects,
 } from "@workspace/db";
 import type { DiscoverySubmission } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth, auditAction } from "../lib/staffAuth.js";
 import { generateProposal, generateSOW } from "../lib/generators.js";
 
 const router: IRouter = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const token = auth.substring(7);
-  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+// Every route checks the capability it uses, in addition to the staff session.
 
 // ── Task templates (mirrors crmProjects.ts) ───────────────────────────────────
 const DISCOVERY_TASK_TEMPLATES: Record<string, string[]> = {
@@ -51,7 +45,19 @@ const DEFAULT_LAUNCH_CHECKLIST = [
 
 // ── Deterministic classification ──────────────────────────────────────────────
 
-function buildDeterministicSummary(sub: DiscoverySubmission): {
+// Narrowed to exactly the fields this function reads, so it stays valid
+// regardless of future additive columns on discoverySubmissions — see
+// docs/sitemint-platform/DISCOVERY_DOMAIN_CONTRACT.md, "crmDiscovery.ts
+// compatibility exception." Compile-time only: the `partial` object below
+// keeps its full original runtime construction and is passed here
+// structurally (TypeScript accepts a wider-shaped variable wherever a
+// narrower Pick<> is expected).
+type DeterministicSummaryInput = Pick<
+  DiscoverySubmission,
+  "formData" | "budget" | "timeline" | "companyName" | "contactName" | "leadScore"
+>;
+
+function buildDeterministicSummary(sub: DeterministicSummaryInput): {
   aiSummary: string;
   estimatedComplexity: string;
   estimatedBudgetTier: string;
@@ -104,7 +110,7 @@ function buildDeterministicSummary(sub: DiscoverySubmission): {
 
 // ── GET /api/crm/discovery-submissions ───────────────────────────────────────
 
-router.get("/crm/discovery-submissions", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/discovery-submissions", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   const { status, budget, timeline, search, limit = "100", offset = "0" } =
     req.query as Record<string, string>;
 
@@ -132,7 +138,7 @@ router.get("/crm/discovery-submissions", requireAdmin, async (req: Request, res:
 
 // ── GET /api/crm/discovery-submissions/:id ────────────────────────────────────
 
-router.get("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/discovery-submissions/:id", requireCrmAuth("leads.read"), async (req: Request, res: Response) => {
   const id = Number(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -150,7 +156,7 @@ router.get("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, 
 
 // ── POST /api/crm/discovery-submissions ───────────────────────────────────────
 
-router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/discovery-submissions", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const contactName = String(body.contactName || "").trim();
   const companyName = String(body.companyName || "").trim();
@@ -161,7 +167,7 @@ router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res
 
   const formData = (body.formData as Record<string, unknown>) || {};
 
-  const partial: DiscoverySubmission = {
+  const partial = {
     id: 0, createdAt: new Date(), updatedAt: new Date(),
     contactName, companyName, email,
     phone: String(body.phone || "") || null,
@@ -239,7 +245,7 @@ router.post("/crm/discovery-submissions", requireAdmin, async (req: Request, res
 
 // ── PATCH /api/crm/discovery-submissions/:id ─────────────────────────────────
 
-router.patch("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/discovery-submissions/:id", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const id = Number(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -265,7 +271,7 @@ router.patch("/crm/discovery-submissions/:id", requireAdmin, async (req: Request
 
 // ── DELETE /api/crm/discovery-submissions/:id ─────────────────────────────────
 
-router.delete("/crm/discovery-submissions/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/crm/discovery-submissions/:id", requireCrmAuth("leads.delete"), async (req: Request, res: Response) => {
   const id = Number(req.params["id"]);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -274,6 +280,7 @@ router.delete("/crm/discovery-submissions/:id", requireAdmin, async (req: Reques
     .returning();
 
   if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+  await auditAction(req, "discovery_submission.deleted", `submission:${id} ${deleted.companyName ?? ""}`.trim());
   res.json({ ok: true });
 });
 
@@ -281,7 +288,7 @@ router.delete("/crm/discovery-submissions/:id", requireAdmin, async (req: Reques
 
 router.post(
   "/crm/discovery-submissions/:id/generate-proposal",
-  requireAdmin,
+  requireCrmAuth("leads.write"),
   async (req: Request, res: Response) => {
     const id = Number(req.params["id"]);
     if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -318,7 +325,9 @@ router.post(
 
 router.post(
   "/crm/discovery-submissions/:id/convert-to-project",
-  requireAdmin,
+  requireCrmAuth("leads.write"),
+  requireCrmAuth("projects.write"),
+  requireCrmAuth("tasks.write"),
   async (req: Request, res: Response) => {
     const id = Number(req.params["id"]);
     if (!id) { res.status(400).json({ error: "Invalid id" }); return; }

@@ -1,0 +1,15 @@
+{
+  "name": "@workspace/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/tokens.test.mjs"
+  },
+  "exports": {
+    "./css": "./src/index.css",
+    "./css/primitives": "./src/primitives.css",
+    "./css/semantic": "./src/semantic.css",
+    "./css/components": "./src/components.css"
+  }
+}

@@ -1,0 +1,466 @@
+/**
+ * Frontend V3 — "Operational Editorial" token foundation (Phase 1).
+ *
+ * Namespaced `--v3-*` beside the retained `--v2-*` layer: no V2 surface changes
+ * until it opts into V3 classes. Governance is unchanged from V2 — components
+ * consume tokens, components do not hardcode hex.
+ *
+ * Tone scoping: a surface declares `data-tone="ink|charcoal|porcelain|white|ice"`
+ * and the contextual roles (--v3-bg / --v3-fg / --v3-fg-muted / --v3-line /
+ * --v3-line-strong) resolve for everything inside it. Components style against
+ * the roles, so light/dark contrast is decided exactly once, here.
+ *
+ * Contrast decisions (WCAG 2.2 AA, validated in DESIGN-SPEC.md §3):
+ * - on ink: white text 17.7:1, slate-d muted 7.4:1; mint/cyan for headings,
+ *   labels and UI accents only.
+ * - on mint / cyan fills: ink text (~9:1). White on mint is prohibited.
+ * - on porcelain/white: ink text; slate muted 5.9:1.
+ * - amber = warnings only; red = destructive/failed only. Neither is ever the
+ *   only carrier of meaning.
+ */
+
+:root {
+  /* ── Palette ─────────────────────────────────────────────────────────── */
+  --v3-ink: #06151f;
+  --v3-charcoal: #0c2633;
+  --v3-charcoal-2: #113344; /* raised dark surface / hover on dark */
+  --v3-mint: #20e6c3;
+  --v3-mint-deep: #17b89c; /* mint for thin lines on light where AA needs more */
+  --v3-cyan: #4fe7f5;
+  --v3-ice: #e9fcf8;
+  --v3-porcelain: #f7f5ef;
+  --v3-white: #ffffff;
+  --v3-slate: #45606e;
+  --v3-slate-d: #8fb0be;
+  --v3-amber: #e8a23d;
+  --v3-amber-deep: #8a5a13; /* warning text on light */
+  --v3-red: #d9534a;
+  --v3-red-deep: #a02c24; /* destructive text on light */
+  --v3-green-ok: #14a385; /* success text on light — teal family, not lawn green */
+
+  /* ── Typography — zero remote requests (perf rule carried from V2) ───── */
+  --v3-font-sans: "Geist", "Geist Sans", ui-sans-serif, system-ui,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --v3-font-serif: "Instrument Serif", Didot, "Playfair Display", Georgia,
+    ui-serif, serif;
+  --v3-font-mono: ui-monospace, "Cascadia Mono", SFMono-Regular, Menlo,
+    Consolas, monospace;
+
+  /* Oversized editorial display — the V3 signature scale. */
+  --v3-text-hero: clamp(2.75rem, 1.9rem + 4vw, 5.25rem); /* 44 → 84px */
+  --v3-text-display: clamp(2.25rem, 1.7rem + 2.8vw, 4rem); /* 36 → 64px */
+  --v3-text-h1: clamp(2rem, 1.6rem + 1.6vw, 2.75rem); /* 32 → 44px */
+  --v3-text-h2: clamp(1.5rem, 1.3rem + 1vw, 2rem); /* 24 → 32px */
+  --v3-text-h3: clamp(1.1875rem, 1.1rem + 0.35vw, 1.375rem); /* 19 → 22px */
+  --v3-text-body-xl: 1.25rem;
+  --v3-text-body-lg: 1.125rem;
+  --v3-text-body: 1rem;
+  --v3-text-small: 0.875rem;
+  --v3-text-micro: 0.75rem;
+
+  --v3-leading-hero: 1.02;
+  --v3-leading-heading: 1.15;
+  --v3-leading-body: 1.6;
+  --v3-tracking-tight: -0.02em;
+  --v3-tracking-micro: 0.14em; /* uppercase eyebrows / wire labels */
+
+  /* ── Spacing — 8px rhythm ─────────────────────────────────────────────── */
+  --v3-space-1: 0.25rem;
+  --v3-space-2: 0.5rem;
+  --v3-space-3: 0.75rem;
+  --v3-space-4: 1rem;
+  --v3-space-6: 1.5rem;
+  --v3-space-8: 2rem;
+  --v3-space-12: 3rem;
+  --v3-space-16: 4rem;
+  --v3-space-24: 6rem;
+  --v3-space-32: 8rem;
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  --v3-container: 1240px;
+  --v3-container-wide: 1440px;
+  --v3-measure: 66ch;
+  --v3-gutter: clamp(1.25rem, 4vw, 2.5rem);
+  --v3-section-y: clamp(4rem, 6vw + 1rem, 8rem);
+  --v3-rail-w: 264px;
+  --v3-rail-w-compact: 72px;
+
+  /* ── Geometry ─────────────────────────────────────────────────────────── */
+  --v3-radius-control: 12px;
+  --v3-radius-card: 16px;
+  --v3-radius-theater: 24px; /* media frames / product theaters only */
+  --v3-radius-pill: 999px;
+
+  /* ── Elevation ────────────────────────────────────────────────────────── */
+  --v3-shadow-1: 0 1px 2px rgba(6, 21, 31, 0.05);
+  --v3-shadow-2: 0 6px 20px rgba(6, 21, 31, 0.08);
+  --v3-shadow-3: 0 16px 48px rgba(6, 21, 31, 0.14);
+  --v3-glow-mint: 0 0 24px rgba(32, 230, 195, 0.28);
+
+  /* ── Focus ────────────────────────────────────────────────────────────── */
+  --v3-focus-ring: 2px solid var(--v3-mint-deep);
+  --v3-focus-offset: 2px;
+
+  /* ── Motion ───────────────────────────────────────────────────────────── */
+  --v3-duration-control: 150ms;
+  --v3-duration-overlay: 200ms;
+  --v3-duration-entrance: 480ms;
+  --v3-duration-draw: 600ms;
+  --v3-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --v3-ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Layering ─────────────────────────────────────────────────────────── */
+  --v3-z-header: 120;
+  --v3-z-drawer: 200;
+  --v3-z-modal: 300;
+  --v3-z-toast: 400;
+}
+
+/* ── Tone scopes ─────────────────────────────────────────────────────────
+   Default (no data-tone) inherits the nearest ancestor scope. */
+[data-tone="ink"] {
+  --v3-bg: var(--v3-ink);
+  --v3-bg-raised: var(--v3-charcoal);
+  --v3-fg: var(--v3-white);
+  --v3-fg-muted: var(--v3-slate-d);
+  --v3-accent-text: var(--v3-mint);
+  --v3-line: rgba(233, 252, 248, 0.1);
+  --v3-line-strong: rgba(233, 252, 248, 0.22);
+  background-color: var(--v3-bg);
+  color: var(--v3-fg);
+}
+
+[data-tone="charcoal"] {
+  --v3-bg: var(--v3-charcoal);
+  --v3-bg-raised: var(--v3-charcoal-2);
+  --v3-fg: var(--v3-white);
+  --v3-fg-muted: var(--v3-slate-d);
+  --v3-accent-text: var(--v3-mint);
+  --v3-line: rgba(233, 252, 248, 0.1);
+  --v3-line-strong: rgba(233, 252, 248, 0.22);
+  background-color: var(--v3-bg);
+  color: var(--v3-fg);
+}
+
+[data-tone="porcelain"] {
+  --v3-bg: var(--v3-porcelain);
+  --v3-bg-raised: var(--v3-white);
+  --v3-fg: var(--v3-ink);
+  --v3-fg-muted: var(--v3-slate);
+  --v3-accent-text: var(--v3-mint-deep);
+  --v3-line: rgba(6, 21, 31, 0.09);
+  --v3-line-strong: rgba(6, 21, 31, 0.2);
+  background-color: var(--v3-bg);
+  color: var(--v3-fg);
+}
+
+[data-tone="white"] {
+  --v3-bg: var(--v3-white);
+  --v3-bg-raised: var(--v3-white);
+  --v3-fg: var(--v3-ink);
+  --v3-fg-muted: var(--v3-slate);
+  --v3-accent-text: var(--v3-mint-deep);
+  --v3-line: rgba(6, 21, 31, 0.09);
+  --v3-line-strong: rgba(6, 21, 31, 0.2);
+  background-color: var(--v3-bg);
+  color: var(--v3-fg);
+}
+
+[data-tone="ice"] {
+  --v3-bg: var(--v3-ice);
+  --v3-bg-raised: var(--v3-white);
+  --v3-fg: var(--v3-ink);
+  --v3-fg-muted: var(--v3-slate);
+  --v3-accent-text: var(--v3-mint-deep);
+  --v3-line: rgba(6, 21, 31, 0.09);
+  --v3-line-strong: rgba(6, 21, 31, 0.2);
+  background-color: var(--v3-bg);
+  color: var(--v3-fg);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Core primitives. Everything reads the tone roles, never raw palette
+   (accents excepted where the same hue is correct on every tone).
+   ───────────────────────────────────────────────────────────────────────── */
+
+.v3-container {
+  width: 100%;
+  max-width: var(--v3-container);
+  margin-inline: auto;
+  padding-inline: var(--v3-gutter);
+}
+
+.v3-section {
+  padding-block: var(--v3-section-y);
+}
+
+/* ── Type roles ── */
+.v3-hero-title {
+  font-family: var(--v3-font-sans);
+  font-size: var(--v3-text-hero);
+  line-height: var(--v3-leading-hero);
+  letter-spacing: var(--v3-tracking-tight);
+  font-weight: 640;
+  margin: 0;
+}
+
+.v3-display {
+  font-family: var(--v3-font-sans);
+  font-size: var(--v3-text-display);
+  line-height: 1.06;
+  letter-spacing: var(--v3-tracking-tight);
+  font-weight: 620;
+  margin: 0;
+}
+
+.v3-h2 {
+  font-size: var(--v3-text-h2);
+  line-height: var(--v3-leading-heading);
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  margin: 0;
+}
+
+.v3-h3 {
+  font-size: var(--v3-text-h3);
+  line-height: var(--v3-leading-heading);
+  font-weight: 600;
+  margin: 0;
+}
+
+.v3-lede {
+  font-size: var(--v3-text-body-xl);
+  line-height: 1.55;
+  color: var(--v3-fg-muted);
+  max-width: var(--v3-measure);
+  margin: 0;
+}
+
+.v3-body {
+  font-size: var(--v3-text-body);
+  line-height: var(--v3-leading-body);
+  color: var(--v3-fg-muted);
+  max-width: var(--v3-measure);
+  margin: 0;
+}
+
+/* Technical uppercase eyebrow — the "wire label". */
+.v3-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  font-size: var(--v3-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--v3-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v3-accent-text);
+}
+
+/* Small editorial serif accent (italic), used sparingly. */
+.v3-serif-note {
+  font-family: var(--v3-font-serif);
+  font-style: italic;
+  font-size: var(--v3-text-body-lg);
+  letter-spacing: 0.01em;
+  color: var(--v3-accent-text);
+}
+
+.v3-mono {
+  font-family: var(--v3-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Buttons ── */
+.v3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v3-space-2);
+  min-height: 48px;
+  min-width: 44px;
+  padding: 0 calc(var(--v3-space-6) + 2px);
+  border-radius: var(--v3-radius-control);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: var(--v3-text-small);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--v3-duration-control) var(--v3-ease-standard),
+    border-color var(--v3-duration-control) var(--v3-ease-standard),
+    color var(--v3-duration-control) var(--v3-ease-standard),
+    transform var(--v3-duration-control) var(--v3-ease-standard);
+}
+
+.v3-btn--primary {
+  background: var(--v3-mint);
+  color: var(--v3-ink);
+}
+.v3-btn--primary:hover {
+  background: var(--v3-cyan);
+}
+
+/* Outline button reads the tone: ghost on ink, ink outline on light. */
+.v3-btn--outline {
+  background: transparent;
+  border-color: var(--v3-line-strong);
+  color: var(--v3-fg);
+}
+.v3-btn--outline:hover {
+  border-color: var(--v3-fg);
+}
+
+.v3-btn--quiet {
+  background: transparent;
+  color: var(--v3-fg);
+  padding-inline: var(--v3-space-4);
+}
+.v3-btn--quiet:hover {
+  color: var(--v3-accent-text);
+}
+
+.v3-btn:focus-visible {
+  outline: var(--v3-focus-ring);
+  outline-offset: var(--v3-focus-offset);
+}
+
+.v3-btn[disabled],
+.v3-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Cards / panels ── */
+.v3-card {
+  background: var(--v3-bg-raised);
+  border: 1px solid var(--v3-line);
+  border-radius: var(--v3-radius-card);
+  transition:
+    transform var(--v3-duration-control) var(--v3-ease-standard),
+    box-shadow var(--v3-duration-control) var(--v3-ease-standard),
+    border-color var(--v3-duration-control) var(--v3-ease-standard);
+}
+
+.v3-card--hover:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--v3-shadow-2);
+  border-color: var(--v3-line-strong);
+}
+
+/* Floating interface container inside a theater — precise, luminous edge. */
+.v3-float {
+  background: rgba(12, 38, 51, 0.82);
+  border: 1px solid rgba(79, 231, 245, 0.22);
+  border-radius: var(--v3-radius-card);
+  box-shadow: var(--v3-shadow-3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--v3-white);
+}
+
+/* ── Status ── */
+.v3-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.v3-dot--live {
+  background: var(--v3-mint);
+  box-shadow: var(--v3-glow-mint);
+  animation: v3-pulse 2.4s var(--v3-ease-standard) infinite;
+}
+.v3-dot--ok { background: var(--v3-green-ok); }
+.v3-dot--warn { background: var(--v3-amber); }
+.v3-dot--down { background: var(--v3-red); }
+.v3-dot--off { background: var(--v3-fg-muted); opacity: 0.5; }
+
+@keyframes v3-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(32, 230, 195, 0.45); }
+  55% { box-shadow: 0 0 0 7px rgba(32, 230, 195, 0); }
+}
+
+.v3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  min-height: 28px;
+  padding: 2px var(--v3-space-3);
+  border-radius: var(--v3-radius-pill);
+  border: 1px solid var(--v3-line);
+  font-size: var(--v3-text-micro);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--v3-fg-muted);
+  white-space: nowrap;
+}
+
+/* ── Skeleton / loading ── */
+.v3-skel {
+  background: color-mix(in srgb, var(--v3-fg) 7%, var(--v3-bg));
+  border-radius: var(--v3-radius-control);
+  position: relative;
+  overflow: hidden;
+}
+.v3-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: v3-skel-sweep 1.4s var(--v3-ease-standard) infinite;
+}
+@keyframes v3-skel-sweep {
+  to { transform: translateX(100%); }
+}
+
+/* ── Entrance reveal (JS toggles data-revealed; CSS-only fallback keeps
+      content visible when IntersectionObserver never runs). ── */
+.v3-reveal {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .v3-reveal[data-reveal-ready] {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity var(--v3-duration-entrance) var(--v3-ease-entrance),
+      transform var(--v3-duration-entrance) var(--v3-ease-entrance);
+  }
+  .v3-reveal[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Global focus + reduced motion ── */
+.v3-focusable:focus-visible,
+[data-tone] a:focus-visible,
+[data-tone] button:focus-visible,
+[data-tone] input:focus-visible,
+[data-tone] select:focus-visible,
+[data-tone] textarea:focus-visible,
+[data-tone] [tabindex]:focus-visible {
+  outline: var(--v3-focus-ring);
+  outline-offset: var(--v3-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-btn,
+  .v3-card,
+  .v3-card--hover:hover {
+    transition: none;
+    transform: none;
+  }
+  .v3-dot--live {
+    animation: none;
+  }
+  .v3-skel::after {
+    animation: none;
+    display: none;
+  }
+}

@@ -1,26 +1,29 @@
 import { useEffect, useState, useCallback } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Check, Clock, AlertTriangle, ChevronRight, RefreshCw } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
-  dueDate?:string; status:string; completedAt?:string; createdAt:string;
+  dueDate?:string; dueKind?:string; status:string; completedAt?:string; createdAt:string;
   leadName?:string; leadCompany?:string;
 }
 
-const tabFilters = ["due-today","overdue","upcoming","completed"] as const;
-type TabFilter = typeof tabFilters[number];
-
-const tabLabels: Record<TabFilter, string> = {
-  "due-today": "Today's Tasks",
-  "overdue": "Overdue",
-  "upcoming": "Future",
-  "completed": "Completed",
-};
+// The bucketing lives in lib/taskBuckets.ts so it can be tested: this page used
+// to count every task that was not completed while its tabs could only show
+// dated ones, so twenty undated tasks were counted here and openable nowhere.
+import {
+  TASK_TABS,
+  TASK_TAB_LABELS,
+  activeTaskCount,
+  bucketCounts,
+  isLate as isTaskLate,
+  isTimedDue,
+  tasksInTab,
+  type TaskTab,
+} from "@/lib/taskBuckets";
 
 const taskTypeIcon: Record<string,string> = {
   Call:"📞",Email:"📧","Send Proposal":"📄","Follow Up":"🔔",
@@ -28,57 +31,63 @@ const taskTypeIcon: Record<string,string> = {
 };
 
 export default function CrmTasks() {
-  const [, navigate] = useLocation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabFilter>("due-today");
+  const [tab, setTab] = useState<TaskTab>("due-today");
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
     setLoading(true);
-    const r = await fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const d = await r.json() as { tasks: Task[] };
-    setTasks(d.tasks || []);
-    setLoading(false);
-  }, [navigate]);
+    setLoadError("");
+    try {
+      const r = await adminFetch("/api/crm/tasks");
+      if (r.status === 401) return;
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const d = await r.json() as { tasks: Task[] };
+      setTasks(d.tasks || []);
+    } catch {
+      setLoadError("Couldn't load tasks. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const completeTask = async (id: number) => {
-    await fetch(`/api/crm/tasks/${id}`, {
+    await adminFetch(`/api/crm/tasks/${id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
     });
     load();
   };
 
   const now = new Date();
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const filtered = tasks.filter(t => {
-    const due = t.dueDate ? new Date(t.dueDate) : null;
-    if (tab === "due-today") return t.status !== "completed" && due && due >= todayStart && due < todayEnd;
-    if (tab === "upcoming") return t.status !== "completed" && due && due >= todayEnd;
-    if (tab === "overdue") return t.status === "overdue" || (t.status !== "completed" && due && due < todayStart);
-    if (tab === "completed") return t.status === "completed";
-    return true;
-  });
-
-  const counts = {
-    all: tasks.length,
-    "due-today": tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status !== "completed" && d && d >= todayStart && d < todayEnd; }).length,
-    upcoming: tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status !== "completed" && d && d >= todayEnd; }).length,
-    overdue: tasks.filter(t => { const d = t.dueDate ? new Date(t.dueDate) : null; return t.status === "overdue" || (t.status !== "completed" && d && d < todayStart); }).length,
-    completed: tasks.filter(t => t.status === "completed").length,
-  };
+  /**
+   * Late by the task's own kind: a moment is late once it has passed, a day is
+   * late only once the day has ended. Comparing every deadline to the start of
+   * today called a task due at 16:00 today "overdue" all morning; comparing
+   * every deadline to this instant called a task due "today" overdue at 00:01.
+   * Neither is a guess any more.
+   */
+  const isLate = (t: Task) => isTaskLate(t, now);
+  const filtered = tasksInTab(tasks, tab, now);
+  const counts = bucketCounts(tasks, now);
 
   if (loading) return (
     <CrmLayout>
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+      </div>
+    </CrmLayout>
+  );
+
+  if (loadError) return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground font-medium">{loadError}</p>
+        <button onClick={load} className="text-sm border border-input rounded-lg px-4 py-1.5 hover:bg-accent transition-colors">Retry</button>
       </div>
     </CrmLayout>
   );
@@ -89,7 +98,9 @@ export default function CrmTasks() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-2xl font-serif font-bold text-foreground">Tasks</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">{tasks.filter(t=>t.status!=="completed").length} active tasks</p>
+            {/* The figure is what the tabs can reach between them, so it cannot
+                drift from them again. */}
+            <p className="text-muted-foreground text-sm mt-0.5">{activeTaskCount(tasks, now)} active tasks</p>
           </div>
           <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -97,8 +108,8 @@ export default function CrmTasks() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-5">
-          {tabFilters.map(f => (
+        <div className="flex gap-1 bg-muted p-1 rounded-xl mb-5">
+          {TASK_TABS.map(f => (
             <button
               key={f}
               onClick={() => setTab(f)}
@@ -106,10 +117,10 @@ export default function CrmTasks() {
                 tab === f ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tabLabels[f]}
+              {TASK_TAB_LABELS[f]}
               {counts[f] > 0 && (
                 <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
-                  f === "overdue" ? "bg-red-100 text-red-700" : f === "due-today" ? "bg-yellow-100 text-yellow-700" : "bg-gray-200 text-gray-600"
+                  f === "overdue" ? "bg-red-100 text-red-700" : f === "due-today" ? "bg-yellow-100 text-yellow-700" : "bg-muted text-muted-foreground"
                 }`}>
                   {counts[f]}
                 </span>
@@ -121,23 +132,23 @@ export default function CrmTasks() {
         {/* Task list */}
         <div className="space-y-2">
           {filtered.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
-              <Check className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <div className="bg-white rounded-xl border border-border py-16 text-center">
+              <Check className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-muted-foreground font-medium">No tasks in this category</p>
             </div>
           ) : (
             filtered.map(task => {
               const due = task.dueDate ? new Date(task.dueDate) : null;
-              const isOverdue = task.status !== "completed" && due && due < todayStart;
+              const isOverdue = isLate(task);
               return (
                 <div key={task.id} className={`bg-white rounded-xl border shadow-sm flex items-start gap-3 p-4 ${
-                  task.status==="completed"?"border-gray-100 opacity-60":isOverdue?"border-red-200":"border-gray-200"
+                  task.status==="completed"?"border-border/60 opacity-60":isOverdue?"border-red-200":"border-border"
                 }`}>
                   <button
                     onClick={() => task.status !== "completed" && completeTask(task.id)}
                     disabled={task.status === "completed"}
                     className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                      task.status==="completed"?"bg-green-500 border-green-500":"border-gray-300 hover:border-green-500"
+                      task.status==="completed"?"bg-green-500 border-green-500":"border-input hover:border-green-500"
                     }`}
                   >
                     {task.status==="completed"&&<Check className="w-3 h-3 text-white"/>}
@@ -163,7 +174,8 @@ export default function CrmTasks() {
                           {due && (
                             <span className={`flex items-center gap-1 text-xs font-medium ${isOverdue?"text-red-600":"text-muted-foreground"}`}>
                               {isOverdue ? <AlertTriangle className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
-                              {due.toLocaleDateString()}
+                              {/* A time appears only when somebody chose one. */}
+                              {isTimedDue(task) ? due.toLocaleString() : due.toLocaleDateString()}
                               {isOverdue && " · Overdue"}
                             </span>
                           )}

@@ -33,15 +33,30 @@ import {
   computeRelationshipProfile,
   type RiLead, type RiActivity,
 } from "@/lib/relationshipIntelligence";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { Figure, LoadFailure, dataOf } from "@/components/crm/LoadState";
+import { useCrmAssignees } from "@/lib/crmAssignees";
+import CustomerTimeline from "@/components/crm/CustomerTimeline";
+import CustomerPortalPanel from "@/components/crm/CustomerPortalPanel";
+import { OwnerPicker, type OwnerChoice } from "@/components/crm/OwnerPicker";
+import { LinkCompanyDialog } from "@/components/crm/companies/LinkCompanyDialog";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUSES = [...LEAD_STATUSES];
 const PRIORITIES = ["Low","Medium","High"];
 const TASK_TYPES = ["Call","Email","Send Proposal","Follow Up","Check Website","Ask for Decision","Send Contract","Other"];
-const TEAM = ["Claidy Taguran","Shasta Greene","Saisa Lorraigne","Unassigned"];
+
+/**
+ * M6: what the owner picker starts on for a contact — the staff id when a
+ * person is resolved; "keep" when only an unmatched name is recorded, so that
+ * saving the status does not erase it; otherwise nobody.
+ */
+function ownerChoiceFor(lead: { assignedTo?: string | null; assignedToStaffId?: number | null }): OwnerChoice {
+  if (lead.assignedToStaffId != null) return lead.assignedToStaffId;
+  return (lead.assignedTo ?? "").trim() ? "keep" : null;
+}
 
 const statusColor: Record<string,string> = Object.fromEntries(
   LEAD_STATUSES.map(s => [s, LEAD_STATUS_STYLES[s].pill]),
@@ -58,6 +73,7 @@ const activityIcon: Record<string,string> = {
   call_initiated:"📞",call_received:"📲",sms_opt_out:"🚫",sms_opt_in:"✅",
   call_outcome:"📞",call_missed:"📵",
   email_logged:"📧",meeting_logged:"🤝",follow_up_logged:"⏰",
+  company_linked:"🏢",company_unlinked:"🏢",
 };
 
 const CALL_DISPOSITIONS = [
@@ -69,7 +85,7 @@ const dispositionColor: Record<CallDisposition, string> = {
   "Connected": "bg-green-100 text-green-700",
   "No Answer": "bg-red-100 text-red-700",
   "Left Voicemail": "bg-yellow-100 text-yellow-700",
-  "Wrong Number": "bg-gray-100 text-gray-600",
+  "Wrong Number": "bg-muted text-muted-foreground",
   "Not Interested": "bg-red-100 text-red-700",
   "Follow Up": "bg-blue-100 text-blue-700",
 };
@@ -91,11 +107,11 @@ function Modal({
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
           <h2 className="font-semibold text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-muted-foreground"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground"
           >
             <X className="w-4 h-4" />
           </button>
@@ -108,9 +124,18 @@ function Modal({
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/** M7: the company record this contact is linked to, when somebody has linked it. */
+interface LinkedCompany {
+  id:number; name:string; domain:string|null; website:string|null; archivedAt:string|null;
+}
+
 interface Lead {
   id:number; name:string; company?:string; phone?:string; email:string; website?:string;
+  /** The link itself, and the company's name — `company` above stays the text as recorded. */
+  companyId?:number|null; companyName?:string|null;
   source:string; serviceInterest?:string; status:string; priority:string; assignedTo?:string;
+  /** M6: the staff member this contact belongs to; null when no person is resolved. */
+  assignedToStaffId?:number|null;
   tags:string[]; lastContactedAt?:string; nextFollowUpAt?:string; notes?:string;
   estimatedValue?:string; packageType?:string; discoveryFormStatus:string;
   proposalStatus:string; sowStatus:string; createdAt:string; updatedAt:string;
@@ -127,6 +152,39 @@ interface Task {
   id:number; leadId:number; type:string; title:string; description?:string;
   dueDate?:string; status:string; completedAt?:string; createdAt:string;
 }
+/** Everything `/api/crm/leads/:id` answers with, as one value. */
+interface LeadBundle {
+  lead: Lead;
+  activities: Activity[];
+  tasks: Task[];
+  linkedCompany: LinkedCompany | null;
+}
+
+/**
+ * A body with no contact in it is a failure, not an empty contact.
+ *
+ * The activity and task arrays may legitimately be absent — the contact is
+ * the record being asked for, and a contact with nothing logged against it is
+ * a real answer.
+ */
+function pickLeadBundle(body: unknown): LeadBundle | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { lead?: unknown; activities?: unknown; tasks?: unknown; linkedCompany?: unknown };
+  if (!b.lead || typeof b.lead !== "object") return undefined;
+  return {
+    lead: b.lead as Lead,
+    activities: Array.isArray(b.activities) ? b.activities as Activity[] : [],
+    tasks: Array.isArray(b.tasks) ? b.tasks as Task[] : [],
+    linkedCompany: (b.linkedCompany ?? null) as LinkedCompany | null,
+  };
+}
+
+/** The thread reads oldest-first; the endpoint answers newest-first. */
+function pickMessages(body: unknown): CrmMessage[] | undefined {
+  const list = body && typeof body === "object" ? (body as { messages?: unknown }).messages : undefined;
+  return Array.isArray(list) ? (list as CrmMessage[]).slice().reverse() : undefined;
+}
+
 type ModalType = "call"|"calllog"|"logact"|"text"|"email"|"note"|"task"|"status"|null;
 
 const LOG_ACTIVITY_TYPES = [
@@ -144,11 +202,30 @@ interface ToastItem { id:number; type:"success"|"error"|"info"; msg:string; }
 export default function CrmLeadDetail() {
   const params = useParams<{id:string}>();
   const [, navigate] = useLocation();
-  const [lead, setLead] = useState<Lead|null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  /**
+   * The contact, and everything that arrives with it, as one answer.
+   *
+   * Measured 2026-09-16: opening a contact id that does not exist rendered
+   * the whole contacts list — "All People — 15 people" — with nothing to say
+   * the record asked for was missing. The API answered 404 and the page
+   * quietly navigated away, so somebody following a stale link from an email
+   * or a bookmark could believe they were looking at the record they asked
+   * for. A read that produced no contact is stated now, and the list is
+   * offered as a link rather than substituted for the record.
+   */
+  const [contactLoad, setContactLoad] = useState<Load<LeadBundle>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // What actually loaded, or null — never an empty record standing in for a
+  // request nobody completed.
+  const bundle = dataOf(contactLoad);
+  const lead = bundle?.lead ?? null;
+  const linkedCompany = bundle?.linkedCompany ?? null;
+  // Stable identities: a fresh `[]` each render would re-run every memo below.
+  const activities = useMemo(() => bundle?.activities ?? [], [bundle]);
+  const tasks = useMemo(() => bundle?.tasks ?? [], [bundle]);
 
   const health = useMemo(
     () => (lead ? scoreLeadFromFields(lead, activities) : null),
@@ -275,7 +352,8 @@ export default function CrmLeadDetail() {
     );
   }, [lead, activities, health, ciStats, discProfile, momentum]);
 
-  const [activeTab, setActiveTab] = useState<"timeline"|"tasks"|"calls"|"sms"|"email">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline"|"history"|"tasks"|"communications"|"opportunity">("timeline");
+  const [commSubTab, setCommSubTab] = useState<"sms"|"calls"|"email">("sms");
   const smsThreadRef = useRef<HTMLDivElement>(null);
 
   // Modals & toasts
@@ -288,8 +366,20 @@ export default function CrmLeadDetail() {
   }, []);
 
   // SMS / call state
-  const [messages, setMessages] = useState<CrmMessage[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
+  /**
+   * The phone system's log for this contact.
+   *
+   * `/api/crm/leads/:id/messages` is one of the `TRANSITIONAL_FOREIGN_AUTH`
+   * routes (lib/adminFetch.ts): its 401 raises no "your session has ended"
+   * dialog, so this surface has to state its own unavailability. Read with
+   * `if (r.ok)` alone, a refused request left the thread saying "No messages
+   * yet", the call list saying "No call history yet" and the Call Summary
+   * reporting "No calls yet" over tiles of zeros — three claims about a
+   * client that nobody had been able to check.
+   */
+  const [messagesLoad, setMessagesLoad] = useState<Load<CrmMessage[]>>({ status: "loading" });
+  const [reloadingMessages, setReloadingMessages] = useState(false);
+  const messages = dataOf(messagesLoad);
   const [smsBody, setSmsBody] = useState("");
   const [sendingSms, setSendingSms] = useState(false);
   const [callingLead, setCallingLead] = useState(false);
@@ -302,18 +392,27 @@ export default function CrmLeadDetail() {
   const [callFilter, setCallFilter] = useState<"all"|"connected"|"missed"|"voicemail"|"follow_up"|"inbound"|"outbound">("all");
 
   const callSummary = useMemo(() => {
-    const msgs = messages.filter(m => m.channel === "call");
+    // Two sources, and only one of them can fail here: outcomes logged by
+    // hand arrive with the contact, while the phone system's own log is a
+    // separate request. Anything that depends on that log stays null when it
+    // did not arrive. "0 calls" is a claim nobody checked — and so is a "last
+    // call" date that is only the latest of the calls we happened to see.
+    const msgs = messages === null ? null : messages.filter(m => m.channel === "call");
     const acts = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type));
     const connected = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Connected").length;
     const voicemail = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Left Voicemail").length;
     const followUp  = acts.filter(a => a.type === "call_outcome" && (a.metadata?.disposition as string | undefined) === "Follow Up").length;
     const missed    = acts.filter(a => a.type === "call_missed").length;
-    const allTs     = [...msgs.map(m => new Date(m.createdAt).getTime()), ...acts.map(a => new Date(a.createdAt).getTime())];
-    const lastCallTs = allTs.length > 0 ? Math.max(...allTs) : null;
+    const allTs     = msgs === null
+      ? null
+      : [...msgs.map(m => new Date(m.createdAt).getTime()), ...acts.map(a => new Date(a.createdAt).getTime())];
+    const lastCallTs = allTs !== null && allTs.length > 0 ? Math.max(...allTs) : null;
     const mostRecent = acts.filter(a => a.type === "call_outcome").sort((x,y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime())[0];
     return {
-      totalCalls: msgs.length,
+      totalCalls: msgs === null ? null : msgs.length,
       connected, missed, voicemail, followUp,
+      /** Outcomes logged by hand — known whether or not the phone log loaded. */
+      loggedOutcomes: acts.length,
       lastCallAt: lastCallTs ? new Date(lastCallTs).toLocaleDateString() : null,
       recentOutcome: mostRecent ? (mostRecent.metadata?.disposition as string | undefined) : undefined,
     };
@@ -331,7 +430,10 @@ export default function CrmLeadDetail() {
   // Edit state (sidebar)
   const [editStatus, setEditStatus] = useState("");
   const [editPriority, setEditPriority] = useState("");
-  const [editAssigned, setEditAssigned] = useState("");
+  // M6: the owner is a staff id from the picker ("keep" = leave the unmatched
+  // name that is recorded), never free text.
+  const [editOwner, setEditOwner] = useState<OwnerChoice>(null);
+  const people = useCrmAssignees();
   const [editFollowUp, setEditFollowUp] = useState("");
   const [editEstValue, setEditEstValue] = useState("");
   const [editPackage, setEditPackage] = useState("");
@@ -364,56 +466,56 @@ export default function CrmLeadDetail() {
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    setLoading(true);
-    const r = await fetch(`/api/crm/leads/${params.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    if (!r.ok) { navigate("/admin/crm/leads"); return; }
-    const d = await r.json() as { lead:Lead; activities:Activity[]; tasks:Task[] };
-    setLead(d.lead);
-    setActivities(d.activities || []);
-    setTasks(d.tasks || []);
-    setEditStatus(d.lead.status);
-    setEditPriority(d.lead.priority);
-    setEditAssigned(d.lead.assignedTo || "");
-    setEditFollowUp(d.lead.nextFollowUpAt ? d.lead.nextFollowUpAt.substring(0,10) : "");
-    setEditEstValue(d.lead.estimatedValue || "");
-    setEditPackage(d.lead.packageType || "");
-    setLoading(false);
-  }, [params.id, navigate]);
+    setReloading(true);
+    setContactLoad(await readAdminResource(`/api/crm/leads/${params.id}`, pickLeadBundle));
+    setReloading(false);
+  }, [params.id]);
 
   useEffect(() => { load(); }, [load]);
 
+  // The editable sidebar fields follow whatever actually loaded, and are left
+  // alone when nothing did.
   useEffect(() => {
-    if (!token()) return;
-    fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${token()}` } })
+    if (!lead) return;
+    setEditStatus(lead.status);
+    setEditPriority(lead.priority);
+    setEditOwner(ownerChoiceFor(lead));
+    setEditFollowUp(lead.nextFollowUpAt ? lead.nextFollowUpAt.substring(0,10) : "");
+    setEditEstValue(lead.estimatedValue || "");
+    setEditPackage(lead.packageType || "");
+  }, [lead]);
+
+  useEffect(() => {
+    adminFetch("/api/crm/email-templates")
       .then(r => r.json()).then(d => setTemplates((d as {templates?: typeof templates}).templates || []));
   }, []);
 
   const loadMessages = useCallback(async () => {
     if (!params.id) return;
-    setLoadingMessages(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/messages`, { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.ok) {
-      const d = await r.json() as { messages: CrmMessage[] };
-      setMessages((d.messages || []).slice().reverse());
+    setReloadingMessages(true);
+    const next = await readAdminResource(`/api/crm/leads/${params.id}/messages`, pickMessages);
+    setMessagesLoad(next);
+    setReloadingMessages(false);
+    if (next.status === "ready") {
       setTimeout(() => smsThreadRef.current?.scrollTo({ top: 99999, behavior: "smooth" }), 100);
     }
-    setLoadingMessages(false);
   }, [params.id]);
 
+  // Asked for on mount, not only when the Communications tab is opened: the
+  // Call Summary panel is in the sidebar from the moment the page renders and
+  // is a statement about this client's call history. It used to report "No
+  // calls yet" about a request nobody had made.
+  useEffect(() => { void loadMessages(); }, [loadMessages]);
+
   useEffect(() => {
-    if (activeTab === "sms" || activeTab === "calls") loadMessages();
+    if (activeTab === "communications") loadMessages();
   }, [activeTab, loadMessages]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const callLead = async () => {
     setCallingLead(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/call`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-    });
+    const r = await adminFetch(`/api/crm/leads/${params.id}/call`, { method: "POST" });
     const d = await r.json() as { error?: string; sid?: string };
     if (r.ok) {
       showToast("Bridge call initiated — your phone will ring shortly.", "info");
@@ -432,9 +534,8 @@ export default function CrmLeadDetail() {
     if (!lead || savingCallLog) return;
     setSavingCallLog(true);
     try {
-      const r = await fetch(`/api/crm/leads/${params.id}/activities`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/activities`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "call_outcome",
           title: `Call outcome: ${callLogDisposition}`,
@@ -468,9 +569,8 @@ export default function CrmLeadDetail() {
       if (logActType === "call_outcome") {
         body.metadata = { disposition: logActDisposition, source: "manual_log" };
       }
-      const r = await fetch(`/api/crm/leads/${params.id}/activities`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/activities`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (r.ok) {
@@ -499,9 +599,8 @@ export default function CrmLeadDetail() {
     try {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const r = await fetch(`/api/crm/leads/${params.id}/tasks`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/tasks`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ type: "Follow Up", title: "Follow up after call", dueDate: tomorrow.toISOString().split("T")[0] }),
       });
       if (r.ok) { showToast("Follow-up task created"); load(); }
@@ -517,9 +616,8 @@ export default function CrmLeadDetail() {
     if (!lead) return;
     setSendingSms(true);
     try {
-      const r = await fetch(`/api/crm/leads/${params.id}/sms`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}/sms`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
       if (r.ok) {
@@ -539,9 +637,8 @@ export default function CrmLeadDetail() {
   const sendSms = async () => {
     if (!smsBody.trim() || !lead) return;
     setSendingSms(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/sms`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/sms`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ body: smsBody.trim() }),
     });
     const d = await r.json() as { error?: string };
@@ -559,9 +656,8 @@ export default function CrmLeadDetail() {
   const addNote = async () => {
     if (!noteText.trim()) return;
     setAddingNote(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/notes`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/notes`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ note: noteText }),
     });
     if (r.ok) {
@@ -578,9 +674,8 @@ export default function CrmLeadDetail() {
   const addTask = async () => {
     if (!taskForm.title) return;
     setAddingTask(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/tasks`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/tasks`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify(taskForm),
     });
     if (r.ok) {
@@ -598,9 +693,8 @@ export default function CrmLeadDetail() {
   const sendEmail = async () => {
     if (!emailSubject || !emailBody) return;
     setSendingEmail(true);
-    const r = await fetch(`/api/crm/leads/${params.id}/email`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}/email`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ subject: emailSubject, body: emailBody, testMode: emailTestMode }),
     });
     if (r.ok) {
@@ -619,9 +713,8 @@ export default function CrmLeadDetail() {
   const quickUpdateStatus = async (newStatus: string) => {
     if (!lead || newStatus === lead.status) { setOpenModal(null); return; }
     setUpdatingStatus(true);
-    const r = await fetch(`/api/crm/leads/${params.id}`, {
+    const r = await adminFetch(`/api/crm/leads/${params.id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
     if (r.ok) {
@@ -636,9 +729,8 @@ export default function CrmLeadDetail() {
 
   const saveField = async (updates: Record<string,unknown>) => {
     setSaving(true);
-    await fetch(`/api/crm/leads/${params.id}`, {
+    await adminFetch(`/api/crm/leads/${params.id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
     setSaving(false);
@@ -649,9 +741,8 @@ export default function CrmLeadDetail() {
     setSavingPhone(true);
     setPhoneError("");
     try {
-      const r = await fetch(`/api/crm/leads/${params.id}`, {
+      const r = await adminFetch(`/api/crm/leads/${params.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ phone: editPhone.trim() || null }),
       });
       if (!r.ok) {
@@ -670,30 +761,69 @@ export default function CrmLeadDetail() {
   };
 
   const completeTask = async (taskId: number) => {
-    await fetch(`/api/crm/tasks/${taskId}`, {
+    await adminFetch(`/api/crm/tasks/${taskId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
     });
     load();
   };
 
   const deleteTask = async (taskId: number) => {
-    await fetch(`/api/crm/tasks/${taskId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
+    await adminFetch(`/api/crm/tasks/${taskId}`, { method: "DELETE" });
     load();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (loading) return (
+  if (contactLoad.status === "loading") return (
     <CrmLayout>
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
+        <span className="sr-only">Loading this contact…</span>
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
       </div>
     </CrmLayout>
   );
 
-  if (!lead) return <CrmLayout><div className="p-8 text-center text-muted-foreground">Lead not found.</div></CrmLayout>;
+  /*
+    A contact that is not there, said out loud.
+
+    This is where the page used to call `navigate("/admin/crm/leads")`: the
+    404 was swallowed and the contacts list appeared in its place, so the
+    person was silently shown a different screen. The list is still one click
+    away — offered, never substituted — and a 403, a 5xx and an unreachable
+    server each keep their own wording, with a way to try again.
+  */
+  if (!lead) {
+    const missing = contactLoad.status === "error" && contactLoad.httpStatus === 404;
+    return (
+      <CrmLayout>
+        <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+          <Link href="/admin/crm/leads">
+            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Leads
+            </button>
+          </Link>
+          <LoadFailure
+            what="This contact"
+            reason={contactLoad.status === "error" ? contactLoad.reason : ""}
+            onRetry={missing ? undefined : () => { void load(); }}
+            retrying={reloading}
+          >
+            <p className="mt-2 text-sm text-muted-foreground break-words">
+              {missing
+                ? "This contact is no longer in the CRM. It may have been deleted, or merged into another record — if you followed a link from an email or a bookmark, the record it pointed at has gone since."
+                : "Nothing about this contact is shown while this is unavailable — the record may well still be here."}
+            </p>
+            <Link href="/admin/crm/leads">
+              <button className="mt-3 text-sm text-primary underline underline-offset-2 hover:opacity-80">
+                Open the contacts list
+              </button>
+            </Link>
+          </LoadFailure>
+        </div>
+      </CrmLayout>
+    );
+  }
 
   const pendingTasks = tasks.filter(t => t.status !== "completed");
 
@@ -703,7 +833,7 @@ export default function CrmLeadDetail() {
       <div className="fixed top-4 right-4 z-[60] space-y-2 pointer-events-none">
         {toasts.map(t => (
           <div key={t.id} className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium max-w-xs
-            ${t.type === "success" ? "bg-green-600 text-white" : t.type === "error" ? "bg-red-600 text-white" : "bg-gray-900 text-white"}`}>
+            ${t.type === "success" ? "bg-green-600 text-white" : t.type === "error" ? "bg-red-600 text-white" : "bg-foreground text-white"}`}>
             {t.type === "success"
               ? <CheckCircle2 className="w-4 h-4 shrink-0" />
               : t.type === "error"
@@ -722,15 +852,212 @@ export default function CrmLeadDetail() {
           </button>
         </Link>
 
-        {/* ── Contact Command Bar ───────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-5">
-          <div className="flex items-stretch divide-x divide-gray-100">
+        {/* ── Summary + recommended next action ───────────────────────────── */}
+        <div className="bg-white rounded-xl border border-border shadow-sm p-4 mb-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-foreground/5 border border-border flex items-center justify-center shrink-0 font-serif font-bold text-sm text-foreground">
+                {lead.name.split(" ").filter(Boolean).slice(0, 2).map(n => n[0]).join("").toUpperCase() || "?"}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-serif font-bold text-foreground truncate">{lead.name}</h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  {[lead.company, lead.source, lead.priority ? `${lead.priority} priority` : null].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href={`/admin/crm/leads/${lead.id}/dna`}>
+                <button className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1">
+                  View Lead DNA
+                </button>
+              </Link>
+              <button
+                onClick={() => navigate(`/admin/crm/campaigns?view=builder&leadId=${lead.id}`)}
+                className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1"
+              >
+                Generate for this lead
+              </button>
+            </div>
+          </div>
+
+          {/* Recommended next action — derived from the already-loaded sales signals */}
+          <div className="mt-3 bg-muted rounded-lg px-3 py-2 border border-border/60 flex items-start gap-2">
+            <span className="text-sm shrink-0 mt-0.5">👉</span>
+            {salesNBA ? (
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground">{salesNBA.action}</p>
+                <p className="text-[11px] text-muted-foreground leading-snug">{salesNBA.reason}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No urgent action needed.</p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Contact information ──────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-border shadow-sm p-4 mb-3">
+          <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Contact Information</h2>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
+              <Mail className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.email}</span>
+            </a>
+            {/* ── Phone field with inline edit ── */}
+            <div className="flex flex-col gap-1">
+              {editingPhone ? (
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") { setEditingPhone(false); setPhoneError(""); } }}
+                      className="flex-1 px-2.5 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
+                      placeholder="+19498806515"
+                      autoFocus
+                    />
+                    <button
+                      onClick={savePhone}
+                      disabled={savingPhone}
+                      className="text-xs px-2.5 py-1.5 bg-foreground text-white rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {savingPhone ? "…" : "Save"}
+                    </button>
+                    <button
+                      onClick={() => { setEditingPhone(false); setEditPhone(lead.phone || ""); setPhoneError(""); }}
+                      className="text-xs px-2 py-1.5 border border-border rounded-lg hover:bg-accent transition-colors shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Use E.164 format when possible.{" "}
+                    US: <code className="bg-muted px-0.5 rounded">+19498806515</code>{" "}
+                    · PH: <code className="bg-muted px-0.5 rounded">+639186069624</code>
+                  </p>
+                  {phoneError && (
+                    <p className="text-[10px] text-red-600 font-medium">{phoneError}</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {lead.phone ? (
+                      <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                        <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2 text-sm text-muted-foreground/50">
+                        <Phone className="w-3.5 h-3.5 shrink-0" /> No phone on record
+                      </span>
+                    )}
+                    <button
+                      onClick={() => { setEditPhone(lead.phone || ""); setEditingPhone(true); setPhoneError(""); }}
+                      className="text-[10px] px-1.5 py-0.5 border border-border rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    >
+                      Edit
+                    </button>
+                    {lead.smsOptOut && (
+                      <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
+                    )}
+                  </div>
+                  {lead.phone && (() => {
+                    const digits = lead.phone.replace(/\D/g, "");
+                    const isE164 = lead.phone.startsWith("+");
+                    if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
+                      const suggested = `+63${digits.slice(1)}`;
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                            <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                            Suggested format: {suggested}
+                          </span>
+                          <button
+                            onClick={() => { setEditPhone(suggested); setEditingPhone(true); setPhoneError(""); }}
+                            className="text-[10px] px-1.5 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors self-start font-medium"
+                          >
+                            Use suggested format
+                          </button>
+                        </div>
+                      );
+                    }
+                    if (!isE164 && digits.length !== 10 && digits.length !== 11) {
+                      return (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                          Phone number may need country code formatting
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </>
+              )}
+            </div>
+            {/* M7: the company RECORD when this contact is linked to one, and the
+                text somebody typed when it is not — never one dressed as the other. */}
+            <div className="flex items-start gap-2 text-sm text-muted-foreground min-w-0">
+              <Building className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                {linkedCompany ? (
+                  <Link href={`/admin/crm/companies/${linkedCompany.id}`}>
+                    <span className="text-primary hover:underline cursor-pointer break-words">{linkedCompany.name}</span>
+                  </Link>
+                ) : lead.company ? (
+                  <span className="break-words">Company on file: {lead.company}</span>
+                ) : (
+                  <span className="text-muted-foreground/70">No company</span>
+                )}
+                {linkedCompany?.archivedAt && (
+                  <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">Archived</span>
+                )}
+                <button
+                  onClick={() => setShowCompanyDialog(true)}
+                  className="ml-2 text-[10px] px-1.5 py-0.5 border border-border rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  {linkedCompany ? "Change company" : "Link to a company"}
+                </button>
+              </div>
+            </div>
+            <LinkCompanyDialog
+              open={showCompanyDialog}
+              contact={{ id: lead.id, name: lead.name, companyText: lead.company ?? null }}
+              currentCompany={linkedCompany ? { id: linkedCompany.id, name: linkedCompany.name } : null}
+              onClose={() => setShowCompanyDialog(false)}
+              onChanged={(message) => { showToast(message); load(); }}
+            />
+            {lead.website && (
+              <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
+                <Globe className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.website}</span>
+              </a>
+            )}
+            {lead.nextFollowUpAt && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-3.5 h-3.5 shrink-0" /> Follow-up: {new Date(lead.nextFollowUpAt).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+
+          {lead.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {lead.tags.map(t => (
+                <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-foreground/5 rounded-full text-muted-foreground border border-border">
+                  <Tag className="w-2.5 h-2.5" />{t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Stage / status & quick actions ──────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden mb-5">
+          <div className="flex items-stretch divide-x divide-border/60">
             {/* Call */}
             <button
               onClick={() => setOpenModal("call")}
               disabled={!lead.phone}
               title={!lead.phone ? "No phone number on record" : "Initiate bridge call"}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
             >
               <PhoneCall className="w-4 h-4 text-green-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Call</span>
@@ -740,7 +1067,7 @@ export default function CrmLeadDetail() {
               onClick={() => { setOpenModal("text"); loadMessages(); }}
               disabled={!lead.phone}
               title={!lead.phone ? "No phone number on record" : lead.smsOptOut ? "SMS opted out" : "Send SMS"}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed group"
             >
               <MessageSquare className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Text</span>
@@ -749,15 +1076,15 @@ export default function CrmLeadDetail() {
             {/* Email */}
             <button
               onClick={() => setOpenModal("email")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-indigo-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-cyan-50 transition-colors group"
             >
-              <Mail className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+              <Mail className="w-4 h-4 text-cyan-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Email</span>
             </button>
             {/* Note */}
             <button
               onClick={() => setOpenModal("note")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-yellow-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-yellow-50 transition-colors group"
             >
               <FileText className="w-4 h-4 text-yellow-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Note</span>
@@ -765,19 +1092,19 @@ export default function CrmLeadDetail() {
             {/* Task */}
             <button
               onClick={() => setOpenModal("task")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-purple-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-teal-50 transition-colors group"
             >
-              <Plus className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform shrink-0" />
+              <Plus className="w-4 h-4 text-teal-600 group-hover:scale-110 transition-transform shrink-0" />
               <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Add Task</span>
             </button>
             {/* Status */}
             <button
               onClick={() => setOpenModal("status")}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3.5 hover:bg-orange-50 transition-colors group"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1.5 sm:px-3 py-3 hover:bg-orange-50 transition-colors group"
             >
               <RefreshCw className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform shrink-0" />
-              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Status</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium leading-tight max-w-full truncate ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground text-center leading-tight">Stage / Status</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium leading-tight max-w-full truncate ${statusColor[lead.status] || "bg-muted text-muted-foreground"}`}>
                 {lead.status}
               </span>
             </button>
@@ -785,175 +1112,24 @@ export default function CrmLeadDetail() {
         </div>
 
         {/* ── Main Grid ────────────────────────────────────────────────────── */}
+        {/*
+          `min-w-0` on both columns is load-bearing on a phone, not tidying.
+          A grid item defaults to `min-width: auto`, so it refuses to shrink
+          below its content's min-content width. One wide child inside then
+          sets the whole column: at 375px this grid's single column resolved to
+          618px, and because the page's <main> is `overflow-x-hidden` the page
+          did NOT scroll — it silently clipped, so 220 elements were off-screen
+          and unreachable with no scrollbar to reveal them. "No horizontal
+          scrolling" is therefore not evidence that a page fits; it can equally
+          mean the overflow is being hidden.
+        */}
         <div className="grid lg:grid-cols-[1fr_300px] gap-5">
           {/* Main panel */}
-          <div className="space-y-5">
-            {/* Lead header / contact card */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <h1 className="text-xl font-serif font-bold text-foreground">{lead.name}</h1>
-                  {lead.company && (
-                    <p className="text-muted-foreground text-sm flex items-center gap-1 mt-0.5">
-                      <Building className="w-3.5 h-3.5" />{lead.company}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link href={`/admin/crm/leads/${lead.id}/dna`}>
-                    <button className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1">
-                      View Lead DNA
-                    </button>
-                  </Link>
-                  <button
-                    onClick={() => navigate(`/admin/crm/campaigns?view=builder&leadId=${lead.id}`)}
-                    className="text-xs text-primary hover:opacity-80 transition-opacity border border-primary/30 rounded-full px-2.5 py-1"
-                  >
-                    Generate for this lead
-                  </button>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
-                    {lead.status}
-                  </span>
-                  <button
-                    onClick={() => setOpenModal("status")}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-gray-200 rounded-full px-2.5 py-1 hover:border-gray-300"
-                  >
-                    Change ↓
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-2 mt-4">
-                <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
-                  <Mail className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.email}</span>
-                </a>
-                {/* ── Phone field with inline edit ── */}
-                <div className="flex flex-col gap-1">
-                  {editingPhone ? (
-                    <div className="space-y-1.5">
-                      <div className="flex gap-1.5">
-                        <input
-                          type="tel"
-                          value={editPhone}
-                          onChange={e => setEditPhone(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") { setEditingPhone(false); setPhoneError(""); } }}
-                          className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-foreground font-mono min-w-0"
-                          placeholder="+19498806515"
-                          autoFocus
-                        />
-                        <button
-                          onClick={savePhone}
-                          disabled={savingPhone}
-                          className="text-xs px-2.5 py-1.5 bg-foreground text-white rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0"
-                        >
-                          {savingPhone ? "…" : "Save"}
-                        </button>
-                        <button
-                          onClick={() => { setEditingPhone(false); setEditPhone(lead.phone || ""); setPhoneError(""); }}
-                          className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Use E.164 format when possible.{" "}
-                        US: <code className="bg-gray-100 px-0.5 rounded">+19498806515</code>{" "}
-                        · PH: <code className="bg-gray-100 px-0.5 rounded">+639186069624</code>
-                      </p>
-                      {phoneError && (
-                        <p className="text-[10px] text-red-600 font-medium">{phoneError}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {lead.phone ? (
-                          <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-                            <Phone className="w-3.5 h-3.5 shrink-0" /> {lead.phone}
-                          </a>
-                        ) : (
-                          <span className="flex items-center gap-2 text-sm text-muted-foreground/50">
-                            <Phone className="w-3.5 h-3.5 shrink-0" /> No phone on record
-                          </span>
-                        )}
-                        <button
-                          onClick={() => { setEditPhone(lead.phone || ""); setEditingPhone(true); setPhoneError(""); }}
-                          className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded text-muted-foreground hover:bg-gray-100 hover:text-foreground transition-colors"
-                        >
-                          Edit
-                        </button>
-                        {lead.smsOptOut && (
-                          <span className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 font-medium">SMS opt-out</span>
-                        )}
-                      </div>
-                      {lead.phone && (() => {
-                        const digits = lead.phone.replace(/\D/g, "");
-                        const isE164 = lead.phone.startsWith("+");
-                        if (!isE164 && digits.length === 11 && digits.startsWith("0")) {
-                          const suggested = `+63${digits.slice(1)}`;
-                          return (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
-                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                Suggested format: {suggested}
-                              </span>
-                              <button
-                                onClick={() => { setEditPhone(suggested); setEditingPhone(true); setPhoneError(""); }}
-                                className="text-[10px] px-1.5 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors self-start font-medium"
-                              >
-                                Use suggested format
-                              </button>
-                            </div>
-                          );
-                        }
-                        if (!isE164 && digits.length !== 10 && digits.length !== 11) {
-                          return (
-                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium inline-flex items-center gap-1">
-                              <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                              Phone number may need country code formatting
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </>
-                  )}
-                </div>
-                {lead.website && (
-                  <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors min-w-0">
-                    <Globe className="w-3.5 h-3.5 shrink-0" /> <span className="min-w-0 break-all">{lead.website}</span>
-                  </a>
-                )}
-                {lead.nextFollowUpAt && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-3.5 h-3.5 shrink-0" /> Follow-up: {new Date(lead.nextFollowUpAt).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-
-              {lead.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {lead.tags.map(t => (
-                    <span key={t} className="flex items-center gap-1 px-2 py-0.5 text-xs bg-foreground/5 rounded-full text-muted-foreground border border-gray-200">
-                      <Tag className="w-2.5 h-2.5" />{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sales Workspace */}
-            <SalesWorkspace
-              lead={lead}
-              activities={activities}
-              tasks={tasks}
-              onReload={load}
-            />
-
+          <div className="space-y-5 min-w-0">
             {/* Tab panel */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-              <div className="flex border-b border-gray-200 px-4 overflow-x-auto">
-                {(["timeline","tasks","calls","sms","email"] as const).map(tab => (
+            <div className="bg-white rounded-xl border border-border shadow-sm">
+              <div className="flex border-b border-border px-4 overflow-x-auto">
+                {(["timeline","history","tasks","communications","opportunity"] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -963,11 +1139,11 @@ export default function CrmLeadDetail() {
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "timeline" ? "Activity"
+                    {tab === "timeline" ? "Activity Log"
+                      : tab === "history" ? "Full History"
                       : tab === "tasks" ? `Tasks${pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ""}`
-                      : tab === "calls" ? "📞 Calls"
-                      : tab === "sms" ? "💬 SMS"
-                      : "Email"}
+                      : tab === "communications" ? "Communications"
+                      : "Opportunity / Project"}
                   </button>
                 ))}
               </div>
@@ -977,7 +1153,7 @@ export default function CrmLeadDetail() {
                 <div className="p-5">
                   <div className="mb-5">
                     <textarea
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                      className="w-full px-3 py-2.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                       rows={3}
                       placeholder="Add a note…"
                       value={noteText}
@@ -1011,7 +1187,7 @@ export default function CrmLeadDetail() {
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm font-medium ${isMissed ? "text-red-600" : "text-foreground"}`}>{a.title}</p>
                               {isOutcome && disposition && (
-                                <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-gray-100 text-gray-600"}`}>
+                                <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-muted text-muted-foreground"}`}>
                                   {disposition}
                                 </span>
                               )}
@@ -1026,6 +1202,12 @@ export default function CrmLeadDetail() {
                 </div>
               )}
 
+              {/* ── Full history tab ───
+                  The activity log above is one stream. This is every stream —
+                  messages, notes, meetings, documents, deals, projects,
+                  payments and support — merged into one order. */}
+              {activeTab === "history" && <CustomerTimeline leadId={lead.id} />}
+
               {/* ── Tasks tab ─── */}
               {activeTab === "tasks" && (
                 <div className="p-5">
@@ -1033,26 +1215,26 @@ export default function CrmLeadDetail() {
                     <Plus className="w-3.5 h-3.5" /> Add Task
                   </Button>
                   {showTaskForm && (
-                    <div className="mb-4 border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                    <div className="mb-4 border border-border rounded-lg p-4 space-y-3 bg-muted">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-semibold text-muted-foreground block mb-1">Type</label>
-                          <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
+                          <select className="w-full px-3 py-2 text-sm border border-input rounded-lg" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
                             {TASK_TYPES.map(t=><option key={t}>{t}</option>)}
                           </select>
                         </div>
                         <div>
                           <label className="text-xs font-semibold text-muted-foreground block mb-1">Due Date</label>
-                          <input type="date" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
+                          <input type="date" className="w-full px-3 py-2 text-sm border border-input rounded-lg" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
                         </div>
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground block mb-1">Title</label>
-                        <input className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" placeholder="Task title" value={taskForm.title} onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))} />
+                        <input className="w-full px-3 py-2 text-sm border border-input rounded-lg" placeholder="Task title" value={taskForm.title} onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))} />
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground block mb-1">Description</label>
-                        <textarea className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none" rows={2} placeholder="Optional details" value={taskForm.description} onChange={e=>setTaskForm(f=>({...f,description:e.target.value}))} />
+                        <textarea className="w-full px-3 py-2 text-sm border border-input rounded-lg resize-none" rows={2} placeholder="Optional details" value={taskForm.description} onChange={e=>setTaskForm(f=>({...f,description:e.target.value}))} />
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={addTask} disabled={addingTask||!taskForm.title}>{addingTask?"Saving…":"Save Task"}</Button>
@@ -1068,10 +1250,10 @@ export default function CrmLeadDetail() {
                   ) : (
                     <ul className="space-y-2">
                       {tasks.map(task => (
-                        <li key={task.id} className={`flex items-start gap-3 p-3 rounded-lg border ${task.status==="completed"?"border-gray-100 bg-gray-50 opacity-60":task.status==="overdue"?"border-red-100 bg-red-50":"border-gray-200 bg-white"}`}>
+                        <li key={task.id} className={`flex items-start gap-3 p-3 rounded-lg border ${task.status==="completed"?"border-border/60 bg-muted opacity-60":task.status==="overdue"?"border-red-100 bg-red-50":"border-border bg-white"}`}>
                           <button
                             onClick={() => task.status!=="completed" && completeTask(task.id)}
-                            className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${task.status==="completed"?"bg-green-500 border-green-500":"border-gray-300 hover:border-green-500"}`}
+                            className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${task.status==="completed"?"bg-green-500 border-green-500":"border-input hover:border-green-500"}`}
                           >
                             {task.status==="completed"&&<Check className="w-3 h-3 text-white"/>}
                           </button>
@@ -1087,7 +1269,7 @@ export default function CrmLeadDetail() {
                               )}
                             </div>
                           </div>
-                          <button onClick={()=>deleteTask(task.id)} className="text-gray-300 hover:text-red-500 transition-colors mt-0.5 shrink-0">
+                          <button onClick={()=>deleteTask(task.id)} className="text-muted-foreground/40 hover:text-red-500 transition-colors mt-0.5 shrink-0">
                             <Trash2 className="w-3.5 h-3.5"/>
                           </button>
                         </li>
@@ -1097,8 +1279,25 @@ export default function CrmLeadDetail() {
                 </div>
               )}
 
-              {/* ── SMS & Calls tab ─── */}
-              {activeTab === "sms" && (
+              {/* ── Communications tab ─── */}
+              {activeTab === "communications" && (
+                <div>
+                  <div className="flex flex-wrap gap-1.5 px-5 pt-4">
+                    {(["sms","calls","email"] as const).map(sub => (
+                      <button
+                        key={sub}
+                        onClick={() => setCommSubTab(sub)}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                          commSubTab === sub
+                            ? "bg-foreground text-white"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {sub === "sms" ? "💬 SMS" : sub === "calls" ? "📞 Calls" : "✉️ Email"}
+                      </button>
+                    ))}
+                  </div>
+              {commSubTab === "sms" && (
                 <div className="flex flex-col h-[520px]">
                   {lead.smsOptOut && (
                     <div className="mx-5 mt-4 flex items-center gap-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
@@ -1113,10 +1312,25 @@ export default function CrmLeadDetail() {
                     </div>
                   )}
                   <div ref={smsThreadRef} className="flex-1 overflow-y-auto p-5 space-y-3">
-                    {loadingMessages ? (
-                      <div className="flex items-center justify-center h-32">
+                    {messagesLoad.status === "loading" ? (
+                      <div className="flex items-center justify-center h-32" role="status" aria-live="polite">
+                        <span className="sr-only">Loading messages…</span>
                         <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
                       </div>
+                    ) : messages === null ? (
+                      /* Deliberately not the empty state below it: "there are
+                         no messages" and "we could not read the thread" must
+                         never look alike. */
+                      <LoadFailure
+                        what="Messages"
+                        reason={messagesLoad.status === "error" ? messagesLoad.reason : ""}
+                        onRetry={() => { void loadMessages(); }}
+                        retrying={reloadingMessages}
+                      >
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          The thread is not shown while this is unavailable — there may well be messages in it.
+                        </p>
+                      </LoadFailure>
                     ) : messages.length === 0 ? (
                       <div className="text-center text-muted-foreground text-sm py-12">
                         {lead.phone ? "No messages yet. Send an SMS below." : "No phone number on record for this lead."}
@@ -1128,7 +1342,7 @@ export default function CrmLeadDetail() {
                       return (
                         <div key={m.id} className={`flex flex-col ${isOut ? "items-end" : "items-start"}`}>
                           <div className={`max-w-sm rounded-2xl px-4 py-2.5 text-sm ${
-                            isCall ? "bg-gray-100 text-gray-700 border border-gray-200 w-full"
+                            isCall ? "bg-muted text-foreground/80 border border-border w-full"
                             : smsInfo?.isError ? "bg-red-50 border border-red-200 text-red-900"
                             : isOut ? "bg-foreground text-white"
                             : "bg-blue-50 border border-blue-200 text-foreground"
@@ -1179,10 +1393,10 @@ export default function CrmLeadDetail() {
                     })}
                   </div>
                   {lead.phone && !lead.smsOptOut && (
-                    <div className="border-t border-gray-200 p-4 space-y-2">
+                    <div className="border-t border-border p-4 space-y-2">
                       <div className="flex gap-2">
                         <textarea
-                          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                          className="flex-1 px-3 py-2 text-sm border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                           rows={3}
                           placeholder={`Text ${lead.name}…`}
                           value={smsBody}
@@ -1205,8 +1419,8 @@ export default function CrmLeadDetail() {
               )}
 
               {/* ── Calls tab ─── */}
-              {activeTab === "calls" && (() => {
-                const callMsgs = messages.filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
+              {commSubTab === "calls" && (() => {
+                const callMsgs = (messages ?? []).filter(m => m.channel === "call").map(m => ({ key:`msg-${m.id}`, kind:"message" as const, ts: new Date(m.createdAt).getTime(), data: m }));
                 const callActs = activities.filter(a => ["call_outcome","call_missed","call_initiated","call_received"].includes(a.type)).map(a => ({ key:`act-${a.id}`, kind:"activity" as const, ts: new Date(a.createdAt).getTime(), data: a }));
                 const all = [...callMsgs, ...callActs].sort((a,b) => b.ts - a.ts);
                 const merged = callFilter === "all" ? all : all.filter(entry => {
@@ -1247,24 +1461,47 @@ export default function CrmLeadDetail() {
                           className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all ${
                             callFilter === p.key
                               ? "bg-foreground text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              : "bg-muted text-muted-foreground hover:bg-accent"
                           }`}
                         >
                           {p.label}
                         </button>
                       ))}
                     </div>
-                    {loadingMessages ? (
-                      <div className="flex items-center justify-center py-12">
+                    {messagesLoad.status === "loading" ? (
+                      <div className="flex items-center justify-center py-12" role="status" aria-live="polite">
+                        <span className="sr-only">Loading the call log…</span>
                         <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
                       </div>
-                    ) : merged.length === 0 ? (
-                      <div className="text-center text-muted-foreground text-sm py-12">
-                        <p className="text-2xl mb-2">📵</p>
-                        <p>No call history yet.</p>
-                        <p className="text-xs mt-1">Bridge calls and missed calls will appear here.</p>
-                      </div>
                     ) : (
+                      <>
+                        {/* Partial, and named as such: outcomes logged by hand
+                            are still real when the phone system's own log is
+                            not available. What is missing is stated rather
+                            than counted as nothing. */}
+                        {messages === null && (
+                          <LoadFailure
+                            what="The call log"
+                            reason={messagesLoad.status === "error" ? messagesLoad.reason : ""}
+                            variant="inline"
+                            className="mb-4"
+                            onRetry={() => { void loadMessages(); }}
+                            retrying={reloadingMessages}
+                          >
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Calls recorded by the phone system are missing from this list. Outcomes logged by hand are still shown.
+                            </p>
+                          </LoadFailure>
+                        )}
+                        {merged.length === 0 ? (
+                          messages !== null && (
+                            <div className="text-center text-muted-foreground text-sm py-12">
+                              <p className="text-2xl mb-2">📵</p>
+                              <p>No call history yet.</p>
+                              <p className="text-xs mt-1">Bridge calls and missed calls will appear here.</p>
+                            </div>
+                          )
+                        ) : (
                       <ul className="space-y-3">
                         {merged.map(entry => {
                           if (entry.kind === "message") {
@@ -1273,7 +1510,7 @@ export default function CrmLeadDetail() {
                             const ok = m.callStatus === "completed";
                             const failed = m.callStatus === "no-answer" || m.callStatus === "busy" || m.callStatus === "failed";
                             return (
-                              <li key={entry.key} className="flex gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">
+                              <li key={entry.key} className="flex gap-3 p-3 rounded-xl border border-border bg-muted">
                                 <span className={`text-base mt-0.5 shrink-0 ${ok?"text-green-600":failed?"text-red-500":"text-yellow-600"}`}>
                                   {ok ? "✅" : failed ? "📵" : "📞"}
                                 </span>
@@ -1302,12 +1539,12 @@ export default function CrmLeadDetail() {
                             const isOutcome = a.type === "call_outcome";
                             const disposition = isOutcome ? (a.metadata?.disposition as CallDisposition | undefined) : undefined;
                             return (
-                              <li key={entry.key} className={`flex gap-3 p-3 rounded-xl border ${isMissed?"border-red-100 bg-red-50":"border-gray-200 bg-white"}`}>
+                              <li key={entry.key} className={`flex gap-3 p-3 rounded-xl border ${isMissed?"border-red-100 bg-red-50":"border-border bg-white"}`}>
                                 <span className="text-base mt-0.5 shrink-0">{activityIcon[a.type] || "•"}</span>
                                 <div className="flex-1 min-w-0">
                                   <p className={`text-sm font-medium ${isMissed?"text-red-600":"text-foreground"}`}>{a.title}</p>
                                   {isOutcome && disposition && (
-                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-gray-100 text-gray-600"}`}>
+                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-semibold mt-0.5 ${dispositionColor[disposition] ?? "bg-muted text-muted-foreground"}`}>
                                       {disposition}
                                     </span>
                                   )}
@@ -1322,13 +1559,15 @@ export default function CrmLeadDetail() {
                           }
                         })}
                       </ul>
+                        )}
+                      </>
                     )}
                   </div>
                 );
               })()}
 
               {/* ── Email tab ─── */}
-              {activeTab === "email" && (
+              {commSubTab === "email" && (
                 <div className="p-5 space-y-4">
                   {emailTestMode && (
                     <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
@@ -1340,7 +1579,7 @@ export default function CrmLeadDetail() {
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground block mb-1">Load Template</label>
                       <select
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-input rounded-lg text-sm"
                         onChange={e => {
                           const t = templates.find(t => t.id === Number(e.target.value));
                           if (t) { setEmailSubject(t.subject.replace("{{name}}",lead.name)); setEmailBody(t.body.replace("{{name}}",lead.name.split(" ")[0])); }
@@ -1354,15 +1593,15 @@ export default function CrmLeadDetail() {
                   )}
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">To</label>
-                    <div className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-muted-foreground bg-gray-50">{lead.email}</div>
+                    <div className="px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground bg-muted">{lead.email}</div>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">Subject</label>
-                    <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="Email subject" value={emailSubject} onChange={e=>setEmailSubject(e.target.value)} />
+                    <input className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="Email subject" value={emailSubject} onChange={e=>setEmailSubject(e.target.value)} />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">Body</label>
-                    <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none" rows={8} placeholder="Email body…" value={emailBody} onChange={e=>setEmailBody(e.target.value)} />
+                    <textarea className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none" rows={8} placeholder="Email body…" value={emailBody} onChange={e=>setEmailBody(e.target.value)} />
                   </div>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -1375,15 +1614,29 @@ export default function CrmLeadDetail() {
                   </div>
                 </div>
               )}
+                </div>
+              )}
+
+              {/* ── Opportunity / Project tab ─── */}
+              {activeTab === "opportunity" && (
+                <div className="p-4">
+                  <SalesWorkspace
+                    lead={lead}
+                    activities={activities}
+                    tasks={tasks}
+                    onReload={load}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           {/* ── Sidebar ───────────────────────────────────────────────────── */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
 
             {/* ── Lead Health Score ──────────────────────────────────────── */}
             {health && (
-              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
                     <span className="crm-insight-dot" />
@@ -1404,7 +1657,7 @@ export default function CrmLeadDetail() {
                     <span className={`text-4xl font-bold leading-none ${health.color}`}>{health.score}</span>
                     <span className="text-sm text-muted-foreground mb-0.5">/ 100</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                     <div
                       className={`h-2 rounded-full transition-all ${health.barColor}`}
                       style={{ width: `${health.score}%` }}
@@ -1435,7 +1688,7 @@ export default function CrmLeadDetail() {
                 )}
 
                 {/* Recommended action */}
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                <div className="bg-muted rounded-lg px-3 py-2.5 border border-border/60">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Recommended Action</p>
                   <p className="text-xs text-foreground font-medium">{health.action}</p>
                 </div>
@@ -1444,7 +1697,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Relationship Intelligence ─────────────────────────────── */}
             {relProfile && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Relationship</h3>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${relProfile.strength.bgColor} ${relProfile.strength.color} ${relProfile.strength.borderColor}`}>
@@ -1464,7 +1717,7 @@ export default function CrmLeadDetail() {
                     </span>
                     <span className="text-xs text-muted-foreground mb-0.5">/ 100 strength</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-1.5 rounded-full ${relProfile.strength.barColor}`}
                       style={{ width: `${relProfile.strength.score}%` }}
@@ -1482,7 +1735,7 @@ export default function CrmLeadDetail() {
                 </div>
 
                 {/* Conversation recommendation */}
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100 space-y-1">
+                <div className="bg-muted rounded-lg px-3 py-2.5 border border-border/60 space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recommended Next Step</p>
                   <p className="text-xs font-semibold text-foreground">{relProfile.conversation.action}</p>
                   <p className="text-[10px] text-muted-foreground">{relProfile.conversation.why}</p>
@@ -1496,7 +1749,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Communication Intelligence ──────────────────────────────── */}
             {ciStats && (
-              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
                     <span className="crm-insight-dot" />
@@ -1518,7 +1771,7 @@ export default function CrmLeadDetail() {
                     </span>
                     <span className="text-xs text-muted-foreground mb-0.5">/ 100 engagement</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-1.5 rounded-full ${ciStats.engagementScore.barColor}`}
                       style={{ width: `${ciStats.engagementScore.score}%` }}
@@ -1527,14 +1780,14 @@ export default function CrmLeadDetail() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Response Rate</p>
                     <p className="text-sm font-bold text-foreground">{ciStats.responseRate.rate}%</p>
                     <p className="text-[10px] text-muted-foreground">
                       {ciStats.responseRate.inboundCount} / {ciStats.responseRate.outboundCount} msgs
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Reply Risk</p>
                     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ${
                       ciStats.replyRisk === "Low"    ? "bg-green-50  text-green-700  border-green-200" :
@@ -1547,7 +1800,7 @@ export default function CrmLeadDetail() {
                 </div>
 
                 {ciStats.engagementScore.badge !== "Highly Engaged" && (
-                  <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                  <div className="bg-muted rounded-lg px-3 py-2.5 border border-border/60">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Engagement Badge</p>
                     <p className={`text-xs font-semibold ${ciStats.engagementScore.color}`}>
                       {ciStats.engagementScore.badge}
@@ -1562,21 +1815,39 @@ export default function CrmLeadDetail() {
             )}
 
             {/* ── Call Summary ─────────────────────────────────────────────── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-serif font-bold text-sm text-foreground">Call Summary</h3>
                 {callSummary.lastCallAt && (
                   <span className="text-[10px] text-muted-foreground">Last: {callSummary.lastCallAt}</span>
                 )}
               </div>
-              {callSummary.totalCalls === 0 ? (
+              {/*
+                The phone system's log is a separate request. When it fails
+                this panel used to collapse to "No calls yet" over four tiles
+                of zeros — a statement about this client's call history that
+                nobody had been able to check.
+              */}
+              {messagesLoad.status === "error" && (
+                <LoadFailure
+                  what="The call log"
+                  reason={messagesLoad.reason}
+                  variant="inline"
+                  onRetry={() => { void loadMessages(); }}
+                  retrying={reloadingMessages}
+                />
+              )}
+              {messagesLoad.status === "ready" && callSummary.totalCalls === 0 && callSummary.loggedOutcomes === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">No calls yet</p>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                    <div className="bg-muted rounded-lg px-2.5 py-2">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Total Calls</p>
-                      <p className="text-2xl font-bold text-foreground">{callSummary.totalCalls}</p>
+                      {/* A dash, never a 0, when the log behind it is unknown. */}
+                      <p className="text-2xl font-bold text-foreground">
+                        <Figure value={callSummary.totalCalls} loading={messagesLoad.status === "loading"} />
+                      </p>
                     </div>
                     <div className="bg-emerald-50 rounded-lg px-2.5 py-2">
                       <p className="text-[10px] text-emerald-700 uppercase tracking-wide mb-0.5">Connected</p>
@@ -1592,7 +1863,7 @@ export default function CrmLeadDetail() {
                     </div>
                   </div>
                   {callSummary.recentOutcome && (
-                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="bg-muted rounded-lg px-3 py-2 border border-border/60">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Last Outcome</p>
                       <p className="text-xs font-semibold text-foreground">{callSummary.recentOutcome}</p>
                     </div>
@@ -1603,7 +1874,7 @@ export default function CrmLeadDetail() {
 
             {/* ── Sales Intelligence ───────────────────────────────────────── */}
             {salesNBA && momentum && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Sales Intelligence</h3>
 
@@ -1611,7 +1882,7 @@ export default function CrmLeadDetail() {
                     salesNBA.priority === "critical" ? "bg-red-50 text-red-700 border-red-200" :
                     salesNBA.priority === "high"     ? "bg-orange-50 text-orange-700 border-orange-200" :
                     salesNBA.priority === "medium"   ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                                                       "bg-gray-50 text-gray-600 border-gray-200"
+                                                       "bg-muted text-muted-foreground border-border"
                   }`}>
                     {salesNBA.priority === "critical" ? "🚨 Critical" :
                      salesNBA.priority === "high"     ? "🔥 High"     :
@@ -1624,7 +1895,7 @@ export default function CrmLeadDetail() {
                   salesNBA.priority === "critical" ? "bg-red-50 border-red-200" :
                   salesNBA.priority === "high"     ? "bg-orange-50 border-orange-200" :
                   salesNBA.priority === "medium"   ? "bg-amber-50 border-amber-200" :
-                                                     "bg-gray-50 border-gray-100"
+                                                     "bg-muted border-border/60"
                 }`}>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Next Best Action</p>
                   <p className="text-sm font-bold text-foreground mb-1">{salesNBA.action}</p>
@@ -1634,20 +1905,20 @@ export default function CrmLeadDetail() {
 
                 {/* Confidence + Urgency */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Confidence</p>
                     <p className="text-sm font-bold text-foreground">{salesNBA.confidence}%</p>
-                    <div className="h-1 w-full bg-gray-200 rounded-full mt-1 overflow-hidden">
+                    <div className="h-1 w-full bg-border rounded-full mt-1 overflow-hidden">
                       <div
                         className={`h-1 rounded-full ${
                           salesNBA.confidence >= 80 ? "bg-emerald-500" :
-                          salesNBA.confidence >= 60 ? "bg-amber-400" : "bg-gray-400"
+                          salesNBA.confidence >= 60 ? "bg-amber-400" : "bg-muted-foreground/50"
                         }`}
                         style={{ width: `${salesNBA.confidence}%` }}
                       />
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-2.5 py-2">
+                  <div className="bg-muted rounded-lg px-2.5 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Urgency</p>
                     <span className={`text-xs font-semibold ${
                       salesNBA.urgency === "immediate" ? "text-red-600" :
@@ -1680,7 +1951,7 @@ export default function CrmLeadDetail() {
                     }`}>{momentum.score}</span>
                     <span className="text-xs text-muted-foreground mb-0.5">/ 100</span>
                   </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mb-1.5">
                     <div
                       className={`h-1.5 rounded-full transition-all ${
                         momentum.score >= 65 ? "bg-emerald-400" :
@@ -1718,12 +1989,12 @@ export default function CrmLeadDetail() {
 
             {/* ── Sales Automation ─────────────────────────────────────────── */}
             {autoQueue && readiness && missingInfo && sequence && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground">Sales Automation</h3>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     autoQueue.availableCount === 0
-                      ? "bg-gray-50 text-gray-500 border-gray-200"
+                      ? "bg-muted text-muted-foreground border-border"
                       : autoQueue.topItem?.priority === "critical"
                         ? "bg-red-50 text-red-700 border-red-200"
                         : autoQueue.topItem?.priority === "high"
@@ -1740,19 +2011,19 @@ export default function CrmLeadDetail() {
                   <div className="grid grid-cols-2 gap-1.5">
                     {[readiness.salesReady, readiness.proposalReady, readiness.contractReady, readiness.onboardingReady].map(gate => (
                       <div key={gate.gate} className={`rounded-lg px-2.5 py-2 border ${
-                        gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"
+                        gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-muted border-border"
                       }`}>
                         <div className="flex items-center gap-1 mb-0.5">
-                          <span className={`text-[9px] font-bold ${gate.ready ? "text-emerald-600" : "text-gray-400"}`}>
+                          <span className={`text-[9px] font-bold ${gate.ready ? "text-emerald-600" : "text-muted-foreground/60"}`}>
                             {gate.ready ? "✓" : "○"}
                           </span>
                           <p className={`text-[9px] font-bold uppercase tracking-wide leading-tight ${gate.ready ? "text-emerald-700" : "text-muted-foreground"}`}>
                             {gate.gate.replace(" Ready", "")}
                           </p>
                         </div>
-                        <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-1 w-full bg-border rounded-full overflow-hidden">
                           <div
-                            className={`h-1 rounded-full ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-gray-300"}`}
+                            className={`h-1 rounded-full ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-border"}`}
                             style={{ width: `${gate.score}%` }}
                           />
                         </div>
@@ -1806,7 +2077,7 @@ export default function CrmLeadDetail() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sequence</p>
                     <span className="text-[10px] text-muted-foreground">Step {sequence.currentStep}/{sequence.totalSteps}</span>
                   </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mb-1.5">
                     <div
                       className="h-1.5 rounded-full bg-foreground transition-all"
                       style={{ width: `${(sequence.currentStep / sequence.totalSteps) * 100}%` }}
@@ -1825,7 +2096,7 @@ export default function CrmLeadDetail() {
 
             {/* ── DISC Behavioral Profile ──────────────────────────────────── */}
             {discProfile && (
-              <div className="crm-insight-card bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+              <div className="crm-insight-card bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
@@ -1861,9 +2132,9 @@ export default function CrmLeadDetail() {
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Confidence</span>
                     <span className="text-[10px] font-bold text-foreground">{discProfile.confidence}%</span>
                   </div>
-                  <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-1 rounded-full bg-gray-400 transition-all"
+                      className="h-1 rounded-full bg-muted-foreground/50 transition-all"
                       style={{ width: `${discProfile.confidence}%` }}
                     />
                   </div>
@@ -1878,7 +2149,7 @@ export default function CrmLeadDetail() {
                     return (
                       <div key={style} className="flex items-center gap-2">
                         <span className={`text-[10px] font-medium w-16 shrink-0 ${meta.textColor}`}>{meta.emoji} {style}</span>
-                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                           <div className={`h-1.5 rounded-full ${meta.barColor} transition-all`} style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0">{pct}%</span>
@@ -1893,7 +2164,7 @@ export default function CrmLeadDetail() {
                     <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">Signals detected</p>
                     {discProfile.reasons.slice(0, 4).map((r, i) => (
                       <div key={i} className="flex items-start gap-1.5">
-                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style]?.textColor ?? "text-gray-700"}`}>{DISC_META[r.style]?.emoji ?? "•"}</span>
+                        <span className={`text-[10px] font-bold shrink-0 ${DISC_META[r.style]?.textColor ?? "text-foreground/80"}`}>{DISC_META[r.style]?.emoji ?? "•"}</span>
                         <p className="text-[10px] text-muted-foreground leading-snug">{r.text}</p>
                       </div>
                     ))}
@@ -1915,17 +2186,16 @@ export default function CrmLeadDetail() {
             )}
 
             {/* Lead management */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-4">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-4">
               <h3 className="font-serif font-bold text-sm text-foreground">Lead Management</h3>
               {([
                 { label:"Status", value:editStatus, onChange:setEditStatus, options:STATUSES },
                 { label:"Priority", value:editPriority, onChange:setEditPriority, options:PRIORITIES },
-                { label:"Assigned To", value:editAssigned, onChange:setEditAssigned, options:TEAM },
               ] as const).map(({ label, value, onChange, options }) => (
                 <div key={label}>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                     value={value}
                     onChange={e => (onChange as (v: string) => void)(e.target.value)}
                   >
@@ -1933,17 +2203,40 @@ export default function CrmLeadDetail() {
                   </select>
                 </div>
               ))}
+              <div className="min-w-0">
+                <label htmlFor="lead-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+                <OwnerPicker
+                  id="lead-owner"
+                  value={editOwner}
+                  onChange={setEditOwner}
+                  assignees={people.assignees}
+                  loading={people.loading}
+                  error={people.error}
+                  onRetry={people.reload}
+                  currentOwner={lead.assignedToStaffId != null
+                    ? { id: lead.assignedToStaffId, label: lead.assignedTo || "Current owner" }
+                    : null}
+                  unmatchedName={lead.assignedToStaffId == null ? ((lead.assignedTo ?? "").trim() || null) : null}
+                />
+                {lead.assignedToStaffId == null && (lead.assignedTo ?? "").trim() && (
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed break-words">
+                    Recorded as “{(lead.assignedTo ?? "").trim()}”, which does not match a person in this CRM.
+                    Choose who it is here, or map the name for every contact that carries it on{" "}
+                    <Link href="/admin/crm/admin#unmapped-owners" className="underline">Admin → Unmapped lead owners</Link>.
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Next Follow-up</label>
-                <input type="date" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={editFollowUp} onChange={e=>setEditFollowUp(e.target.value)} />
+                <input type="date" className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={editFollowUp} onChange={e=>setEditFollowUp(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Est. Value ($)</label>
-                <input type="number" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" placeholder="0.00" value={editEstValue} onChange={e=>setEditEstValue(e.target.value)} />
+                <input type="number" className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" placeholder="0.00" value={editEstValue} onChange={e=>setEditEstValue(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Package Type</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={editPackage} onChange={e=>setEditPackage(e.target.value)}>
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={editPackage} onChange={e=>setEditPackage(e.target.value)}>
                   <option value="">— None —</option>
                   <option>Essential Presence</option>
                   <option>Lead Generation Website</option>
@@ -1958,7 +2251,11 @@ export default function CrmLeadDetail() {
                 disabled={saving}
                 onClick={() => saveField({
                   status: editStatus, priority: editPriority,
-                  assignedTo: editAssigned !== "Unassigned" ? editAssigned : null,
+                  // M6: the owner is sent only when it changed, and only as a
+                  // staff id; "keep" leaves an unmatched recorded name alone.
+                  ...(editOwner !== "keep" && editOwner !== ownerChoiceFor(lead)
+                    ? { assignedToStaffId: editOwner }
+                    : {}),
                   nextFollowUpAt: editFollowUp || null,
                   estimatedValue: editEstValue || null,
                   packageType: editPackage || null,
@@ -1969,7 +2266,7 @@ export default function CrmLeadDetail() {
             </div>
 
             {/* Pipeline docs */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-3">
               <h3 className="font-serif font-bold text-sm text-foreground">Pipeline Docs</h3>
               {[
                 { label:"Discovery Form", key:"discoveryFormStatus", value:lead.discoveryFormStatus },
@@ -1979,7 +2276,7 @@ export default function CrmLeadDetail() {
                 <div key={key} className="flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">{label}</span>
                   <select
-                    className="text-xs px-2 py-1 border border-gray-200 rounded-md focus:outline-none"
+                    className="text-xs px-2 py-1 border border-input rounded-md focus:outline-none"
                     value={value}
                     onChange={e => saveField({ [key]: e.target.value })}
                   >
@@ -1994,8 +2291,13 @@ export default function CrmLeadDetail() {
               )}
             </div>
 
+            {/* ── Customer portal ─────────────────────────────────────────── */}
+            {/* Sits directly under Pipeline Docs on purpose: both answer "what
+                has this client actually been given sight of". */}
+            <CustomerPortalPanel leadId={lead.id} contactEmail={lead.email} />
+
             {/* Lead info */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-border shadow-sm p-4">
               <h3 className="font-serif font-bold text-sm text-foreground mb-3">Lead Info</h3>
               <dl className="space-y-2 text-xs">
                 <div className="flex justify-between"><dt className="text-muted-foreground">Source</dt><dd className="font-medium text-foreground">{lead.source}</dd></div>
@@ -2022,7 +2324,7 @@ export default function CrmLeadDetail() {
             </div>
           ) : (
             <>
-              <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
+              <div className="bg-muted rounded-xl p-4 text-center border border-border/60">
                 <p className="text-xs text-muted-foreground mb-1">Calling</p>
                 <p className="font-semibold text-foreground text-lg">{lead.name}</p>
                 <a href={`tel:${lead.phone}`} className="text-sm text-blue-600">{lead.phone}</a>
@@ -2061,7 +2363,7 @@ export default function CrmLeadDetail() {
                   className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors text-left ${
                     callLogDisposition === d
                       ? `${dispositionColor[d]} border-current`
-                      : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                      : "border-card-border text-muted-foreground hover:border-card-border hover:bg-accent"
                   }`}
                 >
                   {d}
@@ -2073,7 +2375,7 @@ export default function CrmLeadDetail() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes <span className="font-normal">(optional)</span></label>
             <textarea
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+              className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
               rows={3}
               placeholder="What was discussed? Any follow-up needed?"
               value={callLogNotes}
@@ -2119,7 +2421,7 @@ export default function CrmLeadDetail() {
                       className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center ${
                         logActType === t.value
                           ? "bg-foreground text-white border-foreground"
-                          : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                          : "border-card-border text-muted-foreground hover:border-card-border hover:bg-accent"
                       }`}
                     >
                       <span className="block text-base mb-0.5">{t.icon}</span>
@@ -2140,7 +2442,7 @@ export default function CrmLeadDetail() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-left ${
                           logActDisposition === d
                             ? `${dispositionColor[d]} border-current`
-                            : "border-gray-200 text-muted-foreground hover:border-gray-300 hover:bg-gray-50"
+                            : "border-card-border text-muted-foreground hover:border-card-border hover:bg-accent"
                         }`}
                       >
                         {d}
@@ -2153,7 +2455,7 @@ export default function CrmLeadDetail() {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Title <span className="text-red-500">*</span></label>
                 <input
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="w-full px-3 py-2 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   placeholder={
                     logActType === "note_added" ? "Note summary…"
                     : logActType === "call_outcome" ? "e.g. Spoke with John about SEO package"
@@ -2170,7 +2472,7 @@ export default function CrmLeadDetail() {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes <span className="font-normal text-muted-foreground/60">(optional)</span></label>
                 <textarea
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                  className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                   rows={3}
                   placeholder="Additional details…"
                   value={logActDescription}
@@ -2214,7 +2516,7 @@ export default function CrmLeadDetail() {
                 To: <span className="font-medium text-foreground">{lead.name} ({lead.phone})</span>
               </p>
               <textarea
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                 rows={4}
                 placeholder={`Message ${lead.name}…`}
                 value={smsBody}
@@ -2249,7 +2551,7 @@ export default function CrmLeadDetail() {
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Template</label>
               <select
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-input rounded-lg text-sm"
                 onChange={e => {
                   const t = templates.find(t => t.id === Number(e.target.value));
                   if (t) { setEmailSubject(t.subject.replace("{{name}}",lead.name)); setEmailBody(t.body.replace("{{name}}",lead.name.split(" ")[0])); }
@@ -2263,14 +2565,14 @@ export default function CrmLeadDetail() {
           )}
           <p className="text-xs text-muted-foreground">To: <span className="font-medium text-foreground">{lead.email}</span></p>
           <input
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
             placeholder="Subject"
             value={emailSubject}
             onChange={e => setEmailSubject(e.target.value)}
             autoFocus
           />
           <textarea
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
             rows={6}
             placeholder="Email body…"
             value={emailBody}
@@ -2294,7 +2596,7 @@ export default function CrmLeadDetail() {
       <Modal open={openModal === "note"} onClose={() => setOpenModal(null)} title="📝 Add Note">
         <div className="px-5 py-4 space-y-3">
           <textarea
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+            className="w-full px-3 py-2.5 border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
             rows={5}
             placeholder="Write a note about this lead…"
             value={noteText}
@@ -2316,19 +2618,19 @@ export default function CrmLeadDetail() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Type</label>
-              <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
+              <select className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none" value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))}>
                 {TASK_TYPES.map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">Due Date</label>
-              <input type="date" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
+              <input type="date" className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none" value={taskForm.dueDate} onChange={e=>setTaskForm(f=>({...f,dueDate:e.target.value}))} />
             </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Title <span className="text-red-500">*</span></label>
             <input
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
               placeholder="Task title"
               value={taskForm.title}
               onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))}
@@ -2338,7 +2640,7 @@ export default function CrmLeadDetail() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>
             <textarea
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="w-full px-3 py-2 text-sm border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-foreground/20"
               rows={2}
               placeholder="Optional details"
               value={taskForm.description}
@@ -2359,7 +2661,7 @@ export default function CrmLeadDetail() {
         <div className="px-5 py-4">
           <p className="text-xs text-muted-foreground mb-3">
             Current:&nbsp;
-            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-gray-100 text-gray-600"}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[lead.status] || "bg-muted text-muted-foreground"}`}>
               {lead.status}
             </span>
           </p>
@@ -2371,8 +2673,8 @@ export default function CrmLeadDetail() {
                 disabled={updatingStatus}
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all border text-left disabled:opacity-60
                   ${lead.status === s
-                    ? `${statusBtnColor[s] || "border-gray-200 bg-gray-50 text-gray-700"} ring-2 ring-offset-1 ring-foreground/20`
-                    : `${statusBtnColor[s] || "border-gray-200 bg-gray-50 text-gray-700"} opacity-75 hover:opacity-100`
+                    ? `${statusBtnColor[s] || "border-border bg-muted text-foreground/80"} ring-2 ring-offset-1 ring-foreground/20`
+                    : `${statusBtnColor[s] || "border-border bg-muted text-foreground/80"} opacity-75 hover:opacity-100`
                   }`}
               >
                 {lead.status === s ? `● ${s}` : s}

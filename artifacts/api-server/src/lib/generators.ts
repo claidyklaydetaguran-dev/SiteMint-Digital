@@ -52,9 +52,13 @@ const DECISION_LABELS: Record<string, string> = {
   "other": "Other",
 };
 
-function labelBudget(v: string): string { return BUDGET_LABELS[v] || v; }
-function labelTimeline(v: string): string { return TIMELINE_LABELS[v] || v; }
-function labelDecision(v: string): string { return DECISION_LABELS[v] || v; }
+// An absent value renders as "Not specified" rather than as an empty cell or a
+// guess. A proposal that quietly states a budget the client never gave is
+// worse than one that admits the field is blank.
+const NOT_SPECIFIED = "Not specified";
+function labelBudget(v: string): string { return v ? BUDGET_LABELS[v] || v : NOT_SPECIFIED; }
+function labelTimeline(v: string): string { return v ? TIMELINE_LABELS[v] || v : NOT_SPECIFIED; }
+function labelDecision(v: string): string { return v ? DECISION_LABELS[v] || v : NOT_SPECIFIED; }
 function labelServices(arr: string[]): string {
   return arr.map(s => SERVICE_LABELS[s] || s).join(", ");
 }

@@ -1,12 +1,42 @@
 import express, { type Express } from "express";
-import cors from "cors";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { createCorsMiddleware, resolveCorsPolicy } from "./lib/corsPolicy.js";
 import { WebhookHandlers } from "./lib/webhookHandlers";
+import { DISCOVERY_V1_BODY_LIMIT, DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler } from "./lib/discoveryV1BodyLimit.js";
+import { openAiUnavailableErrorHandler } from "./lib/openAiUnavailable.js";
+import { bootGate } from "./lib/bootGate.js";
 
 const app: Express = express();
+
+// Launch security audit (2026-09-24): never advertise the framework, and set
+// the baseline browser-hardening headers on every API response. The
+// Strict-Transport-Security header is added by the platform edge; a CSP is
+// not set here because the API serves JSON, not documents.
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+// Compress JSON responses (launch performance audit, 2026-09-24): the
+// platform edge was measured NOT compressing API bodies, and the CRM list
+// endpoints return hundreds of kilobytes. Threshold keeps tiny health
+// payloads untouched; the Stripe webhook below reads its raw body before
+// any response is written, so it is unaffected. Server-sent event streams
+// (copilot) are excluded: compression would buffer each chunk.
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) =>
+      !String(res.getHeader("Content-Type") ?? "").startsWith("text/event-stream") &&
+      compression.filter(req, res),
+  }),
+);
 
 app.use(
   pinoHttp({
@@ -27,8 +57,22 @@ app.use(
     },
   }),
 );
-app.use(cors({ origin: true, credentials: true }));
+// AR-001G: an explicit, exact-match credentialed CORS allowlist replaces the
+// former `cors({ origin: true, credentials: true })`, which reflected every
+// browser origin back while also allowing credentials. `resolveCorsPolicy` is
+// called here, during module evaluation, deliberately: `index.ts` imports this
+// module before it calls `app.listen()`, so a production deployment with a
+// missing or malformed `CORS_ALLOWED_ORIGINS` fails to start rather than
+// starting with a policy that trusts everyone.
+app.use(createCorsMiddleware(resolveCorsPolicy(process.env)));
 app.use(cookieParser());
+
+// R6: the boot gate is the first thing every /api request meets — ahead of the
+// Stripe webhook below, ahead of the raw-body parsers, ahead of the router.
+// Until `runBootSequence` marks the process ready, only the liveness root and
+// /healthz are served; everything else is refused with a generic 503 before
+// authentication, body parsing, database access or any outbound call.
+app.use("/api", bootGate);
 
 // Register Stripe webhook route BEFORE express.json() -- it needs the raw Buffer body
 app.post(
@@ -57,9 +101,41 @@ app.use("/api/crm/webhooks/resend", express.raw({ type: "application/json" }));
 
 // Capture raw body for receptionist Stripe billing webhook BEFORE json() runs
 app.use("/api/receptionist/billing/webhook", express.raw({ type: "application/json" }));
+
+// Capture raw body for the Vapi voice webhook BEFORE json() runs — signature
+// verification (lib/voice/webhooks/vapiWebhookAuth.ts) needs the exact bytes.
+app.use("/api/voice/webhooks/vapi", express.raw({ type: "application/json" }));
+// P8: the voice-subscription Stripe webhook verifies a signature over the
+// exact bytes, so it needs the raw body too.
+app.use("/api/voice/billing/webhook", express.raw({ type: "application/json" }));
+
+// P5: Twilio posts form-encoded to the voice-number SMS webhooks; the
+// signature covers the decoded parameters, so urlencoded (not raw) parsing
+// is registered for exactly these paths.
+app.use("/api/voice/sms", express.urlencoded({ extended: false }));
+
+// Discovery v1 (structured submissions): explicit 64KB body-size cap,
+// tighter than the global default below and enforced by the parser itself
+// (actual bytes streamed, not a trusted Content-Length header — also
+// correctly bounds chunked-encoded and gzip/deflate-decompressed bodies).
+// Registered before the global express.json() so this path's request
+// stream is fully consumed here; the global parser's own body-parser guard
+// (`if (req._body) return next()`) skips re-parsing for this path. See
+// lib/discoveryV1BodyLimit.ts (independently unit-tested with a minimal
+// standalone Express app — no full app, no database) for the shared
+// constants and the error-translation handler registered right after.
+app.use(DISCOVERY_V1_PATH, express.json({ limit: DISCOVERY_V1_BODY_LIMIT }));
+app.use(DISCOVERY_V1_PATH, discoveryV1BodyLimitErrorHandler);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// AR-001O: the one place an unconfigured optional OpenAI integration becomes a
+// truthful 503 rather than a generic 500. Registered after the router so it
+// covers every OpenAI-dependent route without any of them checking the
+// environment for themselves.
+app.use(openAiUnavailableErrorHandler);
 
 export default app;

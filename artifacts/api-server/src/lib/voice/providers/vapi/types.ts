@@ -1,0 +1,325 @@
+// Milestone 1 / Checkpoint E3A: the adapter-owned explicit runtime
+// configuration for a Vapi assistant. This is NOT the persisted E2 frontend
+// config (`voiceModel.preset`, `advanced.*`) — it is a strictly validated
+// shape that a future Checkpoint E3B will construct from a server-owned,
+// approved preset catalog. SiteMint policy is fail-closed: model, voice, and
+// transcriber are all required here even though Vapi's own API permits
+// omitting them.
+
+import { VoiceProviderError } from "../../errors";
+import type { JsonObject } from "../../types";
+import { TOOL_NAMES } from "../../tools/toolCatalog.js";
+import { VAPI_PROVIDER_KEY } from "./config";
+
+const VAPI_ALLOWED_TOOL_NAMES: ReadonlySet<string> = new Set(TOOL_NAMES);
+
+/** Matches Vapi's documented firstMessageMode enum values. */
+export type VapiFirstMessageMode = "assistant-speaks-first" | "assistant-waits-for-user";
+
+export interface VapiAssistantRuntimeConfig {
+  model: {
+    provider: string;
+    model: string;
+  };
+  voice: {
+    provider: string;
+    voiceId: string;
+    version?: number;
+  };
+  transcriber: {
+    provider: string;
+    model?: string;
+    language?: string;
+  };
+  firstMessageMode: VapiFirstMessageMode;
+  firstMessage?: string;
+  systemInstructions: string;
+  /**
+   * P2: optional server-URL attachment (Vapi `assistant.server`). Present
+   * only when the publish/sync layer loaded a validated VoiceServerConfig
+   * (VOICE_WEBHOOK_ATTACH_ENABLED) — never from a client, never persisted
+   * in an assistant row's config.
+   */
+  server?: {
+    url: string;
+    /**
+     * H1: reference to a provider-side HMAC Custom Credential. There is no
+     * `secret` field by design — carrying one selected Vapi's bearer
+     * mechanism and placed our own webhook secret in a provider payload.
+     */
+    credentialId: string;
+  };
+  /** P3: closed-catalog tool definitions, validated structurally below. */
+  tools?: JsonObject[];
+  /** P6: server-owned call behavior (silence/max-duration/end/voicemail lines). */
+  callPolicy?: {
+    silenceTimeoutSeconds?: number;
+    maxDurationSeconds?: number;
+    endCallMessage?: string;
+    voicemailMessage?: string;
+  };
+}
+
+/** Vapi's documented assistant name limit. */
+export const VAPI_MAX_ASSISTANT_NAME_LENGTH = 40;
+
+const TOP_LEVEL_KEYS = new Set([
+  "model",
+  "voice",
+  "transcriber",
+  "firstMessageMode",
+  "firstMessage",
+  "systemInstructions",
+  "server",
+  "tools",
+  "callPolicy",
+]);
+const CALL_POLICY_KEYS = new Set(["silenceTimeoutSeconds", "maxDurationSeconds", "endCallMessage", "voicemailMessage"]);
+// H1: the server block references an HMAC Custom Credential by id. `secret`
+// is deliberately NOT accepted — it selected Vapi's bearer mechanism and put
+// our own webhook secret into a provider payload. A config still carrying it
+// is rejected by requireNoUnknownKeys rather than silently ignored.
+const SERVER_KEYS = new Set(["url", "credentialId"]);
+/** One credential id: a single run of id-safe characters, never a list. */
+const CREDENTIAL_ID_SHAPE = /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/;
+const TOOL_KEYS = new Set(["type", "function", "server"]);
+const TOOL_FUNCTION_KEYS = new Set(["name", "description", "parameters"]);
+/**
+ * V9: the provider-native transfer tool carries exactly these two keys.
+ *
+ * `destinations` is absent by design, and its absence is enforced rather than
+ * assumed: a destination list here would ship a business's private telephone
+ * numbers into a provider-stored assistant config and route calls without
+ * consulting consent or hours. The destination is resolved per call by our own
+ * webhook instead, which is what `server` is for.
+ */
+const TRANSFER_TOOL_TYPE = "transferCall";
+const TRANSFER_TOOL_KEYS = new Set(["type", "server"]);
+/** At most one: two transfer tools would leave the model choosing between them. */
+const MAX_TRANSFER_TOOLS = 1;
+const MAX_TOOLS = 8;
+const MODEL_KEYS = new Set(["provider", "model"]);
+const VOICE_KEYS = new Set(["provider", "voiceId", "version"]);
+const TRANSCRIBER_KEYS = new Set(["provider", "model", "language"]);
+const FIRST_MESSAGE_MODES: readonly VapiFirstMessageMode[] = [
+  "assistant-speaks-first",
+  "assistant-waits-for-user",
+];
+
+function fail(message: string): never {
+  throw new VoiceProviderError("VALIDATION_FAILED", message, { provider: VAPI_PROVIDER_KEY });
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireNoUnknownKeys(obj: Record<string, unknown>, allowed: ReadonlySet<string>, label: string): void {
+  for (const key of Object.keys(obj)) {
+    if (!allowed.has(key)) {
+      fail(`${label} contains an unsupported field: "${key}".`);
+    }
+  }
+}
+
+function requireNonEmptyString(value: unknown, label: string): string {
+  if (typeof value !== "string") {
+    fail(`${label} must be a string.`);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    fail(`${label} must not be empty.`);
+  }
+  return trimmed;
+}
+
+function optionalNonEmptyString(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  return requireNonEmptyString(value, label);
+}
+
+function optionalNonNegativeInteger(value: unknown, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+    fail(`${label} must be a non-negative integer when provided.`);
+  }
+  return value;
+}
+
+/**
+ * Strictly validates the adapter-owned Vapi runtime configuration. Throws
+ * VoiceProviderError("VALIDATION_FAILED") for anything missing, malformed, or
+ * outside the allowlisted keys. Never accepts credential-shaped fields.
+ */
+export function validateVapiRuntimeConfig(value: unknown): VapiAssistantRuntimeConfig {
+  if (!isPlainObject(value)) {
+    fail("Vapi runtime config must be a plain object.");
+  }
+  requireNoUnknownKeys(value, TOP_LEVEL_KEYS, "Vapi runtime config");
+
+  if (!isPlainObject(value.model)) {
+    fail('Vapi runtime config "model" must be a plain object.');
+  }
+  requireNoUnknownKeys(value.model, MODEL_KEYS, 'Vapi runtime config "model"');
+  const model = {
+    provider: requireNonEmptyString(value.model.provider, "model.provider"),
+    model: requireNonEmptyString(value.model.model, "model.model"),
+  };
+
+  if (!isPlainObject(value.voice)) {
+    fail('Vapi runtime config "voice" must be a plain object.');
+  }
+  requireNoUnknownKeys(value.voice, VOICE_KEYS, 'Vapi runtime config "voice"');
+  const voiceVersion = optionalNonNegativeInteger(value.voice.version, "voice.version");
+  const voice = {
+    provider: requireNonEmptyString(value.voice.provider, "voice.provider"),
+    voiceId: requireNonEmptyString(value.voice.voiceId, "voice.voiceId"),
+    ...(voiceVersion !== undefined ? { version: voiceVersion } : {}),
+  };
+
+  if (!isPlainObject(value.transcriber)) {
+    fail('Vapi runtime config "transcriber" must be a plain object.');
+  }
+  requireNoUnknownKeys(value.transcriber, TRANSCRIBER_KEYS, 'Vapi runtime config "transcriber"');
+  const transcriberModel = optionalNonEmptyString(value.transcriber.model, "transcriber.model");
+  const transcriberLanguage = optionalNonEmptyString(value.transcriber.language, "transcriber.language");
+  const transcriber = {
+    provider: requireNonEmptyString(value.transcriber.provider, "transcriber.provider"),
+    ...(transcriberModel !== undefined ? { model: transcriberModel } : {}),
+    ...(transcriberLanguage !== undefined ? { language: transcriberLanguage } : {}),
+  };
+
+  if (typeof value.firstMessageMode !== "string" || !FIRST_MESSAGE_MODES.includes(value.firstMessageMode as VapiFirstMessageMode)) {
+    fail(`firstMessageMode must be one of: ${FIRST_MESSAGE_MODES.join(", ")}.`);
+  }
+  const firstMessageMode = value.firstMessageMode as VapiFirstMessageMode;
+
+  const firstMessage = optionalNonEmptyString(value.firstMessage, "firstMessage");
+  const systemInstructions = requireNonEmptyString(value.systemInstructions, "systemInstructions");
+
+  let server: { url: string; credentialId: string } | undefined;
+  if (value.server !== undefined) {
+    if (!isPlainObject(value.server)) {
+      fail('Vapi runtime config "server" must be a plain object when present.');
+    }
+    requireNoUnknownKeys(value.server, SERVER_KEYS, 'Vapi runtime config "server"');
+    const url = requireNonEmptyString(value.server.url, "server.url");
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      fail("server.url must be a valid absolute URL.");
+    }
+    if (parsedUrl.protocol !== "https:") fail("server.url must use https.");
+    if (parsedUrl.username || parsedUrl.password) fail("server.url must not contain userinfo.");
+    const credentialId = requireNonEmptyString(value.server.credentialId, "server.credentialId");
+    if (!CREDENTIAL_ID_SHAPE.test(credentialId)) {
+      fail("server.credentialId must be a single well-formed provider credential id.");
+    }
+    server = { url, credentialId };
+  }
+
+  let tools: JsonObject[] | undefined;
+  if (value.tools !== undefined) {
+    if (!Array.isArray(value.tools)) fail('Vapi runtime config "tools" must be an array when present.');
+    if (value.tools.length === 0 || value.tools.length > MAX_TOOLS) {
+      fail(`Vapi runtime config "tools" must contain 1..${MAX_TOOLS} entries.`);
+    }
+    if (server === undefined) fail('Vapi runtime config "tools" requires "server" to be present.');
+
+    /**
+     * Validates a tool's own `server` block exactly as the assistant-level one
+     * is validated: https, no userinfo, one well-formed credential id. Shared so
+     * a transfer tool can never reach the provider under looser rules than a
+     * function tool.
+     */
+    const requireToolServer = (tool: Record<string, unknown>, index: number): void => {
+      if (!isPlainObject(tool.server)) fail(`tools[${index}].server must be a plain object.`);
+      requireNoUnknownKeys(tool.server, SERVER_KEYS, `tools[${index}].server`);
+      const toolUrl = requireNonEmptyString(tool.server.url, `tools[${index}].server.url`);
+      let parsedToolUrl: URL;
+      try { parsedToolUrl = new URL(toolUrl); } catch { fail(`tools[${index}].server.url must be a valid absolute URL.`); }
+      if (parsedToolUrl.protocol !== "https:") fail(`tools[${index}].server.url must use https.`);
+      if (parsedToolUrl.username || parsedToolUrl.password) fail(`tools[${index}].server.url must not contain userinfo.`);
+      const toolCredentialId = requireNonEmptyString(tool.server.credentialId, `tools[${index}].server.credentialId`);
+      if (!CREDENTIAL_ID_SHAPE.test(toolCredentialId)) {
+        fail(`tools[${index}].server.credentialId must be a single well-formed provider credential id.`);
+      }
+    };
+
+    let transferToolCount = 0;
+
+    tools = value.tools.map((tool, index) => {
+      if (!isPlainObject(tool)) fail(`tools[${index}] must be a plain object.`);
+
+      // V9: the provider-native transfer tool. Two keys and nothing else — in
+      // particular no `destinations`, which would carry a business's telephone
+      // numbers into a provider-stored config and route calls without consulting
+      // consent or hours. Rejected here rather than merely never built, so a
+      // future edit cannot add one quietly.
+      if (tool.type === TRANSFER_TOOL_TYPE) {
+        requireNoUnknownKeys(tool, TRANSFER_TOOL_KEYS, `tools[${index}]`);
+        transferToolCount += 1;
+        if (transferToolCount > MAX_TRANSFER_TOOLS) {
+          fail(`Vapi runtime config "tools" must contain at most ${MAX_TRANSFER_TOOLS} "${TRANSFER_TOOL_TYPE}" tool.`);
+        }
+        requireToolServer(tool, index);
+        return tool as JsonObject;
+      }
+
+      requireNoUnknownKeys(tool, TOOL_KEYS, `tools[${index}]`);
+      if (tool.type !== "function") fail(`tools[${index}].type must be "function" or "${TRANSFER_TOOL_TYPE}".`);
+      if (!isPlainObject(tool.function)) fail(`tools[${index}].function must be a plain object.`);
+      requireNoUnknownKeys(tool.function, TOOL_FUNCTION_KEYS, `tools[${index}].function`);
+      const name = requireNonEmptyString(tool.function.name, `tools[${index}].function.name`);
+      if (!VAPI_ALLOWED_TOOL_NAMES.has(name)) fail(`tools[${index}].function.name is not in the closed tool catalog.`);
+      requireNonEmptyString(tool.function.description, `tools[${index}].function.description`);
+      if (!isPlainObject(tool.function.parameters)) fail(`tools[${index}].function.parameters must be a plain object.`);
+      requireToolServer(tool, index);
+      return tool as JsonObject;
+    });
+  }
+
+  let callPolicy: VapiAssistantRuntimeConfig["callPolicy"];
+  if (value.callPolicy !== undefined) {
+    if (!isPlainObject(value.callPolicy)) fail('Vapi runtime config "callPolicy" must be a plain object.');
+    requireNoUnknownKeys(value.callPolicy, CALL_POLICY_KEYS, 'Vapi runtime config "callPolicy"');
+    callPolicy = {};
+    const silence = optionalNonNegativeInteger(value.callPolicy.silenceTimeoutSeconds, "callPolicy.silenceTimeoutSeconds");
+    if (silence !== undefined) callPolicy.silenceTimeoutSeconds = silence;
+    const maxDuration = optionalNonNegativeInteger(value.callPolicy.maxDurationSeconds, "callPolicy.maxDurationSeconds");
+    if (maxDuration !== undefined) callPolicy.maxDurationSeconds = maxDuration;
+    const endLine = optionalNonEmptyString(value.callPolicy.endCallMessage, "callPolicy.endCallMessage");
+    if (endLine !== undefined) callPolicy.endCallMessage = endLine;
+    const vmLine = optionalNonEmptyString(value.callPolicy.voicemailMessage, "callPolicy.voicemailMessage");
+    if (vmLine !== undefined) callPolicy.voicemailMessage = vmLine;
+    if (Object.keys(callPolicy).length === 0) fail('Vapi runtime config "callPolicy" must set at least one field.');
+  }
+
+  return {
+    model,
+    voice,
+    transcriber,
+    firstMessageMode,
+    ...(firstMessage !== undefined ? { firstMessage } : {}),
+    systemInstructions,
+    ...(server !== undefined ? { server } : {}),
+    ...(tools !== undefined ? { tools } : {}),
+    ...(callPolicy !== undefined ? { callPolicy } : {}),
+  };
+}
+
+/**
+ * Validates the assistant name against Vapi's documented 40-character limit.
+ * Never truncates — a name over the limit is a validation failure.
+ */
+export function validateVapiAssistantName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    fail("Assistant name must not be empty.");
+  }
+  if (trimmed.length > VAPI_MAX_ASSISTANT_NAME_LENGTH) {
+    fail(`Assistant name must be at most ${VAPI_MAX_ASSISTANT_NAME_LENGTH} characters.`);
+  }
+  return trimmed;
+}

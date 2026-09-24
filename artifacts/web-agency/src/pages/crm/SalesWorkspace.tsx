@@ -36,6 +36,9 @@ import {
   type BehavioralEvent,
   INTENT_STAGE_COLOR, EVENT_TYPE_LABELS,
 } from "@/lib/behavioralIntelligence";
+import { adminFetch } from "@/lib/adminFetch";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure, dataOf } from "@/components/crm/LoadState";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -89,8 +92,6 @@ export interface SalesWorkspaceProps {
 
 type WsTab = "overview" | "workflow" | "communications" | "proposal" | "sow" | "notes" | "history" | "documents" | "intelligence" | "automation" | "relationship" | "behavior";
 
-const tk = () => localStorage.getItem("adminToken") || "";
-
 // ── Sales Stage Tracker ───────────────────────────────────────────────────────
 
 const STAGES = [
@@ -117,7 +118,7 @@ function StageTracker({ lead }: { lead: WorkspaceLead }) {
         )}
       </div>
       <div className="relative">
-        <div className="absolute top-3 left-3 right-3 h-0.5 bg-gray-100" />
+        <div className="absolute top-3 left-3 right-3 h-0.5 bg-border/60" />
         <div
           className={`absolute top-3 left-3 h-0.5 transition-all ${isLost ? "bg-red-300" : "bg-green-400"}`}
           style={{ width: `${Math.max(0, (completedCount - 1) / (STAGES.length - 1)) * (100 - (6 / STAGES.length * 100))}%` }}
@@ -135,7 +136,7 @@ function StageTracker({ lead }: { lead: WorkspaceLead }) {
                     ? "border-green-400 bg-green-400 text-white"
                     : active
                     ? "border-foreground bg-foreground text-background animate-pulse"
-                    : "border-gray-200 bg-white text-gray-300"
+                    : "border-border bg-white text-muted-foreground/40"
                 }`}>
                   {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span>{i + 1}</span>}
                 </div>
@@ -153,20 +154,20 @@ function StageTracker({ lead }: { lead: WorkspaceLead }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    "Not Started": "bg-gray-100 text-gray-500",
+    "Not Started": "bg-muted text-muted-foreground",
     "Draft": "bg-yellow-100 text-yellow-700",
     "Needs Review": "bg-amber-100 text-amber-700",
     "Sent": "bg-blue-100 text-blue-700",
-    "Viewed": "bg-indigo-100 text-indigo-700",
+    "Viewed": "bg-cyan-100 text-cyan-700",
     "Accepted": "bg-green-100 text-green-700",
     "Declined": "bg-red-100 text-red-700",
-    "Expired": "bg-gray-200 text-gray-600",
+    "Expired": "bg-muted text-muted-foreground",
     // legacy aliases
     "Signed": "bg-green-100 text-green-700",
     "Rejected": "bg-red-100 text-red-700",
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${map[status] || "bg-gray-100 text-gray-600"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${map[status] || "bg-muted text-muted-foreground"}`}>
       {status}
     </span>
   );
@@ -193,7 +194,7 @@ function DocPreviewModal({ html, title, company, onClose }: { html: string; titl
     URL.revokeObjectURL(url);
   };
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col bg-foreground/80 backdrop-blur-sm">
       <div className="bg-foreground text-background px-6 py-3 flex items-center justify-between gap-4 shrink-0">
         <h2 className="font-serif font-semibold text-base">{title}</h2>
         <div className="flex items-center gap-2">
@@ -211,7 +212,7 @@ function DocPreviewModal({ html, title, company, onClose }: { html: string; titl
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden bg-gray-200 p-4">
+      <div className="flex-1 overflow-hidden bg-muted p-4">
         <iframe ref={iframeRef} srcDoc={html} sandbox="allow-same-origin allow-modals" className="w-full h-full bg-white rounded-lg shadow-xl" title={title} />
       </div>
     </div>
@@ -225,7 +226,7 @@ function EditHtmlModal({
 }: { html: string; title: string; saving: boolean; onSave: (v: string) => void; onClose: () => void }) {
   const [value, setValue] = useState(html);
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col bg-foreground/80 backdrop-blur-sm">
       <div className="bg-foreground text-background px-6 py-3 flex items-center justify-between gap-4 shrink-0">
         <h2 className="font-serif font-semibold text-base">Edit {title} HTML</h2>
         <div className="flex items-center gap-2">
@@ -279,9 +280,8 @@ function DocPanel({
   const generate = useCallback(async () => {
     setGenerating(true);
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/${kind}/generate`, {
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/${kind}/generate`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tk()}` },
       });
       if (!r.ok) throw new Error();
       showToast(`${label} generated!`);
@@ -296,9 +296,8 @@ function DocPanel({
   const saveHtml = useCallback(async (newHtml: string) => {
     setSavingHtml(true);
     try {
-      await fetch(`/api/crm/leads/${lead.id}/${kind}`, {
+      await adminFetch(`/api/crm/leads/${lead.id}/${kind}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ html: newHtml }),
       });
       showToast("Saved!");
@@ -315,9 +314,8 @@ function DocPanel({
     setSavingStatus(true);
     try {
       const field = kind === "proposal" ? "proposalStatus" : "sowStatus";
-      await fetch(`/api/crm/leads/${lead.id}`, {
+      await adminFetch(`/api/crm/leads/${lead.id}`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: newStatus }),
       });
       showToast(`Status updated to ${newStatus}`);
@@ -342,8 +340,8 @@ function DocPanel({
       {!html ? (
         /* Empty state */
         <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-            {kind === "proposal" ? <FileText className="w-7 h-7 text-gray-300" /> : <ClipboardList className="w-7 h-7 text-gray-300" />}
+          <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center mx-auto mb-4">
+            {kind === "proposal" ? <FileText className="w-7 h-7 text-muted-foreground/40" /> : <ClipboardList className="w-7 h-7 text-muted-foreground/40" />}
           </div>
           <h3 className="font-semibold text-foreground mb-1">No {label} Yet</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
@@ -381,7 +379,7 @@ function DocPanel({
 
           {/* Thumbnail preview */}
           <div
-            className="relative w-full rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:border-gray-300 transition-colors group"
+            className="relative w-full rounded-xl border border-border overflow-hidden cursor-pointer hover:border-card-border transition-colors group"
             style={{ height: 220 }}
             onClick={() => setPreviewOpen(true)}
           >
@@ -398,7 +396,7 @@ function DocPanel({
           </div>
 
           {/* Status updater */}
-          <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+          <div className="bg-muted rounded-xl border border-border/60 p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Update Status</span>
               {savingStatus && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
@@ -412,7 +410,7 @@ function DocPanel({
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                     docStatus === s
                       ? "bg-foreground text-background border-foreground"
-                      : "bg-white text-muted-foreground border-gray-200 hover:border-gray-300 hover:text-foreground"
+                      : "bg-white text-muted-foreground border-border hover:border-card-border hover:text-foreground"
                   }`}
                 >
                   {s}
@@ -464,9 +462,8 @@ function NotesTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Pro
     if (!newNote.trim()) return;
     setAdding(true);
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/notes`, {
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/notes`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${tk()}`, "Content-Type": "application/json" },
         body: JSON.stringify({ note: newNote }),
       });
       if (!r.ok) throw new Error();
@@ -489,14 +486,14 @@ function NotesTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Pro
       )}
 
       {/* Add note */}
-      <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+      <div className="bg-muted rounded-xl border border-border/60 p-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Add Note</h3>
         <textarea
           value={newNote}
           onChange={e => setNewNote(e.target.value)}
           placeholder="Type a note about this lead…"
           rows={3}
-          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none bg-white"
+          className="w-full px-3 py-2.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none bg-white"
         />
         <div className="flex justify-end mt-2">
           <Button onClick={addNote} disabled={adding || !newNote.trim()} size="sm" className="gap-1.5">
@@ -514,7 +511,7 @@ function NotesTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Pro
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search notes…"
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            className="w-full pl-9 pr-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
           />
         </div>
       )}
@@ -522,13 +519,13 @@ function NotesTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Pro
       {/* Notes list */}
       {filtered.length === 0 ? (
         <div className="text-center py-10">
-          <StickyNote className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+          <StickyNote className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">{search ? "No notes match your search." : "No notes yet — add the first one above."}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((note, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
+            <div key={i} className="bg-white rounded-xl border border-border p-4">
               {note.timestamp && (
                 <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">{note.timestamp}</p>
               )}
@@ -606,7 +603,7 @@ function HistoryTab({ activities, tasks }: { activities: WorkspaceActivity[]; ta
   if (allItems.length === 0) {
     return (
       <div className="p-5 text-center py-12">
-        <History className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+        <History className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">No activity yet for this lead.</p>
       </div>
     );
@@ -619,7 +616,7 @@ function HistoryTab({ activities, tasks }: { activities: WorkspaceActivity[]; ta
           <div key={group.label}>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
-              <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex-1 h-px bg-border/60" />
             </div>
             <div className="space-y-2">
               {group.items.map(a => (
@@ -654,14 +651,14 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
   return (
     <div className="p-5 space-y-5">
       {/* Stage tracker */}
-      <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+      <div className="bg-muted rounded-xl border border-border/60 p-4">
         <StageTracker lead={lead} />
       </div>
 
       {/* Deal summary */}
       <div className="grid sm:grid-cols-2 gap-3">
         {lead.estimatedValue && (
-          <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-border p-3.5">
             <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
               <DollarSign className="w-4 h-4 text-green-600" />
             </div>
@@ -674,9 +671,9 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
           </div>
         )}
         {lead.packageType && (
-          <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4 text-purple-600" />
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-border p-3.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+              <Package className="w-4 h-4 text-teal-600" />
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Package</p>
@@ -685,7 +682,7 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
           </div>
         )}
         {lead.serviceInterest && (
-          <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-border p-3.5">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
               <Zap className="w-4 h-4 text-blue-600" />
             </div>
@@ -695,7 +692,7 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
             </div>
           </div>
         )}
-        <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-3.5">
+        <div className="flex items-center gap-3 bg-white rounded-xl border border-border p-3.5">
           <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
             <Star className="w-4 h-4 text-orange-500" />
           </div>
@@ -707,7 +704,7 @@ function OverviewTab({ lead }: { lead: WorkspaceLead }) {
       </div>
 
       {/* Document statuses */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-white rounded-xl border border-border p-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Document Pipeline</h3>
         <div className="space-y-2.5">
           {docStats.map(d => (
@@ -768,9 +765,9 @@ function WorkflowTab({ lead, activities, tasks }: {
       icon: Clock,
     },
     low: {
-      badge: "bg-gray-100 text-gray-600 border-gray-200",
-      card: "border-gray-200 bg-gray-50",
-      ring: "ring-gray-200",
+      badge: "bg-muted text-muted-foreground border-border",
+      card: "border-border bg-muted",
+      ring: "ring-border",
       icon: CheckCircle2,
     },
   };
@@ -818,7 +815,7 @@ function WorkflowTab({ lead, activities, tasks }: {
 
         <div className="relative pl-2">
           {/* Vertical connector line */}
-          <div className="absolute left-5 top-3 bottom-3 w-px bg-gray-100" />
+          <div className="absolute left-5 top-3 bottom-3 w-px bg-border/60" />
 
           <div className="space-y-0">
             {steps.map(step => (
@@ -828,17 +825,17 @@ function WorkflowTab({ lead, activities, tasks }: {
                   step.status === "completed"
                     ? "border-green-400 bg-green-400"
                     : step.status === "active"
-                    ? "border-gray-900 bg-gray-900"
+                    ? "border-foreground bg-foreground"
                     : step.status === "skipped"
-                    ? "border-gray-200 bg-gray-100"
-                    : "border-gray-200 bg-white"
+                    ? "border-border bg-muted"
+                    : "border-border bg-white"
                 }`}>
                   {step.status === "completed" ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                   ) : step.status === "active" ? (
                     <span className="w-2 h-2 rounded-full bg-white" />
                   ) : (
-                    <span className="w-2 h-2 rounded-full bg-gray-200" />
+                    <span className="w-2 h-2 rounded-full bg-border" />
                   )}
                 </div>
 
@@ -886,12 +883,12 @@ function WorkflowTab({ lead, activities, tasks }: {
                       </span>
                     )}
                     {step.status === "active" && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-900 text-white font-medium shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-foreground text-white font-medium shrink-0">
                         Active
                       </span>
                     )}
                     {step.status === "skipped" && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground/60 font-medium shrink-0">
                         Skipped
                       </span>
                     )}
@@ -904,7 +901,7 @@ function WorkflowTab({ lead, activities, tasks }: {
       </div>
 
       {/* Rule Engine Legend ───────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+      <div className="rounded-xl border border-border/60 bg-muted p-3.5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
           About This Engine
         </p>
@@ -921,23 +918,41 @@ function WorkflowTab({ lead, activities, tasks }: {
 
 // ── Communications Tab ────────────────────────────────────────────────────────
 
+/** A body that is not a message list is a failure, not an empty thread. */
+function pickCiMessages(body: unknown): CiMessage[] | undefined {
+  const list = body && typeof body === "object" ? (body as { messages?: unknown }).messages : undefined;
+  return Array.isArray(list) ? list as CiMessage[] : undefined;
+}
+
 function CommunicationsTab({ lead, activities }: {
   lead: WorkspaceLead;
   activities: WorkspaceActivity[];
 }) {
-  const [msgs, setMsgs] = useState<CiMessage[]>([]);
-  const [fetching, setFetching] = useState(true);
+  /**
+   * The message log every figure on this tab is counted from.
+   *
+   * `.then(r => r.ok ? r.json() : { messages: [] })` fed an empty array into
+   * `computeCommunicationStats`, which dutifully returned an engagement
+   * score, a "0%" response rate and "0 reply · 0 sent" — figures manufactured
+   * out of an absence of data, which is the worst form of this defect: they
+   * look like findings. `/api/crm/leads/:id/messages` is also one of the
+   * `TRANSITIONAL_FOREIGN_AUTH` routes (lib/adminFetch.ts), so its 401 raises
+   * no "your session has ended" dialog either — this tab has to state its own
+   * failure or nothing states it at all.
+   */
+  const [msgsLoad, setMsgsLoad] = useState<Load<CiMessage[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
 
-  useEffect(() => {
-    const t = tk();
-    fetch(`/api/crm/leads/${lead.id}/messages`, {
-      headers: { Authorization: `Bearer ${t}` },
-    })
-      .then(r => r.ok ? r.json() : { messages: [] })
-      .then((d: { messages?: CiMessage[] }) => setMsgs(d.messages ?? []))
-      .catch(() => {})
-      .finally(() => setFetching(false));
+  const loadMessages = useCallback(async () => {
+    setReloading(true);
+    setMsgsLoad(await readAdminResource(`/api/crm/leads/${lead.id}/messages`, pickCiMessages));
+    setReloading(false);
   }, [lead.id]);
+
+  useEffect(() => { void loadMessages(); }, [loadMessages]);
+
+  /** The messages, or null — never [] standing in for a request that failed. */
+  const msgs = dataOf(msgsLoad);
 
   const ciLead: CiLead = {
     id: lead.id,
@@ -947,13 +962,15 @@ function CommunicationsTab({ lead, activities }: {
     proposalStatus: lead.proposalStatus,
   };
 
+  // No message log, no computed figures. A score derived from an empty array
+  // is not a smaller truth than the real one — it is a different claim.
   const stats = useMemo(
-    () => computeCommunicationStats(ciLead, activities, msgs),
+    () => (msgs === null ? null : computeCommunicationStats(ciLead, activities, msgs)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lead.id, activities, msgs],
   );
-  const recs: CommunicationRecommendation[] = useMemo(
-    () => computeCommunicationRecommendations(ciLead, activities, msgs),
+  const recs: CommunicationRecommendation[] | null = useMemo(
+    () => (msgs === null ? null : computeCommunicationRecommendations(ciLead, activities, msgs)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lead.id, activities, msgs],
   );
@@ -975,7 +992,7 @@ function CommunicationsTab({ lead, activities }: {
 
     const items: TItem[] = [];
 
-    for (const m of msgs) {
+    for (const m of msgs ?? []) {
       const isCall = m.channel === "call";
       items.push({
         key: `msg-${m.id}`,
@@ -1010,8 +1027,6 @@ function CommunicationsTab({ lead, activities }: {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [msgs, activities]);
 
-  const { engagementScore: es, responseRate: rr, preferredChannel, replyRisk, status } = stats;
-
   const riskBadge: Record<string, string> = {
     Low:    "text-green-700  bg-green-50  border-green-200",
     Medium: "text-yellow-700 bg-yellow-50 border-yellow-200",
@@ -1019,17 +1034,41 @@ function CommunicationsTab({ lead, activities }: {
   };
   const statusColor: Record<string, string> = {
     Engaged: "text-green-700", "Waiting for Reply": "text-blue-700",
-    "Needs Follow-up": "text-orange-700", Cold: "text-red-700", New: "text-gray-600",
+    "Needs Follow-up": "text-orange-700", Cold: "text-red-700", New: "text-muted-foreground",
   };
   const chanIcon: Record<string, string> = { SMS: "📱", Email: "📧", Call: "📞", Unknown: "—" };
   const priorityStyle = (p: string) =>
     p === "high"   ? "bg-orange-50 border-orange-200" :
-    p === "medium" ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200";
+    p === "medium" ? "bg-blue-50 border-blue-200" : "bg-muted border-border";
 
   return (
     <div className="p-5 space-y-5">
 
       {/* ── Summary card ─────────────────────────────────────────────────── */}
+      {msgsLoad.status === "loading" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground"
+        >
+          Loading this contact's communication history…
+        </div>
+      ) : stats === null ? (
+        /* Where the engagement score, the "0%" response rate and the
+           "0 reply · 0 sent" line used to be computed from an empty array. */
+        <LoadFailure
+          what="Communication intelligence"
+          reason={msgsLoad.status === "error" ? msgsLoad.reason : ""}
+          onRetry={() => { void loadMessages(); }}
+          retrying={reloading}
+        >
+          <p className="mt-2 text-sm text-muted-foreground">
+            No engagement score, response rate, preferred channel or reply risk is shown while the message log is unavailable — every one of them is counted from messages nobody was able to read.
+          </p>
+        </LoadFailure>
+      ) : (() => {
+        const { engagementScore: es, responseRate: rr, preferredChannel, replyRisk, status } = stats;
+        return (
       <div className={`rounded-xl border p-4 ${es.bgColor} ${es.borderColor}`}>
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="text-xs font-bold uppercase tracking-wide text-foreground/60">
@@ -1046,7 +1085,7 @@ function CommunicationsTab({ lead, activities }: {
             <p className={`text-2xl font-bold leading-none ${es.color}`}>
               {es.score}<span className="text-xs font-normal text-muted-foreground">/100</span>
             </p>
-            <div className="w-full bg-gray-200 rounded-full h-1 mt-1.5 overflow-hidden">
+            <div className="w-full bg-border rounded-full h-1 mt-1.5 overflow-hidden">
               <div className={`h-1 rounded-full ${es.barColor}`} style={{ width: `${es.score}%` }} />
             </div>
           </div>
@@ -1096,9 +1135,11 @@ function CommunicationsTab({ lead, activities }: {
           </div>
         )}
       </div>
+        );
+      })()}
 
       {/* ── Recommendations ──────────────────────────────────────────────── */}
-      {recs.length > 0 && (
+      {recs && recs.length > 0 && (
         <div>
           <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
             Recommendations
@@ -1123,13 +1164,32 @@ function CommunicationsTab({ lead, activities }: {
           <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Communication Timeline
           </h3>
-          {fetching && <Loader2 className="w-3 h-3 text-muted-foreground animate-spin ml-1" />}
+          {msgsLoad.status === "loading" && <Loader2 className="w-3 h-3 text-muted-foreground animate-spin ml-1" />}
         </div>
 
+        {/* Partial, and named as such: activity logged in the CRM is still
+            real when the phone system's own log is not available. */}
+        {msgsLoad.status === "error" && (
+          <LoadFailure
+            what="The message log"
+            reason={msgsLoad.reason}
+            variant="inline"
+            className="mb-2.5"
+            onRetry={() => { void loadMessages(); }}
+            retrying={reloading}
+          >
+            <p className="mt-1 text-xs text-muted-foreground">
+              Texts and calls recorded by the phone system are missing from this timeline. Activity logged in the CRM is still shown.
+            </p>
+          </LoadFailure>
+        )}
+
         {timeline.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            {fetching ? "Loading messages…" : "No communication history recorded yet."}
-          </div>
+          msgsLoad.status === "error" ? null : (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              {msgsLoad.status === "loading" ? "Loading messages…" : "No communication history recorded yet."}
+            </div>
+          )
         ) : (
           <div className="space-y-1.5">
             {timeline.map(item => (
@@ -1138,14 +1198,14 @@ function CommunicationsTab({ lead, activities }: {
                 className={`flex items-start gap-3 rounded-lg px-3 py-2.5 border text-sm ${
                   item.direction === "inbound"
                     ? "bg-blue-50/50 border-blue-100"
-                    : "bg-gray-50 border-gray-100"
+                    : "bg-muted border-border/60"
                 }`}
               >
                 <span className="text-base shrink-0 mt-0.5">{item.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
                     <span className={`text-[10px] font-semibold uppercase ${
-                      item.direction === "inbound" ? "text-blue-700" : "text-gray-500"
+                      item.direction === "inbound" ? "text-blue-700" : "text-muted-foreground"
                     }`}>
                       {item.direction === "inbound" ? "← Inbound" : "→ Outbound"}
                     </span>
@@ -1166,7 +1226,7 @@ function CommunicationsTab({ lead, activities }: {
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                         ["failed", "no-answer", "busy"].includes(item.status)
                           ? "bg-red-100 text-red-700"
-                          : "bg-gray-100 text-gray-600"
+                          : "bg-muted text-muted-foreground"
                       }`}>
                         {item.status}
                       </span>
@@ -1247,7 +1307,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
     critical: { border: "border-red-200 bg-red-50",   badge: "bg-red-50 text-red-700 border-red-200",    label: "🚨 Critical" },
     high:     { border: "border-orange-200 bg-orange-50", badge: "bg-orange-50 text-orange-700 border-orange-200", label: "🔥 High" },
     medium:   { border: "border-amber-200 bg-amber-50",   badge: "bg-yellow-50 text-yellow-700 border-yellow-200", label: "⚠️ Medium" },
-    low:      { border: "border-gray-100 bg-gray-50",     badge: "bg-gray-50 text-gray-600 border-gray-200",       label: "· Low" },
+    low:      { border: "border-border/60 bg-muted",     badge: "bg-muted text-muted-foreground border-border",       label: "· Low" },
   };
   const ps = NBA_PRIORITY_STYLE[nba.priority];
 
@@ -1297,7 +1357,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
               <div
                 className={`h-1.5 rounded-full transition-all ${
                   nba.confidence >= 80 ? "bg-emerald-500" :
-                  nba.confidence >= 60 ? "bg-amber-400" : "bg-gray-400"
+                  nba.confidence >= 60 ? "bg-amber-400" : "bg-muted-foreground/50"
                 }`}
                 style={{ width: `${nba.confidence}%` }}
               />
@@ -1318,7 +1378,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
              momentum.trend === "declining" ? "↓ Declining" : "→ Stable"}
           </span>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="bg-white rounded-xl border border-border p-4 space-y-3">
           <div>
             <div className="flex items-end gap-2 mb-1.5">
               <span className={`text-3xl font-bold leading-none ${
@@ -1327,7 +1387,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
               }`}>{momentum.score}</span>
               <span className="text-xs text-muted-foreground mb-0.5">/ 100</span>
             </div>
-            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-border rounded-full overflow-hidden">
               <div
                 className={`h-2 rounded-full transition-all ${
                   momentum.score >= 65 ? "bg-emerald-400" :
@@ -1339,7 +1399,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
           </div>
           <p className="text-xs text-muted-foreground leading-snug">{momentum.explanation}</p>
           {(momentum.positiveSignals.length > 0 || momentum.negativeSignals.length > 0) && (
-            <div className="space-y-1 pt-1 border-t border-gray-50">
+            <div className="space-y-1 pt-1 border-t border-border/40">
               {momentum.positiveSignals.map((s, i) => (
                 <div key={i} className="flex items-start gap-1.5 text-xs">
                   <span className="text-emerald-500 font-bold shrink-0">✓</span>
@@ -1361,14 +1421,14 @@ function IntelligenceTab({ lead, activities, tasks }: {
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Communication Snapshot</p>
         <div className="grid grid-cols-2 gap-2">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-0.5">
+          <div className="bg-white rounded-xl border border-border p-3 space-y-0.5">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Engagement</p>
             <p className={`text-xl font-bold leading-tight ${commStats.engagementScore.color}`}>
               {commStats.engagementScore.score}
             </p>
             <p className="text-[10px] text-muted-foreground">/ 100</p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-0.5">
+          <div className="bg-white rounded-xl border border-border p-3 space-y-0.5">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Reply Risk</p>
             <p className={`text-sm font-bold ${
               commStats.replyRisk === "Low"    ? "text-emerald-600" :
@@ -1380,7 +1440,7 @@ function IntelligenceTab({ lead, activities, tasks }: {
       </div>
 
       {/* ── Engine Legend ────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+      <div className="rounded-xl border border-border/60 bg-muted p-3.5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
           How This Works
         </p>
@@ -1401,7 +1461,7 @@ const AU_PRIORITY_STYLE = {
   critical: { border: "border-red-200 bg-red-50",   badge: "bg-red-50 text-red-700 border-red-200",    label: "🚨 Critical", text: "text-red-700" },
   high:     { border: "border-orange-200 bg-orange-50", badge: "bg-orange-50 text-orange-700 border-orange-200", label: "🔥 High",     text: "text-orange-700" },
   medium:   { border: "border-amber-200 bg-amber-50",   badge: "bg-yellow-50 text-yellow-700 border-yellow-200", label: "⚠️ Medium",  text: "text-amber-700" },
-  low:      { border: "border-gray-100 bg-gray-50",     badge: "bg-gray-50 text-gray-600 border-gray-200",       label: "· Low",       text: "text-gray-600" },
+  low:      { border: "border-border/60 bg-muted",     badge: "bg-muted text-muted-foreground border-border",       label: "· Low",       text: "text-muted-foreground" },
 };
 
 function AutomationTab({ lead, activities, tasks }: {
@@ -1468,7 +1528,7 @@ function AutomationTab({ lead, activities, tasks }: {
     <div className="p-5 space-y-6">
 
       {/* ── Header banner ───────────────────────────────────────────────── */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 flex items-start gap-3">
+      <div className="bg-muted rounded-xl border border-border px-4 py-3 flex items-start gap-3">
         <Zap className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
         <div>
           <p className="text-xs font-semibold text-foreground mb-0.5">Sales Automation Engine</p>
@@ -1488,18 +1548,18 @@ function AutomationTab({ lead, activities, tasks }: {
         </div>
         <div className="grid grid-cols-2 gap-3">
           {gates.map(gate => (
-            <div key={gate.gate} className={`rounded-xl border p-3.5 ${gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"}`}>
+            <div key={gate.gate} className={`rounded-xl border p-3.5 ${gate.ready ? "bg-emerald-50 border-emerald-200" : "bg-muted border-border"}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-xs font-bold ${gate.ready ? "text-emerald-700" : "text-foreground"}`}>
                   {gate.ready ? "✓ " : ""}{gate.gate}
                 </span>
-                <span className={`text-sm font-bold ${gate.ready ? "text-emerald-600" : gate.score >= 50 ? "text-amber-600" : "text-gray-400"}`}>
+                <span className={`text-sm font-bold ${gate.ready ? "text-emerald-600" : gate.score >= 50 ? "text-amber-600" : "text-muted-foreground/60"}`}>
                   {gate.score}%
                 </span>
               </div>
-              <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden mb-2.5">
+              <div className="h-1.5 w-full bg-border rounded-full overflow-hidden mb-2.5">
                 <div
-                  className={`h-1.5 rounded-full transition-all ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-gray-300"}`}
+                  className={`h-1.5 rounded-full transition-all ${gate.ready ? "bg-emerald-400" : gate.score >= 50 ? "bg-amber-400" : "bg-muted-foreground/40"}`}
                   style={{ width: `${gate.score}%` }}
                 />
               </div>
@@ -1528,7 +1588,7 @@ function AutomationTab({ lead, activities, tasks }: {
         </div>
         <div className="space-y-2.5">
           {queue.items.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center">
+            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
               <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground mb-0.5">All caught up</p>
               <p className="text-xs text-muted-foreground">No pending actions for this lead right now.</p>
@@ -1536,7 +1596,7 @@ function AutomationTab({ lead, activities, tasks }: {
           ) : queue.items.map(item => {
             const ps = AU_PRIORITY_STYLE[item.priority];
             return (
-              <div key={item.id} className={`rounded-xl border p-3.5 ${item.status === "blocked" ? "opacity-60 border-gray-200 bg-gray-50" : ps.border}`}>
+              <div key={item.id} className={`rounded-xl border p-3.5 ${item.status === "blocked" ? "opacity-60 border-border bg-muted" : ps.border}`}>
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <p className={`text-sm font-bold leading-tight ${item.status === "blocked" ? "text-muted-foreground" : ps.text}`}>
                     {item.status === "blocked" ? "🔒 " : ""}{item.action}
@@ -1574,7 +1634,7 @@ function AutomationTab({ lead, activities, tasks }: {
             <div key={doc.name} className={`flex items-start justify-between gap-3 rounded-lg border px-3.5 py-2.5 ${
               doc.status === "complete" ? "bg-emerald-50 border-emerald-200" :
               doc.status === "draft"   ? "bg-amber-50 border-amber-200" :
-                                         "bg-gray-50 border-gray-200"
+                                         "bg-muted border-border"
             }`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -1582,14 +1642,14 @@ function AutomationTab({ lead, activities, tasks }: {
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
                     doc.importance === "critical" ? "bg-red-100 text-red-600" :
                     doc.importance === "high"     ? "bg-orange-100 text-orange-600" :
-                                                   "bg-gray-100 text-gray-500"
+                                                   "bg-muted text-muted-foreground"
                   }`}>{doc.importance}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">{doc.action}</p>
               </div>
               <span className={`text-[10px] font-bold shrink-0 mt-0.5 ${
                 doc.status === "complete" ? "text-emerald-600" :
-                doc.status === "draft"   ? "text-amber-600"  : "text-gray-400"
+                doc.status === "draft"   ? "text-amber-600"  : "text-muted-foreground/60"
               }`}>
                 {doc.status === "complete" ? "✓ Done" : doc.status === "draft" ? "◑ Draft" : "○ Missing"}
               </span>
@@ -1613,7 +1673,7 @@ function AutomationTab({ lead, activities, tasks }: {
               <div key={i} className={`rounded-lg border px-3.5 py-2.5 ${
                 f.importance === "critical" ? "bg-red-50 border-red-200" :
                 f.importance === "high"     ? "bg-amber-50 border-amber-200" :
-                                             "bg-gray-50 border-gray-200"
+                                             "bg-muted border-border"
               }`}>
                 <div className="flex items-center gap-2 mb-0.5">
                   <p className={`text-xs font-bold ${
@@ -1623,7 +1683,7 @@ function AutomationTab({ lead, activities, tasks }: {
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${
                     f.importance === "critical" ? "bg-red-100 text-red-600" :
                     f.importance === "high"     ? "bg-amber-100 text-amber-600" :
-                                                 "bg-gray-100 text-gray-500"
+                                                 "bg-muted text-muted-foreground"
                   }`}>{f.importance}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug mb-1">{f.impact}</p>
@@ -1648,14 +1708,14 @@ function AutomationTab({ lead, activities, tasks }: {
             <div key={step.step} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${
               step.status === "completed" ? "bg-emerald-50 border-emerald-200" :
               step.status === "current"   ? "bg-blue-50 border-blue-300 shadow-sm" :
-              step.status === "blocked"   ? "bg-gray-50 border-dashed border-gray-200 opacity-50" :
-                                           "bg-white border-gray-100"
+              step.status === "blocked"   ? "bg-muted border-dashed border-border opacity-50" :
+                                           "bg-white border-border/60"
             }`}>
               <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold ${
                 step.status === "completed" ? "bg-emerald-400 text-white" :
                 step.status === "current"   ? "bg-blue-600 text-white" :
-                step.status === "blocked"   ? "bg-gray-200 text-gray-400" :
-                                             "bg-gray-100 text-gray-400"
+                step.status === "blocked"   ? "bg-border text-muted-foreground/60" :
+                                             "bg-muted text-muted-foreground/60"
               }`}>
                 {step.status === "completed" ? "✓" : step.step}
               </div>
@@ -1687,7 +1747,7 @@ function AutomationTab({ lead, activities, tasks }: {
           </div>
           <div className="space-y-2">
             {suggestions.map((s, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5">
+              <div key={i} className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
                 <div className="flex items-start justify-between gap-2 mb-0.5">
                   <p className="text-xs font-semibold text-foreground">{s.action}</p>
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
@@ -1754,7 +1814,7 @@ function RelationshipTab({ lead, activities, tasks }: {
     immediate:   "bg-red-50   border-red-200   text-red-700",
     today:       "bg-orange-50 border-orange-200 text-orange-700",
     "this-week": "bg-amber-50 border-amber-200  text-amber-700",
-    "when-ready":"bg-gray-50  border-gray-200   text-gray-600",
+    "when-ready":"bg-muted  border-border   text-muted-foreground",
   };
   const URGENCY_LABEL = {
     immediate:   "🚨 Immediate",
@@ -1768,14 +1828,14 @@ function RelationshipTab({ lead, activities, tasks }: {
   const SEVERITY_STYLE = {
     high:   "bg-red-50    text-red-700   border-red-200",
     medium: "bg-amber-50  text-amber-700 border-amber-200",
-    low:    "bg-gray-50   text-gray-600  border-gray-200",
+    low:    "bg-muted   text-muted-foreground  border-border",
   };
 
   return (
     <div className="p-5 space-y-5">
 
       {/* Summary */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+      <div className="bg-muted border border-border rounded-xl p-4">
         <p className="text-sm text-foreground leading-relaxed">{summary}</p>
       </div>
 
@@ -1844,7 +1904,7 @@ function RelationshipTab({ lead, activities, tasks }: {
       </div>
 
       {/* Executive Recommendation */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+      <div className="bg-white rounded-xl border border-border p-4 space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Executive Summary</p>
         <p className="text-sm text-foreground leading-relaxed">{executiveRecommendation}</p>
       </div>
@@ -1869,10 +1929,10 @@ const EVENT_ICONS: Record<string, string> = {
 };
 
 function scoreBarColor(v: number): string {
-  return v >= 70 ? "bg-emerald-400" : v >= 45 ? "bg-amber-400" : v >= 25 ? "bg-blue-400" : "bg-gray-300";
+  return v >= 70 ? "bg-emerald-400" : v >= 45 ? "bg-amber-400" : v >= 25 ? "bg-blue-400" : "bg-muted-foreground/40";
 }
 function scoreTextColor(v: number): string {
-  return v >= 70 ? "text-emerald-600" : v >= 45 ? "text-amber-600" : v >= 25 ? "text-blue-600" : "text-gray-400";
+  return v >= 70 ? "text-emerald-600" : v >= 45 ? "text-amber-600" : v >= 25 ? "text-blue-600" : "text-muted-foreground/60";
 }
 
 function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => Promise<void> }) {
@@ -1889,9 +1949,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
     setLoading(true);
     setError("");
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/behavioral-events`, {
-        headers: { Authorization: `Bearer ${tk()}` },
-      });
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/behavioral-events`);
       if (!r.ok) throw new Error("bad response");
       const data = await r.json() as { events: BehavioralEvent[] };
       setEvents(data.events ?? []);
@@ -1910,9 +1968,8 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
   const deleteEvent = async (eventId: number) => {
     setDeletingId(eventId);
     try {
-      const r = await fetch(`/api/crm/leads/${lead.id}/behavioral-events/${eventId}`, {
+      const r = await adminFetch(`/api/crm/leads/${lead.id}/behavioral-events/${eventId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${tk()}` },
       });
       if (!r.ok) throw new Error();
       showToast("Event removed.");
@@ -1938,7 +1995,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
 
   const TREND_CONFIG = {
     rising:  { icon: "↑", color: "text-emerald-600", label: "Rising",  bg: "bg-emerald-50 border-emerald-200" },
-    stable:  { icon: "→", color: "text-gray-500",    label: "Stable",  bg: "bg-gray-50 border-gray-200" },
+    stable:  { icon: "→", color: "text-muted-foreground",    label: "Stable",  bg: "bg-muted border-border" },
     falling: { icon: "↓", color: "text-red-600",     label: "Falling", bg: "bg-red-50 border-red-200" },
   };
   const tc = TREND_CONFIG[trend.direction];
@@ -1966,8 +2023,8 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
   if (events.length === 0) {
     return (
       <div className="p-8 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">
-          <Activity className="w-6 h-6 text-gray-300" />
+        <div className="w-14 h-14 rounded-2xl bg-muted border border-dashed border-card-border flex items-center justify-center mx-auto mb-4">
+          <Activity className="w-6 h-6 text-muted-foreground/40" />
         </div>
         <h3 className="font-semibold text-foreground mb-1">No Behavioral Signals Yet</h3>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
@@ -1986,7 +2043,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
       )}
 
       {/* ── Intent Stage + Summary ────────────────────────────────────────── */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+      <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-muted-foreground" />
@@ -2011,7 +2068,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
       </div>
 
       {/* ── 7 DNA Score Bars ─────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+      <div className="bg-white border border-border rounded-xl p-4 space-y-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Score Breakdown</p>
         {DNA_DIMS.map(({ label, value }) => (
           <div key={label}>
@@ -2019,7 +2076,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
               <span className="text-xs text-foreground">{label}</span>
               <span className={`text-xs font-bold tabular-nums ${scoreTextColor(value)}`}>{value}</span>
             </div>
-            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
               <div
                 className={`h-1.5 rounded-full transition-all ${scoreBarColor(value)}`}
                 style={{ width: `${value}%` }}
@@ -2057,7 +2114,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
             const isConfirm = confirmDeleteId === ev.id;
             const isDeleting = deletingId === ev.id;
             return (
-              <div key={ev.id} className="bg-white border border-gray-200 rounded-xl p-3.5">
+              <div key={ev.id} className="bg-white border border-border rounded-xl p-3.5">
                 <div className="flex items-start gap-3">
                   <span className="text-base shrink-0 mt-0.5" aria-hidden="true">
                     {EVENT_ICONS[ev.eventType] ?? "🔵"}
@@ -2092,7 +2149,7 @@ function BehaviorTab({ lead, onReload }: { lead: WorkspaceLead; onReload: () => 
                       </button>
                       <button
                         onClick={() => setConfirmDeleteId(null)}
-                        className="text-[10px] px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                        className="text-[10px] px-2 py-1 rounded bg-muted text-muted-foreground hover:bg-accent transition-colors"
                       >
                         Cancel
                       </button>
@@ -2171,9 +2228,9 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
   const secondaryHasBadge = WS_TABS_SECONDARY.some(t => getBadge(t.id) !== null);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-4 pb-0 border-b border-gray-200">
+      <div className="px-5 pt-4 pb-0 border-b border-border">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-5 h-5 rounded bg-foreground flex items-center justify-center">
             <ChevronRight className="w-3 h-3 text-background" />
@@ -2207,7 +2264,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
                   <span>{tab.label}</span>
                   {badge !== null && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                      activeTab === tab.id ? "bg-foreground text-background" : "bg-gray-100 text-gray-500"
+                      activeTab === tab.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
                     }`}>
                       {badge}
                     </span>
@@ -2245,7 +2302,7 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
                 )}
               </button>
               {moreOpen && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-border rounded-lg shadow-lg py-1 z-10">
                   {WS_TABS_SECONDARY.map(tab => {
                     const badge = getBadge(tab.id);
                     const Icon = tab.icon;
@@ -2254,13 +2311,13 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
                         key={tab.id}
                         onClick={() => { setActiveTab(tab.id); setMoreOpen(false); }}
                         className={`w-full flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-left transition-colors ${
-                          activeTab === tab.id ? "bg-gray-100 text-foreground" : "text-muted-foreground hover:bg-gray-50 hover:text-foreground"
+                          activeTab === tab.id ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
                         }`}
                       >
                         <Icon className="w-3.5 h-3.5 shrink-0" />
                         <span className="flex-1 min-w-0">{tab.label}</span>
                         {badge !== null && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 shrink-0">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-muted text-muted-foreground shrink-0">
                             {badge}
                           </span>
                         )}
@@ -2288,8 +2345,8 @@ export function SalesWorkspace({ lead, activities, tasks, onReload }: SalesWorks
       {activeTab === "behavior" && <BehaviorTab lead={lead} onReload={onReload} />}
       {activeTab === "documents" && (
         <div className="p-8 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center mx-auto mb-4">
-            <Folder className="w-6 h-6 text-gray-300" />
+          <div className="w-14 h-14 rounded-2xl bg-muted border border-dashed border-card-border flex items-center justify-center mx-auto mb-4">
+            <Folder className="w-6 h-6 text-muted-foreground/40" />
           </div>
           <h3 className="font-semibold text-foreground mb-1">Documents</h3>
           <p className="text-sm text-muted-foreground">

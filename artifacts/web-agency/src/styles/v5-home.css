@@ -1,0 +1,3038 @@
+/**
+ * Frontend V5 — HomeV5 page styles.
+ *
+ * Owned by the Public Website workstream (per V5-BLUEPRINT.md §2/§15, the
+ * foundation owner defines `--sm-*` tokens in `styles/tokens-v5.css`; this
+ * file only *consumes* those custom properties by name — every `var(--sm-*)`
+ * below carries a light-mode fallback so the page still renders sanely
+ * before that file lands). Imported directly from `HomeV5.tsx` only — no
+ * other file should import this stylesheet, and this file must not touch
+ * `index.css`, `tokens-v4.css`, or any other page's stylesheet.
+ *
+ * Layout/typography reuses the existing `.v4-*`/`.v3-*` utility classes
+ * (container, section, h2, lede, btn, kicker, reveal) already loaded
+ * globally via index.css — this file adds only what those don't cover:
+ * the typographic ledger, split layout, device frames, record illustration,
+ * node diagram, receptionist ring, work grid, timeline, pricing cards,
+ * why-grid, team grid, FAQ accordion, and the Reveal stub's default motion.
+ */
+
+/* ── Reveal (components/v5/Reveal.tsx stub) — matches the existing
+   `.v3-reveal`/`[data-v4-reveal]` opacity+rise pattern already used across
+   the public site, so it composes visually with `useReveal()` sections. ── */
+.sm-reveal {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sm-reveal[data-reveal-ready] {
+    opacity: 0;
+    transform: translateY(var(--sm-rise, 16px));
+    transition:
+      opacity var(--sm-dur-slow, 420ms) var(--sm-ease, ease),
+      transform var(--sm-dur-slow, 420ms) var(--sm-ease, ease);
+  }
+  .sm-reveal[data-reveal-ready][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+  .sm-reveal--words .sm-reveal__word {
+    display: inline-block;
+  }
+}
+
+/* ── Hero brand line (new class, styled here only — HomeV4's own file/CSS
+   stay untouched; this class simply had no stylesheet owner until now). ── */
+.v4-hero__brand-line {
+  margin-top: 0.5em;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--sm-dark-muted, #9FC2CC);
+}
+
+/* ── Hero field height + waypoint labels (owner review finding #1) ──────
+   `SignalHeroV4` (HomeV4.tsx, reused unmodified — see this page's file
+   banner) is not this workstream's file, so the fix has to happen entirely
+   from the outside: these selectors carry a class+id combination
+   (`.sm-home-v5 #hero …`) whose specificity beats the plain single-class
+   rules in `v4-home.css` regardless of stylesheet load order, so no
+   `!important` is needed.
+
+   1. The field (`.v4-hero__field`) is capped so the particle band reads as
+      a purposeful transition instead of a mostly-empty band between the
+      CTAs and the Capture→Organize→Connect→Resolve strip below it. It
+      keeps `flex: 1 1 auto` so it still *shrinks* to fit short viewports
+      (never overflows the fixed-height sticky stage and clips the phase
+      HUD) — the max-height only ever pulls it down from its old flex:1
+      size, never forces it taller.
+   2. The five system waypoints already drawn inside the field (Websites &
+      web apps → Discovery systems → Workflow automation → AI Receptionist
+      → Booked customer — the same connected-system story the six-step
+      journey chapter tells in prose) sit at opacity 0 until the scroll
+      thread reaches them, which is why a static view of the field reads as
+      empty dust with no legible information. Giving them a low resting
+      opacity means the waypoint labels carry information at rest, not only
+      once lit — the field's real content is visible immediately instead of
+      appearing only after scrolling starts. */
+.sm-home-v5 #hero .v4-hero__field {
+  flex: 1 1 auto;
+  max-height: 65vh;
+}
+.sm-home-v5 #hero .v4-hero__node {
+  opacity: 0.42;
+}
+.sm-home-v5 #hero .v4-hero__node.is-lit {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__field {
+    max-height: 46vh;
+    /* Lowered from the original 220px (owner review finding #1, predates
+       this feature) to make room for the film band introduced below —
+       still keeps flex:1 1 auto's shrink-to-fit as the primary behavior;
+       this is only the floor for genuinely short phones. */
+    min-height: 120px;
+  }
+}
+
+/* ── Hero film band (owner spec, wp-herofilm; treatment confirmed in
+   docs/product-plan/2026-09-owner-replan/HERO-FILM-TREATMENT.md — "Mobile:
+   poster + particles, no autoplay"; REVISED 2026-09-05 per owner
+   correction — the upper-right two-column grid this block used to build
+   "looked messed up"; the layout below reverts `.v4-hero__stage` to its
+   original approved normal-flow stack (copy, then field, unchanged from
+   before the film existed — see the pre-film reference at commit ff4cab3^)
+   and re-inserts the film as a FULL-WIDTH horizontal band between them, at
+   every breakpoint. No grid, no absolute positioning, no repositioning
+   above any width — a structural guarantee the film can never sit beside
+   the copy or the field, only between them. The connecting "signal seam"
+   from the grid version is removed outright rather than redrawn for a
+   layout it was never designed for (owner: "paste the video above it" —
+   nothing about the transition needed re-litigating). ─────────────────────
+ * `SignalHeroV4` (`showFilm`, HomeV4.tsx) renders the film markup with no
+ * layout opinion of its own — every placement decision below lives here,
+ * exactly like the field-height fix above, so `v4-home.css` stays untouched.
+ *
+ * Below 768px: a short poster band (video never mounts this narrow — see
+ * `useFilmEligible` in HomeV4.tsx) in normal flow, between the copy and the
+ * field. The caption is dropped at this size (the SVG's own `<title>` still
+ * carries it to assistive tech) — it doesn't read legibly at a thumbnail
+ * height. Measured at 360×780 (a static-HTML reproduction of this exact
+ * markup/CSS, run because the checked-out toolchain's Linux build sandbox
+ * was unavailable mid-session — see the branch's session notes): copy
+ * ≈518px + HUD ≈39px leaves only ≈216px under the copy for the band and
+ * field together, and the field's own mobile floor (120px, v4-home.css/
+ * this file's mobile override, pre-existing and unchanged) claims most of
+ * that — so the owner's suggested "≈180px" target is reduced to 80px here;
+ * anything close to 180px clips the HUD off the bottom of the sticky stage
+ * by ~80px at this width. 80px still reads as a real band, not a sliver.
+ *
+ * Tablet (768–1023px): the same normal-flow band, taller, caption restored.
+ *
+ * Desktop (≥1024px): a full-width cinematic band. `.v4-hero__stage` is a
+ * FIXED-height (`100svh`) `overflow:hidden` flex column (v4-home.css,
+ * unrelated to this revision) — copy and HUD are fixed-size flex children,
+ * `.v4-hero__field` has no explicit height (only min/max), so its
+ * flex-basis is its own (empty — the canvas is absolutely positioned)
+ * content box: 0. Flexbox therefore hands it 100% of the leftover cross-
+ * axis space, clamped to [240px, 65vh] (v4-home.css floor, the max-height
+ * above) — a too-tall band shrinks that leftover below 240px and the
+ * deficit is silently clipped off the bottom of the fixed-height stage,
+ * not scrolled. Measured at 1440×900 on this branch: copy ≈406–438px
+ * (self-hosted vs. a Google-Fonts approximation used to double-check the
+ * arithmetic) + HUD ≈39–41px leaves only ≈415–455px under the copy for the
+ * band and field together — nowhere near the original 46vh target
+ * (≈414px) once the field's own 240px floor is honored, so the band is
+ * tuned down to `min(18vh, 200px)` (≈162px at 900px height), leaving the
+ * field ≈250–290px — roughly 40/60 rather than an exact half/half split,
+ * chosen deliberately over the floor with only a slim margin: it clears
+ * the floor with real headroom (≈25–40px) across both measurements instead
+ * of clipping the HUD off the bottom of the sticky stage. The video crops
+ * to the band via `object-fit: cover` exactly like the mobile/tablet
+ * sizes — no aspect-ratio box, since the band's own fixed height is now
+ * the frame. */
+.sm-home-v5 #hero .v4-hero__film {
+  position: relative;
+  overflow: visible;
+  /* `.v4-hero__stage` is a flex column at every width now; without this the
+     film band (default flex-shrink:1, unlike copy/HUD which are
+     shrink:0 in v4-home.css) is the first thing squeezed on a short
+     viewport instead of the field, which already has its own
+     max-height ceiling to absorb it. */
+  flex-shrink: 0;
+  /* Mobile: dedicated poster block (never a crop of the desktop film). */
+  height: clamp(180px, 30svh, 260px);
+  width: 100%;
+  margin: 0;
+  z-index: 2;
+}
+.sm-home-v5 #hero .v4-hero__film .v4-hero__film-caption {
+  display: none;
+}
+@media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__film {
+    /* Integrated cinematic stage: half the usable hero on tablets. */
+    height: clamp(260px, calc((100svh - var(--v4-hdr-h, 64px)) * 0.5), 470px);
+  }
+  .sm-home-v5 #hero .v4-hero__film .v4-hero__film-caption {
+    display: block;
+  }
+}
+@media (min-width: 1024px) {
+  .sm-home-v5 #hero .v4-hero__film {
+    /* Owner spec: the media stage is 55-60% of the usable hero height, the
+       particle composition fills the remaining 40-45% below it. The film
+       master is cut at ~3:1 specifically for this stage - not a crop of a
+       generic landscape video. */
+    height: clamp(340px, calc((100svh - var(--v4-hdr-h, 64px)) * 0.56), 620px);
+  }
+}
+.sm-home-v5 #hero .v4-hero__film-frame {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: var(--sm-radius-l, 16px);
+  overflow: hidden;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  border: 1px solid rgba(159, 194, 204, 0.22);
+}
+.sm-home-v5 #hero .v4-hero__film-poster,
+.sm-home-v5 #hero .v4-hero__film-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sm-home-v5 #hero .v4-hero__film-caption {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--sm-dark-muted, #9FC2CC);
+  background: rgb(10 42 46 / 0.72);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 3px 7px;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Tighten the field for the tablet band. `v4-home.css`'s own unscoped
+     base rule (not this workstream's file) carries `min-height:240px` at
+     every width the mobile override above doesn't touch — pre-existing,
+     unrelated to the film — and 240px is taller than the available space
+     on a short landscape tablet, which already overflows the fixed-height
+     sticky stage today with no film involved. Lowering the floor here
+     (this rule *is* more specific, so it wins) keeps the film's own
+     addition from compounding that pre-existing gap instead of pretending
+     to fix it, which isn't this file's edit to make. Scoped to 768–1023 —
+     below 768px the dedicated mobile rule (max-height:46vh/min-height:220px)
+     already owns this property and must not be overridden by a later,
+     equal-specificity rule matching the same width. */
+  .sm-home-v5 #hero .v4-hero__field {
+    max-height: 34vh;
+    min-height: 90px;
+  }
+}
+
+/* ── Section rhythm (owner §6) — the shared `.v4-section` clamp() ran up to
+   7.5rem top+bottom between every chapter; scoped-tightened here (same
+   clamp() shape, so mobile still compresses via the vw term) rather than
+   touching `v4-home.css`, which other pages still read unmodified. ────── */
+.sm-home-v5 .v4-section {
+  padding-block: clamp(3rem, 4vw + 1rem, 5.5rem);
+}
+.sm-home-v5 .v4-chapter-head {
+  margin-bottom: 1.5rem;
+}
+.sm-home-v5 .v4-h2 {
+  margin-bottom: 0.6rem;
+}
+
+/* ── Section 2 — typographic ledger (no cards) ───────────────────────── */
+.sm-ledger__list {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-ledger__row {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0.25rem 1.5rem;
+  align-items: baseline;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-ledger__no {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-ledger__label {
+  grid-column: 2;
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-ledger__outcome {
+  grid-column: 2;
+  color: var(--sm-text-muted, #4A6472);
+}
+@media (min-width: 720px) {
+  .sm-ledger__row {
+    grid-template-columns: 3rem 1fr 1fr;
+  }
+  .sm-ledger__outcome {
+    grid-column: 3;
+    text-align: right;
+  }
+}
+
+/* ── Poster-first media break ────────────────────────────────────────── */
+.sm-media-break .sm-hero-media {
+  max-width: 960px;
+  margin: 0 auto;
+}
+.sm-hero-media {
+  position: relative;
+  border-radius: var(--sm-radius-l, 16px);
+  overflow: hidden;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-hero-media__poster {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.sm-hero-media__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* The film only ever covers the poster once it is genuinely rendering
+     frames (`data-sm-playing`, set on the `playing` event). A mounted but
+     stalled/blocked video therefore never shows a blank frame — the
+     Glacier poster stays visible beneath it (owner work order §2). */
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+.sm-hero-media__video[data-sm-playing] {
+  opacity: 1;
+}
+.sm-hero-media__badge {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  max-width: max-content;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--sm-radius-m, 10px);
+  background: rgb(10 42 46 / 0.7);
+  color: var(--sm-dark-text, #E8F5F7);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+}
+@media (max-width: 480px) {
+  .sm-hero-media__badge {
+    max-width: none;
+  }
+}
+
+/* ── Generic split layout (copy + visual) ────────────────────────────── */
+.sm-split {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+/* Grid items may never widen the track past the container (owner work
+   order 2026-09-08 §1: children must shrink with min-width: 0). At 320px
+   the Build Preview's intrinsic min-content stretched the single-column
+   grid 28px past the clipped `.sm-corner-host` section edge, cutting the
+   copy column's kicker and heading. */
+.sm-split > * {
+  min-width: 0;
+}
+@media (min-width: 900px) {
+  .sm-split {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sm-split--reverse {
+    direction: rtl;
+  }
+  .sm-split--reverse > * {
+    direction: ltr;
+  }
+}
+.sm-split__copy > .v4-kicker {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+/* Consistent, intentional spacing between every stacked element in a split
+   column (kicker → h2 → one or two lede paragraphs → CTA) — several of
+   these sections now carry a second, shorter paragraph (connects-to /
+   available-now-vs-custom copy, owner §7), and `.v4-lede` itself carries no
+   margin, so without this the two paragraphs would sit flush. */
+.sm-split__copy > * + * {
+  margin-top: 0.85rem;
+}
+
+/* ── Section 4 — layered browser/device frames (CSS only) ────────────── */
+.sm-devices {
+  position: relative;
+  min-height: 280px;
+}
+.sm-devices__browser {
+  position: relative;
+  width: 88%;
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  padding: 0.6rem 0.75rem 1.25rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-devices__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #A9CFD6);
+  margin-right: 5px;
+}
+.sm-devices__browser-body {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.sm-devices__line {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--sm-surface-alt, #EDF9FA);
+  width: 60%;
+}
+.sm-devices__line--wide {
+  width: 92%;
+  height: 16px;
+}
+.sm-devices__line--short {
+  width: 35%;
+}
+.sm-devices__phone {
+  position: absolute;
+  right: -4%;
+  bottom: -10%;
+  width: 34%;
+  aspect-ratio: 9 / 18;
+  border-radius: 20px;
+  background: var(--sm-ink-950, #153E52);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  padding: 0.9rem 0.6rem;
+}
+.sm-devices__phone-body {
+  display: grid;
+  gap: 0.5rem;
+}
+.sm-devices__phone .sm-devices__line {
+  background: rgb(233 247 243 / 0.18);
+}
+
+/* ── Section 5 — CRM record illustration ─────────────────────────────────
+   The section's sole visual (owner directive, 2026-09-05: "CRM shouldn't be
+   publicized" — the real product capture was removed; this abstract
+   illustration was the pre-existing treatment and stays the only visual).
+   Sized and finished to read as a complete, deliberate visual on its own,
+   not a placeholder standing in for a screenshot. ───────────────────────── */
+.sm-record {
+  position: relative;
+  max-width: 26rem;
+  margin: 0 auto;
+  border-radius: var(--sm-radius-l, 16px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  padding: 1.85rem;
+  display: grid;
+  gap: 0.9rem;
+  overflow: hidden;
+}
+.sm-record::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--sm-signal-thread, linear-gradient(90deg, #32C5D2, #56D2CF));
+}
+.sm-record__badge {
+  justify-self: start;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sm-text-muted, #4A6472);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-pill, 999px);
+  padding: 0.15rem 0.6rem;
+}
+.sm-record__row {
+  display: grid;
+  grid-template-columns: auto 5rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-record__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-text-muted, #4A6472);
+}
+.sm-record__dot--amber {
+  background: var(--sm-amber-600, #b45309);
+}
+.sm-record__dot--mint {
+  background: var(--sm-mint-500, #32C5D2);
+}
+.sm-record__k {
+  font-size: 0.8rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-record__v {
+  color: var(--sm-text, #173642);
+}
+
+/* ── Section 6 — AI & Automation demonstration (owner correction
+   2026-09-09: replaces the too-subtle route-line node diagram). Three
+   readable stages, a signal line that visibly fills between them, one
+   restrained sequence; data-static (reduced motion) shows everything
+   expanded with no animation. ─────────────────────────────────────────── */
+.sm-autodemo-wrap {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+.sm-autodemo {
+  width: 100%;
+  max-width: 460px;
+  background: color-mix(in oklab, var(--sm-dark-bg, #071C29) 72%, #0F3244);
+  border: 1px solid color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 14%, transparent);
+  border-radius: var(--sm-radius-card, 22px);
+  padding: clamp(1.1rem, 0.9rem + 0.8vw, 1.6rem);
+}
+.sm-autodemo__intro {
+  margin: 0 0 1rem;
+  font-family: var(--sm-font-display, inherit);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-autodemo__stages {
+  position: relative;
+  display: grid;
+  gap: 0.7rem;
+  padding-left: 1.9rem;
+}
+.sm-autodemo__line {
+  position: absolute;
+  left: 13px;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 18%, transparent);
+  overflow: hidden;
+}
+.sm-autodemo__line-fill {
+  display: block;
+  width: 100%;
+  height: 33%;
+  border-radius: inherit;
+  background: var(--sm-mint-signature, #99F5D0);
+  transition: height 500ms var(--sm-ease-out, ease);
+}
+.sm-autodemo[data-stage="1"] .sm-autodemo__line-fill { height: 66%; }
+.sm-autodemo[data-stage="2"] .sm-autodemo__line-fill,
+.sm-autodemo[data-static] .sm-autodemo__line-fill { height: 100%; transition: none; }
+.sm-autodemo__stage {
+  position: relative;
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0.35rem 0.4rem 0.35rem 0;
+  font: inherit;
+  color: var(--sm-dark-muted, #9FC2CC);
+  cursor: pointer;
+  border-radius: 10px;
+}
+.sm-autodemo__dot {
+  position: absolute;
+  left: -1.9rem;
+  top: 0.45rem;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--sm-dark-muted, #9FC2CC);
+  background: color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 10%, transparent);
+  border: 1.5px solid color-mix(in oklab, var(--sm-dark-text, #E8F5F7) 22%, transparent);
+  transition: background 300ms ease, color 300ms ease, border-color 300ms ease;
+}
+.sm-autodemo__stage[data-active] .sm-autodemo__dot {
+  background: var(--sm-mint-signature, #99F5D0);
+  border-color: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+.sm-autodemo__title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-autodemo__plain {
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.sm-autodemo__card {
+  display: grid;
+  gap: 2px;
+  margin-top: 0.45rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--sm-white, #fff);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+  box-shadow: 0 8px 24px rgb(0 20 30 / 0.35);
+}
+.sm-autodemo__card-line {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--sm-text, #173642);
+}
+.sm-autodemo__card-line:first-child {
+  font-weight: 700;
+}
+/* display:grid above would defeat the UA's [hidden] rule — restate it. */
+.sm-autodemo__card[hidden] {
+  display: none;
+}
+.sm-autodemo__stage:focus-visible {
+  outline: 2px solid var(--sm-mint-signature, #99F5D0);
+  outline-offset: 3px;
+}
+.sm-autodemo__note {
+  margin: 0.9rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sm-dark-muted, #9FC2CC);
+}
+
+/* ── Section 7 — AI Receptionist call signal (owner correction 2026-09-09:
+   replaces the faint concentric rings). One controlled pulse, a defined
+   waveform, three outcome rows, and a visible thread into the dashboard
+   preview underneath. ─────────────────────────────────────────────────── */
+.sm-callsignal {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  background: var(--sm-white, #fff);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+  border-radius: var(--sm-radius-card, 22px);
+  padding: 1.15rem 1.25rem 0.9rem;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  position: relative;
+}
+.sm-callsignal__head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-callsignal__pulse {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sm-mint-ink, #0B6B57);
+  flex: none;
+}
+.sm-callsignal__pulse::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--sm-mint-ink, #0B6B57);
+  opacity: 0.45;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-sm-motion="off"]) .sm-callsignal__pulse::after {
+    animation: sm-call-pulse 2.6s var(--sm-ease, ease) infinite;
+  }
+}
+@keyframes sm-call-pulse {
+  0% { transform: scale(0.6); opacity: 0.55; }
+  70% { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.sm-callsignal__wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  flex: none;
+}
+.sm-callsignal__wave i {
+  display: block;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--sm-mint-ink, #0B6B57);
+  height: 30%;
+}
+/* A defined, static-legible waveform shape; motion only adds shimmer. */
+.sm-callsignal__wave i:nth-child(2n) { height: 65%; }
+.sm-callsignal__wave i:nth-child(3n) { height: 90%; }
+.sm-callsignal__wave i:nth-child(5n) { height: 45%; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-sm-motion="off"]) .sm-callsignal__wave i {
+    animation: sm-callwave 1.6s ease-in-out infinite alternate;
+  }
+  html:not([data-sm-motion="off"]) .sm-callsignal__wave i:nth-child(2n) { animation-delay: 0.18s; }
+  html:not([data-sm-motion="off"]) .sm-callsignal__wave i:nth-child(3n) { animation-delay: 0.32s; }
+}
+@keyframes sm-callwave {
+  from { transform: scaleY(0.75); }
+  to { transform: scaleY(1.12); }
+}
+.sm-callsignal__status {
+  font-family: var(--sm-font-display, inherit);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--sm-text, #173642);
+}
+.sm-callsignal__steps {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.sm-callsignal__step {
+  display: grid;
+  gap: 1px;
+  padding-left: 1.55rem;
+  position: relative;
+}
+.sm-callsignal__step::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--sm-mint-wash-strong, #D9FAEC);
+  color: var(--sm-mint-ink, #0B6B57);
+}
+.sm-callsignal__step[data-next]::before {
+  content: "→";
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+.sm-callsignal__step-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--sm-text, #173642);
+}
+.sm-callsignal__step-sub {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--sm-text-muted, #4A6472);
+}
+/* The visible handoff into the dashboard preview below. */
+.sm-callsignal__thread {
+  position: absolute;
+  left: 50%;
+  bottom: -1.35rem;
+  width: 3px;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: var(--sm-mint-signature, #99F5D0);
+}
+.sm-callsignal__note {
+  margin: 0.8rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-visual-stack .sm-shot-frame {
+  margin-top: 1.5rem;
+}
+.sm-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  color: var(--sm-text, #173642);
+  margin-bottom: 0.5rem;
+}
+.sm-badge--beta,
+.sm-badge--private-beta {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-badge--available {
+  border-color: var(--sm-green-700, #15803d);
+  color: var(--sm-green-700, #15803d);
+}
+.sm-badge--in-development {
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-badge--planned {
+  color: var(--sm-amber-600, #b45309);
+  border-color: var(--sm-amber-600, #b45309);
+}
+
+/* ── Section 8 — discovery steps ─────────────────────────────────────── */
+.sm-steps-inline {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* ── Real-product proof frame (container completion) ─────────────────── */
+.sm-visual-stack {
+  display: grid;
+  gap: 1.1rem;
+}
+.sm-shot-frame {
+  margin: 0;
+  border-radius: var(--sm-radius-m, 10px);
+  overflow: hidden;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-shot-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.55rem 0.75rem;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-shot-frame__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #A9CFD6);
+}
+.sm-shot-frame__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  background: var(--sm-surface-alt, #EDF9FA);
+}
+.sm-shot-frame__caption {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--sm-text-muted, #4A6472);
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-discovery-grid {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+  margin: 1.5rem 0;
+}
+@media (min-width: 780px) {
+  .sm-discovery-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  }
+  .sm-discovery-grid .sm-steps-inline {
+    margin: 0;
+  }
+}
+
+/* ── Section 9 — selected work grid ──────────────────────────────────── */
+.sm-work-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+@media (min-width: 780px) {
+  .sm-work-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-work-card {
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-card, 22px);
+  padding: var(--sm-card-pad, 1.5rem);
+  background: var(--sm-surface, #fff);
+}
+.sm-work-card__title {
+  font-size: 1.1rem;
+  margin: 0.25rem 0 0.5rem;
+  color: var(--sm-text, #173642);
+}
+.sm-work-card__desc {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.95rem;
+}
+
+/* ── Section 10 — how-it-works timeline ──────────────────────────────── */
+.sm-timeline {
+  list-style: none;
+  margin: 2rem 0;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+@media (min-width: 900px) {
+  .sm-timeline {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+  }
+}
+.sm-timeline__step {
+  border-top: 2px solid var(--sm-mint-500, #32C5D2);
+  padding-top: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.sm-timeline__no {
+  font-family: var(--sm-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  color: var(--sm-dark-muted, #9FC2CC);
+}
+.sm-timeline__title {
+  font-weight: 600;
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-timeline__output {
+  color: var(--sm-dark-muted, #9FC2CC);
+  font-size: 0.9rem;
+}
+
+/* ── Section 11 — pricing estimate cards ─────────────────────────────── */
+.sm-pricing-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin: 2rem 0 1.5rem;
+}
+@media (min-width: 780px) {
+  .sm-pricing-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-pricing-card {
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-card, 22px);
+  padding: var(--sm-card-pad, 1.5rem);
+  background: var(--sm-surface, #fff);
+}
+.sm-pricing-card.is-recommended {
+  border-color: var(--sm-mint-500, #32C5D2);
+}
+.sm-pricing-card__name {
+  font-size: 1.05rem;
+  margin: 0.4rem 0 0.15rem;
+}
+.sm-pricing-card__price {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.4rem;
+  color: var(--sm-mint-700, #0B7487);
+  margin: 0 0 0.4rem;
+}
+.sm-pricing-card__tagline {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.92rem;
+}
+.sm-disclaimer {
+  font-size: 0.82rem;
+  color: var(--sm-text-muted, #4A6472);
+  max-width: 60ch;
+}
+
+/* ── Section 12 — why grid ────────────────────────────────────────────── */
+.sm-why-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 780px) {
+  .sm-why-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.sm-why-item__title {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+  color: var(--sm-text, #173642);
+}
+.sm-why-item__body {
+  color: var(--sm-text-muted, #4A6472);
+}
+
+/* ── Section 13 — team ────────────────────────────────────────────────── */
+.sm-team-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 700px) {
+  .sm-team-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.sm-team-card {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+  padding: var(--sm-card-pad, 1.25rem);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-card, 22px);
+  background: var(--sm-surface, #fff);
+}
+/* Team avatar (owner directive, 2026-09-05: named team, no stock/generated
+   photos yet). A CSS-only initials monogram on a mint→ink disc — a fixed
+   1:1 slot sized to accept a real photograph later with no layout change;
+   `object-fit: cover` is pre-set so a future `background-image`/`<img>`
+   drops in without touching this rule. */
+.sm-team-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: linear-gradient(155deg, var(--sm-mint-400, #56D2CF), var(--sm-ink-950, #153E52));
+  color: var(--sm-white, #fff);
+  font-weight: 700;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.6rem;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgb(11 58 62 / 0.16);
+}
+.sm-team-card__name {
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-team-card__role {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.9rem;
+}
+
+/* ── Section 14 — FAQ accordion ───────────────────────────────────────── */
+.sm-faq {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--sm-slate-300, #b9cbce);
+}
+.sm-faq__item {
+  border-bottom: 1px solid var(--sm-slate-300, #b9cbce);
+}
+.sm-faq__question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sm-dark-text, #E8F5F7);
+  cursor: pointer;
+}
+.sm-faq__question:focus-visible {
+  outline: 2px solid var(--sm-mint-400, #56D2CF);
+  outline-offset: 2px;
+}
+.sm-faq__chevron {
+  font-size: 1.2rem;
+  color: var(--sm-mint-400, #56D2CF);
+}
+.sm-faq__answer {
+  margin: 0 0 1rem;
+  color: var(--sm-dark-muted, #9FC2CC);
+  max-width: 68ch;
+}
+
+/* ── Section 15 — final CTA sign-in line ─────────────────────────────── */
+.sm-final-cta__signin {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--sm-dark-muted, #9FC2CC);
+}
+.sm-final-cta__signin a {
+  color: var(--sm-mint-400, #56D2CF);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Motion enrichment pass (owner: "more interactives, more text transitions,
+   container transitions, transitions while scrolling, and hovers").
+   CSS-only, transform/opacity/clip-path only, zero CLS, no new dependency.
+   Mirrors the same variant contract added to `v5-pages.css` — see that
+   file's banner for the full rationale — re-declared here because HomeV5
+   loads only this stylesheet.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Staggered reveal variants ────────────────────────────────────────────
+   Reads the same `[data-reveal-ready]`/`[data-revealed]` attributes
+   `useReveal()` already toggles on every `data-v4-reveal` node in this
+   page — no new ref, no new observer. */
+.sm-home-v5 .reveal-clip,
+.sm-home-v5 .reveal-fade-up,
+.sm-home-v5 .reveal-scale-settle,
+.sm-home-v5 .reveal-h-left,
+.sm-home-v5 .reveal-h-right {
+  opacity: 1;
+  transform: none;
+  clip-path: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Entrance transitions live on the BASE variant class, not the armed
+     state. Root cause of the 2026-09-08 mobile clipping regression: armed
+     rules carried both the hidden state AND the transition, so they had to
+     keep matching after `data-revealed` landed — and the max-width armed
+     override at the end of this file then out-cascaded the revealed rule,
+     leaving every mobile heading permanently clipped to its bottom 40%.
+     New contract, immune to source order:
+       - base class (here): final state + the transition that plays it;
+       - armed state (below): `:not([data-revealed])` so it can NEVER win
+         after reveal, and `transition: none` so arming is instant while
+         the reveal still animates via this rule. */
+  .sm-home-v5 .reveal-clip {
+    transition:
+      clip-path var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      opacity var(--sm-dur-base, 240ms) ease,
+      transform var(--sm-dur-slow, 420ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 0ms;
+  }
+  .sm-home-v5 .reveal-fade-up {
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease, ease),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease, ease);
+    transition-delay: 110ms;
+  }
+  .sm-home-v5 .reveal-scale-settle {
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 190ms;
+  }
+  .sm-home-v5 .reveal-h-left,
+  .sm-home-v5 .reveal-h-right {
+    transition:
+      opacity var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--sm-dur-base, 240ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 80ms;
+  }
+
+  /* Tier 1 — headings: unclip upward from the baseline. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(6px);
+    transition: none;
+  }
+
+  /* Tier 2 — ledes / body copy: fade + rise, arrives after the heading. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: none;
+  }
+
+  /* Tier 3 — cards / panels: settle from a soft scale, arrives last. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+    transition: none;
+  }
+
+  /* Tier 4 — horizontal reveal, used only where direction carries meaning:
+     the split-section copy blocks slide in from the side they visually
+     occupy (left copy from the left, right/reversed copy from the right). */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateX(-24px);
+    transition: none;
+  }
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateX(24px);
+    transition: none;
+  }
+
+  /* Diagram / path progression — the AI Systems node diagram's connecting
+     curve draws in via SVG stroke-dashoffset (owner §11: "diagram/path
+     progression for workflows"). `pathLength={1}` on the `<path>` normalizes
+     length so the draw distance is exactly 0→1 regardless of geometry. */
+  .sm-home-v5 [data-reveal-ready] .sm-nodes__path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 800ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+    transition-delay: 220ms;
+  }
+  .sm-home-v5 [data-revealed] .sm-nodes__path {
+    stroke-dashoffset: 0;
+  }
+
+  /* Stagger ladder — direct grid/list children carrying the same variant
+     class step further apart purely by sibling position. */
+  .sm-home-v5 .reveal-scale-settle:nth-child(2) { transition-delay: 260ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(3) { transition-delay: 330ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(4) { transition-delay: 400ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(5) { transition-delay: 470ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(6) { transition-delay: 540ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(n+7) { transition-delay: 610ms; }
+
+  .sm-home-v5 .reveal-fade-up:nth-child(2) { transition-delay: 170ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(3) { transition-delay: 230ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(4) { transition-delay: 290ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(5) { transition-delay: 350ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(n+6) { transition-delay: 410ms; }
+}
+
+/* ── Card-family hover signatures ─────────────────────────────────────────
+   Selected-work cards, pricing-estimate cards, team cards, and why-grid
+   panels all lift, deepen their shadow, and shift their border toward
+   mint; each family's badge/avatar/title also picks up a small accent. ── */
+.sm-home-v5 .sm-work-card,
+.sm-home-v5 .sm-pricing-card,
+.sm-home-v5 .sm-team-card,
+.sm-home-v5 .sm-why-item {
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-work-card:hover,
+.sm-home-v5 .sm-work-card:focus-within,
+.sm-home-v5 .sm-pricing-card:hover,
+.sm-home-v5 .sm-pricing-card:focus-within,
+.sm-home-v5 .sm-team-card:hover,
+.sm-home-v5 .sm-team-card:focus-within,
+.sm-home-v5 .sm-why-item:hover,
+.sm-home-v5 .sm-why-item:focus-within {
+  transform: translateY(-4px);
+  border-color: var(--sm-mint-500, #32c5d2);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-home-v5 .sm-team-card__avatar {
+  transition:
+    box-shadow 220ms ease,
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-team-card:hover .sm-team-card__avatar,
+.sm-home-v5 .sm-team-card:focus-within .sm-team-card__avatar {
+  box-shadow: 0 10px 24px rgb(11 58 62 / 0.24);
+  transform: translateY(-2px) scale(1.05);
+}
+.sm-home-v5 .sm-work-card__title,
+.sm-home-v5 .sm-why-item__title {
+  transition: color 220ms ease;
+}
+.sm-home-v5 .sm-work-card:hover .sm-work-card__title,
+.sm-home-v5 .sm-work-card:focus-within .sm-work-card__title,
+.sm-home-v5 .sm-why-item:hover .sm-why-item__title,
+.sm-home-v5 .sm-why-item:focus-within .sm-why-item__title {
+  color: var(--sm-mint-700, #0b7487);
+}
+
+/* Ledger rows and timeline steps — the numbered lists get the same
+   "row nudges, number picks up the accent" treatment as the service pages'
+   process/step lists. */
+.sm-home-v5 .sm-ledger__row,
+.sm-home-v5 .sm-timeline__step {
+  transition: transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-ledger__row:hover,
+.sm-home-v5 .sm-ledger__row:focus-within,
+.sm-home-v5 .sm-timeline__step:hover,
+.sm-home-v5 .sm-timeline__step:focus-within {
+  transform: translateX(4px);
+}
+.sm-home-v5 .sm-ledger__no,
+.sm-home-v5 .sm-timeline__no {
+  display: inline-block;
+  transition: color 220ms ease, transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.sm-home-v5 .sm-ledger__row:hover .sm-ledger__no,
+.sm-home-v5 .sm-ledger__row:focus-within .sm-ledger__no,
+.sm-home-v5 .sm-timeline__step:hover .sm-timeline__no,
+.sm-home-v5 .sm-timeline__step:focus-within .sm-timeline__no {
+  color: var(--sm-mint-500, #32c5d2);
+  transform: translateX(2px);
+}
+
+/* FAQ — a mint inset rail on hover/focus (no layout shift) and a small
+   accent pop on the open chevron. */
+.sm-home-v5 .sm-faq__item {
+  transition: box-shadow 200ms ease;
+}
+.sm-home-v5 .sm-faq__item:hover,
+.sm-home-v5 .sm-faq__item:focus-within {
+  box-shadow: inset 3px 0 0 var(--sm-mint-500, #32c5d2);
+}
+.sm-home-v5 .sm-faq__chevron {
+  display: inline-block;
+  transition:
+    transform 200ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    color 200ms ease;
+}
+.sm-home-v5 .sm-faq__question[aria-expanded="true"] .sm-faq__chevron {
+  transform: scale(1.15);
+  color: var(--sm-mint-400, #56d2cf);
+}
+
+/* ── Button micro-interactions ─────────────────────────────────────────── */
+.sm-home-v5 .v3-btn,
+.sm-home-v5 .v4-btn {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 180ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+.sm-home-v5 .v3-btn::after,
+.sm-home-v5 .v4-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgb(255 255 255 / 0.35) 50%, transparent 80%);
+  transform: translateX(-120%);
+  transition: transform 500ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  pointer-events: none;
+}
+.sm-home-v5 .v3-btn:hover,
+.sm-home-v5 .v3-btn:focus-visible,
+.sm-home-v5 .v4-btn:hover,
+.sm-home-v5 .v4-btn:focus-visible {
+  transform: translateY(-1px);
+}
+.sm-home-v5 .v3-btn:hover::after,
+.sm-home-v5 .v3-btn:focus-visible::after,
+.sm-home-v5 .v4-btn:hover::after,
+.sm-home-v5 .v4-btn:focus-visible::after {
+  transform: translateX(120%);
+}
+
+/* ── Section-boundary seam ─────────────────────────────────────────────── */
+.sm-home-v5 .v4-section {
+  position: relative;
+}
+.sm-home-v5 .v4-section[data-tone] + .v4-section[data-tone]::before,
+.sm-home-v5 .v4-section:not(:first-of-type)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(2rem, 6vw, 4rem);
+  background: linear-gradient(to bottom, rgb(11 58 62 / 0.05), transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-home-v5 .sm-work-card,
+  .sm-home-v5 .sm-pricing-card,
+  .sm-home-v5 .sm-team-card,
+  .sm-home-v5 .sm-why-item,
+  .sm-home-v5 .sm-team-card__avatar,
+  .sm-home-v5 .sm-work-card__title,
+  .sm-home-v5 .sm-why-item__title,
+  .sm-home-v5 .sm-ledger__row,
+  .sm-home-v5 .sm-timeline__step,
+  .sm-home-v5 .sm-ledger__no,
+  .sm-home-v5 .sm-timeline__no,
+  .sm-home-v5 .sm-faq__item,
+  .sm-home-v5 .sm-faq__chevron,
+  .sm-home-v5 .v3-btn,
+  .sm-home-v5 .v4-btn,
+  .sm-home-v5 .v3-btn::after,
+  .sm-home-v5 .v4-btn::after {
+    transition: none;
+  }
+  .sm-home-v5 .sm-work-card:hover,
+  .sm-home-v5 .sm-work-card:focus-within,
+  .sm-home-v5 .sm-pricing-card:hover,
+  .sm-home-v5 .sm-pricing-card:focus-within,
+  .sm-home-v5 .sm-team-card:hover,
+  .sm-home-v5 .sm-team-card:focus-within,
+  .sm-home-v5 .sm-why-item:hover,
+  .sm-home-v5 .sm-why-item:focus-within,
+  .sm-home-v5 .sm-ledger__row:hover,
+  .sm-home-v5 .sm-ledger__row:focus-within,
+  .sm-home-v5 .sm-timeline__step:hover,
+  .sm-home-v5 .sm-timeline__step:focus-within,
+  .sm-home-v5 .v3-btn:hover,
+  .sm-home-v5 .v3-btn:focus-visible,
+  .sm-home-v5 .v4-btn:hover,
+  .sm-home-v5 .v4-btn:focus-visible {
+    transform: none;
+  }
+}
+
+/* ── Mobile simplification (owner §11: "simplify below 768px") ────────────
+   Shorter travel distances, faster settle, and a flattened stagger ladder —
+   mirrors the same rule added to `v5-pages.css`. ─────────────────────────── */
+@media (prefers-reduced-motion: no-preference) and (max-width: 767px) {
+  /* Durations shorten on the BASE class (where the transition now lives). */
+  .sm-home-v5 .reveal-clip { transition-duration: 280ms; }
+  .sm-home-v5 .reveal-fade-up,
+  .sm-home-v5 .reveal-scale-settle,
+  .sm-home-v5 .reveal-h-left,
+  .sm-home-v5 .reveal-h-right { transition-duration: 180ms; }
+  /* Narrow viewports never clip headings (owner work order 2026-09-08 §1:
+     no clip-path/mask reveals on small screens) — the armed state is a
+     plain fade + short rise instead. */
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-clip,
+  .sm-home-v5 .reveal-clip[data-reveal-ready]:not([data-revealed]) {
+    clip-path: none;
+    transform: translateY(10px);
+  }
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-fade-up,
+  .sm-home-v5 .reveal-fade-up[data-reveal-ready]:not([data-revealed]) {
+    transform: translateY(8px);
+  }
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-scale-settle,
+  .sm-home-v5 .reveal-scale-settle[data-reveal-ready]:not([data-revealed]) {
+    transform: scale(0.99) translateY(5px);
+  }
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-left,
+  .sm-home-v5 .reveal-h-left[data-reveal-ready]:not([data-revealed]),
+  .sm-home-v5 [data-reveal-ready]:not([data-revealed]) .reveal-h-right,
+  .sm-home-v5 .reveal-h-right[data-reveal-ready]:not([data-revealed]) {
+    transform: translateX(0) translateY(8px);
+  }
+  /* Flatten the stagger ladder to two short steps instead of up to seven —
+     fewer staggers, per the mobile simplification rule. */
+  .sm-home-v5 .reveal-scale-settle:nth-child(n+2) { transition-delay: 90ms; }
+  .sm-home-v5 .reveal-scale-settle:nth-child(n+4) { transition-delay: 150ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(n+2) { transition-delay: 70ms; }
+  .sm-home-v5 .reveal-fade-up:nth-child(n+4) { transition-delay: 120ms; }
+  .sm-home-v5 .sm-nodes__path {
+    transition-duration: 500ms;
+  }
+}
+
+
+/* ── Perf closeout: below-fold sections skip style/layout until approached.
+   The 15-section homepage spends ~2.3s (4x-throttled) in Style & Layout at
+   boot; content-visibility defers all of it past the hero. The hero itself
+   (first section) stays fully rendered. contain-intrinsic-size keeps the
+   scrollbar honest; reveals still fire (IntersectionObserver is unaffected)
+   and hash/anchor scrolling renders on demand per spec. */
+.sm-home-v5 .v4-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
+}
+
+.sm-home-v5 .sm-team-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Build Preview — `components/v5/BuildPreview.tsx` (owner directive,
+   2026-09-06: "The empty right-hand area must become a substantial
+   interactive Build Preview, not another static decorative card").
+   Mounted in place of the old `.sm-devices` illustration inside Section 4's
+   split (`WebsitesAppsSection`, this file's only other section touched by
+   this workstream) and, optionally, as `WebsitesAppsV3`'s demo pane.
+
+   Structure: `.sm-bp` is the root (carries `data-stage` / `data-viewport` /
+   `data-type` / `data-mode` set by the component), holding the controls row,
+   the Discover→Design→Build→Launch stepper, and the device `.sm-bp__frame`.
+   Every stage/viewport/type/mode rule below keys off those four data
+   attributes rather than re-rendering markup, so the reflow is pure CSS.
+   Glacier tokens only; no gradient (§1); no retired V4 hex. ═════════════════ */
+
+.sm-bp {
+  display: grid;
+  gap: 0.9rem;
+}
+/* No child may size the shared column track past the container: at a
+   320px viewport the stage stepper's min-content (~328px) was widening
+   EVERY sibling — frame included — 28px through the clipped section edge
+   (clip gate, / @320×568). Children shrink (work order §1); the stepper
+   and control rows scroll inside their own boxes when they genuinely
+   cannot fit. */
+.sm-bp > * {
+  min-width: 0;
+}
+.sm-bp__stages,
+.sm-bp__control-row {
+  overflow-x: auto;
+}
+.sm-bp__controls {
+  display: grid;
+  gap: 0.6rem;
+}
+.sm-bp__control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Toggle buttons (Website/Web App, New Build/Redesign) ────────────────── */
+.sm-bp__toggle {
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    transform 200ms ease;
+}
+.sm-bp__toggle:hover {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+  transform: translateY(-1px);
+}
+.sm-bp__toggle[aria-pressed="true"] {
+  background: var(--sm-mint-500, #32C5D2);
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+}
+.sm-bp__toggle--ghost[aria-pressed="true"] {
+  background: var(--sm-ink-950, #153E52);
+  border-color: var(--sm-ink-950, #153E52);
+  color: var(--sm-dark-text, #E8F5F7);
+}
+.sm-bp__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus, 0 0 0 3px rgb(50 197 210 / 0.45));
+}
+
+/* ── Viewport control (Desktop/Tablet/Mobile) ─────────────────────────────── */
+.sm-bp__viewport-row {
+  margin-left: auto;
+}
+.sm-bp__viewport-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--sm-radius-m, 10px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.62rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+.sm-bp__viewport-btn:hover {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__viewport-btn[aria-pressed="true"] {
+  border-color: var(--sm-mint-500, #32C5D2);
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__viewport-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus, 0 0 0 3px rgb(50 197 210 / 0.45));
+}
+
+/* ── Stage stepper (Discover → Design → Build → Launch) ───────────────────── */
+.sm-bp__stages {
+  list-style: none;
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+}
+.sm-bp__stage-item {
+  flex: 1;
+}
+.sm-bp__stage-btn {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.4rem;
+  border: none;
+  border-top: 3px solid var(--sm-line, #CFE7EA);
+  background: transparent;
+  color: var(--sm-text-muted, #4A6472);
+  cursor: pointer;
+  transition: border-color 200ms ease, color 200ms ease;
+}
+.sm-bp__stage-btn:hover {
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__stage-btn[data-complete] {
+  border-top-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-text, #173642);
+}
+.sm-bp__stage-btn[aria-current="step"] {
+  border-top-color: var(--sm-mint-700, #0B7487);
+  color: var(--sm-text, #173642);
+  font-weight: 600;
+}
+.sm-bp__stage-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus, 0 0 0 3px rgb(50 197 210 / 0.45));
+}
+.sm-bp__stage-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sm-surface-alt, #EDF9FA);
+  font-size: 0.65rem;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.sm-bp__stage-btn[data-complete] .sm-bp__stage-dot {
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__stage-btn[aria-current="step"] .sm-bp__stage-dot {
+  background: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+}
+.sm-bp__stage-label {
+  font-size: 0.74rem;
+}
+.sm-bp__stage-caption {
+  margin: -0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--sm-text-muted, #4A6472);
+  min-height: 1.2em;
+}
+
+/* ── Device frame ──────────────────────────────────────────────────────────
+   Width keyed off `[data-viewport]` on the `.sm-bp` root — the same
+   attribute the module reflow rules below key off, so the frame narrowing
+   and the internal layout collapse happen together. */
+.sm-bp__frame-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  /* As a grid child of `.sm-bp`, min-width:auto let the mock site's
+     intrinsic min-content (≈326px) stretch this wrap past the 280px
+     column at a 320px viewport, pushing the frame 28px through the
+     clipped section edge (clip gate, / @320×568). The frame's own
+     overflow:hidden owns any residual internal excess. */
+  min-width: 0;
+  max-width: 100%;
+}
+.sm-bp__frame {
+  width: 100%;
+  /* Grid-item min-width:auto let the mock site's min-content (~326px)
+     size this frame past a 280px column at a 320px viewport and escape
+     the clipped section edge; the mock layout is fully fluid, so letting
+     the frame shrink renders everything correctly at narrow widths. */
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--sm-radius-m, 10px);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+  overflow: hidden;
+  transition: width var(--sm-dur-slow, 420ms) var(--sm-ease, ease), border-radius 200ms ease;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__frame {
+  width: min(420px, 100%);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__frame {
+  width: min(260px, 100%);
+  border-radius: 20px;
+}
+.sm-bp__chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 0.7rem;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-bp__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sm-line-strong, #A9CFD6);
+}
+.sm-bp__chrome-tag {
+  margin-left: auto;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sm-text-muted, #4A6472);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-pill, 999px);
+  padding: 0.1rem 0.5rem;
+}
+.sm-bp__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sm-mint-500, #32C5D2);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sm-bp__live-dot {
+    animation: sm-bp-pulse 1.7s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-bp__live-dot {
+    opacity: 0.75;
+  }
+}
+@keyframes sm-bp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.5); }
+}
+.sm-bp__canvas {
+  padding: 1rem;
+  min-height: 220px;
+}
+
+/* ── Wireframe/design placeholder blocks (Discover + Design stages) ──────── */
+.sm-bp__block {
+  display: block;
+  border-radius: 4px;
+  background: var(--sm-surface-alt, #EDF9FA);
+  border: 1px dashed var(--sm-line-strong, #A9CFD6);
+  transition: background-color 200ms ease, border-color 200ms ease, border-radius 200ms ease;
+}
+.sm-bp[data-stage="design"] .sm-bp__block {
+  background: var(--sm-mint-100, #DFF7F7);
+  border: 1px solid var(--sm-mint-400, #56D2CF);
+  border-radius: 6px;
+}
+.sm-bp[data-stage="design"] .sm-bp__block--cta,
+.sm-bp[data-stage="design"] .sm-bp__block--icon {
+  background: var(--sm-mint-500, #32C5D2);
+  border-color: var(--sm-mint-500, #32C5D2);
+}
+.sm-bp__block--logo { width: 70px; height: 16px; }
+.sm-bp__block--nav-item { width: 38px; height: 10px; }
+.sm-bp__block--headline { width: 72%; height: 20px; }
+.sm-bp__block--sub { width: 55%; height: 12px; }
+.sm-bp__block--cta { width: 92px; height: 28px; border-radius: 999px; }
+.sm-bp__block--icon { width: 26px; height: 26px; border-radius: 50%; }
+.sm-bp__block--line { width: 80%; height: 10px; }
+.sm-bp__block--label { width: 50%; height: 12px; }
+.sm-bp__block--field { width: 100%; height: 26px; }
+.sm-bp__block--stat-value { width: 40px; height: 18px; }
+.sm-bp__block--stat-label { width: 70%; height: 10px; }
+.sm-bp__block--row { width: 100%; height: 16px; }
+
+/* ── Website modules ───────────────────────────────────────────────────── */
+.sm-bp__site,
+.sm-bp__app {
+  display: grid;
+  gap: 0.75rem;
+}
+.sm-bp__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.sm-bp__logo {
+  font-family: var(--sm-font-display, inherit);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__nav-links {
+  display: flex;
+  gap: 0.85rem;
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp__nav-burger {
+  display: none;
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__nav-links {
+  display: none;
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__nav-burger {
+  display: inline-flex;
+}
+.sm-bp__hero {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+/* Every mock-site module shrinks with the frame (min-width:auto on grid
+   items otherwise re-propagates a wide min-content upward). */
+.sm-bp__site > * {
+  min-width: 0;
+}
+.sm-bp__headline {
+  font-family: var(--sm-font-display, inherit);
+  /* Fluid below ~360px so the mock headline can never widen the device
+     frame past a clipped section edge (work order §1; the 320px cell of
+     the clip gate). */
+  font-size: clamp(0.82rem, 0.45rem + 1.8vw, 1rem);
+  margin: 0;
+  color: var(--sm-text, #173642);
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.sm-bp__sub {
+  font-size: 0.78rem;
+  margin: 0;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp__cta-btn {
+  justify-self: start;
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  background: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-white, #fff);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.sm-bp__features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__features {
+  grid-template-columns: repeat(2, 1fr);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__features {
+  grid-template-columns: 1fr;
+}
+.sm-bp__feature {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+}
+.sm-bp__feature-text {
+  font-size: 0.7rem;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__form {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--sm-line, #CFE7EA);
+}
+.sm-bp__form-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__form-field {
+  font-size: 0.68rem;
+  color: var(--sm-text-muted, #4A6472);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 0.35rem 0.5rem;
+}
+.sm-bp__cta-btn--form {
+  margin-top: 0.2rem;
+}
+.sm-bp__audit-tag {
+  justify-self: start;
+  font-size: 0.66rem;
+  color: var(--sm-amber-600, #B45309);
+  border: 1px dashed var(--sm-amber-600, #B45309);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 0.2rem 0.5rem;
+}
+
+/* ── Launch — real portfolio capture (Website only) ───────────────────────
+   Deliberately cropped: `object-fit: cover` + a fixed aspect-ratio box that
+   itself changes per viewport, so the same 1221×850 capture visibly recrops
+   as the device narrows — never a raw screenshot pasted at native size. */
+.sm-bp__hero-shot {
+  margin: 0;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--sm-radius-s, 6px);
+}
+.sm-bp__hero-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__hero-shot {
+  aspect-ratio: 4 / 3;
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__hero-shot {
+  aspect-ratio: 3 / 4;
+}
+.sm-bp__caption {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--sm-text-muted, #4A6472);
+  text-align: center;
+}
+
+/* ── Web App modules ───────────────────────────────────────────────────── */
+.sm-bp__app-topbar {
+  display: flex;
+  align-items: center;
+}
+.sm-bp__app-title {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--sm-text, #173642);
+}
+.sm-bp__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.sm-bp[data-viewport="tablet"] .sm-bp__stats {
+  grid-template-columns: repeat(2, 1fr);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__stats {
+  grid-template-columns: 1fr;
+}
+.sm-bp__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface, #fff);
+}
+.sm-bp__stat-value {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-bp__stat-label {
+  font-size: 0.64rem;
+  color: var(--sm-text-muted, #4A6472);
+}
+.sm-bp__table {
+  overflow-x: auto;
+}
+.sm-bp__data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+.sm-bp__data-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--sm-text-muted, #4A6472);
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+}
+.sm-bp__data-table td {
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--sm-line, #CFE7EA);
+  color: var(--sm-text, #173642);
+}
+.sm-bp__status {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--sm-radius-pill, 999px);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.sm-bp__status--ok {
+  background: var(--sm-green-100, #DCFCE7);
+  color: var(--sm-green-700, #15803D);
+}
+.sm-bp__status--pending {
+  background: var(--sm-amber-100, #FFF4DE);
+  color: var(--sm-amber-600, #B45309);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__data-table th:nth-child(3),
+.sm-bp[data-viewport="mobile"] .sm-bp__data-table td:nth-child(3) {
+  display: none;
+}
+.sm-bp__table-wire {
+  display: grid;
+  gap: 0.4rem;
+}
+.sm-bp__chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 64px;
+}
+.sm-bp__chart-bar {
+  width: 14px;
+  height: var(--bp-bar-h, 40%);
+  border-radius: 3px 3px 0 0;
+  background: var(--sm-line-strong, #A9CFD6);
+  transition: background-color 200ms ease;
+}
+.sm-bp__chart-bar[data-populated] {
+  background: var(--sm-mint-500, #32C5D2);
+}
+.sm-bp[data-viewport="mobile"] .sm-bp__chart-bar:nth-child(n+5) {
+  display: none;
+}
+
+/* ── Compact stacked layout below the split's 900px breakpoint ───────────── */
+@media (max-width: 899px) {
+  .sm-bp__canvas {
+    min-height: 160px;
+    padding: 0.85rem;
+  }
+  .sm-bp__viewport-row {
+    margin-left: 0;
+  }
+}
+
+/* ── Reduced motion — every transition collapses to instant; the only
+   continuous loop (the Launch "live" pulse, gated above) never autoplays
+   here — nothing else in this component animates on its own. ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sm-bp__toggle,
+  .sm-bp__viewport-btn,
+  .sm-bp__stage-btn,
+  .sm-bp__stage-dot,
+  .sm-bp__frame,
+  .sm-bp__block,
+  .sm-bp__chart-bar {
+    transition: none;
+  }
+  .sm-bp__toggle:hover {
+    transform: none;
+  }
+}
+
+/* Controlled workflow labels on the film band — page-rendered text, always
+   readable and correctly spelled (owner directive). */
+.sm-home-v5 #hero .v4-hero__film-labels {
+  position: absolute;
+  /* Clears the 44px pause button anchored at right:10/bottom:10. */
+  right: 64px;
+  bottom: 10px;
+  max-width: 58%;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: rgb(232 245 247 / 0.92);
+  /* Same dark pill as the caption — the film's bright frames were washing
+     the bare text-shadow treatment out. */
+  background: rgb(10 42 46 / 0.72);
+  border-radius: var(--sm-radius-s, 6px);
+  padding: 3px 8px;
+  pointer-events: none;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__film-labels {
+    display: none;
+  }
+}
+
+/* ── Integrated-stage additions (final correction pass): dedicated mobile
+   poster, pausable film (UI UX Pro Max mandate), and the Signal seam that
+   carries one mint thread from the film stage into the particle field. */
+.sm-home-v5 #hero .v4-hero__film-poster--mobile {
+  display: none;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__film-poster--mobile {
+    display: block;
+  }
+  /* Release directive 2026-09-07: mobile now PLAYS its dedicated film crop
+     — the old display:none (poster-only mobile contract) is retired. The
+     video overlays the mobile poster once mounted and playing. */
+}
+.sm-home-v5 #hero .v4-hero__film-pause {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgb(159 194 204 / 0.4);
+  background: rgb(21 62 82 / 0.78);
+  color: var(--sm-mint-400, #56D2CF);
+  cursor: pointer;
+  transition: background 200ms ease, transform 200ms ease;
+}
+.sm-home-v5 #hero .v4-hero__film-pause:hover {
+  background: rgb(21 62 82 / 0.95);
+  transform: scale(1.05);
+}
+.sm-home-v5 #hero .v4-hero__film-pause:focus-visible {
+  outline: 3px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  .sm-home-v5 #hero .v4-hero__film-pause {
+    display: none;
+  }
+}
+.sm-home-v5 #hero .v4-hero__seam {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  width: 2px;
+  height: 34px;
+  background: linear-gradient(to bottom, var(--sm-mint-500, #32C5D2), rgb(50 197 210 / 0));
+  z-index: 2;
+}
+.sm-home-v5 #hero .v4-hero__seam-pulse {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 999px;
+  background: var(--sm-mint-400, #56D2CF);
+  box-shadow: 0 0 10px 2px rgb(86 210 207 / 0.55);
+  animation: sm-seam-travel 2.6s ease-in-out infinite;
+}
+@keyframes sm-seam-travel {
+  0% { transform: translateY(-2px); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(30px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sm-home-v5 #hero .v4-hero__seam-pulse {
+    animation: none;
+    opacity: 0.6;
+    transform: translateY(12px);
+  }
+}
+
+/* ── Team member bio dialog (owner directive 2026-09-06: "make team members
+   clickable"). Native <dialog> — TeamMemberDialog.tsx calls showModal(),
+   which gives a real top-layer modal with a browser-native Tab focus trap
+   and Escape-to-close; this block only supplies the visual chrome, the
+   entrance animation (skipped under reduced motion), and the mobile
+   bottom-sheet layout. Duplicated verbatim into v5-pages.css so the same
+   dialog looks identical from the About page's team pillars. ──────────── */
+.sm-home-v5 .sm-team-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(640px, calc(100vh - 2rem));
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+.sm-home-v5 .sm-team-dialog::backdrop {
+  background: rgb(11 58 62 / 0.45);
+}
+.sm-home-v5 .sm-team-dialog__panel {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-height: min(640px, calc(100vh - 2rem));
+  overflow-y: auto;
+  background: var(--sm-surface, #fff);
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-l, 16px);
+  padding: 2rem;
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+}
+.sm-home-v5 .sm-team-dialog[open] .sm-team-dialog__panel {
+  animation: sm-team-dialog-in 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+@keyframes sm-team-dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sm-home-v5 .sm-team-dialog__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  background: var(--sm-surface, #fff);
+  color: var(--sm-text, #173642);
+  cursor: pointer;
+}
+.sm-home-v5 .sm-team-dialog__close svg {
+  width: 18px;
+  height: 18px;
+}
+.sm-home-v5 .sm-team-dialog__close:hover {
+  border-color: var(--sm-mint-500, #32C5D2);
+  color: var(--sm-mint-700, #0B7487);
+}
+.sm-home-v5 .sm-team-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-right: 2.5rem;
+}
+.sm-home-v5 .sm-team-dialog__avatar {
+  flex: none;
+  display: block;
+  width: 72px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgb(11 58 62 / 0.16);
+}
+.sm-home-v5 .sm-team-dialog__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sm-home-v5 .sm-team-dialog__name {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--sm-text, #173642);
+}
+.sm-home-v5 .sm-team-dialog__role {
+  margin: 0.2rem 0 0;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.95rem;
+}
+.sm-home-v5 .sm-team-dialog__intro {
+  margin: 0;
+  color: var(--sm-text, #173642);
+  line-height: 1.6;
+}
+.sm-home-v5 .sm-team-dialog__responsibilities {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.5rem;
+  color: var(--sm-text, #173642);
+  line-height: 1.55;
+}
+.sm-home-v5 .sm-team-dialog__support {
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sm-line, #CFE7EA);
+  color: var(--sm-text-muted, #4A6472);
+  line-height: 1.6;
+}
+.sm-home-v5 .sm-team-dialog__support strong {
+  color: var(--sm-text, #173642);
+}
+.sm-home-v5 .sm-team-dialog__panel :focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 2px;
+}
+
+/* Team card is now the trigger button — reset the UA button chrome only;
+   the grid/border/padding/gap rule above (Section 13) stays the single
+   source of layout truth. */
+.sm-home-v5 .sm-team-card {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--sm-surface, #fff);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  margin: 0;
+}
+.sm-home-v5 .sm-team-card:focus-visible {
+  outline: 2px solid var(--sm-mint-500, #32C5D2);
+  outline-offset: 2px;
+}
+
+/* Mobile (<640px): bottom-sheet — full-width, slides up from the bottom
+   edge, drag-free (the close button/Escape/backdrop are the only exits). */
+@media (max-width: 639px) {
+  .sm-home-v5 .sm-team-dialog {
+    inset: auto 0 0 0;
+    margin: 0;
+    width: 100%;
+    max-height: 85vh;
+  }
+  .sm-home-v5 .sm-team-dialog__panel {
+    max-height: 85vh;
+    border-radius: var(--sm-radius-l, 16px) var(--sm-radius-l, 16px) 0 0;
+    padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  .sm-home-v5 .sm-team-dialog[open] .sm-team-dialog__panel {
+    animation-name: sm-team-dialog-in-sheet;
+  }
+  @keyframes sm-team-dialog-in-sheet {
+    from { opacity: 0; transform: translateY(100%); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Reduced motion: instant open, no slide/fade. Closing is always instant —
+   there is no exit animation to disable. */
+@media (prefers-reduced-motion: reduce) {
+  .sm-home-v5 .sm-team-dialog[open] .sm-team-dialog__panel {
+    animation: none;
+  }
+}
+
+/* Desktop shows the real film-frame poster; mobile its own dedicated crop. */
+.sm-home-v5 #hero .v4-hero__film-poster--desktop {
+  display: none;
+}
+@media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__film-poster--desktop {
+    display: block;
+  }
+}
+/* ── Owner layout correction (final polish directive 2026-09-06) ─────────
+   Supersedes the media-stage-on-top order. Final hero order:
+     1. Signal particle field on TOP (≈40% of the usable hero on desktop).
+     2. The copy floating ACROSS the field→film boundary — no card, panel,
+        border, blur, or background of any kind. Readability comes from the
+        ink field behind its upper half and a localized gradient inside the
+        film frame behind its lower half.
+     3. The cinematic film on the BOTTOM (≈60%), chrome-less.
+     4. The phase HUD overlaid along the film's bottom edge on desktop.
+   The stage stays the fixed-height 100svh sticky box (v4-home.css), so the
+   copy is position:absolute on desktop — it consumes no flex row, which is
+   what lets field + film split the full viewport without clipping. */
+.sm-home-v5 #hero .v4-hero__stage {
+  position: sticky; /* restated so position:absolute children resolve here */
+}
+/* Short viewports — landscape phones, iPhone-SE-class screens, desktop at
+   200% zoom: the composition is taller than 100svh there, and the fixed
+   sticky stage clipped the phase ledger off the bottom (owner work order
+   2026-09-08 §1, caught by the clip gate at 375×667/568×320/844×390/
+   932×430/640×400). Below 700px of height the hero flows instead —
+   same treatment v4-home.css already applies under reduced motion. */
+@media (max-height: 700px) {
+  .sm-home-v5 #hero .v4-hero__stage {
+    position: relative;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+    /* In flow mode the header clearance belongs on the stage itself, so
+       the first line of copy never starts underneath the fixed header. */
+    padding-top: var(--v4-hdr-h, 64px);
+  }
+  .sm-home-v5 #hero .v4-hero__field {
+    margin-top: 0;
+  }
+}
+.sm-home-v5 #hero .v4-hero__field {
+  /* First child now — carries the fixed-header clearance. */
+  margin-top: var(--v4-hdr-h, 64px);
+}
+.sm-home-v5 #hero .v4-hero__film {
+  margin: 0;
+  padding-inline: clamp(0.6rem, 1.5vw, 1.25rem);
+  padding-bottom: clamp(0.6rem, 1.2vh, 1rem);
+}
+/* Localized gradients ON the media (never behind the text): a deep ink
+   fade across the frame's top ~48% for the overlapping copy, and a slim
+   fade along the bottom edge for the phase HUD overlay. */
+.sm-home-v5 #hero .v4-hero__film-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(7 19 36 / 0.92) 0%, rgb(7 19 36 / 0.55) 22%, rgb(7 19 36 / 0) 48%),
+    linear-gradient(0deg, rgb(7 19 36 / 0.6) 0%, rgb(7 19 36 / 0) 16%);
+}
+/* Decorative film surfaces are pointer-inert: no hover, no PiP/Enhance
+   affordances in Chrome or Edge, no accidental interaction. */
+.sm-home-v5 #hero .v4-hero__film-frame,
+.sm-home-v5 #hero .v4-hero__film-video,
+.sm-home-v5 #hero .v4-hero__film-poster {
+  pointer-events: none;
+}
+.sm-home-v5 #hero .v4-hero__film-video::-webkit-media-controls,
+.sm-home-v5 #hero .v4-hero__film-video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .sm-home-v5 #hero .v4-hero__field {
+    flex: 0 0 auto;
+    height: calc((100svh - var(--v4-hdr-h, 64px)) * 0.4);
+    min-height: 220px;
+    max-height: none;
+  }
+  .sm-home-v5 #hero .v4-hero__film {
+    flex: 1 1 0px;
+    height: auto;
+    min-height: 300px;
+    max-height: calc((100svh - var(--v4-hdr-h, 64px)) * 0.62);
+  }
+  /* The floating copy layer: absolute, straddling the boundary. */
+  .sm-home-v5 #hero .v4-hero__copy {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    /* Overlap tuned so the CTA row ends within the film's top scrim zone,
+       clear of the subject's face in the opening beat (frame review,
+       2026-09-06). */
+    top: calc(var(--v4-hdr-h, 64px) + (100svh - var(--v4-hdr-h, 64px)) * 0.4 - clamp(150px, 19vh, 190px));
+    padding-top: 0;
+    /* Soft text shadow for the frontier pixels where copy meets moving
+       footage — a shadow on the glyphs, not a panel behind them. */
+    text-shadow: 0 1px 18px rgb(7 19 36 / 0.55);
+  }
+  .sm-home-v5 #hero .v4-hero__copy .v4-btn {
+    text-shadow: none;
+  }
+  /* Compacted type (unchanged from the approved compaction). */
+  .sm-home-v5 #hero .v4-hero__title {
+    font-size: clamp(1.9rem, 3.1vw, 2.75rem);
+  }
+  .sm-home-v5 #hero .v4-hero__sub1 {
+    font-size: clamp(1rem, 1.5vw, 1.25rem);
+    margin-bottom: 0.55rem;
+  }
+  .sm-home-v5 #hero .v4-hero__sub {
+    font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+  }
+  /* Phase HUD rides the film's bottom edge — the film stays the visual
+     bottom of the hero and no phase element is clipped. */
+  .sm-home-v5 #hero .v4-hero__hud {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    padding-bottom: 0.9rem;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Mobile: particles first, copy near the transition, dedicated poster
+     band after — all inside one phone viewport, no overlap gymnastics. */
+  /* Mobile hero parity (owner directive 2026-09-10).
+     The scene used to be capped at 20svh — a 169px band, 20% of the screen,
+     against desktop's 36% — so the journey read as a shallow strip of dust
+     with 9px captions, while 162px of the stage sat empty under the film.
+     The cap now matches desktop's share of the viewport and the scene takes
+     that dead space back. `flex: 1 1 auto` still shrinks it on short
+     phones, so this only ever raises the ceiling. */
+  .sm-home-v5 #hero .v4-hero__field {
+    order: 0;
+    min-height: 180px;
+    max-height: 36svh;
+  }
+
+  /* Portrait waypoints: the ring keeps its place on the path and the label
+     sits BESIDE it rather than beneath, so five captions can be legible at
+     once on a 390px screen instead of stacking into each other. `left` now
+     anchors the ring's left edge, which is why the x coordinates in
+     HERO_NODES_NARROW stay in the left half of the field. */
+  .sm-home-v5 #hero .v4-hero__node {
+    grid-auto-flow: column;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+    transform: translate(0, -50%);
+    width: max-content;
+    max-width: calc(100% - 1.5rem);
+    opacity: 0.62;
+  }
+  .sm-home-v5 #hero .v4-hero__node-ring {
+    width: 40px;
+    height: 40px;
+  }
+  .sm-home-v5 #hero .v4-hero__node-ring svg {
+    width: 19px;
+    height: 19px;
+  }
+  /* 9px captions at 42% opacity were the least readable text on the site.
+     11px at a stronger tint clears both the size and the contrast floor. */
+  .sm-home-v5 #hero .v4-hero__node-label {
+    font-size: 0.6875rem;
+    line-height: 1.25;
+    letter-spacing: 0.04em;
+    color: rgb(213 233 238 / 0.92);
+    text-shadow: 0 1px 6px rgb(7 19 36 / 0.85);
+    white-space: normal;
+  }
+  .sm-home-v5 #hero .v4-hero__copy {
+    padding-top: clamp(0.9rem, 2vh, 1.3rem);
+  }
+  .sm-home-v5 #hero .v4-hero__title {
+    font-size: clamp(1.6rem, 7vw, 2rem);
+  }
+  .sm-home-v5 #hero .v4-hero__film {
+    /* 12svh (was 16): keeps the playing band substantial while the hero
+       COPY stays the largest first-viewport element — text-LCP paints with
+       the app render instead of waiting on image raster (release perf
+       gate, 2026-09-07). */
+    height: clamp(96px, 12svh, 150px);
+  }
+}
+
+/* ── Team cards — owner final polish (2026-09-06): larger portrait,
+   ownership sentence, responsibility tags, explicit Meet affordance, and a
+   pastel-mint accent so the people read as real and active. ───────────── */
+.sm-home-v5 .sm-team-card {
+  background: var(--sm-surface, #fff);
+  cursor: pointer;
+  text-align: left;
+  gap: 0.4rem;
+  padding: 1.4rem 1.4rem 1.2rem;
+  border-top: 3px solid var(--sm-mint-border, #80E9BE);
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+.sm-home-v5 .sm-team-card:hover,
+.sm-home-v5 .sm-team-card:focus-visible {
+  border-color: var(--sm-mint-border, #80E9BE);
+  border-top-color: var(--sm-mint-500, #32C5D2);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
+  transform: translateY(-2px);
+}
+/* Professional redesign (2026-09-09): the reference's editorial team card —
+   the portrait carries the card (full-width, gently rounded) rather than a
+   small inset thumbnail. */
+.sm-home-v5 .sm-team-card__avatar {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.sm-home-v5 .sm-team-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sm-home-v5 .sm-team-card__name {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+.sm-home-v5 .sm-team-card__role {
+  color: var(--sm-mint-700, #0B7487);
+  font-weight: 600;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.sm-home-v5 .sm-team-card__summary {
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.93rem;
+  line-height: 1.55;
+  margin-top: 0.15rem;
+}
+.sm-home-v5 .sm-team-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.45rem;
+}
+.sm-home-v5 .sm-team-card__tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sm-mint-chip-bg, #D9FAEC);
+  color: var(--sm-mint-chip-text, #0B7487);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+}
+.sm-home-v5 .sm-team-card__cta {
+  margin-top: 0.7rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--sm-mint-700, #0B7487);
+  transition: transform 200ms ease;
+}
+.sm-home-v5 .sm-team-card:hover .sm-team-card__cta {
+  transform: translateX(3px);
+}
+
+/* ── Team dialog editorial polish (owner final polish, 2026-09-06) ─────── */
+.sm-team-dialog__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.45rem;
+}
+.sm-team-dialog__tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sm-mint-chip-bg, #D9FAEC);
+  color: var(--sm-mint-chip-text, #0B7487);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+}
+.sm-team-dialog__subhead {
+  font-family: var(--sm-font-display, inherit);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-mint-700, #0B7487);
+  margin: 1.2rem 0 0.45rem;
+}
+.sm-team-dialog__support {
+  background: var(--sm-mint-wash, #ECFFF7);
+  border: 1px solid var(--sm-mint-border, #80E9BE);
+  border-radius: var(--sm-radius-m, 10px);
+  padding: 0.8rem 1rem;
+}
+
+/* ── Brand eyebrow + scroll service rail (owner responsive-first
+   directive, 2026-09-06) ───────────────────────────────────────────────── */
+.sm-home-v5 #hero .v4-hero__brand-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 0.65rem;
+  font-family: var(--v4-font-mono, ui-monospace, monospace);
+  font-size: clamp(0.72rem, 0.9vw, 0.82rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sm-mint-400, #56D2CF);
+}
+.sm-home-v5 #hero .v4-hero__brand-eyebrow-rule {
+  width: 34px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sm-mint-500, #32C5D2), var(--sm-mint-400, #56D2CF));
+}
+
+/* The rail: a thin track + six capability labels; the mint signal fills
+   the track from `--sm-rail-p` (set by a passive scroll listener; 1 under
+   reduced motion so the rail renders complete). */
+.sm-home-v5 #hero .v4-hero__rail {
+  position: absolute;
+  z-index: 3;
+  right: clamp(12px, 2vw, 30px);
+  top: calc(var(--v4-hdr-h, 64px) + (100svh - var(--v4-hdr-h, 64px)) * 0.4);
+  transform: translateY(-46%);
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  pointer-events: none;
+}
+.sm-home-v5 #hero .v4-hero__rail-track {
+  position: relative;
+  width: 2px;
+  border-radius: 2px;
+  background: rgb(159 194 204 / 0.28);
+  overflow: hidden;
+}
+.sm-home-v5 #hero .v4-hero__rail-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--sm-rail-p, 0) * 100%);
+  background: linear-gradient(180deg, var(--sm-mint-400, #56D2CF), var(--sm-mint-500, #32C5D2));
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgb(86 210 207 / 0.5);
+}
+.sm-home-v5 #hero .v4-hero__rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sm-home-v5 #hero .v4-hero__rail-item {
+  font-family: var(--v4-font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(199 224 230 / 0.5);
+  text-shadow: 0 1px 8px rgb(7 19 36 / 0.7);
+  transition: color 250ms ease, transform 250ms ease;
+}
+.sm-home-v5 #hero .v4-hero__rail[data-active="0"] .v4-hero__rail-item[data-i="0"],
+.sm-home-v5 #hero .v4-hero__rail[data-active="1"] .v4-hero__rail-item[data-i="1"],
+.sm-home-v5 #hero .v4-hero__rail[data-active="2"] .v4-hero__rail-item[data-i="2"],
+.sm-home-v5 #hero .v4-hero__rail[data-active="3"] .v4-hero__rail-item[data-i="3"],
+.sm-home-v5 #hero .v4-hero__rail[data-active="4"] .v4-hero__rail-item[data-i="4"],
+.sm-home-v5 #hero .v4-hero__rail[data-active="5"] .v4-hero__rail-item[data-i="5"] {
+  color: var(--sm-mint-400, #56D2CF);
+  transform: translateX(-2px);
+}
+
+@media (max-width: 767px) {
+  /* Mobile: a horizontal scroll-snap strip slotted between the copy and
+     the poster band (flex `order`), never a compressed vertical rail. */
+  /* The rail adds ~46px to the fixed-height mobile stage; the field's
+     floor drops a notch so nothing clips on short phones. */
+  /* Mobile particle transition — owner hotfix 2026-09-09.
+     The hero pinned for 260vh: about 2.6 screens of scrolling during which
+     the ONLY thing that changed was the ~169px particle strip at the top,
+     while the headline, buttons and film stayed perfectly still. Measured
+     on production, progress did advance 0 -> 1, but across so much dead
+     scroll that it read as "scrolling does nothing".
+     A shorter runway couples the journey tightly to the thumb: the same
+     five stages now play across ~0.7 of a screen, so the movement is
+     obvious and the page starts moving again quickly. `svh` (not `vh`)
+     keeps the runway stable while the browser toolbar hides and shows —
+     the JS measures the sticky stage for the same reason. */
+  /* Only where the stage actually PINS. Below 701px of viewport height the
+     rule further down flows the stage (position:relative; height:auto), and a
+     hero shorter than its own flowed content overflows it — at 568x320 the
+     HUD spilled out and covered the next section heading. Nothing is pinned
+     in flow mode, so there is no frozen-scroll problem to solve there. */
+  @media (min-height: 701px) {
+    .sm-home-v5 #hero .v4-hero { height: 170svh; }
+  }
+
+  .sm-home-v5 #hero .v4-hero__field { order: 0; min-height: 88px; }
+  .sm-home-v5 #hero .v4-hero__copy { order: 1; }
+  .sm-home-v5 #hero .v4-hero__rail { order: 2; }
+  .sm-home-v5 #hero .v4-hero__film { order: 3; }
+  .sm-home-v5 #hero .v4-hero__hud { order: 4; }
+  .sm-home-v5 #hero .v4-hero__rail {
+    position: static;
+    transform: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0.35rem clamp(1rem, 4vw, 1.4rem) 0.5rem;
+    pointer-events: auto;
+  }
+  .sm-home-v5 #hero .v4-hero__rail-track {
+    width: 100%;
+    height: 2px;
+  }
+  .sm-home-v5 #hero .v4-hero__rail-fill {
+    height: 100%;
+    width: calc(var(--sm-rail-p, 0) * 100%);
+  }
+  .sm-home-v5 #hero .v4-hero__rail-list {
+    flex-direction: row;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .sm-home-v5 #hero .v4-hero__rail-list::-webkit-scrollbar { display: none; }
+  .sm-home-v5 #hero .v4-hero__rail-item {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+}
+
+/* ── Blueprint watermark (mint graphic system, final release directive
+   2026-09-07): a faint mint technical grid behind the ink final-CTA band —
+   the "connected systems" drawing surface. Decorative only; text sits on
+   the ink ground unchanged. */
+.sm-home-v5 .v4-cta-band {
+  background-image:
+    linear-gradient(rgba(153, 245, 208, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(153, 245, 208, 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* ── Short-viewport hero copy (end-of-file on purpose: this MUST
+   out-cascade the ≥768px absolute-copy rule above, which places the copy
+   at 64px + usable×0.4 − clamp(150px,19vh,190px) — on a short viewport
+   that lands ABOVE the fixed header (44px at 844×390) and the eyebrow
+   disappears under it. In the max-height flow mode the copy stacks
+   normally inside the padded stage instead.) ─────────────────────────── */
+@media (max-height: 700px) {
+  /* Short screens — iPhone SE/8 at 667, and ANY iPhone whose Safari toolbars
+     shrink the visual viewport under 700px (owner recording, 2026-09-10).
+
+     This block flows the stage so the copy and film are not crushed into one
+     screen, which is right. What was wrong is that nothing pinned afterwards:
+     measured at 375x667 the scene left the viewport entirely at p≈0.58, so the
+     visitor scrolled the back half of the transformation with nothing to look
+     at, and then scrolled ~40% more hero with the animation already finished.
+
+     So the SCENE pins on its own — under the navigation, where it stays
+     watchable for the whole sequence — while the copy and film flow past it,
+     exactly as they should on a small screen. It carries the ink background
+     because content now passes beneath it. */
+  .sm-home-v5 #hero .v4-hero__copy {
+    position: static;
+    top: auto;
+    /* Reads FIRST and scrolls away cleanly. It must not be ordered after the
+       pinned scene: an opaque panel fixed across the middle of a short screen
+       occludes any heading scrolled to centre, and the headline is the one
+       piece of the hero that has to stay readable. */
+    order: 0;
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+  .sm-home-v5 #hero .v4-hero__field {
+    order: 1;
+    position: sticky;
+    top: var(--v4-hdr-h, 64px);
+    /* Above the flowing copy and film — both are positioned at z-index 2, so
+       at the same level the later DOM node won and the copy scrolled THROUGH
+       the pinned scene, text and particle path interleaved. The scene owns
+       this band; content passes cleanly behind it. */
+    z-index: 6;
+    flex: 0 0 auto;
+    /* Sized so the transformation FINISHES close to where the scene releases.
+       The pinned span is (stage content - header - scene height); the progress
+       runway is (hero - viewport). At 55svh those land within a third of a
+       screen of each other, so there is no long stretch of pinned-but-finished
+       scrolling — and the headline still starts above the fold at rest. */
+    height: 55svh;
+    min-height: 200px;
+    max-height: 55svh;
+    background: var(--v4-ink, #071324);
+    margin-top: 0;
+  }
+  /* Every child is numbered here, not just the two being swapped: at widths
+     above 767px the narrow block that numbers rail/film/hud does not apply, so
+     a bare "order: 1" on the scene sent it past them to the end of the stage
+     and left it with no room to stick. */
+  .sm-home-v5 #hero .v4-hero__rail {
+    order: 2;
+  }
+  .sm-home-v5 #hero .v4-hero__film {
+    order: 3;
+  }
+  .sm-home-v5 #hero .v4-hero__hud {
+    order: 4;
+    position: static;
+    padding-bottom: 0.6rem;
+  }
+  /* On short PORTRAIT screens the film sits below the pinned scene, far below
+     the fold, so the 12svh text-LCP cap does not apply to it here — and the
+     film is most of the scene's sticky runway. See the note on travel above. */
+  @media (max-width: 767px) {
+    .sm-home-v5 #hero .v4-hero__film {
+      height: clamp(200px, 34svh, 300px);
+    }
+  }
+  /* The runway is the scroll the transformation needs — no more. The hero
+     used to run a fixed 260vh here, which finished the animation with about
+     40% of the hero still to scroll: the "large empty area". */
+  .sm-home-v5 #hero .v4-hero {
+    height: auto;
+  }
+  /* The stage clips (), and a clipping ancestor confines a
+     sticky child to its own box — which is why pinning the scene did nothing
+     until this line: the field stuck inside an 846px stage and left with it.
+     The runway lives on the stage too, so the sticky span and the scroll the
+     transformation needs are the same distance. */
+  .sm-home-v5 #hero .v4-hero__stage {
+    overflow: visible;
+    /* The runway must extend the stage CONTENT box, not its padding: a sticky
+       child is bounded by its containing block content edge, so padding-bottom
+       here left the scene unsticking with ~20% of the transformation still to
+       run. min-height keeps the scene pinned for the whole sequence. */
+    min-height: 148svh;
+  }
+}
+
+/* ── Business-owner capability groups (owner directive 2026-09-08) — the
+   ledger's nine capabilities, regrouped into the four things an owner is
+   trying to do. Reuses the ledger row typography tokens. ─────────────── */
+.sm-capgroups {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+@media (min-width: 900px) {
+  .sm-capgroups {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+}
+.sm-capgroup {
+  /* Professional redesign (2026-09-09): the reference card language —
+     22px radius, ~34px desktop padding, quiet border, polished white. */
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-card, 22px);
+  background: var(--sm-surface, #fff);
+  padding: var(--sm-card-pad, 1.5rem);
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  transition:
+    transform 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color 220ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .sm-capgroup:hover,
+  .sm-capgroup:focus-within {
+    transform: translateY(-3px);
+    box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1));
+    border-color: var(--sm-mint-border, #80E9BE);
+  }
+}
+.sm-capgroup__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.8rem;
+  row-gap: 0.3rem;
+  align-items: baseline;
+}
+.sm-capgroup__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.sm-capgroup__promise {
+  grid-column: 2;
+  margin: 0;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.sm-capgroup__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.sm-capgroup__item {
+  display: grid;
+  gap: 0.15rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--sm-mint-signature, #99F5D0);
+}
+.sm-capgroup__item .sm-ledger__outcome {
+  font-size: 0.9rem;
+}
+.sm-capgroup__details {
+  justify-self: start;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--sm-mint-ink, #0B7487);
+  text-decoration: none;
+  border-bottom: 2px solid var(--sm-mint-signature, #99F5D0);
+  padding-bottom: 1px;
+}
+.sm-capgroup__details:hover,
+.sm-capgroup__details:focus-visible {
+  border-bottom-color: var(--sm-mint-ink, #0B7487);
+}
+
+/* ── "What happens behind the scenes" disclosure — the optional technical
+   layer (progressive disclosure per the language hierarchy). ──────────── */
+.sm-tech-detail {
+  margin-top: 1.75rem;
+  border: 1px solid var(--sm-line, #CFE7EA);
+  border-radius: var(--sm-radius-m, 10px);
+  background: var(--sm-surface-alt, #EDF9FA);
+  padding: 0.35rem 1rem;
+}
+.sm-tech-detail summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.6rem 0;
+  color: var(--sm-mint-ink, #0B7487);
+  list-style-position: inside;
+}
+.sm-tech-detail summary:hover {
+  text-decoration: underline;
+}
+.sm-tech-detail__list {
+  margin: 0.25rem 0 0.9rem;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: 0.5rem;
+  color: var(--sm-text-muted, #4A6472);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+.sm-tech-detail__list strong {
+  color: var(--sm-text, #173642);
+}

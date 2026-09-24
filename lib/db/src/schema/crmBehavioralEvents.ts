@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, numeric, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { crmLeads } from "./crmLeads";
 
 // ── crm_behavioral_events ──────────────────────────────────────────────────────
@@ -42,7 +42,12 @@ export const crmBehavioralEvents = pgTable("crm_behavioral_events", {
 
   // Optional free-form metadata (e.g. { campaignId: 7, recipientId: 42 })
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
-});
+}, (table) => [
+  // Push packet 0003 (2026-09-24 performance audit): the Lead DNA profile is
+  // the sum of every event for one lead, and the timeline reads them by time.
+  index("ix_crm_behavioral_events_lead_id").on(table.leadId),
+  index("ix_crm_behavioral_events_occurred_at").on(table.occurredAt),
+]);
 
 export type CrmBehavioralEvent = typeof crmBehavioralEvents.$inferSelect;
 export type InsertCrmBehavioralEvent = typeof crmBehavioralEvents.$inferInsert;

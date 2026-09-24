@@ -1,0 +1,92 @@
+/**
+ * Frontend V3 — the Operational Editorial retheme of the customer dashboard
+ * and sign-in ("Operations Console").
+ *
+ * This file is a pure token-value override layer. The V2 files
+ * (`v2-dashboard.css`, `v2-signin.css`, and every page stylesheet) keep their
+ * markup hooks, motion rules, and literal declarations — the committed
+ * contract tests assert those literals, and they remain true. This layer
+ * re-points the palette, typography, and geometry to the approved V3 system
+ * inside the existing scopes, so every dashboard surface moves to V3 at once
+ * without touching a component contract.
+ *
+ * Doubled class selectors make the override order-proof against import
+ * ordering: same file wins on specificity, not on luck.
+ *
+ * ROLLBACK: remove the two imports of this file (AppShell.tsx, Login.tsx) to
+ * restore the V2 appearance byte-for-byte.
+ */
+
+.sd-app.sd-app {
+  /* ── V3 palette, expressed through the V2 token names the roles read ──── */
+  --v2-warm-white: #fafaf8;
+  --v2-offwhite: #f4f7f6;
+  --v2-mint-mist: #e9fcf8;
+  --v2-mint-100: #dff9f4;
+  --v2-mint-500: #20e6c3;
+  --v2-navy-900: #06151f;
+  --v2-navy-700: #0c2633;
+  --v2-slate-500: #45606e;
+
+  /* ── Role refinements ─────────────────────────────────────────────────── */
+  --sd-border: rgba(6, 21, 31, 0.09);
+  --sd-border-strong: rgba(6, 21, 31, 0.2);
+
+  /* The ink rail and everything printed on it. */
+  --sd-rail: #06151f;
+  --sd-rail-text: #e9fcf8;
+  --sd-rail-muted: #8fb0be;
+  --sd-rail-border: rgba(233, 252, 248, 0.12);
+  --sd-rail-hover: rgba(233, 252, 248, 0.07);
+  --sd-rail-active: rgba(32, 230, 195, 0.14);
+  --sd-rail-accent: #20e6c3;
+
+  /* Focus ring needs the deeper mint for contrast on light surfaces. */
+  --sd-focus-color: #17b89c;
+
+  /* V3 geometry: 12px controls, 14px cards inside the dense app. */
+  --sd-radius-control: 12px;
+  --sd-radius-card: 14px;
+
+  /* V3 grotesk stack (local-first Geist, system otherwise). */
+  --sd-font: "Geist", "Geist Sans", ui-sans-serif, system-ui, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark counterpart stays in the ink family. */
+:where(.dark) .sd-app.sd-app {
+  --sd-canvas: #071a26;
+  --sd-surface: #0c2633;
+  --sd-surface-alt: #0a2230;
+  --sd-surface-accent: #113344;
+  --sd-text: #e9fcf8;
+  --sd-text-muted: #8fb0be;
+  --sd-border: rgba(233, 252, 248, 0.12);
+  --sd-border-strong: rgba(233, 252, 248, 0.24);
+
+  --sd-accent: #20e6c3;
+  --sd-accent-soft: rgba(32, 230, 195, 0.14);
+
+  --sd-rail: #04101a;
+
+  --sd-muted-surface: rgba(233, 252, 248, 0.05);
+  --sd-muted-text: #8fa9b7;
+
+  --sd-focus-color: #20e6c3;
+}
+
+/* ── Sign-in page (its own scope, its own token copies) ─────────────────── */
+.si-page.si-page {
+  --v2-warm-white: #f7f5ef;
+  --v2-offwhite: #ffffff;
+  --v2-mint-mist: #e9fcf8;
+  --v2-mint-100: #dff9f4;
+  --v2-mint-500: #20e6c3;
+  --v2-navy-900: #06151f;
+  --v2-navy-700: #0c2633;
+  --v2-slate-500: #45606e;
+  --v2-radius-control: 12px;
+  --v2-radius-card: 16px;
+  --v2-font-sans: "Geist", "Geist Sans", ui-sans-serif, system-ui, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}

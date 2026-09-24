@@ -1,0 +1,821 @@
+/**
+ * AI Receptionist V5 — the call theater (§preview).
+ *
+ * Reuses the canvas-ring voice object and its Ready / Listening / Thinking /
+ * Speaking / Ended states (the same state model as
+ * `components/v4/ReceptionistTheaterV4.tsx`), re-implemented here against
+ * `previewScript.ts`'s seven curated branches and the `--sm-*` token colors
+ * instead of importing the V4 file directly — this tree owns its own
+ * dependency graph.
+ *
+ * Binding rules carried over from the V4 theater:
+ * - always labeled a simulation; never requests a microphone; nothing here
+ *   makes a network call or a provider request.
+ * - keyboard operable: chips are buttons, Escape ends an active preview.
+ * - `prefers-reduced-motion: reduce` and hidden tabs stop the animation loop.
+ *
+ * Cinematic motion (2026-09-05 owner directive) — this is the page's "call
+ * ring" + "waveform" motif home: the idle "Ready" ring now breathes gently
+ * (`useVoiceObject` below) instead of sitting perfectly static, and
+ * `TheaterWaveform` adds a small ambient bar cluster next to the state
+ * label. Both loops are ambient (not reveal-once) so both are paused via
+ * `data-ambient-paused` — the ring loop through its own IntersectionObserver
+ * (added to the existing visibility gate rather than a second effect), the
+ * waveform via the shared `usePausableAmbient` hook — whenever the tab is
+ * hidden or the theater scrolls offscreen.
+ */
+
+import { useEffect, useRef, useState, type ComponentType, type RefObject } from "react";
+import {
+  PREVIEW_BRANCHES,
+  PREVIEW_STATE_LABEL,
+  type PreviewLine,
+  type VoiceState,
+} from "./previewScript";
+import { PREVIEW_LABEL } from "@/pages/receptionist-v5/sections";
+import { usePausableAmbient } from "./heroMotion";
+
+const MAX_SECONDS = 90;
+
+function formatClock(s: number): string {
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+
+/** Reads a `--sm-*` token from the document, falling back to the documented
+ * V5-BLUEPRINT §2 literal so the ring still renders correctly before the
+ * foundation owner's `tokens-v5.css` is loaded. */
+function readToken(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function useVoiceObject(state: VoiceState, canvasRef: RefObject<HTMLCanvasElement | null>) {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const mint500 = readToken("--sm-mint-500", "#32C5D2");
+    const mint400 = readToken("--sm-mint-400", "#56D2CF");
+    const ink950 = readToken("--sm-ink-950", "#153E52");
+
+    // "Call ring" ambient motif: the idle Ready ring breathes instead of
+    // sitting perfectly still, so the visual reads as alive before a caller
+    // (or, here, a visitor) does anything. Ended stays a static confirmation
+    // — it's a resting result, not an ambient loop. Offscreen pausing below
+    // matters specifically because this loop can now run indefinitely
+    // whenever the state is "ready", not only for a few seconds per call.
+    let onscreen = true;
+    let raf = 0;
+    const observer =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) onscreen = entry.isIntersecting;
+              cancelAnimationFrame(raf);
+              if (onscreen && document.visibilityState === "visible") {
+                raf = requestAnimationFrame(draw);
+              }
+            },
+            { threshold: 0.05 },
+          )
+        : undefined;
+    observer?.observe(canvas);
+
+    function draw(now: number) {
+      if (!canvas || !ctx) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const s = canvas.clientWidth;
+      if (s > 0 && canvas.width !== s * dpr) {
+        canvas.width = s * dpr;
+        canvas.height = s * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const c = s / 2;
+      ctx.clearRect(0, 0, s, s);
+
+      if (state === "ready") {
+        const breathe = reduced ? 1 : 1 + Math.sin(now / 1500) * 0.035;
+        ctx.beginPath();
+        ctx.arc(c, c, (c - 8) * breathe, 0, 6.28);
+        ctx.strokeStyle = ink950;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else if (state === "ended") {
+        ctx.beginPath();
+        ctx.arc(c, c, c - 8, 0, 6.28);
+        ctx.strokeStyle = mint500;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(c, c, 4, 0, 6.28);
+        ctx.fillStyle = mint500;
+        ctx.fill();
+      } else if (state === "listening" || state === "speaking") {
+        const outward = state === "speaking";
+        for (let i = 0; i < 3; i++) {
+          const ph = (now / 1400 + i / 3) % 1;
+          const rr = outward ? 0.35 + ph * 0.6 : 0.95 - ph * 0.6;
+          const alpha = (outward ? 1 - ph : ph) * 0.8;
+          ctx.beginPath();
+          ctx.arc(c, c, (c - 8) * rr, 0, 6.28);
+          ctx.strokeStyle = outward ? withAlpha(mint500, alpha) : withAlpha(mint400, alpha);
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      } else {
+        ctx.beginPath();
+        ctx.arc(c, c, c - 8, 0, 6.28);
+        ctx.strokeStyle = ink950;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        for (let i = 0; i < 3; i++) {
+          const a = now / 600 + i * 2.09;
+          ctx.beginPath();
+          ctx.arc(c + Math.cos(a) * (c - 8), c + Math.sin(a) * (c - 8), 3.2, 0, 6.28);
+          ctx.fillStyle = mint400;
+          ctx.fill();
+        }
+      }
+
+      const active = state === "listening" || state === "thinking" || state === "speaking";
+      const shouldLoop = active || state === "ready";
+      if (!reduced && shouldLoop && document.visibilityState === "visible" && onscreen) {
+        raf = requestAnimationFrame(draw);
+      }
+    }
+
+    function withAlpha(hex: string, alpha: number): string {
+      // hex is expected #rrggbb; anything else (e.g. an unresolved var) just
+      // renders at full opacity rather than throwing.
+      const m = /^#([0-9a-f]{6})$/i.exec(hex);
+      if (!m) return hex;
+      const int = parseInt(m[1], 16);
+      const r = (int >> 16) & 255;
+      const g = (int >> 8) & 255;
+      const b = int & 255;
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    const onVisibility = () => {
+      cancelAnimationFrame(raf);
+      if (document.visibilityState === "visible") raf = requestAnimationFrame(draw);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    raf = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisibility);
+      observer?.disconnect();
+    };
+  }, [state, canvasRef]);
+}
+
+/**
+ * "Waveform" motif — a small ambient CSS bar cluster (`transform: scaleY`
+ * only), shown alongside the idle Ready state as a quiet audio-readiness
+ * accent. Paused via `usePausableAmbient` whenever the tab is hidden or the
+ * theater scrolls offscreen; `aria-hidden` since it carries no information
+ * beyond decoration (the state label above it is the accessible signal).
+ */
+function TheaterWaveform() {
+  const ambientRef = usePausableAmbient<HTMLDivElement>();
+  const bars = [0, 1, 2, 3, 4];
+  return (
+    <div className="smv5-theater__waveform" ref={ambientRef} aria-hidden="true">
+      {bars.map((i) => (
+        <span key={i} className="smv5-theater__wavebar" style={{ animationDelay: `${i * 110}ms` }} />
+      ))}
+    </div>
+  );
+}
+
+export function CallTheaterV5() {
+  const [state, setState] = useState<VoiceState>("ready");
+  const [branchIdx, setBranchIdx] = useState(0);
+  const [lines, setLines] = useState<PreviewLine[]>([]);
+  const [seconds, setSeconds] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const convoRef = useRef<HTMLDivElement>(null);
+  const timersRef = useRef<number[]>([]);
+  const tickRef = useRef<number | null>(null);
+  const stateRef = useRef<VoiceState>("ready");
+  stateRef.current = state;
+
+  useVoiceObject(state, canvasRef);
+
+  function clearTimers() {
+    timersRef.current.forEach((t) => window.clearTimeout(t));
+    timersRef.current = [];
+    if (tickRef.current !== null) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  }
+
+  function end(message: string) {
+    clearTimers();
+    setLines((prev) => [...prev, { who: "System", text: message }]);
+    setState("ended");
+  }
+
+  function start() {
+    const branch = PREVIEW_BRANCHES[branchIdx];
+    clearTimers();
+    setLines([{ who: "System", text: "Simulated preview — no live call is taking place." }]);
+    setSeconds(0);
+    setState("listening");
+    const startedAt = Date.now();
+    tickRef.current = window.setInterval(() => {
+      const s = Math.floor((Date.now() - startedAt) / 1000);
+      setSeconds(s);
+      if (s >= MAX_SECONDS) end(branch.ending);
+    }, 500);
+    for (const step of branch.steps) {
+      timersRef.current.push(
+        window.setTimeout(() => {
+          if (step.state) setState(step.state);
+          if (step.line) setLines((prev) => [...prev, step.line as PreviewLine]);
+        }, step.afterMs),
+      );
+    }
+    const lastStep = branch.steps[branch.steps.length - 1];
+    const total = (lastStep?.afterMs ?? 0) + 2600;
+    timersRef.current.push(window.setTimeout(() => end(branch.ending), total));
+  }
+
+  function reset() {
+    clearTimers();
+    setLines([]);
+    setSeconds(0);
+    setState("ready");
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      const s = stateRef.current;
+      if (s === "listening" || s === "thinking" || s === "speaking") {
+        end("Preview ended by you.");
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => clearTimers, []);
+
+  useEffect(() => {
+    const el = convoRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines]);
+
+  const active = state === "listening" || state === "thinking" || state === "speaking";
+
+  return (
+    <div className="smv5-theater" data-state={state}>
+      <div className="smv5-theater__top">
+        <span className="smv5-theater__label">{PREVIEW_LABEL}</span>
+        {active && (
+          <p className="smv5-theater__timer">
+            {formatClock(seconds)} / {formatClock(MAX_SECONDS)}
+          </p>
+        )}
+      </div>
+
+      <div className="smv5-theater__body">
+        <div className="smv5-theater__voice-col">
+          <div className="smv5-theater__voice" aria-hidden="true">
+            <canvas ref={canvasRef} className="smv5-theater__canvas" />
+          </div>
+          <p className="smv5-theater__state" aria-live="polite">
+            {PREVIEW_STATE_LABEL[state]}
+          </p>
+          {state === "ready" && <TheaterWaveform />}
+        </div>
+
+        <div className="smv5-theater__interact">
+          {state === "ready" && (
+            <div className="smv5-theater__chips" role="group" aria-label="Preview topics">
+              {PREVIEW_BRANCHES.map((branch, i) => (
+                <button
+                  key={branch.id}
+                  type="button"
+                  className="smv5-theater__chip"
+                  aria-pressed={i === branchIdx}
+                  onClick={() => setBranchIdx(i)}
+                >
+                  {branch.chipLabel}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {lines.length > 0 && (
+            <div className="smv5-theater__convo" aria-live="polite" ref={convoRef}>
+              {lines.map((line, i) => (
+                <p key={`${i}-${line.text.slice(0, 12)}`} className="smv5-theater__line">
+                  <b>{line.who}:</b> {line.text}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="smv5-theater__actions">
+            {state === "ready" && (
+              <button type="button" className="smv5-btn smv5-btn--primary" onClick={start}>
+                Start the interactive preview
+              </button>
+            )}
+            {active && (
+              <button
+                type="button"
+                className="smv5-btn smv5-btn--ghost"
+                onClick={() => end("Preview ended by you.")}
+              >
+                End preview
+              </button>
+            )}
+            {state === "ended" && (
+              <button type="button" className="smv5-btn smv5-btn--outline" onClick={reset}>
+                Choose another topic
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <p className="smv5-theater__disclose">
+        Simulated conversation. No microphone is requested, no audio plays, and no call is placed.
+      </p>
+    </div>
+  );
+}
+
+/* ── Hero call theater (§AiReceptionistV5 hero, product-theater redesign,
+ * 2026-09-06) ────────────────────────────────────────────────────────────
+ *
+ * Embedded in the hero's right column (owner directive: "copy + CTA left,
+ * live call experience right", the Vapi/Retell reference pattern) — a
+ * SEPARATE scripted six-state sequence from the topic-picker theater above
+ * (`CallTheaterV5`/`PREVIEW_BRANCHES`): incoming-call ring → answering
+ * (waveform, listening/speaking) → business-rule lookup → availability
+ * check → appointment confirmed → organized outcome. Every stage renders
+ * obviously synthetic data for one illustrative scenario (a dental
+ * practice, "Bloom Dental") — never a real caller, business, or number.
+ *
+ * Reuses this file's own ring/waveform pieces (`useVoiceObject`,
+ * `TheaterWaveform`) against the same five-state voice-object vocabulary,
+ * so the hero's cinematic sequence and the Interactive Preview's
+ * conversation share one visual language. A visitor can either press Play
+ * to auto-advance through the full sequence (each stage timed like a real
+ * call) or step manually with Previous/Next — both are real, keyboard-
+ * operable `<button>`s, and the always-visible disclosure line is a
+ * binding, exact-copy requirement, never paraphrased.
+ */
+
+type HeroCallVoice = VoiceState;
+
+interface HeroCallBeat {
+  voice: HeroCallVoice;
+  /** How long this beat holds before advancing, during auto-play. The
+   *  final beat's value is unused (auto-play stops there). */
+  holdMs: number;
+}
+
+interface HeroCallStage {
+  id: string;
+  /** Shown in the stage label (aria-live) and as the on-screen heading. */
+  label: string;
+  /** Short state chip — the owner's eight canonical states. */
+  chip: string;
+  /** The "current system action" line (monospace status under the card). */
+  action: string;
+  beats: HeroCallBeat[];
+  Card: ComponentType;
+}
+
+function HeroPhoneRingGlyph() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 5c0 8 7 15 15 15l3-4-6-3-2 2c-2-1-4-3-5-5l2-2-3-6-4 3Z" />
+    </svg>
+  );
+}
+
+/** A compact 3×2 availability grid — the same "one slot lights up" motif as
+ *  `AvailabilitySlotGlyph` in AiReceptionistV5.tsx, reimplemented locally
+ *  (self-contained, static — no reveal-once gate needed for a beat that's
+ *  already gated by the stage sequencer above it) rather than exported
+ *  cross-file for one small SVG. */
+function HeroAvailabilityGlyph() {
+  const lit = 4;
+  return (
+    <svg width="56" height="38" viewBox="0 0 66 44" aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const x = (i % 3) * 22 + 2;
+        const y = Math.floor(i / 3) * 20 + 2;
+        return (
+          <rect
+            key={i}
+            x={x}
+            y={y}
+            width="18"
+            height="16"
+            rx="3"
+            fill={i === lit ? "var(--smv5-mint-500)" : "var(--smv5-mist-100)"}
+            stroke="var(--smv5-line-strong)"
+            strokeWidth="1"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function HeroConfirmGlyph() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 44 44" aria-hidden="true">
+      <circle cx="22" cy="22" r="19" fill="var(--smv5-mint-100)" stroke="var(--smv5-mint-500)" strokeWidth="2" />
+      <path d="M13 22.5 19 28.5 31 15" fill="none" stroke="var(--smv5-mint-700)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function HeroReadyCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__note">
+        Line open. Business hours active — calls route to the AI Receptionist
+        immediately.
+      </p>
+      <ul className="smv5-herotheater__list">
+        <li>Bloom Dental · Mon–Fri, 8:00 AM–5:00 PM</li>
+        <li>Booking rules and calendar connected</li>
+      </ul>
+    </div>
+  );
+}
+
+function HeroIncomingCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__caller">
+        <HeroPhoneRingGlyph />
+        (555) 019-2874
+      </p>
+      <p className="smv5-herotheater__note">
+        New caller · no existing record — routed to the AI Receptionist.
+      </p>
+    </div>
+  );
+}
+
+function HeroListeningCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__line smv5-herotheater__line--caller">
+        <b>Caller:</b> &ldquo;Hi — I&rsquo;d like to book a cleaning sometime next
+        week, and I have a question about my insurance.&rdquo;
+      </p>
+    </div>
+  );
+}
+
+function HeroAnsweringCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__line">
+        <b>Assistant:</b> &ldquo;Happy to help with the cleaning — let me check
+        next week&rsquo;s openings. I&rsquo;ll make sure the team follows up on the
+        insurance question.&rdquo;
+      </p>
+    </div>
+  );
+}
+
+function HeroAttentionCard() {
+  return (
+    <div className="smv5-herotheater__panel smv5-herotheater__panel--attention">
+      <p className="smv5-herotheater__note">
+        <b>Insurance question flagged for the team</b> — outside the
+        receptionist&rsquo;s configured knowledge, so it becomes a follow-up task
+        instead of a guess.
+      </p>
+      <ul className="smv5-herotheater__list">
+        <li>Task: confirm coverage details with the caller</li>
+        <li>Assigned: front desk · due before the visit</li>
+      </ul>
+    </div>
+  );
+}
+
+function HeroRulesCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <p className="smv5-herotheater__note">Checking business hours &amp; booking rules…</p>
+      <ul className="smv5-herotheater__list">
+        <li>Open Mon–Fri, 8:00 AM–5:00 PM</li>
+        <li>Cleanings — 30-minute slots</li>
+        <li>New patients require an intake form</li>
+      </ul>
+    </div>
+  );
+}
+
+function HeroAvailabilityCard() {
+  return (
+    <div className="smv5-herotheater__panel smv5-herotheater__panel--row">
+      <HeroAvailabilityGlyph />
+      <p className="smv5-herotheater__note">Checking Tuesday afternoon openings against the calendar…</p>
+    </div>
+  );
+}
+
+function HeroConfirmedCard() {
+  return (
+    <div className="smv5-herotheater__panel smv5-herotheater__panel--row">
+      <HeroConfirmGlyph />
+      <div>
+        <p className="smv5-herotheater__confirm">Tue 2:30 PM — Cleaning</p>
+        <p className="smv5-herotheater__note">Bloom Dental · booked in the calendar after the caller confirmed</p>
+      </div>
+    </div>
+  );
+}
+
+function HeroSummaryCard() {
+  return (
+    <div className="smv5-herotheater__panel">
+      <div className="smv5-herotheater__tags" aria-label="Call outcome tags">
+        <span className="smv5-herotheater__tag smv5-herotheater__tag--booked">Booked</span>
+        <span className="smv5-herotheater__tag smv5-herotheater__tag--attention">Follow-up</span>
+        <span className="smv5-herotheater__tag">New patient</span>
+      </div>
+      <dl className="smv5-herotheater__summary">
+        <div>
+          <dt>Caller</dt>
+          <dd>New patient, first-time caller</dd>
+        </div>
+        <div>
+          <dt>Outcome</dt>
+          <dd>Cleaning confirmed — Tue 2:30 PM</dd>
+        </div>
+        <div>
+          <dt>Follow-up</dt>
+          <dd>Insurance question → front desk; intake form before the visit</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+const HERO_CALL_STAGES: HeroCallStage[] = [
+  {
+    id: "ready",
+    label: "Ready",
+    chip: "Ready",
+    action: "Standing by · business hours active",
+    beats: [{ voice: "ready", holdMs: 1400 }],
+    Card: HeroReadyCard,
+  },
+  {
+    id: "incoming",
+    label: "Incoming call",
+    chip: "Incoming",
+    action: "Inbound from (555) 019-2874 · answering",
+    beats: [{ voice: "ready", holdMs: 1800 }],
+    Card: HeroIncomingCard,
+  },
+  {
+    id: "listening",
+    label: "Listening to the caller",
+    chip: "Listening",
+    action: "Transcribing caller audio · detecting intent",
+    beats: [{ voice: "listening", holdMs: 2400 }],
+    Card: HeroListeningCard,
+  },
+  {
+    id: "responding",
+    label: "Responding",
+    chip: "Responding",
+    action: "Composing reply from the business profile",
+    beats: [{ voice: "speaking", holdMs: 2400 }],
+    Card: HeroAnsweringCard,
+  },
+  {
+    id: "checking",
+    label: "Checking rules & availability",
+    chip: "Checking",
+    action: "Reading booking rules · querying the calendar",
+    beats: [
+      { voice: "thinking", holdMs: 1600 },
+      { voice: "thinking", holdMs: 1600 },
+    ],
+    Card: HeroRulesCard,
+  },
+  {
+    id: "availability",
+    label: "Matching an open slot",
+    chip: "Checking",
+    action: "Tuesday afternoon · 3 openings found",
+    beats: [{ voice: "thinking", holdMs: 2000 }],
+    Card: HeroAvailabilityCard,
+  },
+  {
+    id: "confirmed",
+    label: "Appointment confirmed",
+    chip: "Confirmed",
+    action: "Writing appointment · texting confirmation",
+    beats: [{ voice: "ended", holdMs: 2200 }],
+    Card: HeroConfirmedCard,
+  },
+  {
+    id: "attention",
+    label: "Needs human attention",
+    chip: "Needs attention",
+    action: "Creating a follow-up task for the team",
+    beats: [{ voice: "ended", holdMs: 2400 }],
+    Card: HeroAttentionCard,
+  },
+  {
+    id: "summary",
+    label: "Completed — organized outcome",
+    chip: "Completed",
+    action: "Call logged · outcome and tags recorded",
+    beats: [{ voice: "ended", holdMs: 0 }],
+    Card: HeroSummaryCard,
+  },
+];
+
+const HERO_CALL_BEATS: Array<HeroCallBeat & { stageIndex: number }> = HERO_CALL_STAGES.flatMap(
+  (stage, stageIndex) => stage.beats.map((beat) => ({ ...beat, stageIndex })),
+);
+
+const LAST_BEAT_INDEX = HERO_CALL_BEATS.length - 1;
+
+export function HeroCallTheaterV5() {
+  const [beatIndex, setBeatIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timersRef = useRef<number[]>([]);
+
+  const beat = HERO_CALL_BEATS[beatIndex];
+  const stageIndex = beat.stageIndex;
+  const stage = HERO_CALL_STAGES[stageIndex];
+  const isFirstStage = stageIndex === 0;
+  const isLastStage = stageIndex === HERO_CALL_STAGES.length - 1;
+  const atEnd = beatIndex === LAST_BEAT_INDEX;
+
+  useVoiceObject(beat.voice, canvasRef);
+
+  function clearTimers() {
+    timersRef.current.forEach((t) => window.clearTimeout(t));
+    timersRef.current = [];
+  }
+
+  function playFrom(startIndex: number) {
+    clearTimers();
+    setPlaying(true);
+    setBeatIndex(startIndex);
+    let cumulative = 0;
+    for (let i = startIndex; i < LAST_BEAT_INDEX; i++) {
+      cumulative += HERO_CALL_BEATS[i].holdMs;
+      const nextIndex = i + 1;
+      timersRef.current.push(window.setTimeout(() => setBeatIndex(nextIndex), cumulative));
+    }
+    timersRef.current.push(window.setTimeout(() => setPlaying(false), cumulative));
+  }
+
+  function handlePlayPause() {
+    if (playing) {
+      clearTimers();
+      setPlaying(false);
+      return;
+    }
+    playFrom(atEnd ? 0 : beatIndex);
+  }
+
+  function goToStage(nextStageIndex: number) {
+    clearTimers();
+    setPlaying(false);
+    const clamped = Math.max(0, Math.min(HERO_CALL_STAGES.length - 1, nextStageIndex));
+    const firstBeatOfStage = HERO_CALL_BEATS.findIndex((b) => b.stageIndex === clamped);
+    setBeatIndex(firstBeatOfStage === -1 ? 0 : firstBeatOfStage);
+  }
+
+  useEffect(() => clearTimers, []);
+
+  const showWaveform = beat.voice === "listening" || beat.voice === "speaking";
+  const Card = stage.Card;
+  const playLabel = playing ? "Pause" : atEnd ? "Replay" : "Play";
+
+  // Elapsed call clock: the cumulative scripted time up to the current beat
+  // (deterministic, so jumping stages moves the clock coherently).
+  const elapsedMs = HERO_CALL_BEATS.slice(0, beatIndex).reduce((sum, b) => sum + b.holdMs, 0);
+
+  return (
+    <div className="smv5-herotheater" id="hero-theater" data-stage={stage.id}>
+      {/* Product identity header — this is a SiteMint product surface, not
+          an anonymous card (owner: finished-product hierarchy). */}
+      <header className="smv5-herotheater__id">
+        <span className="smv5-herotheater__id-dot" data-voice={beat.voice} aria-hidden="true" />
+        <div className="smv5-herotheater__id-names">
+          <b>SiteMint AI Receptionist</b>
+          <span>Bloom Dental · simulated line</span>
+        </div>
+        <div className="smv5-herotheater__id-meta">
+          <span className="smv5-herotheater__chip" data-chip={stage.id}>{stage.chip}</span>
+          <span className="smv5-herotheater__clock" aria-label="Elapsed call time">
+            {formatClock(Math.round(elapsedMs / 1000))}
+          </span>
+        </div>
+      </header>
+
+      {/* Stage progress rail — one dot per state, current highlighted. */}
+      <ol className="smv5-herotheater__steps" aria-hidden="true">
+        {HERO_CALL_STAGES.map((s, i) => (
+          <li
+            key={s.id}
+            className="smv5-herotheater__step"
+            data-done={i < stageIndex || undefined}
+            data-current={i === stageIndex || undefined}
+          />
+        ))}
+      </ol>
+
+      <div className="smv5-herotheater__stage">
+        <div className="smv5-herotheater__ringcol">
+          <div className="smv5-theater__voice" aria-hidden="true">
+            <canvas ref={canvasRef} className="smv5-theater__canvas" />
+          </div>
+          {showWaveform && <TheaterWaveform />}
+        </div>
+        <div className="smv5-herotheater__card">
+          <p className="smv5-herotheater__stagelabel" aria-live="polite">
+            <span className="smv5-herotheater__count">
+              {stageIndex + 1} / {HERO_CALL_STAGES.length}
+            </span>
+            {stage.label}
+          </p>
+          <Card />
+        </div>
+      </div>
+
+      {/* Current system action — what the product is doing right now. */}
+      <p className="smv5-herotheater__action" aria-live="polite">
+        <span aria-hidden="true">▸</span> {stage.action}
+      </p>
+
+      <div className="smv5-herotheater__controls" role="group" aria-label="Simulated call playback">
+        <button
+          type="button"
+          className="smv5-btn smv5-btn--ghost"
+          onClick={() => goToStage(stageIndex - 1)}
+          disabled={isFirstStage}
+          aria-label="Previous call state"
+        >
+          ‹ Prev
+        </button>
+        <button
+          type="button"
+          className="smv5-btn smv5-btn--primary"
+          onClick={handlePlayPause}
+          aria-pressed={playing}
+        >
+          {playLabel}
+        </button>
+        <button
+          type="button"
+          className="smv5-btn smv5-btn--ghost"
+          onClick={() => goToStage(stageIndex + 1)}
+          disabled={isLastStage}
+          aria-label="Next call state"
+        >
+          Next ›
+        </button>
+      </div>
+
+      <p className="smv5-herotheater__disclose">Simulated preview — no live call is being placed.</p>
+    </div>
+  );
+}
+
+export default CallTheaterV5;

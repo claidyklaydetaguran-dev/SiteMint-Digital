@@ -1,0 +1,41 @@
+The genuine inbound Development call is complete.
+
+Perform the post-call verification now. Do not simulate or insert any call data.
+
+Verify using actual Twilio, Vapi, webhook, database, and application evidence:
+
+1. Twilio received the inbound call.
+2. Vapi answered using the SiteMint Development assistant.
+3. Genuine authenticated Vapi events reached SiteMint.
+4. The event was not accepted merely through a synthetic fixture.
+5. Only one call record exists despite duplicate webhook delivery.
+6. Start time, end time, duration, provider status, and completion reason are accurate.
+7. The transcript and summary arrived, if supplied by Vapi.
+8. Caller information came from the genuine provider event.
+9. The record appears in Call Logs.
+10. The source is labeled “Vapi + Twilio — Development.”
+11. It is not labeled Demo Mode, simulated, or sample data.
+12. Appointment remains “Not requested” unless I explicitly requested one.
+13. SMS, email, calendar booking, and transfer remain “Not sent,” “Not connected,” or “Not verified.”
+
+Open the genuine Call Logs record and call-detail screen on desktop and mobile. Capture sanitized evidence with all telephone numbers, provider IDs, and private information masked.
+
+Also confirm which Vapi callback authentication mechanism was genuinely used:
+- X-Vapi-Secret;
+- Authorization Bearer;
+- or Vapi HMAC.
+
+Do not describe the authentication as HMAC if the real request used a shared-secret header.
+
+If the real call failed at any stage, report the exact stage and perform non-chargeable diagnostics. Do not ask me to place another chargeable call until the cause is identified.
+
+Run the relevant webhook tests, typecheck, client build, and server build. Confirm Demo Mode still works.
+
+Review all code changes carefully. Do not commit secrets, transcripts, recordings, provider payloads, screenshots, or environment files. If verification succeeds, create one focused commit and push only feature/ai-receptionist-visible-progress.
+
+Do not merge, deploy to Production, modify main, configure SMS/email, or purchase anything.
+
+End with exactly one verdict:
+- REAL DEVELOPMENT VOICE CALL VERIFIED — READY FOR USER REVIEW
+- REAL CALL ATTEMPTED — PROVIDER OR CALLBACK ISSUE REMAINS
+- BLOCKED

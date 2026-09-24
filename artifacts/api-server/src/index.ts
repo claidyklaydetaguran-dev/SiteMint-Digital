@@ -1,8 +1,20 @@
+import type { Server } from "node:http";
 import { runMigrations } from "stripe-replit-sync";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/campaignScheduler.js";
+import { startCrmScheduler } from "./lib/crmScheduler.js";
+import { startSignupJobWorker } from "./lib/signupPipeline/pipeline.js";
+import { startVoiceNotificationWorker } from "./lib/voiceNotifications/notificationOutbox.js";
+import { startVoiceSmsWorker } from "./lib/voiceSms/outboxService.js";
+import { startVoiceReconciliationSweep } from "./lib/voice/webhooks/reconciliation.js";
+import { startUsageBackfillSweep } from "./lib/voiceUsage/usageService.js";
+import { startVoiceDigestSchedule } from "./lib/voiceAlerts/dailyDigest.js";
+import { startGraceExpirySweep } from "./lib/voiceBilling/subscriptionState.js";
+import { logEnvContractFindings } from "./lib/envContract.js";
 import { getStripeSync } from "./lib/stripeClient.js";
+import { isStripeBootSyncEnabled, startStripeBootSync } from "./lib/stripeBootSync.js";
+import { runBootSequence } from "./lib/bootSequence.js";
 
 async function runStripeMigrations(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];
@@ -38,22 +50,108 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-await runStripeMigrations();
-
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
-  logger.info({ port }, "Server listening");
-
-  // Start campaign auto-send scheduler (60-second tick)
+/**
+ * Everything that must NOT run until migrations have succeeded.
+ *
+ * Each starter already checks its own capability flag and registers nothing
+ * while that flag is off; this only decides *when* they are allowed to start.
+ */
+function startBackgroundWorkers(): void {
+  // Campaign auto-send scheduler (60-second tick)
   startScheduler(60_000);
 
-  // Run slow Stripe webhook registration/backfill in the background so it
-  // doesn't delay the HTTP port opening (and failing deploy health checks).
-  initStripeWebhookAndSync().catch((err) => {
-    logger.error({ err }, "Error initializing Stripe webhook/sync");
+  // M2: CRM reminder engine (30-second tick). This is what makes a task
+  // reminder fire with every browser closed and survive a restart — jobs are
+  // rows in crm_scheduled_jobs, claimed with FOR UPDATE SKIP LOCKED so running
+  // several instances cannot double-send. Always on: an idle tick is one
+  // indexed SELECT against an empty queue.
+  startCrmScheduler(30_000);
+
+  // Registration -> CRM -> email pipeline worker (15-second tick). Always on:
+  // an idle tick is one indexed SELECT, and rows only exist after a signup
+  // route has run — which is itself flag-gated.
+  startSignupJobWorker({
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
   });
+
+  // V7: post-call business notifications (15-second tick). Always on for the
+  // same reason as the signup worker: an idle tick is one indexed SELECT, and
+  // rows only exist after a real call ended. Crucially it is started even when
+  // email delivery is off, so a row queued while VOICE_ALERTS_ENABLED was false
+  // is delivered once it is turned on rather than silently discarded.
+  startVoiceNotificationWorker({
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
+  });
+
+  // P5: the voice-number SMS sender (30-second tick). It had no caller at all,
+  // so a booking confirmation the caller had agreed to was queued and never
+  // sent. Inert while VOICE_SMS_ENABLED is not "true" or the credential set is
+  // incomplete: the batch returns before claiming anything, so an idle tick is
+  // one indexed SELECT and nothing is sent by accident.
+  startVoiceSmsWorker({
+    info: (o, m) => logger.info(o, m),
+    error: (o, m) => logger.error(o, m),
+  });
+
+  // P2: voice call-state reconciliation sweep (5-minute tick). Inert unless
+  // VOICE_RECONCILIATION_ENABLED="true" — the starter itself checks the flag
+  // and registers nothing when it is off, per the disabled-by-default rule.
+  startVoiceReconciliationSweep(5 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  });
+
+  // P7: metering backfill (15-minute tick) rides the same reconciliation
+  // flag; the daily digest has its own flag. Both starters register nothing
+  // while their flag is off.
+  startUsageBackfillSweep(15 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  } as Parameters<typeof startUsageBackfillSweep>[1]);
+  startVoiceDigestSchedule(24 * 60 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  } as Parameters<typeof startVoiceDigestSchedule>[1]);
+  // P8: dunning-window expiry (hourly tick), same reconciliation flag.
+  startGraceExpirySweep(60 * 60_000, {
+    logger: (event, meta) => logger.info(meta, event),
+  } as Parameters<typeof startGraceExpirySweep>[1]);
+
+  // P9: environment-contract validation — surfaces flags that do not
+  // enable anything and fail-closed configs that would refuse at use
+  // time. Logging only; behavior is unchanged.
+  void logEnvContractFindings((level, message) =>
+    level === "error" ? logger.error(message) : logger.warn(message),
+  );
+
+  // Stripe webhook registration/backfill.
+  //
+  // AR-001G: this is opt-in. Registering a managed webhook and starting a
+  // backfill are external mutations of a Stripe account, and they must not
+  // happen merely because a connector happens to be attached to whatever
+  // environment the server booted in. `runStripeMigrations()` is a different
+  // thing entirely — an internal database migration that startup requires —
+  // and is deliberately left outside this flag.
+  startStripeBootSync({
+    isEnabled: () => isStripeBootSyncEnabled(process.env),
+    runBootSync: initStripeWebhookAndSync,
+    logger,
+  });
+}
+
+// R6: bind the port BEFORE migrations so the platform's health probe has an
+// upstream while they run, with `bootGate` refusing application traffic until
+// they succeed. See lib/bootSequence.ts.
+await runBootSequence({
+  listen: () =>
+    new Promise<Server>((resolve, reject) => {
+      const server = app.listen(port, () => {
+        logger.info({ port }, "Server listening");
+        resolve(server);
+      });
+      server.on("error", reject);
+    }),
+  runMigrations: runStripeMigrations,
+  startWorkers: startBackgroundWorkers,
+  logger,
+  exit: (code) => process.exit(code),
 });

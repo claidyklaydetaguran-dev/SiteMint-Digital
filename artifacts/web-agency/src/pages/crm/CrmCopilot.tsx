@@ -11,6 +11,7 @@ import {
   type SitemintPersona,
 } from "../../lib/campaignTaxonomy";
 import type { CampaignStep } from "./CrmCampaignSequence";
+import { adminFetch } from "@/lib/adminFetch";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -45,9 +46,6 @@ export interface ParsedStep {
     topicId: string;
   };
 }
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 
 // ── Tone / channel / temperature options ──────────────────────────────────────
 
@@ -170,8 +168,8 @@ function Chip({
       onClick={onClick}
       className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
         selected
-          ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-          : "bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-700"
+          ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+          : "bg-white text-muted-foreground border-border hover:border-teal-300 hover:text-teal-700"
       }`}
     >
       {label}
@@ -182,7 +180,7 @@ function Chip({
 function ScoreBadge({ label, value }: { label: string; value: string | number }) {
   const num = typeof value === "number" ? value : parseInt(String(value), 10);
   const color = isNaN(num)
-    ? "bg-gray-100 text-gray-600"
+    ? "bg-muted text-muted-foreground"
     : num >= 8 ? "bg-emerald-100 text-emerald-700"
     : num >= 6 ? "bg-amber-100 text-amber-700"
     : "bg-red-100 text-red-600";
@@ -203,37 +201,37 @@ function RenderedOutput({ text }: { text: string }) {
     const line = lines[i];
     if (line.startsWith("### ")) {
       rendered.push(
-        <h3 key={i} className="text-sm font-bold text-gray-900 mt-5 mb-1.5 border-b border-gray-100 pb-1">
+        <h3 key={i} className="text-sm font-bold text-foreground mt-5 mb-1.5 border-b border-border/60 pb-1">
           {line.replace("### ", "")}
         </h3>
       );
     } else if (line.startsWith("## ")) {
       rendered.push(
-        <h2 key={i} className="text-base font-bold text-violet-900 mt-6 mb-2">
+        <h2 key={i} className="text-base font-bold text-teal-900 mt-6 mb-2">
           {line.replace("## ", "")}
         </h2>
       );
     } else if (line.startsWith("**") && line.endsWith("**")) {
       rendered.push(
-        <p key={i} className="text-xs font-bold text-gray-800 mt-2">{line.replace(/\*\*/g, "")}</p>
+        <p key={i} className="text-xs font-bold text-foreground mt-2">{line.replace(/\*\*/g, "")}</p>
       );
     } else if (line.match(/^\*\*[^*]+:\*\*/)) {
       const parts = line.match(/^\*\*([^*]+):\*\*\s*(.*)/);
       rendered.push(
         <p key={i} className="text-xs mt-1">
-          <span className="font-semibold text-gray-700">{parts?.[1]}: </span>
-          <span className="text-gray-600">{parts?.[2]}</span>
+          <span className="font-semibold text-foreground/80">{parts?.[1]}: </span>
+          <span className="text-muted-foreground">{parts?.[2]}</span>
         </p>
       );
     } else if (line.startsWith("- ")) {
       rendered.push(
-        <li key={i} className="text-xs text-gray-600 ml-4 list-disc">{line.slice(2)}</li>
+        <li key={i} className="text-xs text-muted-foreground ml-4 list-disc">{line.slice(2)}</li>
       );
     } else if (line.trim() === "---") {
-      rendered.push(<hr key={i} className="border-gray-100 my-3" />);
+      rendered.push(<hr key={i} className="border-border/60 my-3" />);
     } else if (line.trim()) {
       rendered.push(
-        <p key={i} className="text-xs text-gray-600 leading-relaxed mt-1">{line}</p>
+        <p key={i} className="text-xs text-muted-foreground leading-relaxed mt-1">{line}</p>
       );
     }
     i++;
@@ -310,9 +308,8 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
         channels,
       });
 
-      const res = await fetch("/api/crm/campaigns/copilot/generate", {
-        method:  "POST",
-        headers: authH(),
+      const res = await adminFetch("/api/crm/campaigns/copilot/generate", {
+        method: "POST",
         body,
       });
 
@@ -406,40 +403,40 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
     <div className="space-y-4">
 
       {/* Safety notice */}
-      <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3">
-        <Shield className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+        <Shield className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
         <div>
-          <p className="text-xs font-bold text-violet-900">AI Campaign Copilot</p>
-          <p className="text-[11px] text-violet-700 mt-0.5">
+          <p className="text-xs font-bold text-teal-900">AI Campaign Copilot</p>
+          <p className="text-[11px] text-teal-700 mt-0.5">
             AI generates strategy drafts only. No contacts are enrolled, no messages are queued, and nothing is sent automatically. Review all copy before use.
           </p>
         </div>
       </div>
 
       {/* Config panel */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
         <button
           onClick={() => setShowConfig(x => !x)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-violet-600" />
-            <span className="text-sm font-bold text-gray-900">Campaign Configuration</span>
+            <Sparkles className="w-4 h-4 text-teal-600" />
+            <span className="text-sm font-bold text-foreground">Campaign Configuration</span>
             {!showConfig && effectiveGoal && (
-              <span className="text-[10px] text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-semibold">
+              <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full font-semibold">
                 {effectiveGoal}
               </span>
             )}
           </div>
-          {showConfig ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          {showConfig ? <ChevronUp className="w-4 h-4 text-muted-foreground/60" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/60" />}
         </button>
 
         {showConfig && (
-          <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+          <div className="px-4 pb-4 space-y-4 border-t border-border/60">
 
             {/* Campaign Goal */}
             <div>
-              <label className="block text-[11px] font-bold text-gray-700 mb-2 mt-3 uppercase tracking-wide">Campaign Goal</label>
+              <label className="block text-[11px] font-bold text-foreground/80 mb-2 mt-3 uppercase tracking-wide">Campaign Goal</label>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {CAMPAIGN_GOALS.map(g => (
                   <Chip key={g} label={g} selected={goal === g} onClick={() => { setGoal(g); setCustomGoal(""); }} />
@@ -452,7 +449,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   placeholder="Describe your campaign goal…"
                   value={customGoal}
                   onChange={e => setCustomGoal(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               )}
             </div>
@@ -460,11 +457,11 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
             {/* Audience */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Persona</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Persona</label>
                 <select
                   value={personaId}
                   onChange={e => setPersonaId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200 bg-white"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200 bg-white"
                 >
                   <option value="">— Any persona —</option>
                   {SITEMINT_PERSONAS.map(p => (
@@ -472,14 +469,14 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   ))}
                 </select>
                 {selectedPersona && (
-                  <p className="text-[10px] text-violet-700 mt-1 leading-relaxed">
+                  <p className="text-[10px] text-teal-700 mt-1 leading-relaxed">
                     {selectedPersona.description} · CTA: {selectedPersona.bestCTA}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">DISC Style</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">DISC Style</label>
                 <div className="flex flex-wrap gap-1.5">
                   {DISC_STYLES.map(d => (
                     <Chip key={d} label={d} selected={discStyle === d} onClick={() => setDiscStyle(d)} />
@@ -490,7 +487,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Lead Temperature</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Lead Temperature</label>
                 <div className="flex gap-1.5">
                   {TEMPERATURES.map(t => (
                     <Chip key={t} label={t} selected={temperature === t} onClick={() => setTemperature(t)} />
@@ -498,30 +495,30 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Industry</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Industry</label>
                 <input
                   type="text"
                   placeholder="e.g. Real Estate, Law…"
                   value={industry}
                   onChange={e => setIndustry(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Lead Source</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Lead Source</label>
                 <input
                   type="text"
                   placeholder="e.g. Referral, Google, Form…"
                   value={leadSource}
                   onChange={e => setLeadSource(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                 />
               </div>
             </div>
 
             {/* Tone */}
             <div>
-              <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Tone</label>
+              <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Tone</label>
               <div className="flex flex-wrap gap-1.5">
                 {TONES.map(t => (
                   <Chip key={t} label={t} selected={tone === t} onClick={() => setTone(t)} />
@@ -532,7 +529,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
             {/* Length + Channels */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Campaign Length</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Campaign Length</label>
                 <div className="flex gap-1.5 flex-wrap mb-2">
                   {TOUCH_OPTIONS.map(n => (
                     <Chip
@@ -548,12 +545,12 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                   <input
                     type="number" min={1} max={30} value={customTouches}
                     onChange={e => setCustomTouches(Number(e.target.value))}
-                    className="w-24 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                    className="w-24 border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200"
                   />
                 )}
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Channels</label>
+                <label className="block text-[11px] font-bold text-foreground/80 mb-1.5 uppercase tracking-wide">Channels</label>
                 <div className="flex gap-1.5 flex-wrap">
                   {CHANNEL_OPTIONS.map(ch => (
                     <Chip
@@ -571,7 +568,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
             <button
               onClick={generate}
               disabled={generating || !effectiveGoal}
-              className="flex items-center gap-2 px-6 py-2.5 bg-violet-600 text-white text-sm font-bold rounded-xl hover:bg-violet-700 disabled:opacity-40 transition-colors shadow-sm"
+              className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700 disabled:opacity-40 transition-colors shadow-sm"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {generating ? "Generating campaign…" : "✨ Generate Complete Campaign"}
@@ -590,15 +587,15 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
 
       {/* Output */}
       {(output || generating) && (
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
 
           {/* Output header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-muted/60">
             <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-violet-600" />
-              <span className="text-xs font-bold text-gray-900">AI Campaign Strategy</span>
+              <Brain className="w-4 h-4 text-teal-600" />
+              <span className="text-xs font-bold text-foreground">AI Campaign Strategy</span>
               {generating && !done && (
-                <span className="flex items-center gap-1 text-[10px] text-violet-600 font-semibold">
+                <span className="flex items-center gap-1 text-[10px] text-teal-600 font-semibold">
                   <Loader2 className="w-3 h-3 animate-spin" /> Writing…
                 </span>
               )}
@@ -612,7 +609,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
               {done && (
                 <button
                   onClick={copyAll}
-                  className="flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent transition-colors"
                 >
                   {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                   {copied ? "Copied!" : "Copy all"}
@@ -620,7 +617,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
               )}
               <button
                 onClick={reset}
-                className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/60 hover:text-foreground/80 px-2 py-1 rounded hover:bg-accent transition-colors"
               >
                 <RotateCcw className="w-3 h-3" /> New generation
               </button>
@@ -635,7 +632,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
             {output ? (
               <RenderedOutput text={output} />
             ) : (
-              <div className="flex items-center gap-2 text-xs text-violet-600 animate-pulse py-4">
+              <div className="flex items-center gap-2 text-xs text-teal-600 animate-pulse py-4">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Thinking about your campaign strategy…
               </div>
@@ -644,7 +641,7 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
 
           {/* Post-generation actions */}
           {done && output && (
-            <div className="border-t border-gray-100 px-4 py-4 bg-gray-50/60 space-y-3">
+            <div className="border-t border-border/60 px-4 py-4 bg-muted/60 space-y-3">
 
               {/* Quick meta summary */}
               {(() => {
@@ -653,39 +650,39 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     {meta.name && (
-                      <div className="col-span-2 bg-violet-50 border border-violet-200 rounded-xl p-3">
-                        <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide mb-0.5">Campaign Name</p>
-                        <p className="text-sm font-bold text-violet-900">{meta.name}</p>
-                        {meta.objective && <p className="text-[11px] text-violet-700 mt-1">{meta.objective}</p>}
+                      <div className="col-span-2 bg-teal-50 border border-teal-200 rounded-xl p-3">
+                        <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide mb-0.5">Campaign Name</p>
+                        <p className="text-sm font-bold text-teal-900">{meta.name}</p>
+                        {meta.objective && <p className="text-[11px] text-teal-700 mt-1">{meta.objective}</p>}
                       </div>
                     )}
                     {meta.overallScore && (
-                      <div className="bg-white border border-gray-200 rounded-xl p-3">
+                      <div className="bg-white border border-border rounded-xl p-3">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <BarChart3 className="w-3.5 h-3.5 text-violet-600" />
-                          <p className="text-[10px] font-bold text-gray-700">Campaign Score</p>
+                          <BarChart3 className="w-3.5 h-3.5 text-teal-600" />
+                          <p className="text-[10px] font-bold text-foreground/80">Campaign Score</p>
                         </div>
-                        <p className="text-xs text-gray-600">{meta.overallScore}</p>
+                        <p className="text-xs text-muted-foreground">{meta.overallScore}</p>
                       </div>
                     )}
                     {meta.replyRate && (
-                      <div className="bg-white border border-gray-200 rounded-xl p-3">
+                      <div className="bg-white border border-border rounded-xl p-3">
                         <div className="flex items-center gap-1.5 mb-1">
                           <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                          <p className="text-[10px] font-bold text-gray-700">Expected Rates</p>
+                          <p className="text-[10px] font-bold text-foreground/80">Expected Rates</p>
                         </div>
-                        <p className="text-xs text-gray-600">Reply: {meta.replyRate}</p>
-                        {meta.conversionRate && <p className="text-xs text-gray-600">Conversion: {meta.conversionRate}</p>}
+                        <p className="text-xs text-muted-foreground">Reply: {meta.replyRate}</p>
+                        {meta.conversionRate && <p className="text-xs text-muted-foreground">Conversion: {meta.conversionRate}</p>}
                       </div>
                     )}
                     {meta.risk && (
-                      <div className="bg-white border border-gray-200 rounded-xl p-3">
+                      <div className="bg-white border border-border rounded-xl p-3">
                         <div className="flex items-center gap-1.5 mb-1">
                           <Shield className="w-3.5 h-3.5 text-amber-500" />
-                          <p className="text-[10px] font-bold text-gray-700">Risk / Duration</p>
+                          <p className="text-[10px] font-bold text-foreground/80">Risk / Duration</p>
                         </div>
-                        <p className="text-xs text-gray-600">Risk: {meta.risk}</p>
-                        {meta.duration && <p className="text-xs text-gray-600">Duration: {meta.duration}</p>}
+                        <p className="text-xs text-muted-foreground">Risk: {meta.risk}</p>
+                        {meta.duration && <p className="text-xs text-muted-foreground">Duration: {meta.duration}</p>}
                       </div>
                     )}
                     {parsed.length > 0 && (
@@ -722,12 +719,12 @@ export function CrmCopilot({ campaignId, campaignName, existingSteps, onBuildSeq
                 <button
                   onClick={generate}
                   disabled={generating}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-violet-200 text-violet-700 text-xs font-semibold rounded-xl hover:bg-violet-50 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2.5 border border-teal-200 text-teal-700 text-xs font-semibold rounded-xl hover:bg-teal-50 disabled:opacity-40 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   Regenerate
                 </button>
-                <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                <p className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
                   <Shield className="w-3 h-3" />
                   No contacts enrolled · No messages sent · Review before using
                 </p>

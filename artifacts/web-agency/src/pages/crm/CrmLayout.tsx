@@ -1,22 +1,31 @@
 import { Link, useLocation } from "wouter";
 import { CrmErrorBoundary } from "@/components/CrmErrorBoundary";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { ConnectionBanner } from "@/components/crm/ConnectionBanner";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { SiteMintLogo } from "@/components/SiteMintLogo";
 import {
   Search, Mail, Phone, MessageSquare, Bell, LogOut,
   ChevronDown, LayoutDashboard, X, UserPlus, Send,
   AlertCircle, ChevronRight, Check, Plus, Clock, AlertTriangle, UserCheck,
-  Home, Users, Megaphone, Share2, FolderOpen, BarChart2, Settings,
+  Home, Users, UserCog, ListChecks, Megaphone, Share2, FolderOpen, BarChart2, Settings,
   Menu, LayoutGrid, CheckSquare, Inbox, CalendarDays, Globe,
-  GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon, FileText,
-  Image, Layers, Facebook, Instagram, Activity, Download,
-  ClipboardList, Briefcase, ListTodo, TrendingUp, Dna, Brain,
-  BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft,
-  ExternalLink, Building2,
+  GitBranch, DollarSign, CreditCard, Zap, Mail as MailIcon,
+  Layers, Activity, Download,
+  ClipboardList, Briefcase, ListTodo, TrendingUp,
+  BotMessageSquare, Cpu, Wrench, PhoneCall, Plug, ChevronLeft, LifeBuoy,
+  ExternalLink, Building2, FileText, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const tok = () => localStorage.getItem("adminToken") || "";
+import { adminFetch, adminProbe, adminLogout, bindDraftOwner } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import {
+  Figure, LoadFailure, PageLoadFailures, dataOf, failedParts, reasonOf,
+  type FailedPart,
+} from "@/components/crm/LoadState";
+import { LEAD_STATUSES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { AdminRouteGuard } from "@/components/crm/AdminRouteGuard";
+import { OwnerPicker } from "@/components/crm/OwnerPicker";
+import { useCrmAssignees } from "@/lib/crmAssignees";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CrmLead {
@@ -34,10 +43,88 @@ interface Notification {
   title: string; sub: string; href: string; urgent: boolean;
 }
 
+// ── What the chrome reads ──────────────────────────────────────────────────────
+// A body that is not the shape this chrome expects is a failure too — not a
+// reason to render an empty picker or a bell with nothing in it.
+function pickLeads(body: unknown): CrmLead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as CrmLead[] : undefined;
+}
+
+function pickTasks(body: unknown): NavTask[] | undefined {
+  const list = body && typeof body === "object" ? (body as { tasks?: unknown }).tasks : undefined;
+  return Array.isArray(list) ? list as NavTask[] : undefined;
+}
+
+function pickTemplates(body: unknown): Template[] | undefined {
+  const list = body && typeof body === "object" ? (body as { templates?: unknown }).templates : undefined;
+  return Array.isArray(list) ? list as Template[] : undefined;
+}
+
+function pickPhoneConfigured(body: unknown): boolean | undefined {
+  const value = body && typeof body === "object" ? (body as { configured?: unknown }).configured : undefined;
+  return typeof value === "boolean" ? value : undefined;
+}
+
+/**
+ * The bell's items, derived from whatever actually loaded.
+ *
+ * Pure on purpose: the caller decides whether the resulting list is the whole
+ * truth. Passing it a list that never arrived would manufacture an all-clear.
+ */
+function buildNotifications(leads: CrmLead[], tasks: NavTask[]): Notification[] {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart.getTime() + 86400000);
+  const yesterday = new Date(now.getTime() - 86400000);
+  const notifs: Notification[] = [];
+
+  tasks.filter(t => t.status !== "completed").forEach(t => {
+    if (!t.dueDate) return;
+    const due = new Date(t.dueDate);
+    if (due < todayStart) {
+      notifs.push({ id: `task-overdue-${t.id}`, type: "overdue_task", title: t.title,
+        sub: t.leadName ? `Overdue task for ${t.leadName}` : `Overdue ${t.type} task`,
+        href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: true });
+    } else if (due >= todayStart && due < todayEnd) {
+      notifs.push({ id: `task-today-${t.id}`, type: "due_today", title: t.title,
+        sub: t.leadName ? `Due today — ${t.leadName}` : `Due today · ${t.type}`,
+        href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: false });
+    }
+  });
+
+  leads.forEach(l => {
+    if (l.nextFollowUpAt) {
+      const fu = new Date(l.nextFollowUpAt);
+      if (fu < todayStart) {
+        notifs.push({ id: `followup-overdue-${l.id}`, type: "followup_due",
+          title: `Follow-up overdue: ${l.name}`,
+          sub: `${l.status || "Lead"} · was due ${fu.toLocaleDateString()}`,
+          href: `/admin/crm/leads/${l.id}`, urgent: true });
+      } else if (fu >= todayStart && fu < todayEnd) {
+        notifs.push({ id: `followup-today-${l.id}`, type: "followup_due",
+          title: `Follow-up today: ${l.name}`,
+          sub: `${l.status || "Lead"}${l.company ? ` · ${l.company}` : ""}`,
+          href: `/admin/crm/leads/${l.id}`, urgent: false });
+      }
+    }
+    if (normalizeLeadStatus(l.status) === "New Inquiry" && l.createdAt && new Date(l.createdAt) > yesterday) {
+      notifs.push({ id: `new-lead-${l.id}`, type: "new_lead", title: `New lead: ${l.name}`,
+        sub: `${l.source || "Uncontacted"}${l.company ? ` · ${l.company}` : ""}`,
+        href: `/admin/crm/leads/${l.id}`, urgent: false });
+    }
+  });
+
+  return notifs;
+}
+
 // ── Avatar helpers ─────────────────────────────────────────────────────────────
+// Tonal, on-brand avatar set (owner mint discipline 2026-09-08): enough
+// variation to tell people apart, all of it in the mint/ocean family —
+// no decorative purple/pink/orange/red hues in the chrome.
 const AVATAR_COLORS = [
-  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
-  "bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500","bg-red-400","bg-yellow-500",
+  "bg-teal-600","bg-cyan-700","bg-emerald-600","bg-sky-700",
+  "bg-teal-800","bg-cyan-500","bg-emerald-800","bg-sky-500",
 ];
 function av(name: string) {
   const i = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length;
@@ -69,9 +156,10 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Home,
     items: [
       { label: "Command Center",     href: "/admin/crm/dashboard",        icon: LayoutGrid },
-      { label: "My Day / Tasks",     href: "/admin/crm/tasks",            icon: CheckSquare },
+      { label: "My Day",             href: "/admin/crm/my-day",           icon: CheckSquare },
+      { label: "Operations",         href: "/admin/crm/operations",       icon: FolderOpen },
+      { label: "All Tasks",          href: "/admin/crm/tasks",            icon: ListChecks },
       { label: "Calendar",           href: "/admin/crm/calendar",         icon: CalendarDays },
-      { label: "Discovery Portal",   href: "/admin/dashboard",            icon: Globe, exact: true },
     ],
   },
   {
@@ -90,6 +178,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Sales Workspace", href: "/admin/crm/workspace", icon: LayoutGrid },
       { label: "Contacts",     href: "/admin/crm/leads",    icon: Users },
+      { label: "Companies",    href: "/admin/crm/companies", icon: Building2 },
+      { label: "Duplicate Review", href: "/admin/crm/duplicates", icon: Copy },
       { label: "Pipeline",     href: "/admin/crm/pipeline", icon: GitBranch },
       { label: "Deals",        href: "/admin/crm/deals",    icon: DollarSign },
       { label: "Transactions", href: "/admin/crm/transactions", icon: CreditCard },
@@ -99,13 +189,17 @@ const NAV_GROUPS: NavGroup[] = [
     id: "marketing",
     label: "Marketing",
     icon: Megaphone,
+    // Naming, not decoration. Two different things were both called "campaign"
+    // — one-off broadcasts and multi-step nurture sequences — and each had a
+    // "New campaign" button, so somebody wanting to send one email had to know
+    // that "Campaigns" was the wrong door. Marketing is now the front door and
+    // is listed first; the sequence system keeps its own name and its own
+    // queue, which is what it actually is.
     items: [
-      { label: "Campaigns",        href: "/admin/crm/campaigns",         icon: Zap },
-      { label: "Campaign Builder", href: "/admin/crm/campaign-builder", icon: Layers },
-      { label: "Campaign Queue",   href: "/admin/crm/campaign-queue",   icon: Activity },
-      { label: "Email Templates",  href: "/admin/crm/email-templates", icon: MailIcon },
-      { label: "Content Hub",      icon: FileText, comingSoon: true },
-      { label: "Landing Pages",    icon: Image,    comingSoon: true },
+      { label: "Marketing",       href: "/admin/crm/campaign-builder", icon: MailIcon },
+      { label: "Sequences",       href: "/admin/crm/campaigns",        icon: Zap },
+      { label: "Sequence Queue",  href: "/admin/crm/campaign-queue",   icon: Activity },
+      { label: "Email Templates", href: "/admin/crm/email-templates",  icon: Layers },
     ],
   },
   {
@@ -113,9 +207,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Social",
     icon: Share2,
     items: [
-      { label: "Facebook Leads",    icon: Facebook,  comingSoon: true },
-      { label: "Instagram Leads",   icon: Instagram, comingSoon: true },
-      { label: "Meta Diagnostics",  icon: Brain,     comingSoon: true },
       { label: "Import Contacts",   href: "/admin/crm/import", icon: Download },
     ],
   },
@@ -125,9 +216,23 @@ const NAV_GROUPS: NavGroup[] = [
     icon: FolderOpen,
     items: [
       { label: "Discovery CRM",  href: "/admin/crm/discovery",    icon: ClipboardList },
+      { label: "Discovery Portal", href: "/admin/dashboard",      icon: Globe, exact: true },
       { label: "Projects",       href: "/admin/crm/projects",      icon: FolderOpen },
+      { label: "Documents",      href: "/admin/crm/documents",     icon: FileText },
+      { label: "Support",        href: "/admin/crm/support",       icon: LifeBuoy },
       { label: "AI Intake Scoring",      href: "/admin/crm/intake-cases",          icon: BotMessageSquare },
       { label: "Receptionist Accounts",  href: "/admin/crm/receptionist-accounts", icon: Building2 },
+    ],
+  },
+  {
+    id: "receptionist-ops",
+    label: "Receptionist Ops",
+    icon: PhoneCall,
+    items: [
+      { label: "Firms",   href: "/admin/ops/firms",   icon: Building2 },
+      { label: "Issues",  href: "/admin/ops/issues",  icon: AlertTriangle },
+      { label: "Usage",   href: "/admin/ops/usage",   icon: Activity },
+      { label: "Numbers", href: "/admin/ops/numbers", icon: PhoneCall },
     ],
   },
   {
@@ -136,8 +241,6 @@ const NAV_GROUPS: NavGroup[] = [
     icon: BarChart2,
     items: [
       { label: "Reporting",                href: "/admin/crm/reporting", icon: TrendingUp },
-      { label: "Lead DNA",                 href: "/admin/crm/leads", icon: Dna },
-      { label: "Relationship Intelligence",icon: Users,          comingSoon: true },
       { label: "Behavioral Intelligence",  href: "/admin/crm/intelligence/behavioral", icon: BotMessageSquare },
       { label: "Automation Queue",         href: "/admin/crm/intelligence/automation-queue", icon: Cpu },
     ],
@@ -147,8 +250,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Settings",
     icon: Settings,
     items: [
-      { label: "Settings",  href: "/admin/crm/settings", icon: Wrench },
-      { label: "Admin Hub", href: "/admin/crm/admin",    icon: LayoutDashboard },
+      { label: "Settings",   href: "/admin/crm/settings", icon: Wrench },
+      { label: "People",     href: "/admin/crm/people",   icon: Users },
+      { label: "My Account", href: "/admin/crm/account",  icon: UserCog },
+      { label: "Admin Hub",  href: "/admin/crm/admin",    icon: LayoutDashboard },
     ],
   },
 ];
@@ -168,10 +273,82 @@ function detectGroup(location: string): string {
   return match?.groupId ?? "home";
 }
 
+// ── Breadcrumbs ─────────────────────────────────────────────────────────────
+// Derived from NAV_GROUPS (group → item) plus any route segments beyond the
+// matched nav item's href (e.g. a dynamic :id) — no separately maintained
+// breadcrumb map to drift out of sync with the nav.
+function humanizeSegment(seg: string): string {
+  const decoded = decodeURIComponent(seg);
+  if (/^\d+$/.test(decoded)) return `#${decoded}`;
+  return decoded.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function CrmBreadcrumbs({ location }: { location: string }) {
+  const match = GROUP_LOOKUP.find(({ href, exact }) =>
+    exact ? location === href : location.startsWith(href));
+  if (!match) return null;
+  const group = NAV_GROUPS.find(g => g.id === match.groupId);
+  const item = group?.items.find(i => i.href === match.href);
+  if (!group || !item) return null;
+
+  const rest = location.slice(match.href.length).split("/").filter(Boolean);
+  const crumbs: { label: string; href?: string }[] = [
+    { label: group.label },
+    { label: item.label, href: item.href },
+    ...rest.map(seg => ({ label: humanizeSegment(seg) })),
+  ];
+
+  return (
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 px-4 md:px-6 pt-3 pb-1 text-xs text-muted-foreground overflow-x-auto">
+      {crumbs.map((c, i) => (
+        <span key={i} className="flex items-center gap-1.5 shrink-0">
+          {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />}
+          {c.href ? (
+            <Link href={c.href}>
+              <span className="hover:text-foreground transition-colors cursor-pointer">{c.label}</span>
+            </Link>
+          ) : (
+            <span className={i === crumbs.length - 1 ? "text-foreground font-medium" : ""}>{c.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+// ── 404 within the CRM chrome ────────────────────────────────────────────────
+// Used by the `/admin*` catch-all route so an unmatched deep link still shows
+// the sidebar/breadcrumbs instead of the bare public 404 card.
+export function CrmNotFound() {
+  return (
+    <CrmLayout>
+      <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
+        <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+          <AlertCircle className="w-6 h-6 text-muted-foreground/60" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground">Page not found</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          That page doesn't exist or may have moved.
+        </p>
+        <Link href="/admin/crm/dashboard">
+          <span className="mt-2 inline-block text-sm font-medium text-primary hover:underline cursor-pointer">
+            Back to Command Center
+          </span>
+        </Link>
+      </div>
+    </CrmLayout>
+  );
+}
+
 // ── Email Compose Modal ────────────────────────────────────────────────────────
-function EmailComposeModal({ leads, templates, onClose }: {
-  leads: CrmLead[]; templates: Template[]; onClose: () => void;
+function EmailComposeModal({ leadsLoad, templatesLoad, onRetry, retrying, onClose }: {
+  leadsLoad: Load<CrmLead[]>; templatesLoad: Load<Template[]>;
+  onRetry: () => void; retrying: boolean; onClose: () => void;
 }) {
+  // Null, never an empty list: a recipient picker with nobody in it is a claim
+  // that this business has no contacts.
+  const leads = dataOf(leadsLoad);
+  const templates = dataOf(templatesLoad);
   const [toSearch, setToSearch] = useState("");
   const [toLead, setToLead] = useState<CrmLead | null>(null);
   const [ccOpen, setCcOpen] = useState(false);
@@ -186,9 +363,9 @@ function EmailComposeModal({ leads, templates, onClose }: {
   const [tplOpen, setTplOpen] = useState(false);
 
   const toResults = toSearch.length > 0 && !toLead
-    ? leads.filter(l =>
-        l.name.toLowerCase().includes(toSearch.toLowerCase()) ||
-        l.email.toLowerCase().includes(toSearch.toLowerCase()) ||
+    ? (leads ?? []).filter(l =>
+        (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) ||
+        (l.email ?? "").toLowerCase().includes(toSearch.toLowerCase()) ||
         (l.phone || "").includes(toSearch)
       ).slice(0, 6)
     : [];
@@ -205,20 +382,27 @@ function EmailComposeModal({ leads, templates, onClose }: {
     if (!body.trim()) { setError("Body is required."); return; }
     setError("");
     setSending(true);
-    const r = await fetch(`/api/crm/leads/${toLead.id}/email`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, body, cc, bcc }),
-    });
-    setSending(false);
-    if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
-    else { const d = await r.json().catch(() => ({})); setError((d as {error?: string}).error || "Failed to send email."); }
+    try {
+      const r = await adminFetch(`/api/crm/leads/${toLead.id}/email`, {
+        method: "POST",
+        body: JSON.stringify({ subject, body, cc, bcc }),
+      });
+      // The server's own words. The flat "Failed to send email." said the same
+      // thing for a refused grant, an ended session and a server that was never
+      // reached — three different problems with three different answers.
+      if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
+      else setError(`Email not sent. ${await responseFailureReason(r)}`);
+    } catch {
+      setError(`Email not sent. ${failureReason(null)}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
           <h2 className="font-semibold text-foreground">New Email</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-4 h-4" /></button>
         </div>
@@ -232,21 +416,21 @@ function EmailComposeModal({ leads, templates, onClose }: {
           </div>
         ) : (
           <>
-            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+            <div className="divide-y divide-border/60 flex-1 overflow-y-auto">
               <div className="px-5 py-2.5 relative">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">To:</span>
                   {toLead ? (
-                    <div className="flex items-center gap-2 bg-blue-50 rounded-full px-2 py-0.5">
+                    <div className="flex items-center gap-2 bg-accent rounded-full px-2 py-0.5">
                       <div className={`w-5 h-5 rounded-full ${av(toLead.name)} flex items-center justify-center`}>
                         <span className="text-white text-[9px] font-bold">{ini(toLead.name)}</span>
                       </div>
-                      <span className="text-xs text-blue-700 font-medium">{toLead.name}</span>
-                      <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-blue-400 hover:text-blue-600"><X className="w-3 h-3" /></button>
+                      <span className="text-xs text-teal-800 font-medium">{toLead.name}</span>
+                      <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-teal-600 hover:text-teal-800"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder-gray-400"
-                      placeholder="Enter name or email" value={toSearch} onChange={e => setToSearch(e.target.value)} />
+                    <input autoFocus aria-label="Search existing contacts" className="flex-1 min-w-0 text-sm focus:outline-none placeholder:text-muted-foreground/60"
+                      placeholder="Search existing contacts" value={toSearch} onChange={e => setToSearch(e.target.value)} />
                   )}
                   <div className="ml-auto flex gap-2 text-xs text-blue-500">
                     <button onClick={() => setCcOpen(o => !o)}>CC</button>
@@ -254,42 +438,60 @@ function EmailComposeModal({ leads, templates, onClose }: {
                   </div>
                 </div>
                 {toResults.length > 0 && (
-                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
+                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-border shadow-xl z-10 overflow-hidden">
                     {toResults.map(l => (
                       <button key={l.id} onClick={() => { setToLead(l); setToSearch(""); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors">
                         <div className={`w-8 h-8 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                           <span className="text-white text-xs font-bold">{ini(l.name)}</span>
                         </div>
                         <div className="text-left">
                           <p className="text-sm font-medium text-foreground">{l.name}</p>
-                          {l.phone && <p className="text-xs text-muted-foreground">{l.phone}</p>}
+                          <p className="text-xs text-muted-foreground">{l.email || "No email address saved"}</p>
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
+                {leads !== null && !toLead && (
+                  <p className="mt-2 text-xs text-muted-foreground" role="status">
+                    {toSearch.trim() && toResults.length === 0
+                      ? "No matching contact. This composer sends to saved contacts; add the recipient in Contacts first."
+                      : "Choose a saved contact to select their email address."}
+                  </p>
+                )}
+                {/* Searching an unloaded list finds nobody, which reads as "you have nobody". */}
+                {leads === null && !toLead && (
+                  <LoadFailure
+                    what="Contacts"
+                    reason={reasonOf(leadsLoad) ?? ""}
+                    variant="inline"
+                    className="mt-2"
+                    onRetry={onRetry}
+                    retrying={retrying}
+                  />
+                )}
               </div>
               {ccOpen && (
                 <div className="px-5 py-2.5 flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">CC:</span>
-                  <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="CC email addresses" value={cc} onChange={e => setCc(e.target.value)} />
+                  <input className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60" placeholder="CC email addresses" value={cc} onChange={e => setCc(e.target.value)} />
                 </div>
               )}
               {bccOpen && (
                 <div className="px-5 py-2.5 flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">BCC:</span>
-                  <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="BCC email addresses" value={bcc} onChange={e => setBcc(e.target.value)} />
+                  <input className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60" placeholder="BCC email addresses" value={bcc} onChange={e => setBcc(e.target.value)} />
                 </div>
               )}
               <div className="px-5 py-2.5 flex items-center gap-2">
                 <span className="text-xs font-semibold text-muted-foreground w-12 shrink-0">Subject:</span>
-                <input className="flex-1 text-sm focus:outline-none placeholder-gray-400" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} />
+                <input className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} />
               </div>
               <div className="px-5 py-2.5">
-                <textarea className="w-full text-sm focus:outline-none resize-none placeholder-gray-400 min-h-[180px]"
+                <textarea className="w-full text-sm focus:outline-none resize-none placeholder:text-muted-foreground/60 min-h-[180px]"
                   placeholder="Write your message…" value={body} onChange={e => setBody(e.target.value)} />
-                <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-muted-foreground">
+                <div className="mt-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
                   <p>Best,</p>
                   <p className="font-medium text-foreground">SiteMint Digital Solutions</p>
                 </div>
@@ -300,15 +502,27 @@ function EmailComposeModal({ leads, templates, onClose }: {
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
               </div>
             )}
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
+            <div className="px-5 py-3 border-t border-border/60 flex items-center gap-2">
               <div className="relative">
                 <button onClick={() => setTplOpen(o => !o)} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">📋 Templates</button>
                 {tplOpen && (
-                  <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-10 overflow-hidden">
-                    {templates.length === 0
+                  <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-border rounded-xl shadow-xl z-10 overflow-hidden">
+                    {/* "No templates yet." is a fact about the account. Only say it when we know. */}
+                    {templates === null
+                      ? (
+                        <LoadFailure
+                          what="Templates"
+                          reason={reasonOf(templatesLoad) ?? ""}
+                          variant="inline"
+                          className="p-3"
+                          onRetry={onRetry}
+                          retrying={retrying}
+                        />
+                      )
+                      : templates.length === 0
                       ? <p className="p-3 text-xs text-muted-foreground">No templates yet.</p>
                       : templates.map(t => (
-                          <button key={t.id} onClick={() => applyTemplate(t)} className="w-full text-left px-4 py-2.5 text-xs hover:bg-gray-50 transition-colors">
+                          <button key={t.id} onClick={() => applyTemplate(t)} className="w-full text-left px-4 py-2.5 text-xs hover:bg-accent transition-colors">
                             <p className="font-medium text-foreground">{t.name}</p>
                             <p className="text-muted-foreground truncate">{t.subject}</p>
                           </button>
@@ -318,7 +532,7 @@ function EmailComposeModal({ leads, templates, onClose }: {
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
-                <Button size="sm" onClick={send} disabled={sending || !toLead} className="gap-1.5 bg-blue-600 hover:bg-blue-700">
+                <Button size="sm" onClick={send} disabled={sending || !toLead} className="gap-1.5">
                   <Send className="w-3.5 h-3.5" />
                   {sending ? "Sending…" : "Send Email"}
                 </Button>
@@ -332,7 +546,10 @@ function EmailComposeModal({ leads, templates, onClose }: {
 }
 
 // ── Phone Call Dropdown ────────────────────────────────────────────────────────
-function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => void }) {
+function PhoneDropdown({ leadsLoad, onRetry, retrying, onClose }: {
+  leadsLoad: Load<CrmLead[]>; onRetry: () => void; retrying: boolean; onClose: () => void;
+}) {
+  const leads = dataOf(leadsLoad);
   const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
@@ -342,25 +559,38 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
     return () => document.removeEventListener("mousedown", h);
   }, [onClose]);
 
-  const results = q.length > 0
-    ? leads.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
-    : leads.filter(l => l.phone).slice(0, 6);
+  // null when the contacts never arrived — distinct from "nobody matched".
+  const results = leads === null
+    ? null
+    : q.length > 0
+      ? leads.filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 8)
+      : leads.filter(l => l.phone).slice(0, 6);
 
   return (
-    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200]">
-      <div className="p-3 border-b border-gray-100">
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-border shadow-2xl z-[200]">
+      <div className="p-3 border-b border-border/60">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <input autoFocus className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          <input autoFocus className="w-full pl-8 pr-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
             placeholder="Search name or phone…" value={q} onChange={e => setQ(e.target.value)} />
         </div>
       </div>
-      <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-        {results.length === 0
+      <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
+        {results === null
+          ? (
+            <LoadFailure
+              what="Contacts"
+              reason={reasonOf(leadsLoad) ?? ""}
+              className="m-3"
+              onRetry={onRetry}
+              retrying={retrying}
+            />
+          )
+          : results.length === 0
           ? <p className="p-4 text-xs text-muted-foreground text-center">No leads with phone found</p>
           : results.map(l => (
               <a key={l.id} href={`tel:${l.phone}`} onClick={onClose}
-                className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors">
                 <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                   <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
                 </div>
@@ -379,8 +609,13 @@ function PhoneDropdown({ leads, onClose }: { leads: CrmLead[]; onClose: () => vo
 }
 
 // ── SMS Modal ──────────────────────────────────────────────────────────────────
-function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void }) {
-  const [configured, setConfigured] = useState<boolean | null>(null);
+function SmsModal({ leadsLoad, onRetry, retrying, onClose }: {
+  leadsLoad: Load<CrmLead[]>; onRetry: () => void; retrying: boolean; onClose: () => void;
+}) {
+  const leads = dataOf(leadsLoad);
+  // A probe that failed is not "SMS is not configured". That answer sent
+  // somebody off to add Twilio credentials this account may already have.
+  const [statusLoad, setStatusLoad] = useState<Load<boolean>>({ status: "loading" });
   const [toSearch, setToSearch] = useState("");
   const [toLead, setToLead] = useState<CrmLead | null>(null);
   const [body, setBody] = useState("");
@@ -388,15 +623,16 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/crm/phone/status", { headers: { Authorization: `Bearer ${tok()}` } })
-      .then(r => r.json())
-      .then(d => setConfigured((d as { configured: boolean }).configured))
-      .catch(() => setConfigured(false));
+  const loadStatus = useCallback(async () => {
+    setStatusLoad(await readAdminResource("/api/crm/phone/status", pickPhoneConfigured));
   }, []);
 
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const configured = dataOf(statusLoad);
+
   const toResults = toSearch.length > 0 && !toLead
-    ? leads.filter(l => l.name.toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
+    ? (leads ?? []).filter(l => (l.name ?? "").toLowerCase().includes(toSearch.toLowerCase()) || (l.phone || "").includes(toSearch)).slice(0, 6)
     : [];
 
   const send = async () => {
@@ -404,20 +640,24 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
     if (!body.trim()) { setError("Message body is required."); return; }
     setError("");
     setSending(true);
-    const r = await fetch(`/api/crm/leads/${toLead.id}/sms`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ body: body.trim() }),
-    });
-    setSending(false);
-    if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
-    else { const d = await r.json().catch(() => ({})); setError((d as { error?: string }).error || "Failed to send SMS."); }
+    try {
+      const r = await adminFetch(`/api/crm/leads/${toLead.id}/sms`, {
+        method: "POST",
+        body: JSON.stringify({ body: body.trim() }),
+      });
+      if (r.ok) { setSent(true); setTimeout(onClose, 1800); }
+      else setError(`SMS not sent. ${await responseFailureReason(r)}`);
+    } catch {
+      setError(`SMS not sent. ${failureReason(null)}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
           <h2 className="font-semibold text-foreground flex items-center gap-2"><MessageSquare className="w-4 h-4 text-sky-500" /> New SMS</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
@@ -427,29 +667,49 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
             <p className="font-semibold text-foreground">SMS sent!</p>
             <p className="text-xs text-muted-foreground">Logged to {toLead?.name}'s timeline.</p>
           </div>
-        ) : configured === null ? (
-          <div className="flex items-center justify-center py-16">
+        ) : statusLoad.status === "loading" ? (
+          <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+            <span className="sr-only">Checking whether texting is set up…</span>
             <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+          </div>
+        ) : configured === null ? (
+          /*
+            Not the setup panel below: "SMS is not configured" is a statement
+            about this account's settings, and a probe that failed did not read
+            them. Showing the env-var list here sent people to fix something
+            that may not be broken.
+          */
+          <div className="p-5">
+            <LoadFailure
+              what="Texting settings"
+              reason={reasonOf(statusLoad) ?? ""}
+              onRetry={() => { void loadStatus(); }}
+            >
+              <p className="mt-2 text-sm text-muted-foreground">
+                Whether texting is switched on here is unknown — which is not the same as it being
+                off, so no setup steps are shown.
+              </p>
+            </LoadFailure>
           </div>
         ) : !configured ? (
           <div className="p-6 text-center space-y-4">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto"><MessageSquare className="w-6 h-6 text-blue-600" /></div>
             <h3 className="font-semibold text-foreground">SMS not configured yet</h3>
             <p className="text-sm text-muted-foreground">Add Twilio credentials to enable two-way texting.</p>
-            <div className="bg-gray-50 rounded-xl p-4 text-left text-xs space-y-1 text-muted-foreground">
+            <div className="bg-muted rounded-xl p-4 text-left text-xs space-y-1 text-muted-foreground">
               <p className="font-semibold text-foreground">Required env vars:</p>
               {["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER"].map(k => (
-                <p key={k}><code className="bg-gray-200 px-1 rounded">{k}</code></p>
+                <p key={k}><code className="bg-border px-1 rounded">{k}</code></p>
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">Dismiss</button>
-              <Link href="/admin/crm/settings"><button onClick={onClose} className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors">Go to Settings</button></Link>
+              <button onClick={onClose} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Dismiss</button>
+              <Link href="/admin/crm/settings"><button onClick={onClose} className="flex-1 text-sm bg-primary text-primary-foreground rounded-lg py-2 hover:bg-primary/85 transition-colors">Go to Settings</button></Link>
             </div>
           </div>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
-            <div className="divide-y divide-gray-100 flex-1 overflow-y-auto">
+            <div className="divide-y divide-border/60 flex-1 overflow-y-auto">
               <div className="px-5 py-2.5 relative">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground w-8 shrink-0">To:</span>
@@ -463,15 +723,15 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                       <button onClick={() => { setToLead(null); setToSearch(""); }} className="text-sky-400 hover:text-sky-600"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder-gray-400"
+                    <input autoFocus className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60"
                       placeholder="Search lead by name or phone…" value={toSearch} onChange={e => setToSearch(e.target.value)} />
                   )}
                 </div>
                 {toResults.length > 0 && (
-                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl z-10 overflow-hidden">
+                  <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-xl border border-border shadow-xl z-10 overflow-hidden">
                     {toResults.map(l => (
                       <button key={l.id} onClick={() => { setToLead(l); setToSearch(""); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors">
                         <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                           <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
                         </div>
@@ -484,9 +744,20 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                     ))}
                   </div>
                 )}
+                {/* Searching an unloaded list finds nobody, which reads as "you have nobody". */}
+                {leads === null && !toLead && (
+                  <LoadFailure
+                    what="Contacts"
+                    reason={reasonOf(leadsLoad) ?? ""}
+                    variant="inline"
+                    className="mt-2"
+                    onRetry={onRetry}
+                    retrying={retrying}
+                  />
+                )}
               </div>
               <div className="px-5 py-3">
-                <textarea className="w-full text-sm focus:outline-none resize-none placeholder-gray-400 min-h-[160px]"
+                <textarea className="w-full text-sm focus:outline-none resize-none placeholder:text-muted-foreground/60 min-h-[160px]"
                   placeholder="Write your SMS message… (160 chars per segment)"
                   value={body} onChange={e => setBody(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); }} />
@@ -498,7 +769,7 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
               </div>
             )}
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
+            <div className="px-5 py-3 border-t border-border/60 flex items-center gap-2">
               <p className="text-xs text-muted-foreground">⌘+Enter to send</p>
               <div className="ml-auto flex items-center gap-2">
                 <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
@@ -516,19 +787,29 @@ function SmsModal({ leads, onClose }: { leads: CrmLead[]; onClose: () => void })
 }
 
 // ── New Person Modal ───────────────────────────────────────────────────────────
-function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClose: () => void; onCreated: () => void }) {
+function NewPersonModal({ leadsLoad, onRetry, retrying, onClose, onCreated }: {
+  leadsLoad: Load<CrmLead[]>; onRetry: () => void; retrying: boolean;
+  onClose: () => void; onCreated: () => void;
+}) {
+  const leads = dataOf(leadsLoad);
   const [step, setStep] = useState<"search" | "form">("search");
   const [q, setQ] = useState("");
-  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New", priority:"Medium", assignedTo:"", notes:"" });
+  const [form, setForm] = useState({ name:"", email:"", phone:"", company:"", source:"Manual Entry", status:"New Inquiry", priority:"Medium", assignedToStaffId: null as number | null, notes:"" });
+  // M6: a picker over real staff accounts, not three names typed into the source.
+  const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [dupWarning, setDupWarning] = useState("");
 
   const searchResults = q.length > 1
-    ? leads.filter(l => l.name.toLowerCase().includes(q.toLowerCase()) || l.email.toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
+    ? (leads ?? []).filter(l => (l.name ?? "").toLowerCase().includes(q.toLowerCase()) || (l.email ?? "").toLowerCase().includes(q.toLowerCase()) || (l.phone || "").includes(q)).slice(0, 5)
     : [];
 
   const checkDup = (email: string, phone: string) => {
-    const byEmail = email && leads.find(l => l.email.toLowerCase() === email.toLowerCase());
+    // No list, no duplicate check. Silence here would read as "no duplicate
+    // found", which is the same lie in a quieter voice.
+    if (leads === null) { setDupWarning(""); return; }
+    const byEmail = email && leads.find(l => (l.email ?? "").toLowerCase() === email.toLowerCase());
     const byPhone = phone && leads.find(l => l.phone === phone);
     if (byEmail) setDupWarning(`Duplicate: ${byEmail.name} has this email.`);
     else if (byPhone) setDupWarning(`Duplicate: ${byPhone.name} has this phone.`);
@@ -538,35 +819,58 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
   const save = async () => {
     if (!form.name || !form.email) return;
     setSaving(true);
-    const r = await fetch("/api/crm/leads", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    if (r.ok) { onCreated(); onClose(); }
+    setSaveError("");
+    try {
+      const r = await adminFetch("/api/crm/leads", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      // A refused save used to close nothing and say nothing: the form simply
+      // sat there, and the contact had not been created.
+      if (r.ok) { onCreated(); onClose(); }
+      else setSaveError(`Contact not created. ${await responseFailureReason(r)}`);
+    } catch {
+      setSaveError(`Contact not created. ${failureReason(null)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
           <h2 className="font-semibold text-foreground">New Contact</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
         {step === "search" ? (
           <div className="p-5">
             <p className="text-sm text-muted-foreground mb-3">Search for an existing contact first to avoid duplicates.</p>
+            {/* Without the list there is no duplicate check — say so before they type. */}
+            {leads === null && (
+              <LoadFailure
+                what="Existing contacts"
+                reason={reasonOf(leadsLoad) ?? ""}
+                variant="inline"
+                className="mb-3"
+                onRetry={onRetry}
+                retrying={retrying}
+              >
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nothing can be matched against, so this will not warn you about a duplicate.
+                </p>
+              </LoadFailure>
+            )}
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <input autoFocus className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              <input autoFocus className="w-full pl-9 pr-3 py-2.5 text-sm border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 placeholder="Enter name or phone number" value={q} onChange={e => setQ(e.target.value)} />
             </div>
             {searchResults.length > 0 && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden mb-3 divide-y divide-gray-50">
+              <div className="border border-border rounded-xl overflow-hidden mb-3 divide-y divide-border/40">
                 {searchResults.map(l => (
                   <Link key={l.id} href={`/admin/crm/leads/${l.id}`}>
-                    <div onClick={onClose} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
+                    <div onClick={onClose} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent cursor-pointer">
                       <div className={`w-8 h-8 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                         <span className="text-white text-xs font-bold">{ini(l.name)}</span>
                       </div>
@@ -581,12 +885,23 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               </div>
             )}
             <button onClick={() => { setForm(f => ({ ...f, name: q })); setStep("form"); }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-muted-foreground hover:border-blue-300 hover:text-blue-600 transition-colors">
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-teal-400 hover:text-teal-700 transition-colors">
               <Plus className="w-4 h-4" /> Create new contact
             </button>
           </div>
         ) : (
           <div className="p-5 space-y-3">
+            {saveError && (
+              <p role="alert" className="flex items-start gap-2 text-xs text-muted-foreground bg-destructive/5 border border-destructive/30 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-destructive" aria-hidden="true" />
+                <span className="min-w-0 break-words">{saveError}</span>
+              </p>
+            )}
+            {leads === null && (
+              <p className="text-xs text-muted-foreground break-words">
+                Existing contacts could not be loaded, so this form cannot warn you about a duplicate.
+              </p>
+            )}
             {dupWarning && (
               <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {dupWarning}
@@ -601,8 +916,8 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
               <div key={key}>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                 <input type={type} placeholder={ph}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  value={(form as Record<string, string>)[key]}
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  value={String(form[key as keyof typeof form] ?? "")}
                   onChange={e => {
                     const v = e.target.value;
                     setForm(f => ({ ...f, [key]: v }));
@@ -614,31 +929,33 @@ function NewPersonModal({ leads, onClose, onCreated }: { leads: CrmLead[]; onClo
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                   value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-                  {["New","Contacted","Follow-up","Proposal Sent","Negotiating","Won","Lost","Nurture"].map(s => <option key={s}>{s}</option>)}
+                  {LEAD_STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Priority</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none"
                   value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
                   {["High","Medium","Low"].map(p => <option key={p}>{p}</option>)}
                 </select>
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-              <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
-                value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                <option value="">Unassigned</option>
-                <option>Claidy Taguran</option>
-                <option>Shasta Greene</option>
-                <option>Saisa Lorraigne</option>
-              </select>
+              <label htmlFor="quick-add-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+              <OwnerPicker
+                id="quick-add-owner"
+                value={form.assignedToStaffId}
+                onChange={next => setForm(f => ({ ...f, assignedToStaffId: typeof next === "number" ? next : null }))}
+                assignees={people.assignees}
+                loading={people.loading}
+                error={people.error}
+                onRetry={people.reload}
+              />
             </div>
             <div className="flex gap-2 pt-1">
-              <button onClick={() => setStep("search")} className="flex-1 text-sm border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">Back</button>
+              <button onClick={() => setStep("search")} className="flex-1 text-sm border border-input rounded-lg py-2 hover:bg-accent transition-colors">Back</button>
               <Button className="flex-1" onClick={save} disabled={saving || !form.name || !form.email}>
                 {saving ? "Saving…" : "Create Contact"}
               </Button>
@@ -661,7 +978,12 @@ function NotifIcon({ type }: { type: string }) {
   if (type === "new_lead")     return <UserCheck className="w-4 h-4 text-blue-500" />;
   return <Bell className="w-4 h-4 text-orange-500" />;
 }
-function BellDropdown({ notifications, onClose }: { notifications: Notification[]; onClose: () => void }) {
+function BellDropdown({ notifications, failures, onRetry, retrying, onClose }: {
+  notifications: Notification[];
+  /** The lists behind the bell that could not be loaded. */
+  failures: readonly FailedPart[];
+  onRetry: () => void; retrying: boolean; onClose: () => void;
+}) {
   const [, navigate] = useLocation();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -672,28 +994,43 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
   const urgent = notifications.filter(n => n.urgent);
   const normal  = notifications.filter(n => !n.urgent);
   return (
-    <div ref={ref} className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-border shadow-2xl z-[200] overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-foreground">Notifications</span>
-          {notifications.length > 0 && (
+          {failures.length > 0 ? (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground leading-tight">
+              <Figure value={null} />
+            </span>
+          ) : notifications.length > 0 ? (
             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white leading-tight">{notifications.length}</span>
-          )}
+          ) : null}
         </div>
         <Link href="/admin/crm/tasks"><button onClick={onClose} className="text-xs text-primary hover:underline">View Tasks →</button></Link>
       </div>
+      {/*
+        A false all-clear is worse than a false zero, and this one was on every
+        screen in the product: with the loads swallowed, the bell told every
+        operator there was nothing to do when nobody had managed to ask.
+        "All caught up!" now requires both lists to have actually arrived.
+      */}
+      {failures.length > 0 && (
+        <PageLoadFailures failures={failures} onRetry={onRetry} retrying={retrying} className="m-3" />
+      )}
       {notifications.length === 0 ? (
-        <div className="p-8 text-center">
-          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-gray-300" /></div>
-          <p className="text-sm font-medium text-foreground">All caught up!</p>
-          <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
-        </div>
+        failures.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-muted-foreground/40" /></div>
+            <p className="text-sm font-medium text-foreground">All caught up!</p>
+            <p className="text-xs text-muted-foreground mt-1">No overdue tasks or pending follow-ups.</p>
+          </div>
+        ) : null
       ) : (
-        <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+        <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
           {[...urgent, ...normal].map(n => (
             <button key={n.id} onClick={() => { navigate(n.href); onClose(); }}
-              className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left ${n.urgent ? "border-l-2 border-red-400" : ""}`}>
-              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type] ?? "bg-gray-50"} flex items-center justify-center shrink-0 mt-0.5`}>
+              className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-accent transition-colors text-left ${n.urgent ? "border-l-2 border-red-400" : ""}`}>
+              <div className={`w-8 h-8 rounded-full ${NOTIF_BG[n.type] ?? "bg-muted"} flex items-center justify-center shrink-0 mt-0.5`}>
                 <NotifIcon type={n.type} />
               </div>
               <div className="flex-1 min-w-0">
@@ -706,7 +1043,7 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
         </div>
       )}
       {notifications.length > 0 && (
-        <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
+        <div className="px-4 py-2.5 border-t border-border/60 bg-muted">
           <Link href="/admin/crm/tasks"><button onClick={onClose} className="text-xs text-primary font-medium hover:underline w-full text-center">Go to Tasks page</button></Link>
         </div>
       )}
@@ -715,18 +1052,13 @@ function BellDropdown({ notifications, onClose }: { notifications: Notification[
 }
 
 // ── Global Search ──────────────────────────────────────────────────────────────
-const STATUS_BADGE: Record<string, string> = {
-  New:"bg-blue-100 text-blue-700", Contacted:"bg-sky-100 text-sky-700",
-  "Follow-up":"bg-yellow-100 text-yellow-700", "Proposal Sent":"bg-orange-100 text-orange-700",
-  Negotiating:"bg-purple-100 text-purple-700", Won:"bg-green-100 text-green-700",
-  Lost:"bg-red-100 text-red-700", Nurture:"bg-gray-100 text-gray-600",
-};
-const PRIORITY_BADGE: Record<string, string> = { High:"bg-red-50 text-red-600", Low:"bg-gray-100 text-gray-500" };
+const PRIORITY_BADGE: Record<string, string> = { High:"bg-red-50 text-red-600", Low:"bg-muted text-muted-foreground" };
 
 function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: () => void; onNavigate: (href: string) => void }) {
   const [results, setResults] = useState<CrmLead[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(false);
+  /** The stated reason the search failed, or null. */
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [selIdx, setSelIdx] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -737,13 +1069,29 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
   }, [onClose]);
 
   useEffect(() => {
-    if (q.length < 2) { setResults([]); setLoading(false); setFetchError(false); return; }
-    setLoading(true); setFetchError(false); setSelIdx(0);
+    if (q.length < 2) { setResults([]); setLoading(false); setSearchError(null); return; }
+    setLoading(true); setSearchError(null); setSelIdx(0);
     const ctrl = new AbortController();
-    fetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${tok()}` }, signal: ctrl.signal })
-      .then(r => { if (!r.ok) throw new Error("api"); return r.json() as Promise<{ leads: CrmLead[] }>; })
-      .then(d => { setResults((d.leads || []).slice(0, 8)); setLoading(false); })
-      .catch(err => { if ((err as Error).name !== "AbortError") { setFetchError(true); setLoading(false); } });
+    void (async () => {
+      try {
+        const r = await adminFetch(`/api/crm/leads?search=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+        if (!r.ok) {
+          // The words come from the response, so a refusal names the missing
+          // grant instead of the one flat sentence every code used to get.
+          const reason = await responseFailureReason(r);
+          if (!ctrl.signal.aborted) { setSearchError(reason); setLoading(false); }
+          return;
+        }
+        const d = await r.json() as { leads?: CrmLead[] };
+        if (ctrl.signal.aborted) return;
+        setResults((d.leads || []).slice(0, 8));
+        setLoading(false);
+      } catch (err) {
+        if ((err as Error).name === "AbortError" || ctrl.signal.aborted) return;
+        setSearchError(failureReason(null));
+        setLoading(false);
+      }
+    })();
     return () => ctrl.abort();
   }, [q]);
 
@@ -761,20 +1109,25 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
   }, [results, selIdx, go, onClose]);
 
   return (
-    <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-2xl z-[200] overflow-hidden">
+    <div ref={ref} className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-border shadow-2xl z-[200] overflow-hidden">
       {loading ? (
         <div className="flex items-center gap-2.5 px-4 py-3.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin shrink-0" /> Searching…
+          <div className="w-3 h-3 border-2 border-border border-t-muted-foreground rounded-full animate-spin shrink-0" /> Searching…
         </div>
-      ) : fetchError ? (
-        <div className="flex items-center gap-2 px-4 py-3.5 text-xs text-red-600"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> Search unavailable — please try again.</div>
+      ) : searchError ? (
+        <div role="alert" className="flex items-start gap-2 px-4 py-3.5 text-xs text-muted-foreground">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-destructive" aria-hidden="true" />
+          <span className="min-w-0 break-words">
+            <span className="font-medium text-foreground">Search unavailable.</span> {searchError}
+          </span>
+        </div>
       ) : results.length === 0 ? (
         <div className="px-4 py-3.5 text-xs text-muted-foreground text-center">No results for <span className="font-medium text-foreground">"{q}"</span></div>
       ) : (
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-border/40">
           {results.map((l, idx) => (
             <button key={l.id} onClick={() => go(l)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${idx === selIdx ? "bg-blue-50" : "hover:bg-gray-50"}`}>
+              className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${idx === selIdx ? "bg-blue-50" : "hover:bg-accent"}`}>
               <div className={`w-7 h-7 rounded-full ${av(l.name)} flex items-center justify-center shrink-0`}>
                 <span className="text-white text-[10px] font-bold">{ini(l.name)}</span>
               </div>
@@ -783,8 +1136,8 @@ function GlobalSearchDropdown({ q, onClose, onNavigate }: { q: string; onClose: 
                 <p className="text-xs text-muted-foreground truncate">{l.company ? `${l.company} · ` : ""}{l.email || l.phone || ""}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {l.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_BADGE[l.status] ?? "bg-gray-100 text-gray-600"}`}>{l.status}</span>}
-                {l.priority && l.priority !== "Medium" && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[l.priority] ?? "bg-gray-100 text-gray-500"}`}>{l.priority}</span>}
+                {l.status && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${LEAD_STATUS_STYLES[normalizeLeadStatus(l.status)]?.pill ?? "bg-muted text-muted-foreground"}`}>{normalizeLeadStatus(l.status)}</span>}
+                {l.priority && l.priority !== "Medium" && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_BADGE[l.priority] ?? "bg-muted text-muted-foreground"}`}>{l.priority}</span>}
               </div>
             </button>
           ))}
@@ -815,10 +1168,10 @@ function SideNavItem({ item, isActive, onNavigate }: {
     <Link href={item.href!}>
       <button onClick={onNavigate}
         className={`${base} ${isActive
-          ? "bg-blue-500/20 text-white border-l-2 border-blue-400 pl-[10px]"
+          ? "bg-primary/15 text-white border-l-2 border-primary pl-[10px]"
           : "text-white/60 hover:text-white hover:bg-white/8 border-l-2 border-transparent pl-[10px]"
         }`}>
-        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-blue-300" : "text-white/50 group-hover:text-white/80"}`} />
+        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-primary" : "text-white/50 group-hover:text-white/80"}`} />
         <span className="flex-1 truncate">{item.label}</span>
         {item.href === "/admin/dashboard" && (
           <ExternalLink className="w-3 h-3 text-white/30 group-hover:text-white/60 shrink-0" />
@@ -844,7 +1197,7 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden py-3 space-y-0.5">
+    <div data-testid="crm-sidebar-nav" className="flex flex-col h-full overflow-x-hidden py-3 space-y-0.5">
       {/* Workspace label */}
       <div className="px-4 pb-3 mb-1 border-b border-white/8">
         <p className="text-[11px] font-bold text-white/30 uppercase tracking-wider">SiteMint Digital</p>
@@ -894,9 +1247,36 @@ function SidebarContent({
 export function CrmLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [modal, setModal] = useState<"email" | "phone" | "sms" | "person" | "bell" | "profile" | null>(null);
-  const [allLeads, setAllLeads] = useState<CrmLead[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // M1: show who is actually signed in. Falls back to the generic chip when
+  // the session is still the legacy shared admin, which has no person behind it.
+  const [signedIn, setSignedIn] = useState<{ displayName: string; email: string; role: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await adminProbe("/api/crm/staff/me");
+        if (!r.ok || cancelled) return;
+        const d = await r.json() as { staff?: { id?: number; displayName: string; email: string; role: string } };
+        if (d.staff) {
+          setSignedIn(d.staff);
+          // Scope preserved editor content to this person. Switching accounts
+          // on a shared machine discards the previous one's unsent text before
+          // they can reach an editor.
+          bindDraftOwner(d.staff.id ?? d.staff.email);
+        }
+      } catch { /* leave the generic chip */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const initials = signedIn
+    ? signedIn.displayName.replace(/\[[^\]]*\]/g, "").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?"
+    : "SM";
+  // The chrome's three reads, each keeping its own answer.
+  const [leadsLoad, setLeadsLoad] = useState<Load<CrmLead[]>>({ status: "loading" });
+  const [tasksLoad, setTasksLoad] = useState<Load<NavTask[]>>({ status: "loading" });
+  const [templatesLoad, setTemplatesLoad] = useState<Load<Template[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -905,6 +1285,8 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
   const profileRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   // Auto-detect and expand the active group, plus remember collapsed groups
   const activeGroupId = detectGroup(location);
@@ -931,69 +1313,46 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const buildNotifications = useCallback((leads: CrmLead[], tasks: NavTask[]) => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(todayStart.getTime() + 86400000);
-    const yesterday = new Date(now.getTime() - 86400000);
-    const notifs: Notification[] = [];
-
-    tasks.filter(t => t.status !== "completed").forEach(t => {
-      if (!t.dueDate) return;
-      const due = new Date(t.dueDate);
-      if (due < todayStart) {
-        notifs.push({ id: `task-overdue-${t.id}`, type: "overdue_task", title: t.title,
-          sub: t.leadName ? `Overdue task for ${t.leadName}` : `Overdue ${t.type} task`,
-          href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: true });
-      } else if (due >= todayStart && due < todayEnd) {
-        notifs.push({ id: `task-today-${t.id}`, type: "due_today", title: t.title,
-          sub: t.leadName ? `Due today — ${t.leadName}` : `Due today · ${t.type}`,
-          href: t.leadId ? `/admin/crm/leads/${t.leadId}` : "/admin/crm/tasks", urgent: false });
-      }
-    });
-
-    leads.forEach(l => {
-      if (l.nextFollowUpAt) {
-        const fu = new Date(l.nextFollowUpAt);
-        if (fu < todayStart) {
-          notifs.push({ id: `followup-overdue-${l.id}`, type: "followup_due",
-            title: `Follow-up overdue: ${l.name}`,
-            sub: `${l.status || "Lead"} · was due ${fu.toLocaleDateString()}`,
-            href: `/admin/crm/leads/${l.id}`, urgent: true });
-        } else if (fu >= todayStart && fu < todayEnd) {
-          notifs.push({ id: `followup-today-${l.id}`, type: "followup_due",
-            title: `Follow-up today: ${l.name}`,
-            sub: `${l.status || "Lead"}${l.company ? ` · ${l.company}` : ""}`,
-            href: `/admin/crm/leads/${l.id}`, urgent: false });
-        }
-      }
-      if (l.status === "New" && l.createdAt && new Date(l.createdAt) > yesterday) {
-        notifs.push({ id: `new-lead-${l.id}`, type: "new_lead", title: `New lead: ${l.name}`,
-          sub: `${l.source || "Uncontacted"}${l.company ? ` · ${l.company}` : ""}`,
-          href: `/admin/crm/leads/${l.id}`, urgent: false });
-      }
-    });
-
-    setNotifications(notifs);
+  /**
+   * The chrome's data, honestly.
+   *
+   * This used to swallow every failure with `.catch(() => {})` — and, before
+   * that could even matter, returned early unless a legacy bearer token was in
+   * localStorage. A per-person staff session never has one, so for signed-in
+   * staff these three requests were never sent at all: the bell said "All
+   * caught up!", the call list said "No leads with phone found" and the
+   * template list said "No templates yet." for ever, on every CRM screen.
+   */
+  const loadLeads = useCallback(async () => {
+    setReloading(true);
+    const [nextLeads, nextTasks, nextTemplates] = await Promise.all([
+      readAdminResource("/api/crm/leads", pickLeads),
+      readAdminResource("/api/crm/tasks", pickTasks),
+      readAdminResource("/api/crm/email-templates", pickTemplates),
+    ]);
+    setLeadsLoad(nextLeads);
+    setTasksLoad(nextTasks);
+    setTemplatesLoad(nextTemplates);
+    setReloading(false);
   }, []);
 
-  const loadLeads = useCallback(() => {
-    const t = tok();
-    if (!t) return;
-    Promise.all([
-      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
-      fetch("/api/crm/tasks", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
-      fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${t}` } }).then(r => r.json()),
-    ]).then(([ld, td, tmpl]) => {
-      const leads: CrmLead[] = ld.leads || [];
-      const tasks: NavTask[] = td.tasks || [];
-      setAllLeads(leads);
-      setTemplates(tmpl.templates || []);
-      buildNotifications(leads, tasks);
-    }).catch(() => {});
-  }, [buildNotifications]);
+  useEffect(() => { void loadLeads(); }, [loadLeads]);
 
-  useEffect(() => { loadLeads(); }, [loadLeads]);
+  const allLeads = dataOf(leadsLoad);
+  const navTasks = dataOf(tasksLoad);
+
+  // Whatever did load still produces items; the parts that did not are named
+  // beside them rather than counted as nothing.
+  const notifications = useMemo(
+    () => buildNotifications(allLeads ?? [], navTasks ?? []),
+    [allLeads, navTasks],
+  );
+  const notifFailures = failedParts([
+    ["Contacts", leadsLoad] as const,
+    ["Tasks", tasksLoad] as const,
+  ]);
+  /** How many need attention, or null when either list behind it failed. */
+  const notifCount = notifFailures.length === 0 ? notifications.length : null;
 
   useEffect(() => {
     if (search.length < 2) { setDebouncedSearch(""); return; }
@@ -1011,38 +1370,89 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [modal]);
 
-  // Close mobile menu on ESC
+  // Mobile drawer: close on Escape, and trap Tab focus inside it while open
+  // (M-3) — restore focus to the hamburger trigger on close.
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileMenuOpen(false); };
+    const h = (e: KeyboardEvent) => {
+      if (!mobileMenuOpen) return;
+      if (e.key === "Escape") { setMobileMenuOpen(false); return; }
+      if (e.key !== "Tab" || !drawerRef.current) return;
+      const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
-  }, []);
+  }, [mobileMenuOpen]);
 
-  const logout = () => { localStorage.removeItem("adminToken"); navigate("/admin"); };
+  const drawerWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      drawerRef.current?.focus();
+      drawerWasOpenRef.current = true;
+    } else if (drawerWasOpenRef.current) {
+      drawerWasOpenRef.current = false;
+      menuBtnRef.current?.focus();
+    }
+  }, [mobileMenuOpen]);
+
+  const logout = () => { adminLogout().finally(() => navigate("/admin")); };
 
   const SIDEBAR_W = sidebarExpanded ? "w-60" : "w-0";
 
   return (
+    <AdminRouteGuard>
     <div className="h-screen flex flex-col overflow-hidden bg-crm-content">
 
       {/* ── Modals ── */}
-      {modal === "email"  && <EmailComposeModal leads={allLeads} templates={templates} onClose={() => setModal(null)} />}
-      {modal === "sms"    && <SmsModal leads={allLeads} onClose={() => setModal(null)} />}
-      {modal === "person" && <NewPersonModal leads={allLeads} onClose={() => setModal(null)} onCreated={loadLeads} />}
+      {modal === "email"  && (
+        <EmailComposeModal
+          leadsLoad={leadsLoad} templatesLoad={templatesLoad}
+          onRetry={() => { void loadLeads(); }} retrying={reloading}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "sms"    && (
+        <SmsModal
+          leadsLoad={leadsLoad}
+          onRetry={() => { void loadLeads(); }} retrying={reloading}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "person" && (
+        <NewPersonModal
+          leadsLoad={leadsLoad}
+          onRetry={() => { void loadLeads(); }} retrying={reloading}
+          onClose={() => setModal(null)} onCreated={() => { void loadLeads(); }}
+        />
+      )}
 
       {/* ── Topbar ── */}
       <header className="h-11 bg-crm-header flex items-center gap-2 px-3 shrink-0 z-50 relative">
 
         {/* Mobile hamburger */}
-        <button onClick={() => setMobileMenuOpen(o => !o)}
+        <button ref={menuBtnRef} onClick={() => setMobileMenuOpen(o => !o)}
+          aria-expanded={mobileMenuOpen} aria-label="Open menu"
           className="lg:hidden w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition-colors shrink-0">
           <Menu className="w-4 h-4" />
         </button>
 
-        {/* Logo */}
+        {/* Logo — hidden below `sm`. At 375px the wordmark and the action
+            row do not both fit: the actions (compose, call, text, add, bell,
+            profile) are `shrink-0`, so they were pushed past the right edge of
+            an overflow-hidden shell, putting the profile menu (sign out, My
+            account) out of reach. The menu drawer still carries the brand. */}
         <Link href="/admin/crm">
-          <div className="cursor-pointer flex items-center shrink-0">
-            <SiteMintLogo variant="light" iconSize={18} />
+          <div className="cursor-pointer hidden sm:flex items-center shrink-0">
+            <SiteMintLogo variant="ops" iconSize={18} />
           </div>
         </Link>
 
@@ -1073,24 +1483,33 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right action buttons */}
         <div className="flex items-center gap-1 ml-auto shrink-0">
+          {/* One quiet treatment for the whole action row (owner mint
+              discipline): dark chip, mint glyph — matching the bell — so the
+              top bar stops reading as four unrelated colored products. */}
           <button onClick={() => setModal("email")} title="Compose email"
-            className="w-7 h-7 bg-blue-600 hover:bg-blue-500 rounded-full flex items-center justify-center transition-colors">
-            <Mail className="w-3.5 h-3.5 text-white" />
+            className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+            <Mail className="w-3.5 h-3.5 text-primary" />
           </button>
           <div className="relative" ref={phoneRef}>
             <button onClick={() => setModal(m => m === "phone" ? null : "phone")} title="Call a contact"
-              className="w-7 h-7 bg-green-600 hover:bg-green-500 rounded-full flex items-center justify-center transition-colors">
-              <Phone className="w-3.5 h-3.5 text-white" />
+              className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+              <Phone className="w-3.5 h-3.5 text-primary" />
             </button>
-            {modal === "phone" && <PhoneDropdown leads={allLeads} onClose={() => setModal(null)} />}
+            {modal === "phone" && (
+              <PhoneDropdown
+                leadsLoad={leadsLoad}
+                onRetry={() => { void loadLeads(); }} retrying={reloading}
+                onClose={() => setModal(null)}
+              />
+            )}
           </div>
           <button onClick={() => setModal("sms")} title="Send SMS"
-            className="w-7 h-7 bg-sky-600 hover:bg-sky-500 rounded-full flex items-center justify-center transition-colors">
-            <MessageSquare className="w-3.5 h-3.5 text-white" />
+            className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+            <MessageSquare className="w-3.5 h-3.5 text-primary" />
           </button>
           <button onClick={() => setModal("person")} title="Add new contact"
-            className="w-7 h-7 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center transition-colors">
-            <UserPlus className="w-3.5 h-3.5 text-white" />
+            className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
+            <UserPlus className="w-3.5 h-3.5 text-primary" />
           </button>
 
           {/* Bell */}
@@ -1098,37 +1517,62 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             <button onClick={() => setModal(m => m === "bell" ? null : "bell")} title="Notifications"
               className="w-7 h-7 bg-white/8 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors">
               <Bell className="w-3.5 h-3.5 text-white/60" />
-              {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
-                  {notifications.length > 9 ? "9+" : notifications.length}
+              {/*
+                A number on the bell is a promise that somebody counted. When a
+                list behind it failed there is no number — a dash, never a 0,
+                and never the quiet absence that reads as "nothing for you".
+              */}
+              {notifCount === null ? (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-white/25 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
+                  <Figure value={null} />
                 </span>
-              )}
+              ) : notifCount > 0 ? (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none pointer-events-none">
+                  {notifCount > 9 ? "9+" : notifCount}
+                </span>
+              ) : null}
             </button>
-            {modal === "bell" && <BellDropdown notifications={notifications} onClose={() => setModal(null)} />}
+            {modal === "bell" && (
+              <BellDropdown
+                notifications={notifications} failures={notifFailures}
+                onRetry={() => { void loadLeads(); }} retrying={reloading}
+                onClose={() => setModal(null)}
+              />
+            )}
           </div>
 
           {/* Profile */}
           <div className="relative ml-0.5" ref={profileRef}>
             <button onClick={() => setModal(m => m === "profile" ? null : "profile")}
               className="flex items-center gap-1 focus:outline-none">
-              <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-[11px] font-bold">SM</span>
+              <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center"
+                title={signedIn ? `${signedIn.displayName} (${signedIn.email})` : "Shared admin sign-in"}>
+                <span className="text-white text-[11px] font-bold">{initials}</span>
               </div>
               <ChevronDown className={`w-3 h-3 text-white/40 transition-transform ${modal === "profile" ? "rotate-180" : ""}`} />
             </button>
             {modal === "profile" && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 z-[200] overflow-hidden py-1">
-                <div className="px-4 py-2.5 border-b border-gray-100">
-                  <p className="text-xs font-semibold text-foreground">SiteMint Digital</p>
-                  <p className="text-xs text-muted-foreground">Admin</p>
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-border z-[200] overflow-hidden py-1">
+                <div className="px-4 py-2.5 border-b border-border/60">
+                  <p className="text-xs font-semibold text-foreground truncate">
+                    {signedIn?.displayName ?? "SiteMint Digital"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {signedIn ? signedIn.role.replace(/_/g, " ") : "Shared admin sign-in"}
+                  </p>
                 </div>
+                <Link href="/admin/crm/account">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
+                    <UserCog className="w-3.5 h-3.5 text-muted-foreground" /> My account
+                  </button>
+                </Link>
                 <Link href="/admin/crm/settings">
-                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors flex items-center gap-2">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
                     <Settings className="w-3.5 h-3.5 text-muted-foreground" /> Settings
                   </button>
                 </Link>
                 <Link href="/admin/dashboard">
-                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors flex items-center gap-2">
+                  <button onClick={() => setModal(null)} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors flex items-center gap-2">
                     <LayoutDashboard className="w-3.5 h-3.5 text-muted-foreground" /> Discovery Portal
                   </button>
                 </Link>
@@ -1160,9 +1604,10 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
             {/* Drawer */}
-            <div className="relative w-72 max-w-[85vw] bg-crm-sidebar h-full flex flex-col z-10 shadow-2xl">
+            <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Navigation menu"
+              className="relative w-72 max-w-[85vw] bg-crm-sidebar h-full flex flex-col z-10 shadow-2xl outline-none">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <SiteMintLogo variant="light" iconSize={18} />
+                <SiteMintLogo variant="ops" iconSize={18} />
                 <button onClick={() => setMobileMenuOpen(false)} className="text-white/50 hover:text-white transition-colors">
                   <X className="w-4 h-4" />
                 </button>
@@ -1181,11 +1626,16 @@ export function CrmLayout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main content ── */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
+          {/* Above the breadcrumbs so a connection problem is visible on every
+              CRM screen rather than only where somebody remembered to add it. */}
+          <ConnectionBanner />
+          <CrmBreadcrumbs location={location} />
           <CrmErrorBoundary>
             {children}
           </CrmErrorBoundary>
         </main>
       </div>
     </div>
+    </AdminRouteGuard>
   );
 }

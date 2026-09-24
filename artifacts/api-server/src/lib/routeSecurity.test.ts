@@ -1,0 +1,269 @@
+// R6 — the durable route-security contract.
+//
+// This is the test that has to fail when someone adds an unguarded write
+// endpoint. It re-derives the mutating-route inventory from source on every
+// run and compares it against the committed manifest.
+
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+import {
+  callsImportedFunction,
+  detectProtection,
+  detectSideEffects,
+  discoverMutatingRoutes,
+  type MutatingRoute,
+  type Protection,
+} from "./routeSecurity.js";
+import {
+  KNOWN_OPEN_ROUTES,
+  OPEN_WRITERS_PENDING_AUTHORIZATION,
+  ROUTE_SECURITY_MANIFEST,
+} from "./routeSecurity.manifest.js";
+
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
+const routes = discoverMutatingRoutes(join(SRC, "routes"), join(SRC, "app.ts"));
+const byKey = new Map(routes.map((r) => [r.key, r]));
+
+const protectionOf = (r: MutatingRoute): Protection =>
+  detectProtection(r)[0] ?? "unauthenticated";
+
+describe("route-security inventory", () => {
+  it("discovers every mutating route, including the app-level Stripe webhook", () => {
+    expect(routes.length).toBeGreaterThanOrEqual(127);
+    expect(byKey.has("POST /api/stripe/webhook"), "app.ts registrations must be scanned").toBe(true);
+    // Keys must be unique or the manifest cannot address a route.
+    expect(new Set(routes.map((r) => r.key)).size).toBe(routes.length);
+    for (const r of routes) expect(r.method, r.key).toMatch(/^(POST|PUT|PATCH|DELETE)$/);
+  });
+
+  it("classifies every discovered route — a new route cannot ship unlisted", () => {
+    const missing = routes.map((r) => r.key).filter((k) => !(k in ROUTE_SECURITY_MANIFEST));
+    expect(
+      missing,
+      `unclassified mutating route(s). Add them to routeSecurity.manifest.ts with the protection they carry:\n${missing.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("has no stale manifest entries", () => {
+    const stale = Object.keys(ROUTE_SECURITY_MANIFEST).filter((k) => !byKey.has(k));
+    expect(stale, `manifest lists route(s) that no longer exist:\n${stale.join("\n")}`).toEqual([]);
+  });
+
+  it("every route still carries the protection it is recorded as having", () => {
+    const regressions: string[] = [];
+    for (const r of routes) {
+      const expected = ROUTE_SECURITY_MANIFEST[r.key];
+      if (!expected) continue; // reported by the completeness test above
+      const actual = protectionOf(r);
+      if (actual !== expected) regressions.push(`${r.key}: manifest="${expected}" source="${actual}" [${r.file}]`);
+    }
+    expect(
+      regressions,
+      `route protection changed. If deliberate, update the manifest; if not, this is a regression:\n${regressions.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("the set of unauthenticated routes is exactly the reviewed allowlists", () => {
+    const open = routes.filter((r) => detectProtection(r).length === 0).map((r) => r.key).sort();
+    const allowed = [...Object.keys(KNOWN_OPEN_ROUTES), ...Object.keys(OPEN_WRITERS_PENDING_AUTHORIZATION)].sort();
+    expect(
+      open,
+      "an uncontrolled route appeared (or an allowlisted one was closed). Gate it behind a default-off flag, or record it in the manifest with evidence.",
+    ).toEqual(allowed);
+  });
+
+  it("the two allowlists never overlap", () => {
+    const both = Object.keys(KNOWN_OPEN_ROUTES).filter((k) => k in OPEN_WRITERS_PENDING_AUTHORIZATION);
+    expect(both, "a route cannot be both proven-safe and a pending writer").toEqual([]);
+  });
+
+  it("no allowlisted open route can persist data or act externally", () => {
+    // R7: KNOWN_OPEN_ROUTES is for routes PROVEN incapable of a side effect.
+    // Both conditions matter — a clean detector result means nothing if the
+    // handler delegates across a module boundary the scan cannot follow.
+    for (const key of Object.keys(KNOWN_OPEN_ROUTES)) {
+      const route = byKey.get(key);
+      expect(route, `${key} is allowlisted but does not exist`).toBeDefined();
+      const fx = detectSideEffects(route as MutatingRoute);
+      expect(fx, `${key} persists data or acts externally — it belongs in OPEN_WRITERS_PENDING_AUTHORIZATION or behind a flag`).toEqual([]);
+      expect(
+        callsImportedFunction(route as MutatingRoute),
+        `${key} delegates to an imported function, so it cannot be PROVEN side-effect free from source`,
+      ).toBe(false);
+    }
+  });
+
+  it("every pending open writer is documented with what it actually does", () => {
+    for (const [key, evidence] of Object.entries(OPEN_WRITERS_PENDING_AUTHORIZATION)) {
+      expect(byKey.has(key), `${key} is listed but no longer exists`).toBe(true);
+      expect(evidence.length, `${key} needs real evidence, not a label`).toBeGreaterThan(120);
+      // The entry must name a concrete effect, not merely assert safety.
+      expect(/persist|token|row|email|sms|calendar|stripe|external/i.test(evidence), key).toBe(true);
+    }
+  });
+
+  it("zero uncontrolled public writers outside the reviewed lists", () => {
+    const offenders = routes
+      .filter((r) => detectProtection(r).length === 0)
+      .filter((r) => !(r.key in KNOWN_OPEN_ROUTES) && !(r.key in OPEN_WRITERS_PENDING_AUTHORIZATION))
+      .map((r) => `${r.key} effects=[${detectSideEffects(r).join(",")}]`);
+    expect(offenders, "unreviewed route reachable with no authentication, signature, credential or flag").toEqual([]);
+  });
+
+  it("R8: both exception lists are empty — every mutating route is protected", () => {
+    // The closure claim, asserted directly rather than inferred from the
+    // absence of offenders above.
+    expect(Object.keys(KNOWN_OPEN_ROUTES), "no route may be exempt as proven-safe").toEqual([]);
+    expect(Object.keys(OPEN_WRITERS_PENDING_AUTHORIZATION), "no open writer may remain").toEqual([]);
+    const open = routes.filter((r) => detectProtection(r).length === 0).map((r) => r.key);
+    expect(open, "a route with no protection signal at all").toEqual([]);
+  });
+
+  it("the exception mechanism still exists — emptiness is a fact, not a deletion", () => {
+    // Deleting the lists would make the assertion above vacuous. Both must
+    // remain real, importable, empty objects that a future route could be
+    // added to (and would then have to justify itself).
+    expect(typeof KNOWN_OPEN_ROUTES, "KNOWN_OPEN_ROUTES was removed").toBe("object");
+    expect(typeof OPEN_WRITERS_PENDING_AUTHORIZATION, "OPEN_WRITERS_PENDING_AUTHORIZATION was removed").toBe("object");
+    expect(KNOWN_OPEN_ROUTES).not.toBeNull();
+    expect(OPEN_WRITERS_PENDING_AUTHORIZATION).not.toBeNull();
+    const manifestSource = readFileSync(join(SRC, "lib", "routeSecurity.manifest.ts"), "utf8");
+    expect(manifestSource).toMatch(/export const KNOWN_OPEN_ROUTES/);
+    expect(manifestSource).toMatch(/export const OPEN_WRITERS_PENDING_AUTHORIZATION/);
+  });
+
+  it("no public database writer or external-action route lacks protection", () => {
+    // Restates the goal in terms of side effects rather than route names: a
+    // route that can write or reach outside must carry a real guard.
+    const unguarded = routes
+      .filter((r) => detectSideEffects(r).length > 0 || callsImportedFunction(r))
+      .filter((r) => detectProtection(r).length === 0)
+      .map((r) => r.key);
+    expect(unguarded, "a route that can persist data or act externally is unprotected").toEqual([]);
+  });
+
+  it("every allowlisted open route carries a substantive reason", () => {
+    for (const [key, reason] of Object.entries(KNOWN_OPEN_ROUTES)) {
+      expect(reason.length, `${key} needs a real justification`).toBeGreaterThan(80);
+      // Rate limiting bounds abuse; it does not control access. Accepting it as
+      // a justification is precisely how the R5 audit missed a writer.
+      expect(/rate limit(ed|ing)?\.?$/i.test(reason.trim()), `${key}: rate limiting alone is not access control`).toBe(false);
+    }
+  });
+
+  it("the writers R6 closed are flag-gated, and each has its own flag", () => {
+    for (const key of [
+      "POST /api/v1/discovery-submissions",
+      "POST /api/ai-toolkit/checkout",
+      "POST /api/receptionist/auth/signup",
+      "POST /api/landing-test/view",
+      "POST /api/public/schedule/:slug/requests",
+      "POST /api/receptionist/account/password-reset/request",
+    ]) {
+      expect(ROUTE_SECURITY_MANIFEST[key], key).toBe("feature-flag");
+    }
+    const checkout = byKey.get("POST /api/ai-toolkit/checkout");
+    expect(checkout?.body).toMatch(/isAiToolkitCheckoutEnabled/);
+    // Boot sync and customer checkout are separate capabilities.
+    expect(checkout?.body).not.toMatch(/STRIPE_BOOT_SYNC_ENABLED/);
+    const discovery = byKey.get("POST /api/v1/discovery-submissions");
+    expect(discovery?.body).toMatch(/isPublicFormSubmissionsEnabled/);
+  });
+});
+
+describe("parser correctness (the false-positive traps)", () => {
+  it("does not inherit middleware from the following route", () => {
+    // POST /landing-test/view is immediately followed by an admin-only GET.
+    // Bounding route bodies only on mutating verbs made the POST absorb that
+    // GET's requireAdmin and report itself protected while it was wide open.
+    const view = byKey.get("POST /api/landing-test/view");
+    expect(view, "route missing").toBeDefined();
+    expect(view?.body, "absorbed the neighbouring route's middleware").not.toMatch(/requireAdmin/);
+    expect(view?.chain).not.toMatch(/requireAdmin/);
+    expect(protectionOf(view as MutatingRoute)).toBe("feature-flag");
+  });
+
+  it("does not let a helper defined above a block of routes leak their guards", () => {
+    // Inlining a called helper is what lets delegating routes be classified,
+    // but a helper's source must stop at the next route registration. Without
+    // that bound, password-reset/request picked up a later route's
+    // requireReceptionistAuth and was misreported as session-protected.
+    //
+    // R8 gave this route its own flag, so the assertion is now "exactly its own
+    // gate, and specifically NOT session" — the leak this guards against would
+    // show up as an extra `session` signal, which is still the thing being
+    // excluded. Stripping the flag must leave it with nothing at all.
+    const req = byKey.get("POST /api/receptionist/account/password-reset/request");
+    expect(req, "route missing").toBeDefined();
+    expect(detectProtection(req as MutatingRoute)).toEqual(["feature-flag"]);
+    expect(detectProtection(req as MutatingRoute), "absorbed a neighbour's session guard").not.toContain("session");
+    const withoutFlag = {
+      ...(req as MutatingRoute),
+      body: (req as MutatingRoute).body.replace(/isPasswordResetRequestsEnabled/g, "x"),
+    };
+    expect(detectProtection(withoutFlag), "a helper leaked a guard into this route").toEqual([]);
+  });
+
+  it("R8: the password-reset guard precedes its imported delegation", () => {
+    // The guard has to be visible in the ROUTE body, not only somewhere in the
+    // file, and it must sit before the call into requestPasswordReset — which
+    // is where the token row, the audit row and the email actually happen.
+    const route = byKey.get("POST /api/receptionist/account/password-reset/request");
+    expect(route, "route missing").toBeDefined();
+    const body = (route as MutatingRoute).body;
+    const guardAt = body.indexOf("isPasswordResetRequestsEnabled");
+    const delegateAt = body.indexOf("requestPasswordReset(");
+    expect(guardAt, "guard not in the route body").toBeGreaterThan(-1);
+    expect(delegateAt, "delegation not found").toBeGreaterThan(-1);
+    expect(guardAt, "the gate must run before the imported delegation").toBeLessThan(delegateAt);
+    // ...and before the rate limiter, so a blocked request consumes no budget.
+    const limiterAt = body.indexOf('limited(req, res, "pw-reset")');
+    expect(limiterAt).toBeGreaterThan(-1);
+    expect(guardAt).toBeLessThan(limiterAt);
+    // The token-proven siblings must NOT have been gated.
+    for (const sibling of [
+      "POST /api/receptionist/account/password-reset/complete",
+      "POST /api/receptionist/account/verify-email/confirm",
+      "POST /api/receptionist/account/members/accept",
+    ]) {
+      expect(ROUTE_SECURITY_MANIFEST[sibling], sibling).toBe("token-proven");
+    }
+  });
+
+  it("still resolves genuine delegation to a same-file handler", () => {
+    // The inverse failure: these routes are thin wrappers whose guard lives in
+    // the function they call. They must not read as unprotected.
+    expect(protectionOf(byKey.get("POST /api/v1/discovery-submissions") as MutatingRoute)).toBe("feature-flag");
+    expect(protectionOf(byKey.get("POST /api/voice/sms/inbound") as MutatingRoute)).toBe("signature");
+    expect(protectionOf(byKey.get("POST /api/voice/sms/status") as MutatingRoute)).toBe("signature");
+  });
+
+  it("treats rate limiting and honeypots as non-protection", () => {
+    // The scheduling route keeps both, but they are not what protects it:
+    // strip the flag guard and it classifies as open again. Before R7 closed
+    // it, that limiter is exactly what made the R5 audit call it safe.
+    const sched = byKey.get("POST /api/public/schedule/:slug/requests");
+    expect(sched?.body).toMatch(/publicSchedulingIpLimiter/);
+    expect(sched?.body).toMatch(/isHoneypotTripped/);
+    expect(detectProtection(sched as MutatingRoute)).toEqual(["feature-flag"]);
+    const withoutFlag = {
+      ...(sched as MutatingRoute),
+      body: (sched as MutatingRoute).body.replace(/isPublicSchedulingRequestsEnabled/g, "x"),
+    };
+    expect(
+      detectProtection(withoutFlag),
+      "the limiter and honeypot must not count as protection on their own",
+    ).toEqual([]);
+  });
+
+  it("detects the side effects that make a route a writer", () => {
+    // Sanity-check the detector against a route known to write and one known
+    // to reach an external service, so an over-broad edit that silences it
+    // shows up here instead of quietly emptying the writer classification.
+    expect(detectSideEffects(byKey.get("POST /api/landing-test/view") as MutatingRoute)).toContain("db-write");
+    expect(detectSideEffects(byKey.get("POST /api/ai-toolkit/checkout") as MutatingRoute)).toContain("external");
+  });
+});

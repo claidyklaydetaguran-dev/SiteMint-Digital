@@ -1,0 +1,707 @@
+/**
+ * SiteMint V5 "Signal, mint-led" — override-only remap (V5-BLUEPRINT §1, §2,
+ * §14 PR-1). Retheme-not-rewrite, exactly the mechanism tokens-v4.css itself
+ * introduced: nothing here rewrites a pinned file (v4-chrome.css,
+ * v4-home.css, v4-air.css, v4-auth.css, v4-ops.css, v3-*.css) — it only
+ * redefines the CSS custom properties those files already read, and a small
+ * number of rules whose pinned declarations are literal (hex/rgba) rather
+ * than `var()`, restated here at matching or higher specificity so the
+ * cascade resolves to System B without editing the file that owns them.
+ *
+ * Loaded last in index.css (after tokens-v5.css and every V2–V4 layer), so
+ * `.v4-shell { ... }` wins the V4 palette block on source order at equal
+ * specificity, and the few doubled/compound selectors below win on
+ * specificity regardless of order — the same two techniques v4-auth.css and
+ * v4-ops.css already use.
+ *
+ * Because a V4 rule that reads `var(--v3-mint)` was itself defined (by
+ * tokens-v4.css) as `--v3-mint: var(--v4-cyan)`, redefining `--v4-cyan` here
+ * is enough — the `--v3-*` alias re-resolves against the new value
+ * automatically without this file redeclaring it. Only the handful of V4
+ * primitives that were literal hex/rgba (not `var()`) need a direct entry
+ * below (`--v3-ice`, `--v3-glow-mint`, the header's dark-surface tint, the
+ * primary button's hardcoded white text).
+ *
+ * ROLLBACK: remove this file's import from index.css to restore the V4 cyan
+ * appearance byte-for-byte — nothing it touches is deleted, only shadowed.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Public chrome + homepage + AI Receptionist landing (`.v4-shell`).
+   ───────────────────────────────────────────────────────────────────────── */
+.v4-shell {
+  /* ── V4 root primitives, re-pointed to System B (V5-BLUEPRINT §2) ──────
+     Every `.v4-shell` descendant that reads `var(--v4-*)` picks these up;
+     every `--v3-*` alias tokens-v4.css declared as `var(--v4-*)` re-resolves
+     through them for free. */
+  --v4-ink: var(--sm-ink-950); /* #153E52 — hero field, deepest dark */
+  --v4-navy: var(--sm-teal-900); /* #173642 — raised dark surface */
+  --v4-navy-2: color-mix(in oklab, var(--sm-teal-900) 86%, white); /* hover-on-dark */
+  --v4-navy-line: color-mix(in oklab, var(--sm-dark-text) 16%, transparent);
+  --v4-cloud: var(--sm-porcelain); /* #F8FCFC — page background */
+  --v4-paper: var(--sm-white); /* surfaces */
+  --v4-mist: var(--sm-line); /* #CFE7EA — hairlines on light */
+  --v4-line-strong-l: var(--sm-line-strong); /* #A9CFD6 */
+  --v4-text: var(--sm-teal-900); /* #173642 — deep-teal primary text */
+  --v4-mute: var(--sm-slate-600); /* #4A6472 — muted text on light */
+  --v4-mute-dark: var(--sm-dark-muted); /* #9FC2CC — muted text on dark */
+  /* Final brand pass (2026-09-07): interaction/link accents leave the
+     Glacier cyan family for the pastel signature system — signature on
+     dark surfaces, mint-ink (#0B6B57, 6.4:1 on white) for text accents on
+     light. Deep structural cyan remains only in data/graphic texture that
+     references --sm-mint-500 directly. */
+  --v4-cyan: var(--sm-mint-signature); /* accent on dark / bright fills */
+  --v4-cyan-deep: var(--sm-mint-ink); /* text-safe link/focus accent on light */
+  --v4-turquoise: #8CEFC7; /* secondary accent between signature and border */
+  --v4-mint: var(--sm-mint-signature); /* completion accent */
+  /* --v4-amber / --v4-amber-deep / --v4-red / --v4-red-deep / --v4-green-ok:
+     intentionally NOT overridden — amber stays reserved for human-attention
+     states and red/green stay semantic-only (V5-BLUEPRINT §1), unrelated to
+     the navy/cyan retirement this file exists to do. */
+
+  /* Two `--v3-*` primitives tokens-v4.css declared as literal values (not
+     `var()`), so they need a direct entry — everything else in this block
+     is unused by name and exists only for documentation/rollback clarity. */
+  --v3-ice: var(--sm-mist-100); /* was literal #e7f4f8 */
+  --v3-glow-mint: 0 0 24px rgba(50, 197, 210, 0.28); /* mint-500 #32C5D2 — was cyan rgba(34,211,238,…), then briefly the REJECTED System-B green rgba(37,208,176 = #25D0B0) */
+  --v3-shadow-3: 0 24px 64px -32px rgba(21, 62, 82, 0.4); /* ink-950 #153E52 — was navy-black, then briefly the REJECTED System-B green rgba(10,42,46 = #0A2A2E) */
+}
+
+/* ── Tone roles: `--v3-line`/`--v3-line-strong` are computed by
+   tokens-v3.css as fixed rgba mixes (not `var(--v3-ink)`), so they do not
+   follow the primitive remap above. Restated at higher specificity
+   (class + attribute vs. attribute alone) for both the shell root itself
+   (heroTone sets `data-tone` directly on `.v4-shell`) and any nested
+   section that opts into a tone. ───────────────────────────────────────── */
+.v4-shell[data-tone="porcelain"],
+.v4-shell [data-tone="porcelain"],
+.v4-shell[data-tone="white"],
+.v4-shell [data-tone="white"],
+.v4-shell[data-tone="ice"],
+.v4-shell [data-tone="ice"] {
+  --v3-line: var(--sm-line); /* #CFE7EA */
+  --v3-line-strong: var(--sm-line-strong); /* #A9CFD6 */
+}
+
+.v4-shell[data-tone="ink"],
+.v4-shell [data-tone="ink"],
+.v4-shell[data-tone="charcoal"],
+.v4-shell [data-tone="charcoal"] {
+  --v3-line: color-mix(in oklab, var(--sm-dark-text) 10%, transparent);
+  --v3-line-strong: color-mix(in oklab, var(--sm-dark-text) 22%, transparent);
+}
+
+/* ── Primary button: mint fill, deep-teal text, on every tone (V5-BLUEPRINT
+   §1 — white text on the primary mint fails contrast; deep text passes at
+   6.35:1). The pinned rule hardcodes `color: #ffffff` and a cyan-deep fill,
+   so both need a direct restatement rather than a primitive remap. ────── */
+.v4-shell .v4-btn--primary {
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+
+.v4-shell .v4-btn--primary:hover {
+  background: var(--sm-mint-signature-hover, #7DEFC5);
+  box-shadow: 0 4px 16px -6px rgba(11, 107, 87, 0.35); /* restrained mint-ink shadow, no gloss */
+}
+
+.v4-shell .v4-btn--primary:active {
+  background: var(--sm-mint-signature-press, #69E7B8);
+  box-shadow: 0 2px 8px -4px rgba(11, 107, 87, 0.3);
+}
+
+.v4-shell[data-tone="ink"] .v4-btn--primary,
+.v4-shell [data-tone="ink"] .v4-btn--primary,
+.v4-shell[data-tone="charcoal"] .v4-btn--primary,
+.v4-shell [data-tone="charcoal"] .v4-btn--primary,
+.v4-shell .v4-on-dark .v4-btn--primary {
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+
+/* ── Header dark-surface tint: the pinned rule hardcodes navy rgba rather
+   than `var(--v4-ink)`/`var(--v4-navy-line)`, so it does not follow the
+   primitive remap either. Same colours, ink-950-tinted. ────────────────── */
+.v4-shell .v4-header[data-surface="dark"] {
+  background: rgba(21, 62, 82, 0.72); /* ink-950 #153E52 — was the REJECTED System-B green rgba(10,42,46 = #0A2A2E) */
+  border-bottom-color: rgba(232, 245, 247, 0.16); /* sm-dark-text #E8F5F7 — was the REJECTED System-B green rgba(233,247,243 = #E9F7F3) */
+}
+
+/* ── Focus ring: System B replaces the 2px solid outline with the soft mint
+   ring token (V5-BLUEPRINT §2 `--sm-focus`) on every V4 surface. ───────── */
+.v4-shell :focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus);
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Auth shell — the retained AI Receptionist signup surface
+   (`.v2-auth-shell .sg-page`). Mirrors v4-auth.css's own selector and
+   doubled-class technique one layer later.
+   ───────────────────────────────────────────────────────────────────────── */
+.v2-auth-shell .sg-page.sg-page {
+  --v3-porcelain: var(--sm-porcelain);
+  --v3-white: var(--sm-white);
+  --v3-ice: var(--sm-mist-100);
+  --v3-mint: var(--sm-accent); /* fill accent */
+  --v3-mint-deep: var(--sm-mint-700); /* text-safe link/label mint */
+  --v3-ink: var(--sm-ink-950);
+  --v3-charcoal: var(--sm-teal-900);
+  --v3-slate: var(--sm-slate-600);
+  --v3-radius-control: 6px;
+  --v3-radius-card: 10px;
+  --v3-font-sans: var(--sm-font-body);
+}
+
+.v2-auth-shell .sg-page :focus-visible {
+  outline: none;
+  box-shadow: var(--sm-focus);
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ops shell — the internal CRM (`.v2-dashboard-shell`). Mirrors v4-ops.css's
+   own doubled-class technique one layer later; re-points the shadcn HSL
+   variables to System B with a dark teal-ink sidebar in place of navy.
+   ───────────────────────────────────────────────────────────────────────── */
+.v2-dashboard-shell.v2-dashboard-shell {
+  /* System B as HSL triplets (shadcn format) — see tokens-v5.css header
+     comment for why this file, not `:root`, is where they get declared. */
+  --background: 180 33% 98%; /* porcelain (Glacier #F8FCFC) */
+  --foreground: 197 48% 17%; /* ink (Glacier #173642) */
+  --border: 187 39% 87%; /* line (Glacier #CFE7EA) */
+  --card: 0 0% 100%;
+  --card-foreground: 197 48% 17%;
+  --card-border: 189 35% 75%; /* line-strong (Glacier #A9CFD6) */
+
+  --sidebar: 203 59% 20%; /* ink-950 (Glacier #153E52) — blue-charcoal sidebar */
+  --sidebar-foreground: 188 48% 94%; /* dark-text (Glacier #E8F5F7) */
+  --sidebar-border: color-mix(in oklab, var(--sm-dark-text) 14%, transparent);
+  --sidebar-primary: 156 82% 78%; /* pastel signature #99F5D0 */
+  --sidebar-primary-foreground: 197 48% 17%; /* ink (Glacier #173642) */
+  --sidebar-accent: 155 77% 92%; /* mint wash-strong #D9FAEC */
+  --sidebar-accent-foreground: 197 48% 17%;
+  --sidebar-ring: 168 81% 23%; /* mint-ink #0B6B57 — AA focus on light */
+
+  --primary: 156 82% 78%; /* pastel signature #99F5D0 */
+  --primary-foreground: 203 59% 20%; /* ink-950 text on signature (8.8:1) */
+  --ring: 168 81% 23%; /* mint-ink #0B6B57 */
+
+  --accent: 155 77% 92%; /* mint wash-strong #D9FAEC */
+  --accent-foreground: 197 48% 17%;
+
+  /* Neutral-chrome roles for the CRM gray-* normalization: System B has no
+     generic gray, so muted surfaces are mist, muted text is slate-600, and
+     input boundaries are line-strong — the same trio the helpdesk's shadcn
+     layer resolves to. Without these, `bg-muted`/`text-muted-foreground`
+     inside the ops shell would fall through to the marketing site's
+     blue-tinted `:root` values. */
+  --muted: 185 57% 95%; /* mist (Glacier #EDF9FA) */
+  --muted-foreground: 201 21% 37%; /* slate-600 */
+  --secondary: 185 57% 95%; /* mist (Glacier #EDF9FA) */
+  --secondary-foreground: 197 48% 17%; /* ink (Glacier #173642) */
+  --input: 189 35% 75%; /* line-strong (Glacier #A9CFD6) */
+}
+
+/* ── Internal-environment bar — ink-950 + mint voice, amber stays reserved. */
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar {
+  background: var(--sm-ink-950);
+  color: var(--sm-dark-text);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__brand-dot { /* signature via swap below */
+  background: var(--sm-mint-signature);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__scope {
+  color: var(--sm-dark-muted);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__badge {
+  border-color: color-mix(in oklab, var(--sm-amber-600) 45%, transparent);
+  color: var(--sm-amber-600);
+}
+
+/* ── Owner final polish (2026-09-06): global decorative-film contract,
+   Motion preference, and the pastel-mint brand layer. ─────────────────── */
+
+/* 1 · Decorative films are pointer-inert everywhere: no hover, no Chrome/
+   Edge PiP or "Enhance" affordances, no native controls, ever. */
+video[data-sm-decorative-film] {
+  pointer-events: none;
+}
+video[data-sm-decorative-film]::-webkit-media-controls,
+video[data-sm-decorative-film]::-webkit-media-controls-enclosure,
+video[data-sm-decorative-film]::-webkit-media-controls-panel {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+/* 2 · Global Motion preference: decorative videos are unmounted by their
+   eligibility gates (motionPref.ts); this pauses ambient CSS animation. */
+html[data-sm-motion="off"] .v4-shell *,
+html[data-sm-motion="off"] .sm-v5page *,
+html[data-sm-motion="off"] .sm-home-v5 * {
+  animation-play-state: paused !important;
+}
+
+/* The footer control itself — discreet, text-like, ≥44px hit target. */
+.v4-footer__motion {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 10px 0;
+  min-height: 44px;
+  font: inherit;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--sm-mint-signature, #99F5D0);
+}
+.v4-footer__motion:hover {
+  opacity: 1;
+}
+.v4-footer__motion:focus-visible {
+  outline: 2px solid var(--sm-mint-signature, #99F5D0);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* 3 · Pastel-mint brand layer — small global touches; section washes and
+   per-component accents are applied in the page stylesheets. */
+.v4-shell ::selection {
+  background: var(--sm-mint-100, #DFF7F7);
+  color: var(--sm-ink-950, #153E52);
+}
+/* Outline buttons pick up a mint hover wash on light surfaces. */
+.v4-shell [data-tone="white"] .v4-btn--outline:hover,
+.v4-shell [data-tone="porcelain"] .v4-btn--outline:hover {
+  background: var(--sm-mint-hover, #F4FFFA);
+  border-color: var(--sm-mint-border, #80E9BE);
+}
+/* Cards on light surfaces: mint border + soft glow on hover (150–300ms
+   transitions already exist on the card primitives). */
+.v4-shell [data-tone="white"] .v3-card:hover,
+.v4-shell [data-tone="porcelain"] .v3-card:hover {
+  border-color: var(--sm-mint-border, #80E9BE);
+  box-shadow: var(--sm-shadow-2, 0 16px 40px rgb(11 58 62 / 0.1)), var(--sm-mint-glow, 0 0 0 4px rgba(153, 245, 208, 0.28));
+}
+
+/* ── Navigation system (owner responsive-first directive, 2026-09-06) ────
+   Desktop: five-card "What We Build" mega panel. Tablet (640–1023): the
+   Menu control opens a wide right-anchored panel. Mobile (<640): a
+   designed full-screen SiteMint sheet. One Motion preference lives in the
+   sheet's Preferences group and the desktop panel foot. */
+
+/* Desktop mega panel — six service cards (owner correction 2026-09-09:
+   AI Receptionist joined the dropdown), 3×2 so cards keep a readable
+   width inside the 1180px column. */
+@media (min-width: 1024px) {
+  .v4-shell .v4-panel__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+/* Mint hover/active language on panel cards. */
+.v4-shell .v4-panel__card {
+  border-radius: 12px;
+  transition: background 200ms ease, box-shadow 200ms ease;
+}
+.v4-shell .v4-panel__card:hover,
+.v4-shell .v4-panel__card:focus-visible {
+  background: var(--sm-mint-hover, #F4FFFA);
+  box-shadow: inset 3px 0 0 var(--sm-mint-signature, #99F5D0);
+}
+.v4-shell .v4-panel__foot {
+  align-items: center;
+}
+
+/* Sheet entrance: 200ms fade + settle; instant under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .v4-shell .v4-sheet {
+    animation: sm-sheet-in 200ms cubic-bezier(0.22, 0.9, 0.28, 1);
+  }
+  .v4-shell .v4-sheet__panel {
+    animation: sm-sheet-panel-in 220ms cubic-bezier(0.22, 0.9, 0.28, 1);
+  }
+}
+@keyframes sm-sheet-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sm-sheet-panel-in {
+  from { transform: translateY(10px); opacity: 0.4; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Designed sheet identity + structure. */
+.v4-shell .v4-sheet__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--v4-font-display, "Space Grotesk", sans-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--v4-cloud, #EAF4F6);
+}
+.v4-shell .v4-sheet__brand b {
+  color: var(--sm-mint-signature, #99F5D0);
+  font-weight: 700;
+}
+/* A faint mint aurora at the sheet top — brand atmosphere, not a card. */
+.v4-shell .v4-sheet__panel {
+  background:
+    radial-gradient(120% 30% at 50% 0%, rgb(153 245 208 / 0.1) 0%, transparent 70%);
+}
+/* Active route: mint rail + wash (replaces the plain cyan text color). */
+.v4-shell .v4-sheet__link[aria-current="page"],
+.v4-shell .v4-sheet__link[aria-current="true"] {
+  color: var(--sm-mint-signature, #99F5D0);
+  box-shadow: inset 3px 0 0 var(--sm-mint-signature, #99F5D0);
+  background: rgb(153 245 208 / 0.1); /* solid wash per the v5 foundation contract */
+  padding-left: 0.75rem;
+}
+.v4-shell .v4-sheet__sub .v4-sheet__link[aria-current="page"] {
+  box-shadow: inset 3px 0 0 var(--sm-mint-signature, #99F5D0);
+}
+.v4-shell .v4-sheet__group-btn:hover,
+.v4-shell .v4-sheet__link:hover {
+  color: var(--sm-mint-signature, #99F5D0);
+}
+.v4-shell .v4-sheet__close:focus-visible,
+.v4-shell .v4-sheet__group-btn:focus-visible,
+.v4-shell .v4-sheet__link:focus-visible {
+  outline: 2px solid var(--sm-mint-signature, #99F5D0);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* The visitor-facing "Reduce animation" switch and its Preferences group
+   were removed on 2026-09-09 (owner directive) — the operating system's
+   prefers-reduced-motion setting is now the only motion authority, so the
+   control, its styles, and its stored value are all retired. */
+
+/* Tablet (640–1023): wide right-anchored panel over a dimmed backdrop
+   instead of a full-bleed takeover. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .v4-shell .v4-sheet {
+    background: rgb(7 19 36 / 0.55);
+    backdrop-filter: blur(2px);
+  }
+  .v4-shell .v4-sheet__panel {
+    margin-left: auto;
+    width: min(520px, 92vw);
+    min-height: 100%;
+    background:
+      radial-gradient(120% 30% at 50% 0%, rgb(153 245 208 / 0.1) 0%, transparent 70%),
+      var(--v4-ink, #071324);
+    box-shadow: -24px 0 60px rgb(0 0 0 / 0.35);
+    padding: 1.5rem 2rem 2rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .v4-shell .v4-sheet__panel {
+      animation: sm-sheet-slide-in 220ms cubic-bezier(0.22, 0.9, 0.28, 1);
+    }
+  }
+}
+@keyframes sm-sheet-slide-in {
+  from { transform: translateX(24px); opacity: 0.4; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Mobile (<640): keep the full-screen takeover, roomier rhythm, safe-area
+   padding for notched devices. */
+@media (max-width: 639px) {
+  .v4-shell .v4-sheet__panel {
+    padding: calc(1rem + env(safe-area-inset-top, 0px)) 1.4rem calc(1.6rem + env(safe-area-inset-bottom, 0px));
+  }
+  .v4-shell .v4-sheet__cta {
+    margin-top: 1.2rem;
+  }
+}
+
+/* ── Pastel-mint distribution (owner responsive-first directive):
+   varied, intentional mint moments on every page while the blue-charcoal
+   / cyan / white foundation stays put. ─────────────────────────────────── */
+
+/* 1 · Alternating section washes: every porcelain-toned section site-wide
+   picks up a barely-green mint wash (was #F8FCFC near-white cyan). Ink and
+   white sections are untouched, so pages alternate white → mint wash → ink
+   instead of reading uniformly blue. */
+.v4-shell {
+  --sm-porcelain-mint: #ECFFF7;
+}
+.v4-shell[data-tone="porcelain"],
+.v4-shell [data-tone="porcelain"] {
+  --v3-bg: var(--sm-porcelain-mint);
+}
+
+/* 2 · Editorial accents on light surfaces: chapter numbers, eyebrows, and
+   kickers carry the brand mint instead of neutral slate. */
+.v4-shell [data-tone="white"] .v3m-sechead__no,
+.v4-shell [data-tone="porcelain"] .v3m-sechead__no,
+.v4-shell [data-tone="white"] .v3-eyebrow,
+.v4-shell [data-tone="porcelain"] .v3-eyebrow,
+.v4-shell [data-tone="white"] .v4-kicker,
+.v4-shell [data-tone="porcelain"] .v4-kicker {
+  color: var(--sm-mint-ink, #0B6B57);
+}
+
+/* 3 · Icon backplates: pillar/value icons sit on a mint surface. */
+.v4-shell .v3m-pillar__icon {
+  background: var(--sm-mint-wash-deep, #D9FAEC);
+  color: var(--sm-mint-ink, #0B6B57);
+}
+.v4-shell .v4-pillar__glyph {
+  background: var(--sm-mint-wash-deep, #D9FAEC);
+  color: var(--sm-mint-ink, #0B6B57);
+  border-radius: 12px;
+  padding: 9px;
+  box-sizing: content-box;
+  width: 30px;
+  height: 30px;
+}
+
+/* 4 · Footer: link hovers + the brand line pick up mint. */
+.v4-footer__cols a:hover {
+  color: var(--sm-mint-signature, #99F5D0);
+}
+.v4-footer__legal span:last-child {
+  color: var(--sm-mint-signature, #99F5D0);
+  opacity: 0.85;
+}
+
+/* ── AI Receptionist sub-nav on compact widths (owner responsive-first
+   directive): a scrollable rail as a second header row, instead of hiding
+   the in-page navigation behind the hamburger. `--v4-hdr-h` is raised on
+   this shell only (the :has() scope), so the fixed-header offset contract
+   (scroll-margin-top, hero clearance) stays correct everywhere. */
+@media (max-width: 1023px) {
+  /* Professional redesign perf fix (2026-09-09): PublicShell stamps
+     data-header-mode on the shell, replacing the former
+     `.v4-shell:has(.v4-header[data-mode="product"])` — :has() invalidation
+     measured ~3.2s of Style & Layout on the product page. */
+  .v4-shell[data-header-mode="product"] {
+    --v4-hdr-h: 108px;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-header__inner {
+    flex-wrap: wrap;
+    row-gap: 0;
+    align-content: start;
+    padding-top: 10px;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav {
+    display: block;
+    order: 10;
+    flex: 1 1 100%;
+    margin-left: 0;
+    overflow: hidden;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.1rem;
+    padding-bottom: 2px;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__list::-webkit-scrollbar {
+    display: none;
+  }
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link {
+    min-height: 40px;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    font-size: 0.85rem;
+  }
+  /* Mint active pill for the scrollspy state on the rail. */
+  .v4-shell .v4-header[data-mode="product"] .v4-product-nav__link[aria-current="true"] {
+    color: var(--sm-mint-ink, #0B6B57);
+    background: var(--sm-mint-wash-deep, #D9FAEC);
+  }
+  .v4-shell .v4-header[data-mode="product"][data-surface="dark"] .v4-product-nav__link[aria-current="true"] {
+    color: var(--sm-mint-signature, #99F5D0);
+    background: rgb(153 245 208 / 0.14);
+  }
+}
+
+/* ── Mobile/tablet sheet containment fix (root cause of the "no mobile
+   navigation" report): the header's backdrop-filter makes it the
+   CONTAINING BLOCK for fixed descendants, so the sheet's `inset: 0`
+   resolved to the 64px header box — the menu opened as a 63px sliver.
+   The header is pinned at the viewport origin, so explicit viewport
+   sizing (rather than inset) restores the full-screen overlay no matter
+   what filter the header carries. */
+.v4-shell .v4-sheet {
+  inset: auto;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ── Canonical mint signature (mint-brand directive, 2026-09-07) ───────── */
+
+/* Key-phrase emphasis: refined signature UNDERLINE (owner correction,
+   2026-09-07 — the thick #99F5D0 highlight block is retired). A gently
+   imperfect signal-line in the exact swatch sits just below the phrase:
+   rounded ends, 2px-scale on mobile, 3px maximum on desktop, never
+   covering the letterforms. Text color is inherited, so the phrase reads
+   correctly on ink heroes (light text) and light page heroes (dark text)
+   alike. Draws once during reveal when motion is allowed; immediately
+   visible under prefers-reduced-motion or the Reduce-animation preference. */
+.v4-shell .sm-mark,
+.sm-v5page .sm-mark {
+  --sm-mark-h: 3px;
+  color: inherit;
+  padding-bottom: 0.14em; /* slight offset below the baseline */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 4' preserveAspectRatio='none'%3E%3Cpath d='M2.5 2.6C32 1.4 72 3.1 117.5 1.9' fill='none' stroke='%2399F5D0' stroke-width='3.1' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% var(--sm-mark-h);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+@media (max-width: 639px) {
+  .v4-shell .sm-mark,
+  .sm-v5page .sm-mark {
+    --sm-mark-h: 2px;
+    padding-bottom: 0.12em;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-sm-motion="off"]) .v4-shell .sm-mark,
+  html:not([data-sm-motion="off"]) .sm-v5page .sm-mark {
+    animation: sm-mark-draw 700ms cubic-bezier(0.22, 0.9, 0.28, 1) 250ms both;
+  }
+}
+@keyframes sm-mark-draw {
+  from { background-size: 0% var(--sm-mark-h); }
+  to { background-size: 100% var(--sm-mark-h); }
+}
+
+/* Mint Signal corner ornament host. */
+.v4-shell .sm-corner-host,
+.sm-v5page .sm-corner-host {
+  position: relative;
+  overflow: hidden;
+}
+.sm-mint-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+  line-height: 0;
+  opacity: 0.9;
+}
+.sm-mint-corner--flip {
+  right: auto;
+  left: 0;
+  transform: scaleX(-1);
+}
+@media (max-width: 639px) {
+  .sm-mint-corner svg {
+    width: 150px;
+    height: 110px;
+  }
+}
+
+/* Focus rings site-wide pick up the signature glow (contrast preserved by
+   the 2px ink-outline underneath on light surfaces). */
+.v4-shell a:focus-visible,
+.v4-shell button:focus-visible {
+  outline-color: var(--sm-mint-border, #80E9BE);
+}
+
+/* ── Unified public button family (final release directive, 2026-09-07):
+   every marketing-surface action reads from the signature system. Primary
+   = solid #99F5D0 + deep blue-charcoal text (8.8:1), subtle darker-mint
+   hover, restrained shadow, no gloss. Secondary = mint wash + mint border
+   + dark text. Tertiary = quiet text with a mint underline accent.
+   Semantic/destructive/status controls are NOT remapped, and disabled
+   states keep their muted, clearly-inactive treatment. The `.v4-btn`
+   family is restyled above; this block brings the `.v3-btn` vocabulary
+   (Services/About/Process/Work/Pricing/Start/footer) into the same family. */
+.v4-shell .v3-btn--primary {
+  background: var(--sm-mint-signature, #99F5D0);
+  color: var(--sm-ink-950, #153E52);
+}
+.v4-shell .v3-btn--primary:hover {
+  background: var(--sm-mint-signature-hover, #7DEFC5);
+  box-shadow: 0 4px 16px -6px rgba(11, 107, 87, 0.35);
+}
+.v4-shell .v3-btn--primary:active {
+  background: var(--sm-mint-signature-press, #69E7B8);
+}
+
+/* Secondary on light tones: transparent mint wash + mint border. */
+.v4-shell [data-tone="white"] .v3-btn--outline,
+.v4-shell [data-tone="porcelain"] .v3-btn--outline,
+.v4-shell [data-tone="white"] .v4-btn--outline,
+.v4-shell [data-tone="porcelain"] .v4-btn--outline {
+  background: var(--sm-mint-wash, #ECFFF7);
+  border-color: var(--sm-mint-border, #80E9BE);
+  color: var(--sm-teal-900, #173642);
+}
+.v4-shell [data-tone="white"] .v3-btn--outline:hover,
+.v4-shell [data-tone="porcelain"] .v3-btn--outline:hover,
+.v4-shell [data-tone="white"] .v4-btn--outline:hover,
+.v4-shell [data-tone="porcelain"] .v4-btn--outline:hover {
+  background: var(--sm-mint-wash-strong, #D9FAEC);
+  border-color: var(--sm-mint-border, #80E9BE);
+}
+
+/* Secondary on dark tones: transparent, light text, mint-tinted border. */
+.v4-shell [data-tone="ink"] .v3-btn--outline,
+.v4-shell [data-tone="charcoal"] .v3-btn--outline,
+.v4-shell [data-tone="ink"] .v4-btn--outline,
+.v4-shell [data-tone="charcoal"] .v4-btn--outline,
+.v4-shell .v4-on-dark .v4-btn--outline {
+  border-color: rgba(153, 245, 208, 0.45);
+}
+.v4-shell [data-tone="ink"] .v3-btn--outline:hover,
+.v4-shell [data-tone="charcoal"] .v3-btn--outline:hover,
+.v4-shell [data-tone="ink"] .v4-btn--outline:hover,
+.v4-shell [data-tone="charcoal"] .v4-btn--outline:hover,
+.v4-shell .v4-on-dark .v4-btn--outline:hover {
+  border-color: var(--sm-mint-signature, #99F5D0);
+  background: rgba(153, 245, 208, 0.08);
+}
+
+/* Tertiary (quiet): text action with a mint directional underline. */
+.v4-shell .v3-btn--quiet {
+  text-decoration: underline;
+  text-decoration-color: var(--sm-mint-border, #80E9BE);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.v4-shell .v3-btn--quiet:hover {
+  color: var(--sm-mint-ink, #0B6B57);
+  text-decoration-color: var(--sm-mint-signature, #99F5D0);
+}
+
+/* ── Mint graphic-design details (final release directive): authored,
+   non-random accents. 1 · Chapter numbers carry a short signal dash. */
+.v4-shell .v3m-sechead__no::after {
+  content: "";
+  display: inline-block;
+  width: 30px;
+  height: 3px;
+  margin-left: 10px;
+  vertical-align: middle;
+  border-radius: 999px;
+  background: var(--sm-mint-signature, #99F5D0);
+}
+
+/* 2 · Editorial media frames: support/texture figures and portfolio
+   captures close on a thin signature edge — the mint "frame edge" from the
+   brand system, doubling as a grounded baseline for the image. */
+.v4-shell .sm-about-texture img,
+.v4-shell .sm-portfolio-card__img {
+  border-bottom: 3px solid var(--sm-mint-signature, #99F5D0);
+}

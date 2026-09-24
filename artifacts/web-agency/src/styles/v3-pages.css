@@ -1,0 +1,197 @@
+/**
+ * Frontend V3 — inner marketing pages (`.v3sp-*` service pages, work,
+ * process, about, insights, start, legal). Shared vocabulary comes from
+ * v3-marketing.css.
+ */
+
+/* Two-column editorial block: section number rail + body. */
+.v3sp-two {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3sp-two__body {
+  display: grid;
+  gap: var(--v3-space-4);
+  max-width: 56rem;
+}
+@media (min-width: 1024px) {
+  .v3sp-two {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: var(--v3-space-8);
+  }
+}
+
+/* ── Work page ── */
+.v3wk-item {
+  display: grid;
+  gap: var(--v3-space-6);
+  padding-block: var(--v3-space-12);
+  border-top: 1px solid var(--v3-line);
+}
+.v3wk-item__meta {
+  display: grid;
+  gap: var(--v3-space-3);
+  align-content: start;
+  justify-items: start;
+}
+.v3wk-item__body {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+@media (min-width: 1024px) {
+  .v3wk-item {
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: var(--v3-space-12);
+  }
+}
+
+/* ── Insights ── */
+.v3in-list {
+  display: grid;
+  gap: var(--v3-space-4);
+}
+.v3in-item {
+  display: grid;
+  gap: var(--v3-space-2);
+  padding: var(--v3-space-6);
+}
+.v3in-item__status {
+  justify-self: start;
+}
+
+/* ── Start page ── */
+.v3st-panel {
+  padding: var(--v3-space-8);
+  display: grid;
+  gap: var(--v3-space-6);
+}
+.v3st-expect {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--v3-space-4);
+  counter-reset: v3st;
+}
+.v3st-expect li {
+  position: relative;
+  counter-increment: v3st;
+  padding-left: var(--v3-space-12);
+  display: grid;
+  gap: var(--v3-space-1);
+}
+.v3st-expect li::before {
+  content: counter(v3st, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  font-family: var(--v3-font-mono);
+  font-size: var(--v3-text-small);
+  font-weight: 600;
+  color: var(--v3-accent-text);
+}
+.v3st-expect strong {
+  font-weight: 620;
+  color: var(--v3-fg);
+}
+.v3st-expect span {
+  font-size: var(--v3-text-small);
+  line-height: 1.55;
+  color: var(--v3-fg-muted);
+}
+
+/* ── Legal ── */
+.v3lg-updated {
+  font-size: var(--v3-text-small);
+  color: var(--v3-fg-muted);
+}
+
+/* ── Services hub ── */
+.v3sv-lead {
+  display: grid;
+  gap: var(--v3-space-4);
+  max-width: 56rem;
+  margin-bottom: var(--v3-space-12);
+}
+
+/* ── AI Receptionist landing (`.v3a-*`) ── */
+.v3a-subnav {
+  padding-top: calc(88px + var(--v3-space-2));
+  border-bottom: 1px solid var(--v3-line);
+}
+.v3a-subnav__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--v3-space-6);
+  min-height: 48px;
+  overflow-x: auto;
+}
+.v3a-subnav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  font-size: var(--v3-text-micro);
+  font-weight: 600;
+  letter-spacing: var(--v3-tracking-micro);
+  text-transform: uppercase;
+  color: var(--v3-accent-text);
+  white-space: nowrap;
+}
+.v3a-subnav__list {
+  display: flex;
+  gap: var(--v3-space-2);
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.v3a-subnav__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--v3-space-3);
+  font-size: var(--v3-text-small);
+  color: var(--v3-fg-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--v3-radius-pill);
+}
+.v3a-subnav__link:hover {
+  color: var(--v3-fg);
+}
+
+/* The subnav supplies the top offset, so the hero doesn't double it. */
+.v3a-hero {
+  padding-top: var(--v3-space-12);
+}
+
+@media (min-width: 768px) {
+  .v3a-float--intent {
+    left: var(--v3-space-6);
+    top: 96px;
+  }
+  .v3a-float--avail {
+    right: var(--v3-space-6);
+    top: 72px;
+  }
+  .v3a-float--handoff {
+    right: var(--v3-space-8);
+    bottom: var(--v3-space-6);
+  }
+}
+
+/* ── V3 retheme scopes for retained V2 auth surfaces ──
+   The signup flow keeps its markup and logic; only its token values move to
+   the V3 palette. Scoped to the page root so no other V2 surface changes. */
+.sg-page {
+  --v2-warm-white: var(--v3-porcelain);
+  --v2-offwhite: var(--v3-white);
+  --v2-mint-mist: var(--v3-ice);
+  --v2-mint-100: var(--v3-ice);
+  --v2-mint-500: var(--v3-mint);
+  --v2-navy-900: var(--v3-ink);
+  --v2-navy-700: var(--v3-charcoal);
+  --v2-slate-500: var(--v3-slate);
+  --v2-radius-control: var(--v3-radius-control);
+  --v2-radius-card: var(--v3-radius-card);
+  --v2-font-sans: var(--v3-font-sans);
+}

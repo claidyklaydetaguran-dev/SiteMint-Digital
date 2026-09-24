@@ -6,12 +6,18 @@
 - **Artifact**: `artifacts/helpdesk`
 - **Base path**: `/ai-receptionist/dashboard`
 - **Auth**: Cookie-based session (`receptionist_session`), validated via `GET /api/receptionist/auth/me`
-- **Pages**: Login, Inbox (conversations), Billing, Settings (agent config), Contacts (stub), Deploy (stub)
+- **Pages** (post-Phase 2C): Login, Overview (`/`), Conversations inbox (`/conversations`),
+  AI Receptionist agent config (`/receptionist`), Billing (`/billing`),
+  Settings (`/settings` — Members/Language stubs), Contacts (`/contacts` — stub).
+  `/deploy` is an in-SPA redirect to `/receptionist` (the Deploy page was deleted in Phase 2B).
 
-### Frontend (legacy — to be retired in Phase 2)
-- **Location**: `artifacts/web-agency/src/pages/receptionist/`
-- **Routes**: `/app`, `/app/login`, `/app/agent-config`, `/app/settings`, `/app/conversations/:id`
-- **Status**: Live but partially disconnected; billing redirects land here (bug); signup navigates here (bug). Retirement deferred to Phase 2.
+### Frontend (legacy — RETIRED in Phase 2A)
+- The legacy receptionist pages under `artifacts/web-agency/src/pages/receptionist/`
+  were deleted in Phase 2A. The `/app`, `/app/login`, `/app/agent-config`,
+  `/app/settings`, `/app/conversations/:id` routes in web-agency are now
+  `window.location.replace` redirects to `/ai-receptionist/dashboard/...`.
+  Billing return URLs and the signup entry point were repointed at the new
+  dashboard in Phase 1B.
 
 ### Backend
 - **Artifact**: `artifacts/api-server`
@@ -74,10 +80,26 @@ Two auth systems coexist and must not collide:
 | CRM / Admin | `Authorization: Bearer` token in `localStorage` | Client memory | — (stateless) |
 | AI Receptionist | `httpOnly` cookie `receptionist_session` | `receptionist_sessions` table | `receptionist_sessions` |
 
-## Known Gaps (see ROADMAP.md for remediation phases)
+## Known Gaps
 
-- STOP/opt-out not handled at application level (Phase 1A)
-- Firm-resolution fallback to first DB row is unsafe (Phase 1A)
-- Billing success/cancel URLs point to legacy `/app/settings` (Phase 1B)
-- Signup redirects to legacy `/app` frontend (Phase 1B)
-- Auth endpoints lack rate limiting and generic error messages (Phase 1C)
+The Phase 1A–1C gaps previously listed here (unsafe firm-resolution fallback, missing
+STOP/opt-out handling, wrong billing/signup redirect URLs, missing auth rate limiting)
+are all **fixed and frozen** — see SESSION_HANDOFF.md for per-phase test evidence.
+
+Remaining known gaps:
+- Stripe checkout initiation blocked by missing owner ops (`STRIPE_RECEPTIONIST_PRICE_ID`
+  + Stripe connection); Phase 1B tests (d)–(f) still deferred — must run before onboarding
+  any paying customer.
+- Signup 409 email enumeration — accepted residual risk (see DECISION_LOG.md).
+- In-memory rate-limit state resets on restart and is per-instance under autoscale.
+- Inbox manual reply composer and AgentConfig "Test" tab are not implemented.
+- Contacts and Settings (Members/Language) pages are stubs.
+
+## Voice Platform (Milestone 1+, approved 2026-07-17)
+
+The product is expanding into the SiteMint voice + messaging platform: assistants,
+publish-to-Vapi via a server-side `VoiceProvider` abstraction, browser test calls, and
+(in later milestones) phone numbers, call logs, transcripts, analysis, tools, knowledge
+bases, contacts, and analytics. See `VOICE_PLATFORM.md` (created during Milestone 1) and
+DECISION_LOG.md entries dated 2026-07-17. Voice tables use versioned Drizzle migrations
+(ADR-05, scoped); the SMS pipeline and all tables above are unchanged.

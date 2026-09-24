@@ -1,0 +1,62 @@
+/**
+ * Frontend V4 — SiteMint Operations (internal CRM) Signal skin.
+ *
+ * Same mechanism and scope as the committed V3 layer (v3-ops.css), one layer
+ * later: the shadcn semantic variables the CRM consumes are re-pointed to the
+ * V4 Signal palette inside `.v2-dashboard-shell`, and the internal-environment
+ * bar moves to the V4 ink + mono voice. CRM page markup and the 26 admin pages
+ * are untouched; server-side Bearer auth remains the actual boundary.
+ *
+ * Doubled class wins over v3-ops.css on specificity, not import luck.
+ * ROLLBACK: remove this file's import from index.css to restore V3 ops.
+ * The `.dark` counterpart is deliberately left alone (as in V3).
+ */
+
+.v2-dashboard-shell.v2-dashboard-shell {
+  /* V4 palette as HSL triplets (shadcn format). */
+  --background: 206 47% 97%; /* cloud */
+  --foreground: 215 67% 8%; /* ink */
+  --border: 207 37% 85%; /* mist */
+  --card: 0 0% 100%;
+  --card-foreground: 215 67% 8%;
+  --card-border: 207 37% 88%;
+
+  --sidebar: 210 45% 95%;
+  --sidebar-foreground: 215 67% 8%;
+  --sidebar-border: 207 37% 85%;
+  --sidebar-primary: 215 67% 8%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 194 55% 94%; /* ice */
+  --sidebar-accent-foreground: 215 67% 8%;
+  --sidebar-ring: 193 82% 31%; /* cyan-deep */
+
+  --primary: 215 67% 8%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 193 82% 31%; /* cyan-deep — AA focus on light */
+
+  --accent: 194 55% 94%;
+  --accent-foreground: 215 67% 8%;
+}
+
+/* ── Internal-environment bar — V4 voice ── */
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar {
+  background: #071324;
+  color: #e7f4f8;
+  font-family: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo,
+    Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__brand-dot {
+  background: linear-gradient(135deg, #22d3ee, #4af2c8);
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__scope {
+  color: #93aec4;
+}
+
+.v2-dashboard-shell.v2-dashboard-shell .v3o-bar__badge {
+  border-color: rgba(245, 165, 36, 0.4);
+  color: #f5a524;
+}

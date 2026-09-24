@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { db, crmLeads, crmActivities, crmMessages } from "@workspace/db";
 import { eq, desc, or, and, isNotNull } from "drizzle-orm";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth } from "../lib/staffAuth.js";
 import {
   isTwilioConfigured, getTwilio, getTwilioPhone, getForwardPhone, getCrmBaseUrl,
   normalizePhone, isOptOutMessage, isOptInMessage,
@@ -30,16 +31,87 @@ function checkSmsRate(toNumber: string): boolean {
 }
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  if (!validateToken(auth.substring(7))) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
+//
+// Owner-authorized change (2026-09-11), naming this file: the CRM-facing admin
+// routes below move to the shared staff-session authentication so the three
+// Super Admin accounts reach Inbox, Communications and the phone tools as
+// themselves, with per-person audit attribution, and so restricted roles are
+// actually enforced here too.
+//
+// Scope is deliberately the guard and nothing else. The five Twilio webhook
+// routes are NOT touched: they keep `validateTwilioWebhook` signature
+// validation, and no SMS, voice, consent or messaging behaviour changes.
+// `requireCrmAuth` still accepts the legacy shared bearer until
+// CRM_LEGACY_BEARER_ENABLED=false, so this deploys without a flag day.
+const requireAdmin = requireCrmAuth();
+
+// ── Sender attribution ────────────────────────────────────────────────────────
+//
+// Owner-authorized change (2026-09-11), naming this file: record which
+// authenticated staff member initiated an SMS or call.
+//
+// Nothing recorded a sender before. With three Super Admins sharing the CRM,
+// "who texted this client?" had no answer, and the activity timeline credited
+// every message to the literal string "admin".
+//
+// Four origins are kept distinct, and none is ever inferred into another:
+//
+//   staff      a signed-in person pressed send; `sentByStaffId` names them
+//   automated  a sequence or reminder sent it; there is no person to name
+//   inbound    the customer sent it
+//   legacy     it predates attribution; the sender is genuinely unknown
+//
+// Historical rows are never given a sender. An unknown sender stays unknown.
+//
+// Scope is attribution and the conversation link. Webhook signature validation,
+// Twilio credentials, SMS/voice/consent behaviour and the receptionist system
+// are untouched.
+
+/** The person behind this request, or null on the legacy shared bearer token. */
+function actor(req: Request): { id: number | null; label: string | null } {
+  const s = req.staffAuth?.staff;
+  return s ? { id: s.id, label: s.displayName || s.email } : { id: null, label: null };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-async function logActivity(leadId: number, type: string, title: string, description?: string, metadata?: Record<string, unknown>) {
-  await db.insert(crmActivities).values({ leadId, type, title, description, metadata });
+async function logActivity(
+  req: Request, leadId: number, type: string, title: string,
+  description?: string, metadata?: Record<string, unknown>,
+) {
+  const who = actor(req);
+  await db.insert(crmActivities).values({
+    leadId, type, title, description, metadata,
+    // Falls back to the column default ("admin") only for the shared token,
+    // where an anonymous administrator is the accurate description.
+    ...(who.label ? { createdBy: who.label } : {}),
+  });
+}
+
+/**
+ * Attaches a just-written message to its durable conversation.
+ *
+ * Never throws: a message that is already saved and sent must not be rolled
+ * back because the conversation index could not be updated. A failure here
+ * leaves `conversation_id` null, which the idempotent backfill repairs.
+ */
+async function linkToConversation(args: {
+  messageId: number;
+  contactId: number | null;
+  counterparty: string | null;
+  name?: string | null;
+}): Promise<number | null> {
+  try {
+    const { linkMessageToConversation } = await import("../lib/conversations.js");
+    return await linkMessageToConversation({
+      messageId: args.messageId,
+      channel: "phone",
+      provider: "twilio",
+      contactId: args.contactId,
+      externalAddress: args.counterparty,
+      externalName: args.name ?? null,
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function findLeadByPhone(phone: string) {
@@ -56,7 +128,7 @@ async function findLeadByPhone(phone: string) {
 }
 
 // ── GET /crm/phone/status ──────────────────────────────────────────────────────
-router.get("/crm/phone/status", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/phone/status", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
   const configured = isTwilioConfigured();
   const baseUrl = getCrmBaseUrl();
   const businessNumber = process.env.TWILIO_PHONE_NUMBER ?? "";
@@ -102,7 +174,7 @@ router.get("/crm/phone/status", requireAdmin, async (req: Request, res: Response
 });
 
 // ── POST /crm/phone/test-sms ───────────────────────────────────────────────────
-router.post("/crm/phone/test-sms", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/phone/test-sms", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   if (!isTwilioConfigured()) { res.status(400).json({ error: "Twilio is not configured." }); return; }
   const { to } = req.body as { to?: string };
   if (!to) { res.status(400).json({ error: "Destination number required." }); return; }
@@ -122,7 +194,7 @@ router.post("/crm/phone/test-sms", requireAdmin, async (req: Request, res: Respo
 });
 
 // ── GET /crm/conversations ─────────────────────────────────────────────────────
-router.get("/crm/conversations", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/conversations", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   try {
     const messages = await db.select().from(crmMessages)
       .orderBy(desc(crmMessages.createdAt))
@@ -156,7 +228,7 @@ router.get("/crm/conversations", requireAdmin, async (req: Request, res: Respons
 });
 
 // ── GET /crm/leads/:id/messages ───────────────────────────────────────────────
-router.get("/crm/leads/:id/messages", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/leads/:id/messages", requireCrmAuth("communications.read"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
   try {
@@ -171,7 +243,7 @@ router.get("/crm/leads/:id/messages", requireAdmin, async (req: Request, res: Re
 });
 
 // ── POST /crm/leads/:id/sms ───────────────────────────────────────────────────
-router.post("/crm/leads/:id/sms", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/sms", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   if (!isTwilioConfigured()) { res.status(400).json({ error: "Twilio is not configured." }); return; }
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -196,18 +268,30 @@ router.post("/crm/leads/:id/sms", requireAdmin, async (req: Request, res: Respon
       statusCallback: getCrmBaseUrl() ? `${getCrmBaseUrl()}/api/crm/webhooks/twilio/sms/status` : undefined,
     });
 
+    const who = actor(req);
     const [saved] = await db.insert(crmMessages).values({
       leadId: id,
       direction: "outbound",
       channel: "sms",
       body: body.trim(),
       twilioSid: msg.sid,
+      providerMessageId: msg.sid,
       fromNumber: getTwilioPhone(),
       toNumber: to,
       status: msg.status,
+      // Who actually pressed send. On the shared bearer token there is no
+      // person to name, so this stays null and `origin` says why.
+      sentByStaffId: who.id,
+      sentByLabel: who.label,
+      origin: who.id ? "staff" : "legacy",
     }).returning();
 
-    await logActivity(id, "sms_sent", `SMS sent to ${lead.name}`, body.trim().substring(0, 100), { twilioSid: msg.sid, to });
+    await linkToConversation({ messageId: saved.id, contactId: id, counterparty: to, name: lead.name });
+
+    await logActivity(req, id, "sms_sent",
+      `SMS sent to ${lead.name}${who.label ? ` by ${who.label}` : ""}`,
+      body.trim().substring(0, 100),
+      { twilioSid: msg.sid, to, sentByStaffId: who.id });
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
 
     res.json({ success: true, message: saved, sid: msg.sid });
@@ -218,7 +302,7 @@ router.post("/crm/leads/:id/sms", requireAdmin, async (req: Request, res: Respon
 });
 
 // ── POST /crm/leads/:id/call ──────────────────────────────────────────────────
-router.post("/crm/leads/:id/call", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/leads/:id/call", requireCrmAuth("communications.send"), async (req: Request, res: Response) => {
   if (!isTwilioConfigured()) { res.status(400).json({ error: "Twilio is not configured." }); return; }
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -247,18 +331,28 @@ router.post("/crm/leads/:id/call", requireAdmin, async (req: Request, res: Respo
       statusCallbackMethod: "POST",
     });
 
+    const who = actor(req);
     const [saved] = await db.insert(crmMessages).values({
       leadId: id,
       direction: "outbound",
       channel: "call",
       body: `Bridge call initiated to ${lead.name} (${leadPhone})`,
       twilioSid: call.sid,
+      providerMessageId: call.sid,
       fromNumber: getTwilioPhone(),
       toNumber: leadPhone,
       callStatus: "initiated",
+      sentByStaffId: who.id,
+      sentByLabel: who.label,
+      origin: who.id ? "staff" : "legacy",
     }).returning();
 
-    await logActivity(id, "call_initiated", `Outbound call initiated to ${lead.name}`, `Bridge: Twilio called ${forwardTo}, then connects to ${leadPhone}`, { twilioSid: call.sid });
+    await linkToConversation({ messageId: saved.id, contactId: id, counterparty: leadPhone, name: lead.name });
+
+    await logActivity(req, id, "call_initiated",
+      `Outbound call initiated to ${lead.name}${who.label ? ` by ${who.label}` : ""}`,
+      `Bridge: Twilio called ${forwardTo}, then connects to ${leadPhone}`,
+      { twilioSid: call.sid, sentByStaffId: who.id });
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, id));
 
     res.json({ success: true, message: saved, sid: call.sid });
@@ -269,7 +363,7 @@ router.post("/crm/leads/:id/call", requireAdmin, async (req: Request, res: Respo
 });
 
 // ── PATCH /crm/leads/:id/sms-consent ─────────────────────────────────────────
-router.patch("/crm/leads/:id/sms-consent", requireAdmin, async (req: Request, res: Response) => {
+router.patch("/crm/leads/:id/sms-consent", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
   const { smsConsent, smsOptOut } = req.body as { smsConsent?: boolean; smsOptOut?: boolean };
@@ -301,7 +395,7 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
       const lead = await findLeadByPhone(From ?? "");
       if (lead) {
         await db.update(crmLeads).set({ smsOptOut: true, updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
-        await logActivity(lead.id, "sms_opt_out", `${lead.name} sent STOP — SMS opt-out recorded`, Body);
+        await logActivity(req, lead.id, "sms_opt_out", `${lead.name} sent STOP — SMS opt-out recorded`, Body);
       }
       res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
       return;
@@ -311,7 +405,7 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
       const lead = await findLeadByPhone(From ?? "");
       if (lead) {
         await db.update(crmLeads).set({ smsOptOut: false, updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
-        await logActivity(lead.id, "sms_opt_in", `${lead.name} re-subscribed to SMS`, Body);
+        await logActivity(req, lead.id, "sms_opt_in", `${lead.name} re-subscribed to SMS`, Body);
       }
       res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
       return;
@@ -330,22 +424,30 @@ router.post("/crm/webhooks/twilio/sms", validateTwilioWebhook, async (req: Reque
         priority: "Medium",
       }).returning();
       lead = created;
-      await logActivity(lead.id, "lead_created", `New lead from inbound SMS`, `Phone: ${From}`);
+      await logActivity(req, lead.id, "lead_created", `New lead from inbound SMS`, `Phone: ${From}`);
     }
 
-    await db.insert(crmMessages).values({
+    const [inboundSms] = await db.insert(crmMessages).values({
       leadId: lead.id,
       direction: "inbound",
       channel: "sms",
       body: Body,
       twilioSid: MessageSid,
+      providerMessageId: MessageSid,
       fromNumber: From,
       toNumber: To,
       status: "received",
+      // The customer sent it. There is no staff sender, and recording that is
+      // accurate rather than leaving a gap somebody might later fill in.
+      origin: "inbound",
       metadata: NumMedia && Number(NumMedia) > 0 ? { hasMedia: true, numMedia: Number(NumMedia) } : undefined,
+    }).returning();
+
+    await linkToConversation({
+      messageId: inboundSms.id, contactId: lead.id, counterparty: From, name: lead.name,
     });
 
-    await logActivity(lead.id, "sms_received", `Inbound SMS from ${lead.name}`, Body?.substring(0, 100));
+    await logActivity(req, lead.id, "sms_received", `Inbound SMS from ${lead.name}`, Body?.substring(0, 100));
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
 
     // Stop any active sequence enrollments for this lead
@@ -373,7 +475,7 @@ router.post("/crm/webhooks/twilio/sms/status", validateTwilioWebhook, async (req
         updated[0]?.leadId != null
       ) {
         const errorSuffix = ErrorCode ? ` (error ${ErrorCode})` : "";
-        await logActivity(
+        await logActivity(req, 
           updated[0].leadId,
           "sms_failed",
           `SMS delivery failed${errorSuffix}`,
@@ -406,21 +508,27 @@ router.post("/crm/webhooks/twilio/voice", validateTwilioWebhook, async (req: Req
         priority: "Medium",
       }).returning();
       lead = created;
-      await logActivity(lead.id, "lead_created", `New lead from inbound call`, `Phone: ${From}`);
+      await logActivity(req, lead.id, "lead_created", `New lead from inbound call`, `Phone: ${From}`);
     }
 
-    await db.insert(crmMessages).values({
+    const [inboundCall] = await db.insert(crmMessages).values({
       leadId: lead.id,
       direction: "inbound",
       channel: "call",
       body: `Incoming call from ${From}`,
       twilioSid: CallSid,
+      providerMessageId: CallSid,
       fromNumber: From,
       toNumber: To,
       callStatus: "ringing",
+      origin: "inbound",
+    }).returning();
+
+    await linkToConversation({
+      messageId: inboundCall.id, contactId: lead.id, counterparty: From, name: lead.name,
     });
 
-    await logActivity(lead.id, "call_received", `Incoming call from ${lead.name}`, `From: ${From}`);
+    await logActivity(req, lead.id, "call_received", `Incoming call from ${lead.name}`, `From: ${From}`);
     await db.update(crmLeads).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(crmLeads.id, lead.id));
 
     const baseUrl = getCrmBaseUrl();
@@ -486,7 +594,7 @@ router.post("/crm/webhooks/twilio/voice/status", validateTwilioWebhook, async (r
 
         if (!alreadyLogged) {
           const durationLabel = CallDuration ? ` after ${CallDuration}s` : "";
-          await logActivity(
+          await logActivity(req, 
             existing.leadId,
             "call_missed",
             "Missed call",
@@ -503,7 +611,7 @@ router.post("/crm/webhooks/twilio/voice/status", validateTwilioWebhook, async (r
 });
 
 // ── GET /crm/phone/audit ──────────────────────────────────────────────────────
-router.get("/crm/phone/audit", requireAdmin, async (req: Request, res: Response) => {
+router.get("/crm/phone/audit", requireCrmAuth("settings.read"), async (req: Request, res: Response) => {
   try {
     const leads = await db
       .select({ id: crmLeads.id, name: crmLeads.name, phone: crmLeads.phone })
@@ -545,7 +653,7 @@ router.get("/crm/phone/audit", requireAdmin, async (req: Request, res: Response)
 });
 
 // ── POST /crm/phone/normalize ─────────────────────────────────────────────────
-router.post("/crm/phone/normalize", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/phone/normalize", requireCrmAuth("leads.write"), async (req: Request, res: Response) => {
   try {
     const { leadIds } = req.body as { leadIds?: number[] };
     if (!Array.isArray(leadIds) || leadIds.length === 0) {

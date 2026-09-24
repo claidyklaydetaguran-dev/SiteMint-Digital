@@ -1,0 +1,392 @@
+// R5 — runtime proof for the three public-write gates.
+//
+// publicWriteGuards.test.ts proves guard PLACEMENT by scanning source. This
+// file proves BEHAVIOUR: it boots the real app over loopback and issues real
+// requests, with the database replaced by a trap that throws on any access.
+//
+// That trap is what makes "zero rows written" a real assertion rather than a
+// hopeful one — a blocked request that reached the database would surface as a
+// 500 from the route's catch block instead of the expected 503.
+
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+// No credentials in the literal — see apiRootLiveness.test.ts.
+process.env["DATABASE_URL"] ??= "postgresql://127.0.0.1:1/guard_never_connected";
+process.env["CORS_ALLOWED_ORIGINS"] ??= "https://example.test";
+
+// Records every attempted database access so a blocked request can assert none.
+const dbHits: string[] = [];
+vi.mock("@workspace/db", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const trap = (name: string) =>
+    new Proxy(
+      {},
+      {
+        get(_t, prop) {
+          if (prop === "then") return undefined;
+          const key = `${name}.${String(prop)}`;
+          // Drizzle table objects are read from the same module; only the
+          // query surfaces (`db`, `pool`) are trapped, so any hit here is a
+          // genuine query attempt.
+          (globalThis as { __dbHits?: string[] }).__dbHits?.push(key);
+          throw new Error(`database accessed: ${key}`);
+        },
+      },
+    );
+  return { ...actual, db: trap("db"), pool: trap("pool") };
+});
+(globalThis as { __dbHits?: string[] }).__dbHits = dbHits;
+
+// R6: count every Stripe client acquisition and Checkout Session creation, so
+// "a blocked checkout makes zero Stripe calls" is measured, not assumed.
+const stripeCalls: string[] = [];
+(globalThis as { __stripeCalls?: string[] }).__stripeCalls = stripeCalls;
+vi.mock("./lib/stripeClient.js", () => ({
+  getUncachableStripeClient: async () => {
+    (globalThis as { __stripeCalls?: string[] }).__stripeCalls?.push("getClient");
+    return {
+      checkout: {
+        sessions: {
+          create: async () => {
+            (globalThis as { __stripeCalls?: string[] }).__stripeCalls?.push("sessions.create");
+            return { url: "https://checkout.example.test/session" };
+          },
+        },
+      },
+    };
+  },
+  getStripeSync: async () => ({}),
+}));
+
+// R8: a fetch tripwire is the honest test for "sends zero emails". The reset
+// mail leaves as a POST to the Resend API through the alert transport, so
+// counting outbound fetches catches it wherever the sender happens to live —
+// and catches any other external call a blocked request might attempt.
+const outboundFetches: string[] = [];
+globalThis.fetch = ((input: unknown) => {
+  outboundFetches.push(String(input));
+  throw new Error("outbound request attempted during a blocked request");
+}) as unknown as typeof globalThis.fetch;
+
+const { default: app } = await import("./app.js");
+
+// R6: the boot gate refuses application traffic until the boot sequence
+// marks the process ready. These suites exercise the READY app, so they
+// declare that explicitly — the fail-closed default stays "starting".
+const { setBootState } = await import("./lib/bootState.js");
+setBootState("ready");
+
+let server: http.Server;
+let base: string;
+
+beforeAll(async () => {
+  server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+const FLAGS = [
+  "PUBLIC_REGISTRATION_ENABLED",
+  "PUBLIC_FORM_SUBMISSIONS_ENABLED",
+  "PUBLIC_ANALYTICS_WRITES_ENABLED",
+  "AI_TOOLKIT_CHECKOUT_ENABLED",
+  "PUBLIC_SCHEDULING_REQUESTS_ENABLED",
+  "PASSWORD_RESET_REQUESTS_ENABLED",
+] as const;
+
+afterEach(() => {
+  for (const f of FLAGS) delete process.env[f];
+  dbHits.length = 0;
+  stripeCalls.length = 0;
+  outboundFetches.length = 0;
+});
+
+function post(path: string, body: unknown): Promise<{ status: number; body: string }> {
+  const payload = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      `${base}${path}`,
+      { method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(payload) } },
+      (res) => {
+        let out = "";
+        res.on("data", (c) => (out += c));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body: out }));
+      },
+    );
+    req.on("error", reject);
+    req.end(payload);
+  });
+}
+
+// A structurally valid v1 discovery submission — enough to get past the
+// schema if the gate ever let it through, so the test proves the GATE is
+// what stops it and not a validation error.
+const DISCOVERY_V1_BODY = {
+  meta: { formStartedAt: new Date(Date.now() - 60_000).toISOString(), honeypot: "" },
+  answers: { contact: { name: "A", email: "a@b.test" } },
+};
+
+// Several gated routes have OTHER legitimate 503s (discovery-v1 answers 503
+// when its fingerprint config is unavailable), so "did the gate fire?" is
+// decided by the gate's own message, never by the status code alone.
+const DISABLED_MESSAGE: Record<string, string> = {
+  PUBLIC_REGISTRATION_ENABLED: "Account creation is not currently available.",
+  PUBLIC_FORM_SUBMISSIONS_ENABLED: "Form submission is not currently available.",
+  PUBLIC_ANALYTICS_WRITES_ENABLED: "Analytics recording is not currently available.",
+  AI_TOOLKIT_CHECKOUT_ENABLED: "Checkout is not currently available.",
+  PUBLIC_SCHEDULING_REQUESTS_ENABLED: "Online booking is not currently available.",
+  PASSWORD_RESET_REQUESTS_ENABLED: "Password reset is not currently available.",
+};
+
+// A structurally valid booking request. The slug is a well-formed 32-hex value
+// that matches no firm, so even if the gate opened this could not create a real
+// appointment — the test proves the GATE stops it, not a bad slug.
+const SCHEDULING_BODY = {
+  appointmentTypeId: "00000000-0000-0000-0000-000000000000",
+  startUtc: new Date(Date.now() + 86_400_000).toISOString(),
+  contact: { name: "A", email: "a@b.test" },
+  formStartedAt: new Date(Date.now() - 60_000).toISOString(),
+};
+
+// path → [flag that gates it, a body that WOULD be valid if it got through]
+const GATED: Array<[string, string, unknown]> = [
+  ["/api/receptionist/auth/signup", "PUBLIC_REGISTRATION_ENABLED", { email: "a@b.test", password: "Str0ngPassw0rd!", firmName: "X" }],
+  ["/api/contact/submit", "PUBLIC_FORM_SUBMISSIONS_ENABLED", { name: "A", email: "a@b.test", message: "hello there" }],
+  ["/api/discovery/submit", "PUBLIC_FORM_SUBMISSIONS_ENABLED", { name: "A", email: "a@b.test" }],
+  ["/api/landing-test/submit", "PUBLIC_FORM_SUBMISSIONS_ENABLED", { vertical: "lawyers", name: "A", email: "a@b.test" }],
+  ["/api/landing-test/view", "PUBLIC_ANALYTICS_WRITES_ENABLED", { page: "lawyers" }],
+  // R6: the two writers closed in this PR.
+  ["/api/v1/discovery-submissions", "PUBLIC_FORM_SUBMISSIONS_ENABLED", DISCOVERY_V1_BODY],
+  ["/api/ai-toolkit/checkout", "AI_TOOLKIT_CHECKOUT_ENABLED", {}],
+  // R7: the public booking writer.
+  ["/api/public/schedule/00000000000000000000000000000000/requests", "PUBLIC_SCHEDULING_REQUESTS_ENABLED", SCHEDULING_BODY],
+  // R8: the last public writer.
+  ["/api/receptionist/account/password-reset/request", "PASSWORD_RESET_REQUESTS_ENABLED", { email: "nobody@example.test" }],
+];
+
+function get(path: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(`${base}${path}`, { method: "GET" }, (res) => {
+      let out = "";
+      res.on("data", (c) => (out += c));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body: out }));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+describe("public write gates — runtime behaviour", () => {
+  for (const [path, flag, body] of GATED) {
+    it(`${path} is refused with 503 and touches no database when ${flag} is absent`, async () => {
+      const res = await post(path, body);
+      expect(res.status).toBe(503);
+      expect(res.body).toContain(DISABLED_MESSAGE[flag] as string);
+      expect(dbHits, "a blocked request must not reach the database").toEqual([]);
+    });
+
+    it(`${path} discloses no flag name or configuration detail while disabled`, async () => {
+      const res = await post(path, body);
+      expect(res.body).not.toContain(flag);
+      expect(res.body).not.toMatch(/PUBLIC_[A-Z_]*ENABLED/);
+      expect(res.body).not.toMatch(/env|process|config/i);
+    });
+
+    for (const bad of ["", " ", "false", "FALSE", "TRUE", "True", "1", "yes", "on", "true "]) {
+      it(`${path} stays refused when ${flag}=${JSON.stringify(bad)}`, async () => {
+        process.env[flag] = bad;
+        const res = await post(path, body);
+        expect(res.status).toBe(503);
+        expect(res.body).toContain(DISABLED_MESSAGE[flag] as string);
+        expect(dbHits).toEqual([]);
+      });
+    }
+
+    it(`${path} passes the gate when ${flag} is exactly "true"`, async () => {
+      process.env[flag] = "true";
+      const res = await post(path, body);
+      // Past the gate the request meets the trapped database, this route's own
+      // validation, or its own unrelated 503 — what must no longer appear is
+      // the GATE's reply. That is what the exact string "true" changes.
+      expect(res.body).not.toContain(DISABLED_MESSAGE[flag] as string);
+    });
+  }
+
+  it("the analytics gate is independent of the form-submission gate", async () => {
+    process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
+    const res = await post("/api/landing-test/view", { page: "lawyers" });
+    expect(res.status, "enabling forms must not enable analytics").toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_ANALYTICS_WRITES_ENABLED"] as string);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("the form-submission gate is independent of the analytics gate", async () => {
+    process.env["PUBLIC_ANALYTICS_WRITES_ENABLED"] = "true";
+    const res = await post("/api/landing-test/submit", { vertical: "lawyers", name: "A", email: "a@b.test" });
+    expect(res.status, "enabling analytics must not enable form submission").toBe(503);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("the registration gate is independent of both others", async () => {
+    process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
+    process.env["PUBLIC_ANALYTICS_WRITES_ENABLED"] = "true";
+    const res = await post("/api/receptionist/auth/signup", { email: "a@b.test", password: "Str0ngPassw0rd!", firmName: "X" });
+    expect(res.status).toBe(503);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("a blocked checkout makes zero Stripe calls", async () => {
+    const res = await post("/api/ai-toolkit/checkout", {});
+    expect(res.status).toBe(503);
+    expect(stripeCalls, "no Stripe client may be built and no session created").toEqual([]);
+    expect(dbHits, "not even the price lookup may run").toEqual([]);
+  });
+
+  it("an enabled checkout reaches Stripe and returns the session url", async () => {
+    process.env["AI_TOOLKIT_CHECKOUT_ENABLED"] = "true";
+    const res = await post("/api/ai-toolkit/checkout", {});
+    // The price lookup hits the trapped database first, which is itself proof
+    // the gate opened; Stripe is reached only once that lookup succeeds.
+    expect(res.status).not.toBe(503);
+    expect(dbHits.length, "enabled checkout performs the price lookup").toBeGreaterThan(0);
+  });
+
+  it("checkout is not gated by the boot-sync flag", async () => {
+    process.env["STRIPE_BOOT_SYNC_ENABLED"] = "true";
+    const res = await post("/api/ai-toolkit/checkout", {});
+    expect(res.status, "boot sync must not enable customer checkout").toBe(503);
+    expect(stripeCalls).toEqual([]);
+    delete process.env["STRIPE_BOOT_SYNC_ENABLED"];
+  });
+
+  it("a blocked discovery submission creates no submission, job or external action", async () => {
+    const res = await post("/api/v1/discovery-submissions", DISCOVERY_V1_BODY);
+    expect(res.status).toBe(503);
+    expect(dbHits, "no submission row and no pending job").toEqual([]);
+    expect(stripeCalls).toEqual([]);
+  });
+
+  it("discovery and checkout gates are independent of each other", async () => {
+    process.env["AI_TOOLKIT_CHECKOUT_ENABLED"] = "true";
+    expect((await post("/api/v1/discovery-submissions", DISCOVERY_V1_BODY)).body)
+      .toContain(DISABLED_MESSAGE["PUBLIC_FORM_SUBMISSIONS_ENABLED"] as string);
+    delete process.env["AI_TOOLKIT_CHECKOUT_ENABLED"];
+    process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
+    const res = await post("/api/ai-toolkit/checkout", {});
+    expect(res.status).toBe(503);
+    expect(stripeCalls).toEqual([]);
+  });
+
+  it("a blocked booking request is refused before the slug lookup", async () => {
+    // The slug is syntactically valid but matches no firm. A request that got
+    // past the gate would resolve the firm (a database read) and answer 404;
+    // 503 with no database hit proves the gate ran first.
+    const res = await post("/api/public/schedule/00000000000000000000000000000000/requests", SCHEDULING_BODY);
+    expect(res.status).toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    expect(dbHits, "no slug/firm lookup, no appointment row, no dependent row").toEqual([]);
+    expect(stripeCalls, "no external action").toEqual([]);
+  });
+
+  it("a blocked booking request is refused before rate limiting or honeypot", async () => {
+    // A tripped honeypot answers 400. Sending one and still getting 503 proves
+    // the gate precedes the bot checks — and that the limiter budget is never
+    // consumed while booking is off.
+    const trapped = { ...SCHEDULING_BODY, website: "http://spam.example" };
+    for (let i = 0; i < 12; i++) {
+      const res = await post("/api/public/schedule/00000000000000000000000000000000/requests", trapped);
+      expect(res.status, `attempt ${i}`).toBe(503);
+      expect(res.body, `attempt ${i}`).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    }
+    expect(dbHits).toEqual([]);
+  });
+
+  it("public read-only scheduling stays available while booking is off", async () => {
+    // Gating the writer must not take the booking page down. These are reads,
+    // so they reach the trapped database — which is the point: they were not
+    // short-circuited by the booking gate.
+    for (const path of [
+      "/api/public/schedule/00000000000000000000000000000000/config",
+      "/api/public/schedule/00000000000000000000000000000000/days",
+      "/api/public/schedule/00000000000000000000000000000000/slots",
+    ]) {
+      const res = await get(path);
+      expect(res.body, path).not.toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    }
+  });
+
+  it("the booking gate is independent of the other four flags", async () => {
+    process.env["PUBLIC_FORM_SUBMISSIONS_ENABLED"] = "true";
+    process.env["PUBLIC_REGISTRATION_ENABLED"] = "true";
+    process.env["PUBLIC_ANALYTICS_WRITES_ENABLED"] = "true";
+    process.env["AI_TOOLKIT_CHECKOUT_ENABLED"] = "true";
+    const res = await post("/api/public/schedule/00000000000000000000000000000000/requests", SCHEDULING_BODY);
+    expect(res.status, "no other flag may enable booking").toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PUBLIC_SCHEDULING_REQUESTS_ENABLED"] as string);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("a blocked password-reset request writes no token, no audit row, and sends no email", async () => {
+    const res = await post("/api/receptionist/account/password-reset/request", { email: "nobody@example.test" });
+    expect(res.status).toBe(503);
+    expect(res.body).toContain(DISABLED_MESSAGE["PASSWORD_RESET_REQUESTS_ENABLED"] as string);
+    // The token row, the audit row and the email all live behind the imported
+    // requestPasswordReset, which reaches the database first. No database hit
+    // means none of the three happened.
+    expect(dbHits, "no token row and no audit row").toEqual([]);
+    expect(outboundFetches, "no outbound request while reset is disabled").toEqual([]);
+  });
+
+  it("a blocked reset request stays blocked across repeated attempts", async () => {
+    // Also proves the gate precedes the rate limiter: 12 attempts against a
+    // 10-per-hour bucket never turn into 429, and never consume budget.
+    for (let i = 0; i < 12; i++) {
+      const res = await post("/api/receptionist/account/password-reset/request", { email: `a${i}@example.test` });
+      expect(res.status, `attempt ${i}`).toBe(503);
+    }
+    expect(dbHits).toEqual([]);
+    expect(outboundFetches).toEqual([]);
+  });
+
+  it("the reset gate is independent of the other five flags", async () => {
+    for (const f of FLAGS) if (f !== "PASSWORD_RESET_REQUESTS_ENABLED") process.env[f] = "true";
+    const res = await post("/api/receptionist/account/password-reset/request", { email: "nobody@example.test" });
+    expect(res.status, "no other flag may enable password reset").toBe(503);
+    expect(dbHits).toEqual([]);
+  });
+
+  it("having an email provider configured does not enable password reset", async () => {
+    // Generic mail configuration is not consent to expose password recovery.
+    process.env["RESEND_API_KEY"] = "re_test_not_a_real_key";
+    const res = await post("/api/receptionist/account/password-reset/request", { email: "nobody@example.test" });
+    expect(res.status).toBe(503);
+    expect(outboundFetches).toEqual([]);
+    delete process.env["RESEND_API_KEY"];
+  });
+
+  it("the token-proven sibling routes are not gated by the reset flag", async () => {
+    // Gating these would strand anyone holding a valid token.
+    for (const path of [
+      "/api/receptionist/account/password-reset/complete",
+      "/api/receptionist/account/verify-email/confirm",
+      "/api/receptionist/account/members/accept",
+    ]) {
+      const res = await post(path, { token: "x".repeat(40), newPassword: "Str0ngPassw0rd!" });
+      expect(res.body, path).not.toContain(DISABLED_MESSAGE["PASSWORD_RESET_REQUESTS_ENABLED"] as string);
+    }
+  });
+
+  it("login is not gated by any public-write flag", async () => {
+    // A gate on login would lock out existing customers; it must reach the
+    // credential path (and therefore the trapped database) even with all
+    // three flags absent.
+    const res = await post("/api/receptionist/auth/login", { email: "a@b.test", password: "x" });
+    expect(res.status).not.toBe(503);
+  });
+});

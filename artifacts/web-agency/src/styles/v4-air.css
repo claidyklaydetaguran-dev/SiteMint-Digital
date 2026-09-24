@@ -1,0 +1,319 @@
+/**
+ * Frontend V4 — AI Receptionist landing presentation (hero grid, staging
+ * theater, steps, straight answers). Namespaced `v4-air-*` / `v4-theater-*`;
+ * consumes only V4 tokens and the shared V4 marketing vocabulary.
+ */
+
+.v4-air__hero {
+  padding-block: calc(var(--v4-hdr-h) + clamp(2rem, 6vw, 4rem))
+    clamp(3rem, 7vw, 5rem);
+}
+
+.v4-air__crumb {
+  margin: 0 0 1.2rem;
+}
+
+.v4-air__crumb a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.v4-air__crumb a:hover {
+  text-decoration: underline;
+}
+
+.v4-air__grid {
+  display: grid;
+  grid-template-columns: 6fr 6fr;
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: center;
+}
+
+.v4-air__title {
+  color: var(--v4-cloud);
+  font-size: clamp(2rem, 3.8vw, 3.2rem);
+  line-height: 1.06;
+  margin: 0 0 0.9rem;
+  text-wrap: balance;
+}
+
+.v4-air__sub {
+  color: var(--v4-mute-dark);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 32em;
+  margin: 0 0 1.5rem;
+}
+
+.v4-air__ctas {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.v4-air__note {
+  color: var(--v4-mute-dark);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  max-width: 34em;
+  margin: 1.4rem 0 0;
+}
+
+/* ── Theater ───────────────────────────────────────────────────────────── */
+.v4-theater {
+  border: 1px solid var(--v4-navy-line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--v4-navy) 0%, #0a1c33 100%);
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  min-height: 470px;
+}
+
+.v4-theater__tag {
+  font-family: var(--v4-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--v4-ink);
+  background: var(--v4-amber);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.v4-theater__voice {
+  width: 170px;
+  height: 170px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.v4-theater__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.v4-theater__gem {
+  width: 56px;
+  height: 56px;
+  position: relative;
+  z-index: 1;
+}
+
+.v4-theater[data-state="ready"] .v4-theater__gem {
+  animation: v4-breathe 4s ease-in-out infinite;
+}
+
+@keyframes v4-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+.v4-theater__state {
+  font-family: var(--v4-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--v4-cloud);
+  margin: 0;
+  min-height: 1.4em;
+}
+
+.v4-theater__timer {
+  font-family: var(--v4-font-mono);
+  font-size: 0.85rem;
+  color: var(--v4-mute-dark);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theater__chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.v4-theater__chip {
+  border: 1px solid var(--v4-navy-line);
+  background: none;
+  color: var(--v4-mute-dark);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  min-height: 38px;
+  cursor: pointer;
+  transition:
+    color 160ms ease-out,
+    border-color 160ms ease-out,
+    background 160ms ease-out;
+}
+
+.v4-theater__chip:hover {
+  color: var(--v4-cloud);
+  border-color: var(--v4-cyan);
+}
+
+.v4-theater__chip[aria-pressed="true"] {
+  color: var(--v4-ink);
+  background: var(--v4-cyan);
+  border-color: var(--v4-cyan);
+}
+
+.v4-theater__convo {
+  width: 100%;
+  max-height: 120px;
+  overflow: auto;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--v4-mute-dark);
+}
+
+.v4-theater__line {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.v4-theater__line b {
+  color: var(--v4-cloud);
+  font-weight: 500;
+}
+
+.v4-theater__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.v4-theater__end {
+  border-color: var(--v4-red);
+  color: var(--v4-red);
+  background: transparent;
+}
+
+.v4-theater__disclose {
+  font-size: 0.78rem;
+  color: var(--v4-mute-dark);
+  text-align: center;
+  max-width: 34em;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.v4-theater__privacy {
+  font-family: var(--v4-font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--v4-mute-dark);
+  border-top: 1px solid var(--v4-navy-line);
+  padding-top: 0.7rem;
+  width: 100%;
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Steps (01) ────────────────────────────────────────────────────────── */
+.v4-air__steps {
+  list-style: none;
+  margin: 2.4rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.1rem;
+}
+
+.v4-air__step {
+  background: var(--v3-bg-raised, var(--v4-paper));
+  border: 1px solid var(--v3-line, var(--v4-mist));
+  border-radius: 10px;
+  padding: 1.3rem;
+}
+
+.v4-air__step-num {
+  font-family: var(--v4-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--v4-cyan-deep);
+}
+
+.v4-air__step-title {
+  font-size: 1.1rem;
+  margin: 0.4rem 0 0.35rem;
+}
+
+.v4-air__step-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--v3-fg-muted, var(--v4-mute));
+}
+
+/* ── Straight answers (02) ─────────────────────────────────────────────── */
+.v4-air__answers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.1rem;
+  margin-top: 2.4rem;
+}
+
+.v4-air__answer {
+  border-left: 3px solid var(--v4-cyan-deep);
+  padding-left: 1.1rem;
+}
+
+.v4-air__answer-q {
+  font-size: 1.05rem;
+  margin: 0 0 0.4rem;
+}
+
+.v4-air__answer-a {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--v3-fg-muted, var(--v4-mute));
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .v4-air__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v4-air__steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .v4-air__answers {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .v4-air__steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .v4-theater[data-state="ready"] .v4-theater__gem {
+    animation: none;
+  }
+}

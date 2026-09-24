@@ -1,0 +1,38 @@
+/**
+ * Frontend V4 — Signal skin for the retained auth surface (AI Receptionist
+ * signup under AuthShell).
+ *
+ * Pure token-value override, one hop above the committed V3 layer: v3-pages
+ * already re-points the signup's `--v2-*` names at `--v3-*`; this block
+ * re-points those `--v3-*` names at the V4 Signal values inside the auth
+ * shell only. No markup, logic, or signup contract changes — the committed
+ * signupContract test keeps reading the same source literals.
+ *
+ * Doubled class keeps the override order-proof. ROLLBACK: remove this
+ * file's import from index.css to restore the V3 signup appearance.
+ */
+
+.v2-auth-shell .sg-page.sg-page {
+  --v3-porcelain: var(--v4-cloud);
+  --v3-white: var(--v4-paper);
+  --v3-ice: #e7f4f8;
+  --v3-mint: var(--v4-cyan); /* fill accent — ink text on it is 9.5:1 */
+  --v3-ink: var(--v4-ink);
+  --v3-charcoal: var(--v4-navy);
+  --v3-slate: var(--v4-mute);
+  --v3-radius-control: 6px;
+  --v3-radius-card: 10px;
+  --v3-font-sans: var(--v4-font-body);
+}
+
+.v2-auth-shell .sg-page h1,
+.v2-auth-shell .sg-page h2,
+.v2-auth-shell .sg-page h3 {
+  font-family: var(--v4-font-display);
+  letter-spacing: -0.02em;
+}
+
+.v2-auth-shell .sg-page :focus-visible {
+  outline: 2px solid var(--v4-cyan-deep);
+  outline-offset: 2px;
+}

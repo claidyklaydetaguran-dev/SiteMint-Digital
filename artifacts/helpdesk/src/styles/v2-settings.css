@@ -1,0 +1,310 @@
+/**
+ * Frontend V2 Phase 11 — the Settings workspace layer.
+ *
+ * Companion to `v2-dashboard.css` (Phase 7) and the Phase 8–10 route layers,
+ * and subject to the same rules. This file **defines no colour of its own**:
+ * every value below is an `--sd-*` token from the shell, so the route inherits
+ * the palette, the dark counterpart, the focus ring, the 8-point spacing, the
+ * 44px minimum target and the motion system without restating any of them. No
+ * new colour family, no remote request, no font, no image, no gradient, no
+ * glow, no decorative loop.
+ *
+ * Namespaced `sg-*` (SiteMint settings) so it cannot collide with `sd-*`,
+ * `si-*`, `sc-*`, `sr-*`, `sk-*`, the `--v2-*` public tokens or the app's
+ * shadcn variables. It is imported *alongside* the shell stylesheet, never
+ * instead of it.
+ *
+ * ── Composition ───────────────────────────────────────────────────────────
+ * One editorial column on the warm-white canvas, capped at the measure the
+ * other read-first routes use. The page is an account record, so it is built
+ * from hairline rows rather than cards: four values, two destinations, one
+ * notice and one action, in that order, each separated by rules rather than by
+ * boxes. Nothing here is a panel, because nothing here is a container the eye
+ * needs to keep track of.
+ *
+ * The one place the system's saturated mint appears is the two genuine links
+ * and the focus ring — the same rule as every other route: mint marks something
+ * you can actually do. The read-only values are deliberately quiet, and the
+ * sign-out control is a bordered button rather than a filled one, so the most
+ * destructive thing on the page is findable without being the loudest.
+ *
+ * ── Motion ────────────────────────────────────────────────────────────────
+ * Inherited, not extended. The shell's single 8px entrance runs once on the
+ * page container via `sd-enter`. This layer adds no keyframes at all — it
+ * transitions only colour properties, and `prefers-reduced-motion` is already
+ * honoured globally by `index.css`. Nothing loops, nothing staggers, nothing
+ * animates on scroll, and no animation here can trigger a request.
+ */
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
+
+/* Narrower than the shell default: this is a record to be read, not a
+   workspace to be scanned, so the measure is capped for line length rather
+   than stretched to the viewport. */
+/* Tighter than the other read-first routes on purpose: the whole record —
+   four values, two destinations, one notice and the sign-out control — is
+   meant to be readable at 1440×900 without scrolling, so Sign out is findable
+   without being hunted for. */
+.sg-page {
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--sd-space-6) var(--sd-space-6) var(--sd-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+/* The one sentence that says what the route is for. Sits under the title at
+   the same measure as the rest of the column. */
+.sg-lede {
+  margin: var(--sd-space-2) 0 0;
+  max-width: 40rem;
+  font-size: var(--sd-text-body);
+  line-height: 1.6;
+  color: var(--sd-text-muted);
+}
+
+/* The authentication-loading branch. Text, not a spinner: the shell already
+   owns the boot animation, and a second one competing with it reads as two
+   things loading instead of one. */
+.sg-loading {
+  margin: 0;
+  padding: var(--sd-space-8) 0;
+  font-size: var(--sd-text-body);
+  color: var(--sd-text-muted);
+}
+
+/* ── Account record ────────────────────────────────────────────────────── */
+
+/* Sits with the section heading rather than beside each row: saying "read
+   only" four times would make a normal account look restricted. */
+.sg-note {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+
+.sg-fields {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--sd-border);
+}
+
+/* Label column tight enough that the value reads as attached to it. */
+.sg-fields__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  gap: var(--sd-space-2) var(--sd-space-4);
+  align-items: baseline;
+  padding: var(--sd-space-3) 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.sg-fields__label {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A long business name or a long address wraps; it is never truncated, because
+   a half-shown email address is worse than a wrapped one. */
+.sg-fields__value {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  line-height: 1.55;
+  color: var(--sd-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* An absent optional value is muted, never red: nothing has gone wrong. The
+   distinction is carried by the words "Not available", not by the colour. */
+.sg-fields__value[data-missing="true"] {
+  color: var(--sd-text-muted);
+}
+
+/* ── Configuration destinations ────────────────────────────────────────── */
+
+.sg-places {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--sd-border);
+}
+
+/* Same hairline rhythm as the account rows, so the page reads as one record
+   rather than as two unrelated modules. */
+.sg-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-3) var(--sd-space-6);
+  padding: var(--sd-space-2) 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.sg-place__body {
+  min-width: 0;
+}
+
+.sg-place__title {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+
+.sg-place__detail {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text-muted);
+}
+
+/* Inherits `.sd-link`'s 44px minimum target and its underline treatment; this
+   only stops the label wrapping mid-phrase and places the icon. */
+.sg-place__action {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.sg-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+/* ── Preference notice ─────────────────────────────────────────────────── */
+
+/* Phase 7's band is built for readiness states that call for action. Here the
+   message is settled information, so the dot keeps the neutral treatment and
+   the band sits on the muted surface rather than the accent one — mint is
+   reserved for something being right, and "not available" is neither right nor
+   wrong. */
+.sg-status[data-state="neutral"] {
+  background: var(--sd-muted-surface);
+  border-color: var(--sd-border);
+}
+.sg-status[data-state="neutral"] .sd-status__dot {
+  background: var(--sd-muted-text);
+}
+.sg-status .sd-status__detail {
+  max-width: 46rem;
+}
+
+/* ── Session ───────────────────────────────────────────────────────────── */
+
+.sg-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-3) var(--sd-space-6);
+  padding-top: var(--sd-space-4);
+  border-top: 1px solid var(--sd-border);
+}
+
+.sg-session__detail {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+
+/* Bordered rather than filled. Signing out is genuine and must be easy to find,
+   but it is not the thing the operator came here to do, so it does not take the
+   page's only saturated fill. */
+.sg-signout {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--sd-space-5);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface);
+  color: var(--sd-text);
+  font: inherit;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--sd-dur-control) var(--sd-ease),
+    border-color var(--sd-dur-control) var(--sd-ease),
+    color var(--sd-dur-control) var(--sd-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sg-signout:hover:not(:disabled) {
+    background: var(--sd-surface-alt);
+    border-color: var(--sd-text-muted);
+  }
+}
+
+.sg-signout:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+
+/* Pending: the control stays in place and keeps its size, so the row does not
+   reflow under the pointer while the request is in flight. */
+.sg-signout:disabled {
+  cursor: progress;
+  color: var(--sd-text-muted);
+  border-color: var(--sd-border);
+}
+
+/* ── Sign-out failure ──────────────────────────────────────────────────── */
+
+/* Red is used here and nowhere else on the route, because this is the only
+   genuine error state it has. The message is also announced, so the colour is
+   never the only carrier. */
+.sg-failure {
+  margin-top: var(--sd-space-4);
+  padding: var(--sd-space-4);
+  border: 1px solid var(--sd-danger-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-danger-surface);
+}
+
+.sg-failure__title {
+  margin: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-danger);
+}
+
+.sg-failure__detail {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text);
+}
+
+/* ── Narrow viewports ──────────────────────────────────────────────────── */
+
+/* A two-column grid at 360px leaves the value column too tight to read, and a
+   right-aligned action on the same line as its description forces both to
+   truncate. Both stack. */
+@media (max-width: 40rem) {
+  .sg-page {
+    padding: var(--sd-space-6) var(--sd-space-4) var(--sd-space-8);
+    gap: var(--sd-space-6);
+  }
+  .sg-fields__row {
+    grid-template-columns: 1fr;
+    gap: var(--sd-space-1);
+  }
+  .sg-place,
+  .sg-session {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sg-signout {
+    width: 100%;
+  }
+}

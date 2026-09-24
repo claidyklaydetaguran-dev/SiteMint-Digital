@@ -2,19 +2,19 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { eq } from "drizzle-orm";
 import { db, crmLeads } from "@workspace/db";
 import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth } from "../lib/staffAuth.js";
 import { generateCampaignDraft, generateSequenceDraft } from "../lib/aiCampaign.js";
+import { isOpenAiUnavailableError } from "../lib/openAiUnavailable.js";
 
 const DISC_STYLES = new Set(["Driver", "Expressive", "Amiable", "Analytical"]);
 
 const router: IRouter = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const token = auth.substring(7);
-  if (!validateToken(token)) { res.status(401).json({ error: "Invalid token" }); return; }
-  next();
-}
+// M1 cutover: the CRM gate now accepts a per-person staff session first and
+// falls back to the legacy shared bearer only while CRM_LEGACY_BEARER_ENABLED
+// is not "false". Keeping the name leaves every route below unchanged, and
+// the route-security manifest still reads "admin" for them.
+const requireAdmin = requireCrmAuth();
 
 // ── POST /crm/campaigns/ai-generate ──────────────────────────────────────────
 // Returns a structured JSON draft (single campaign OR multi-step sequence) for
@@ -22,7 +22,7 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 // campaign/step, NEVER enrolls a lead, and NEVER sends anything — it only
 // returns draft data. A human must click the existing Save/Create button.
 
-router.post("/crm/campaigns/ai-generate", requireAdmin, async (req: Request, res: Response) => {
+router.post("/crm/campaigns/ai-generate", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       mode,
@@ -76,6 +76,12 @@ router.post("/crm/campaigns/ai-generate", requireAdmin, async (req: Request, res
     const draft = await generateCampaignDraft(input);
     res.json({ mode: "single", draft });
   } catch (err) {
+    // AR-001O: an unconfigured OpenAI integration is not a server fault, and a
+    // retry cannot fix it. Hand it to the 503 handler registered in app.ts.
+    if (isOpenAiUnavailableError(err)) {
+      next(err);
+      return;
+    }
     req.log.error({ err }, "Error generating AI campaign draft");
     res.status(500).json({ error: "Failed to generate draft — please try again." });
   }

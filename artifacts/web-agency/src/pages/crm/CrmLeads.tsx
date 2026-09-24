@@ -1,19 +1,22 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useLocation, Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, RefreshCw, Download, Users, Phone, MessageSquare, SlidersHorizontal, List, Mail } from "lucide-react";
+import { Search, Plus, RefreshCw, Download, FileDown, Users, Phone, MessageSquare, List } from "lucide-react";
 import { scoreLeadFromFields } from "@/lib/leadScore";
-import { LEAD_STATUSES, PROJECT_TYPES } from "@/lib/crmTaxonomy";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { LEAD_STATUSES, PROJECT_TYPES, LEAD_STATUS_STYLES, normalizeLeadStatus } from "@/lib/crmTaxonomy";
+import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
+import { ownerLabel, useCrmAssignees } from "@/lib/crmAssignees";
+import { OwnerPicker } from "@/components/crm/OwnerPicker";
 
 const STATUSES = [...LEAD_STATUSES];
 const SERVICE_TYPES = [...PROJECT_TYPES];
 const PRIORITIES = ["Low","Medium","High"];
 
 const AVATAR_COLORS = [
-  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
+  "bg-blue-500","bg-cyan-500","bg-teal-500","bg-teal-500",
   "bg-red-400","bg-orange-400","bg-yellow-500","bg-teal-500","bg-cyan-500","bg-emerald-500",
 ];
 function initials(name: string) {
@@ -38,8 +41,12 @@ function timeAgo(d: string) {
 
 interface Lead {
   id: number; name: string; company?: string; email: string; phone?: string;
+  /** M7: the company record this contact is linked to, when somebody has linked it. */
+  companyId?: number | null; companyName?: string | null;
   status: string; priority: string; source: string; serviceInterest?: string;
   assignedTo?: string; nextFollowUpAt?: string | null; lastContactedAt?: string | null;
+  /** M6: the staff reference the product reads; `assignedTo` is the name as recorded. */
+  assignedToStaffId?: number | null;
   createdAt: string; updatedAt: string; tags: string[];
   estimatedValue?: string | null;
   proposalStatus?: string;
@@ -49,13 +56,14 @@ interface Lead {
 interface NewLeadForm {
   name: string; email: string; company: string; phone: string; website: string;
   source: string; serviceInterest: string; status: string; priority: string;
-  assignedTo: string; notes: string;
+  /** M6: a staff id from the picker — the server records that person's name beside it. */
+  assignedToStaffId: number | null; notes: string;
 }
 
 const emptyForm: NewLeadForm = {
   name:"", email:"", company:"", phone:"", website:"",
   source:"Manual Entry", serviceInterest:"", status:"New Inquiry", priority:"Medium",
-  assignedTo:"", notes:"",
+  assignedToStaffId: null, notes:"",
 };
 
 const DAY = 86_400_000;
@@ -73,16 +81,19 @@ interface SmartList {
   section?: "stage" | "priority" | "intelligence";
 }
 
+// Note: filterStatus values are canonical LeadStatus strings (crmTaxonomy). Every
+// lead is bucketed via normalizeLeadStatus(lead.status) so legacy raw status
+// strings (e.g. "New", "Contacted") still group into the right smart list.
 const STAGE_LISTS: SmartList[] = [
   { label: "All People",                emoji: "👥",  section: "stage" },
-  { label: "New Lead - Needs Contact",  emoji: "🟢", filterStatus: "New",           section: "stage" },
-  { label: "Contacted",                 emoji: "📞", filterStatus: "Contacted",     section: "stage" },
-  { label: "Follow-up",                 emoji: "🔔", filterStatus: "Follow-up",     section: "stage" },
-  { label: "Proposal Sent",             emoji: "📄", filterStatus: "Proposal Sent", section: "stage" },
-  { label: "Active / Negotiating",      emoji: "🤝", filterStatus: "Negotiating",   section: "stage" },
-  { label: "Won Clients",               emoji: "🏆", filterStatus: "Won",           section: "stage" },
-  { label: "Nurture",                   emoji: "🌱", filterStatus: "Nurture",       section: "stage" },
-  { label: "Lost",                      emoji: "❌", filterStatus: "Lost",          section: "stage" },
+  { label: "New Lead - Needs Contact",  emoji: "🟢", filterStatus: "New Inquiry",       section: "stage" },
+  { label: "Contacted",                 emoji: "📞", filterStatus: "Follow-Up Needed",  section: "stage" },
+  { label: "Follow-up",                 emoji: "🔔", filterStatus: "Follow-Up Needed",  section: "stage" },
+  { label: "Proposal Sent",             emoji: "📄", filterStatus: "Proposal Sent",     section: "stage" },
+  { label: "Active / Negotiating",      emoji: "🤝", filterStatus: "Qualified",         section: "stage" },
+  { label: "Won Clients",               emoji: "🏆", filterStatus: "Won",               section: "stage" },
+  { label: "Nurture",                   emoji: "🌱", filterStatus: "On Hold",           section: "stage" },
+  { label: "Lost",                      emoji: "❌", filterStatus: "Lost",              section: "stage" },
 ];
 
 const INTELLIGENCE_LISTS: SmartList[] = [
@@ -99,14 +110,14 @@ const INTELLIGENCE_LISTS: SmartList[] = [
     filterFn: (l) =>
       !!l.nextFollowUpAt &&
       new Date(l.nextFollowUpAt) < new Date() &&
-      !["Won","Lost"].includes(l.status),
+      !["Won","Lost"].includes(normalizeLeadStatus(l.status)),
   },
   {
     label: "No Contact 14 Days",
     emoji: "📞",
     section: "intelligence",
     filterFn: (l) =>
-      !["Won","Lost"].includes(l.status) &&
+      !["Won","Lost"].includes(normalizeLeadStatus(l.status)) &&
       (!l.lastContactedAt || Date.now() - new Date(l.lastContactedAt).getTime() > 14 * DAY),
   },
   {
@@ -119,13 +130,13 @@ const INTELLIGENCE_LISTS: SmartList[] = [
     label: "Waiting for Reply",
     emoji: "📩",
     section: "intelligence",
-    filterFn: (l) => l.status === "Proposal Sent",
+    filterFn: (l) => normalizeLeadStatus(l.status) === "Proposal Sent",
   },
   {
     label: "Cold Leads",
     emoji: "🧊",
     section: "intelligence",
-    filterFn: (_l, score) => score < 40 && !["Won","Lost"].includes(_l.status),
+    filterFn: (_l, score) => score < 40 && !["Won","Lost"].includes(normalizeLeadStatus(_l.status)),
   },
 ];
 
@@ -137,48 +148,66 @@ const PRIORITY_LISTS: SmartList[] = [
 
 const ALL_LISTS = [...STAGE_LISTS, ...INTELLIGENCE_LISTS, ...PRIORITY_LISTS];
 
+function pickLeads(body: unknown): Lead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as Lead[] : undefined;
+}
+
 export default function CrmLeads() {
   const [, navigate] = useLocation();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [allLeads, setAllLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Measured 2026-09-16: while this request was failing the page rendered
+  // "All People — 0 people" over an empty table, and the database held 15
+  // contacts. The list is a `Load` now, so "we could not ask" can never again
+  // be rendered as "you have none".
+  const [leadsLoad, setLeadsLoad] = useState<Load<Lead[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [activeList, setActiveList] = useState<SmartList>(STAGE_LISTS[0]);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<NewLeadForm>(emptyForm);
+  // M6: who a contact can be handed to — and whose name to show for a
+  // contact's staff reference in the list.
+  const people = useCrmAssignees();
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [importingDiscovery, setImportingDiscovery] = useState(false);
-  const [importMsg, setImportMsg] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [importMsg, setImportMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  // Collapsed by default on phones — at 375px the list rail crowded the rows.
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window === "undefined" || window.matchMedia("(min-width: 768px)").matches);
+  const [listQuery, setListQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState("");
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    setLoading(true);
-    const r = await fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const d = await r.json() as { leads: Lead[] };
-    setAllLeads(d.leads || []);
-    setLoading(false);
-  }, [navigate]);
+    setReloading(true);
+    setLeadsLoad(await readAdminResource("/api/crm/leads", pickLeads));
+    setReloading(false);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  /** The contacts, or null when the request did not produce any. */
+  const allLeads = leadsLoad.status === "ready" ? leadsLoad.data : null;
 
   // ── Memoised health scores (computed once per allLeads change) ────────────
   const scoreMap = useMemo(() => {
     const map = new Map<number, ReturnType<typeof scoreLeadFromFields>>();
-    for (const l of allLeads) map.set(l.id, scoreLeadFromFields(l));
+    for (const l of allLeads ?? []) map.set(l.id, scoreLeadFromFields(l));
     return map;
   }, [allLeads]);
 
   // ── Client-side filtering (instant, no extra API calls) ───────────────────
-  useEffect(() => {
+  // null, not [], when the contacts never arrived — so nothing downstream can
+  // count it and report a zero.
+  const leads = useMemo<Lead[] | null>(() => {
+    if (allLeads === null) return null;
     let filtered = allLeads;
     const fs = activeList.filterStatus || filterStatus;
     const fp = activeList.filterPriority || filterPriority;
-    if (fs) filtered = filtered.filter(l => l.status === fs);
+    if (fs) filtered = filtered.filter(l => normalizeLeadStatus(l.status) === fs);
     if (fp) filtered = filtered.filter(l => l.priority === fp);
     if (activeList.filterFn) {
       filtered = filtered.filter(l => {
@@ -189,18 +218,21 @@ export default function CrmLeads() {
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(l =>
-        l.name.toLowerCase().includes(q) ||
-        l.email.toLowerCase().includes(q) ||
+        (l.name ?? "").toLowerCase().includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q) ||
         (l.company || "").toLowerCase().includes(q) ||
+        (l.companyName || "").toLowerCase().includes(q) ||
         (l.phone || "").includes(q)
       );
     }
-    setLeads(filtered);
+    return filtered;
   }, [allLeads, activeList, filterStatus, filterPriority, search, scoreMap]);
 
-  const countFor = (list: SmartList) => {
+  /** How many are in a smart list, or null when the contacts never arrived. */
+  const countFor = (list: SmartList): number | null => {
+    if (allLeads === null) return null;
     return allLeads.filter(l => {
-      if (list.filterStatus  && l.status   !== list.filterStatus)  return false;
+      if (list.filterStatus  && normalizeLeadStatus(l.status) !== list.filterStatus)  return false;
       if (list.filterPriority && l.priority !== list.filterPriority) return false;
       if (list.filterFn) {
         const score = scoreMap.get(l.id)?.score ?? 50;
@@ -216,6 +248,9 @@ export default function CrmLeads() {
     setFilterPriority("");
   };
 
+  const matchesListQuery = (list: SmartList) =>
+    !listQuery || list.label.toLowerCase().includes(listQuery.toLowerCase());
+
   const createLead = async () => {
     const errors: { name?: string; email?: string } = {};
     if (!form.name.trim()) errors.name = "Full name is required.";
@@ -224,30 +259,87 @@ export default function CrmLeads() {
     if (Object.keys(errors).length) { setFormErrors(errors); return; }
     setFormErrors({});
     setSaving(true);
-    const r = await fetch("/api/crm/leads", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    if (r.ok) { setShowCreate(false); setForm(emptyForm); load(); }
-    else {
-      const d = await r.json().catch(() => ({})) as { error?: string };
-      setFormErrors({ name: d.error || "Failed to create lead. Please try again." });
+    try {
+      const r = await adminFetch("/api/crm/leads", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      if (r.ok) { setShowCreate(false); setForm(emptyForm); load(); }
+      else setFormErrors({ name: `Lead not created. ${await responseFailureReason(r)}` });
+    } catch {
+      setFormErrors({ name: `Lead not created. ${failureReason(null)}` });
+    } finally {
+      setSaving(false);
     }
   };
 
+  /**
+   * Export exactly the list on screen.
+   *
+   * The ids of the currently-visible rows are sent rather than the filter
+   * values, because several of these smart lists are computed in the browser
+   * from the lead score — "score ≥ 80" has no server-side equivalent, and
+   * exporting "everything with status X" while somebody is looking at that list
+   * would be a different file wearing the right name.
+   *
+   * The response is fetched rather than linked so the request carries the
+   * session, and so a refusal (this needs `data.export`, which not every role
+   * holds) can be shown instead of opening a page of JSON.
+   */
+  const exportVisible = async () => {
+    if (!leads || leads.length === 0) return;
+    setExporting(true); setExportMsg("");
+    try {
+      const ids = leads.map(l => l.id).join(",");
+      const r = await adminFetch(`/api/crm/contacts/export.csv?ids=${ids}`);
+      if (r.status === 401) { setExporting(false); return; }
+      // The refusal says which grant is missing now that every CRM route names
+      // one, so this no longer has to guess at "permission to export".
+      if (!r.ok) {
+        setExportMsg(`Nothing exported. ${await responseFailureReason(r)}`);
+        setExporting(false);
+        setTimeout(() => setExportMsg(""), 8000);
+        return;
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sitemint-contacts-${activeList.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportMsg(`Exported ${r.headers.get("X-Export-Rows") ?? leads.length} contacts`);
+      setTimeout(() => setExportMsg(""), 5000);
+    } catch {
+      setExportMsg(`Nothing exported. ${failureReason(null)}`);
+      setTimeout(() => setExportMsg(""), 8000);
+    }
+    setExporting(false);
+  };
+
+  // A failed import used to report "Imported undefined, skipped undefined" in
+  // a success-green pill, because the body was read without checking the
+  // response at all.
   const importDiscovery = async () => {
     setImportingDiscovery(true);
-    const r = await fetch("/api/crm/import-discovery", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    const d = await r.json() as { imported: number; skipped: number };
-    setImportMsg(`Imported ${d.imported}, skipped ${d.skipped} duplicates`);
-    setImportingDiscovery(false);
-    load();
-    setTimeout(() => setImportMsg(""), 5000);
+    setImportMsg(null);
+    try {
+      const r = await adminFetch("/api/crm/import-discovery", { method: "POST" });
+      if (!r.ok) {
+        setImportMsg({ text: `Nothing imported. ${await responseFailureReason(r)}`, ok: false });
+      } else {
+        const d = await r.json().catch(() => null) as { imported?: number; skipped?: number } | null;
+        setImportMsg(typeof d?.imported === "number" && typeof d?.skipped === "number"
+          ? { text: `Imported ${d.imported}, skipped ${d.skipped} duplicates`, ok: true }
+          : { text: "The import ran, but the server's answer was not in the expected shape.", ok: false });
+        load();
+      }
+    } catch {
+      setImportMsg({ text: `Nothing imported. ${failureReason(null)}`, ok: false });
+    } finally {
+      setImportingDiscovery(false);
+      setTimeout(() => setImportMsg(null), 8000);
+    }
   };
 
   return (
@@ -256,8 +348,8 @@ export default function CrmLeads() {
 
         {/* ── LEFT — Smart list sidebar ──────────────────────────────────── */}
         {sidebarOpen && (
-          <aside className="w-52 bg-white border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto">
-            <div className="p-3 border-b border-gray-100">
+          <aside className="w-52 bg-white border-r border-border flex flex-col shrink-0 overflow-y-auto">
+            <div className="p-3 border-b border-border/60">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">All People</span>
                 <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -267,9 +359,10 @@ export default function CrmLeads() {
               <div className="relative mt-2">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                 <input
-                  className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full pl-6 pr-2 py-1.5 text-xs border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-foreground/20"
                   placeholder="Search lists…"
-                  readOnly
+                  value={listQuery}
+                  onChange={e => setListQuery(e.target.value)}
                 />
               </div>
             </div>
@@ -277,19 +370,20 @@ export default function CrmLeads() {
             <div className="flex-1 p-2 space-y-0.5">
               {/* Stage-based lists */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 py-1.5">By Stage</p>
-              {STAGE_LISTS.map(list => {
+              {STAGE_LISTS.filter(matchesListQuery).map(list => {
                 const count = countFor(list);
                 const isActive = activeList.label === list.label;
                 return (
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-gray-50"
+                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
-                    {count > 0 && (
+                    {/* No badge at all when the contacts never arrived — a "0" here was the lie. */}
+                    {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        isActive ? "bg-blue-200 text-blue-800" : "bg-gray-100 text-gray-600"
+                        isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
                     )}
                   </button>
@@ -298,19 +392,19 @@ export default function CrmLeads() {
 
               {/* Intelligence-based lists */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 py-1.5 mt-3">Intelligence</p>
-              {INTELLIGENCE_LISTS.map(list => {
+              {INTELLIGENCE_LISTS.filter(matchesListQuery).map(list => {
                 const count = countFor(list);
                 const isActive = activeList.label === list.label;
                 return (
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-gray-50"
+                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
-                    {count > 0 && (
+                    {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        isActive ? "bg-blue-200 text-blue-800" : "bg-gray-100 text-gray-600"
+                        isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
                     )}
                   </button>
@@ -319,19 +413,19 @@ export default function CrmLeads() {
 
               {/* Priority-based lists */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 py-1.5 mt-3">By Priority</p>
-              {PRIORITY_LISTS.map(list => {
+              {PRIORITY_LISTS.filter(matchesListQuery).map(list => {
                 const count = countFor(list);
                 const isActive = activeList.label === list.label;
                 return (
                   <button key={list.label} onClick={() => selectList(list)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-gray-50"
+                      isActive ? "bg-blue-50 text-blue-700 font-semibold" : "text-foreground hover:bg-accent"
                     }`}>
                     <span className="text-sm shrink-0">{list.emoji}</span>
                     <span className="flex-1 truncate">{list.label}</span>
-                    {count > 0 && (
+                    {count !== null && count > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        isActive ? "bg-blue-200 text-blue-800" : "bg-gray-100 text-gray-600"
+                        isActive ? "bg-blue-200 text-blue-800" : "bg-muted text-muted-foreground"
                       }`}>{count}</span>
                     )}
                   </button>
@@ -344,7 +438,7 @@ export default function CrmLeads() {
         {/* ── MAIN content ──────────────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Header */}
-          <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap">
+          <div className="bg-white border-b border-border px-5 py-3 flex items-center gap-3 flex-wrap">
             {!sidebarOpen && (
               <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground mr-1">
                 <List className="w-4 h-4" />
@@ -353,37 +447,59 @@ export default function CrmLeads() {
             <h1 className="text-base font-bold text-foreground">
               {activeList.emoji} {activeList.label}
             </h1>
-            <span className="text-xs text-muted-foreground">— {leads.length} people</span>
+            {/* The count exists only when the contacts did. */}
+            <span className="text-xs text-muted-foreground">
+              {leads
+                ? <>— {leads.length} people</>
+                : <>— <Figure value={null} loading={leadsLoad.status === "loading"} /> people</>}
+            </span>
 
             <div className="ml-auto flex items-center gap-2 flex-wrap">
               {importMsg && (
-                <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg">
-                  {importMsg}
+                <span className={`text-xs px-3 py-1.5 rounded-lg min-w-0 break-words ${
+                  importMsg.ok
+                    ? "text-green-700 bg-green-50 border border-green-200"
+                    : "text-foreground bg-destructive/5 border border-destructive/30"
+                }`}>
+                  {importMsg.text}
                 </span>
               )}
-              <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-8">
+              {exportMsg && (
+                <span className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                  {exportMsg}
+                </span>
+              )}
+              <Button variant="outline" size="sm" onClick={importDiscovery} disabled={importingDiscovery} className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
                 <Download className="w-3.5 h-3.5" />
                 {importingDiscovery ? "Importing…" : "Import"}
               </Button>
-              <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => setShowCreate(true)}>
+              <Button variant="outline" size="sm" onClick={exportVisible} disabled={exporting || !leads || leads.length === 0}
+                title={leads
+                  ? `Export the ${leads.length} contact(s) in "${activeList.label}"`
+                  : "Contacts could not be loaded, so there is nothing to export"}
+                className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8">
+                <FileDown className="w-3.5 h-3.5" />
+                {exporting ? "Exporting…" : leads ? `Export ${leads.length}` : "Export"}
+              </Button>
+              <Button size="sm" className="gap-1.5 text-xs h-11 [@media(hover:hover)]:h-8" onClick={() => setShowCreate(true)}>
                 <Plus className="w-3.5 h-3.5" /> + New Lead
               </Button>
             </div>
           </div>
 
           {/* Filter bar */}
-          <div className="bg-white border-b border-gray-200 px-4 py-2 flex flex-wrap gap-2 items-center">
+          <div className="bg-white border-b border-border px-4 py-2 flex flex-wrap gap-2 items-center">
             <div className="relative min-w-44 flex-1 max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input
-                className="w-full pl-9 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                className="w-full pl-9 pr-3 py-1.5 text-xs border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 placeholder="Search name, email, phone…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             <select
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white"
+              className="px-3 py-1.5 text-xs border border-input rounded-lg focus:outline-none bg-white"
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); setActiveList(STAGE_LISTS[0]); }}
             >
@@ -391,69 +507,91 @@ export default function CrmLeads() {
               {STATUSES.map(s => <option key={s}>{s}</option>)}
             </select>
             <select
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white"
+              className="px-3 py-1.5 text-xs border border-input rounded-lg focus:outline-none bg-white"
               value={filterPriority}
               onChange={e => { setFilterPriority(e.target.value); setActiveList(STAGE_LISTS[0]); }}
             >
               <option value="">All Priorities</option>
               {PRIORITIES.map(p => <option key={p}>{p}</option>)}
             </select>
-            <button className="flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-muted-foreground">
-              <SlidersHorizontal className="w-3 h-3" /> Columns
-            </button>
-            <button className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors text-muted-foreground">Me ▾</button>
-            <Button variant="ghost" size="sm" onClick={load} className="px-2 h-8">
+            <Button variant="ghost" size="sm" onClick={load} className="px-3 h-11 [@media(hover:hover)]:px-2 [@media(hover:hover)]:h-8">
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
           </div>
 
-          {/* Bulk action strip */}
-          {leads.length > 0 && (
-            <div className="bg-gray-50 border-b border-gray-200 px-4 py-1.5 flex items-center gap-3">
+          {/* Result count strip */}
+          {leads && allLeads && leads.length > 0 && (
+            <div className="bg-muted border-b border-border px-4 py-1.5 flex items-center gap-3">
               <span className="text-xs text-muted-foreground">Showing {leads.length} of {allLeads.length}</span>
-              <div className="flex items-center gap-2 ml-auto">
-                {[{icon: Mail, label:"Email"},{icon: Phone, label:"Call"},{icon: MessageSquare, label:"Text"},{icon: Users, label:"Assign"}].map(({icon: Icon, label}) => (
-                  <button key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-gray-100 transition-colors">
-                    <Icon className="w-3 h-3" /> {label}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
           {/* Table */}
           <div className="flex-1 overflow-auto bg-white">
-            {loading ? (
-              <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
-                  <tr>
-                    {["Name","Health","Last Communication","Updated","Stage","Assigned","Phone"].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
-                          <div className="space-y-1">
-                            <div className="h-3 w-24 bg-gray-200 rounded" />
-                            <div className="h-2 w-16 bg-gray-100 rounded" />
-                          </div>
-                        </div>
-                      </td>
-                      {Array.from({ length: 6 }).map((_, j) => (
-                        <td key={j} className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-16" /></td>
+            {leadsLoad.status === "loading" ? (
+              <>
+                {/* M-3: below md, the table gives way to stacked card rows. */}
+                <div className="md:hidden divide-y divide-border/40">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-4 flex items-center gap-2.5 animate-pulse">
+                      <div className="w-8 h-8 rounded-full bg-border shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-3 w-32 bg-border rounded" />
+                        <div className="h-2 w-20 bg-muted rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <table className="hidden md:table w-full text-sm border-collapse">
+                  <thead className="sticky top-0 bg-white border-b border-border/60 z-10">
+                    <tr>
+                      {["Name","Health","Last Communication","Updated","Stage","Assigned","Phone"].map(h => (
+                        <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-border shrink-0" />
+                            <div className="space-y-1">
+                              <div className="h-3 w-24 bg-border rounded" />
+                              <div className="h-2 w-16 bg-muted rounded" />
+                            </div>
+                          </div>
+                        </td>
+                        {Array.from({ length: 6 }).map((_, j) => (
+                          <td key={j} className="px-4 py-3"><div className="h-3 bg-muted rounded w-16" /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            ) : leads === null ? (
+              /*
+                Deliberately NOT the "No leads found" panel below: the person
+                has to be able to tell "you have no contacts" from "we could
+                not ask". The words come from the response, so a refusal names
+                the missing permission and an unreachable server says so.
+              */
+              <div className="p-4 sm:p-5">
+                <LoadFailure
+                  what="Contacts"
+                  reason={leadsLoad.status === "error" ? leadsLoad.reason : ""}
+                  onRetry={() => { void load(); }}
+                  retrying={reloading}
+                >
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    No contact count is shown while this is unavailable — there may well be contacts here.
+                  </p>
+                </LoadFailure>
+              </div>
             ) : leads.length === 0 ? (
               <div className="py-16 text-center">
-                <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-muted-foreground font-medium">No leads found</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">
                   {activeList.section === "intelligence"
@@ -465,8 +603,55 @@ export default function CrmLeads() {
                 </button>
               </div>
             ) : (
-              <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
+              <>
+                {/* M-3: mobile card rows — the same `leads` array, key fields only. */}
+                <div className="md:hidden divide-y divide-border/40">
+                  {leads.map(lead => {
+                    const health = scoreMap.get(lead.id);
+                    // Not a <Link>: the card contains a tel: anchor, and nested
+                    // <a> elements are invalid HTML (hydration errors on mobile).
+                    return (
+                      <div key={lead.id} role="link" tabIndex={0}
+                        onClick={() => navigate(`/admin/crm/leads/${lead.id}`)}
+                        onKeyDown={e => { if (e.key === "Enter") navigate(`/admin/crm/leads/${lead.id}`); }}>
+                        <div className="p-4 flex items-start gap-3 active:bg-accent cursor-pointer">
+                          <div className={`w-9 h-9 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
+                            <span className="text-white text-xs font-bold">{initials(lead.name)}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-medium text-sm text-foreground truncate">{lead.name}</p>
+                              {health && (
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ${health.bgColor} ${health.color} ${health.borderColor}`}>
+                                  {health.score}
+                                </span>
+                              )}
+                            </div>
+                            {(lead.companyName || lead.company) && (
+                              <p className="text-xs text-muted-foreground truncate">{lead.companyName ?? lead.company}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>
+                                {normalizeLeadStatus(lead.status)}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {lead.lastContactedAt ? `Last contact ${timeAgo(lead.lastContactedAt)}` : "Never contacted"}
+                              </span>
+                            </div>
+                          </div>
+                          {lead.phone && (
+                            <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()} title="Call"
+                               className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                              <Phone className="w-3.5 h-3.5 text-white" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <table className="hidden md:table w-full text-sm border-collapse">
+                <thead className="sticky top-0 bg-white border-b border-border/60 z-10">
                   <tr>
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-48">Name</th>
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Health</th>
@@ -477,24 +662,35 @@ export default function CrmLeads() {
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Phone</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border/40">
                   {leads.map(lead => {
                     const health = scoreMap.get(lead.id);
                     return (
-                      <tr key={lead.id} className="hover:bg-gray-50/70 transition-colors group">
+                      <tr key={lead.id} className="hover:bg-accent/70 transition-colors group">
                         {/* Name + avatar */}
                         <td className="px-4 py-2.5">
-                          <Link href={`/admin/crm/leads/${lead.id}`}>
-                            <div className="flex items-center gap-2.5 cursor-pointer">
-                              <div className={`w-7 h-7 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0`}>
+                          <div className="flex items-center gap-2.5">
+                            <Link href={`/admin/crm/leads/${lead.id}`}>
+                              <div className={`w-7 h-7 rounded-full ${avatarColor(lead.name)} flex items-center justify-center shrink-0 cursor-pointer`}>
                                 <span className="text-white text-[10px] font-bold">{initials(lead.name)}</span>
                               </div>
-                              <div className="min-w-0">
-                                <span className="font-medium text-xs text-blue-600 hover:text-blue-800 transition-colors block truncate">{lead.name}</span>
-                                {lead.company && <span className="text-[10px] text-muted-foreground truncate block">{lead.company}</span>}
-                              </div>
+                            </Link>
+                            <div className="min-w-0">
+                              <Link href={`/admin/crm/leads/${lead.id}`}>
+                                <span className="font-medium text-xs text-blue-600 hover:text-blue-800 transition-colors block truncate cursor-pointer">{lead.name}</span>
+                              </Link>
+                              {/* M7: the company RECORD when the contact is linked to one — a separate
+                                  link, never nested inside the contact's own — and the text on file
+                                  when nobody has linked it yet. */}
+                              {lead.companyId && lead.companyName ? (
+                                <Link href={`/admin/crm/companies/${lead.companyId}`}>
+                                  <span className="text-[10px] text-muted-foreground hover:text-foreground underline truncate block cursor-pointer">{lead.companyName}</span>
+                                </Link>
+                              ) : lead.company ? (
+                                <span className="text-[10px] text-muted-foreground truncate block">{lead.company}</span>
+                              ) : null}
                             </div>
-                          </Link>
+                          </div>
                         </td>
                         {/* Health Score */}
                         <td className="px-4 py-2.5">
@@ -507,7 +703,7 @@ export default function CrmLeads() {
                                 </span>
                               </div>
                             </Link>
-                          ) : <span className="text-gray-300">—</span>}
+                          ) : <span className="text-muted-foreground/40">—</span>}
                         </td>
                         {/* Last communication */}
                         <td className="px-4 py-2.5">
@@ -515,10 +711,9 @@ export default function CrmLeads() {
                             {lead.lastContactedAt ? (
                               <div>
                                 <p className="text-muted-foreground">{timeAgo(lead.lastContactedAt)}</p>
-                                <p className="text-[10px] text-muted-foreground/60">{lead.status === "Contacted" ? "Outgoing call" : "Email"}</p>
                               </div>
                             ) : (
-                              <span className="text-gray-300 text-xs">Never</span>
+                              <span className="text-muted-foreground/40 text-xs">Never</span>
                             )}
                           </div>
                         </td>
@@ -528,29 +723,29 @@ export default function CrmLeads() {
                         </td>
                         {/* Stage */}
                         <td className="px-4 py-2.5">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                            lead.status === "Won"           ? "bg-green-100 text-green-700" :
-                            lead.status === "Lost"          ? "bg-red-100 text-red-600" :
-                            lead.status === "Proposal Sent" ? "bg-purple-100 text-purple-700" :
-                            lead.status === "Negotiating"   ? "bg-orange-100 text-orange-700" :
-                            lead.status === "New"           ? "bg-blue-100 text-blue-700" :
-                            lead.status === "Contacted"     ? "bg-indigo-100 text-indigo-700" :
-                            lead.status === "Follow-up"     ? "bg-yellow-100 text-yellow-700" :
-                            "bg-gray-100 text-gray-600"
-                          }`}>{lead.status}</span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${LEAD_STATUS_STYLES[normalizeLeadStatus(lead.status)].pill}`}>{normalizeLeadStatus(lead.status)}</span>
                         </td>
-                        {/* Assigned */}
+                        {/* Assigned — M6: the staff reference decides; a recorded name that matches nobody is shown as exactly that */}
                         <td className="px-4 py-2.5">
-                          {lead.assignedTo ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-5 h-5 rounded-full ${avatarColor(lead.assignedTo)} flex items-center justify-center shrink-0`}>
-                                <span className="text-white text-[8px] font-bold">{initials(lead.assignedTo)}</span>
+                          {(() => {
+                            const owner = ownerLabel(lead, people.assignees);
+                            if (!owner.label) return <span className="text-xs text-muted-foreground/40">—</span>;
+                            return owner.resolved ? (
+                              <div className="flex items-center gap-1.5 min-w-0" title={owner.label}>
+                                <div className={`w-5 h-5 rounded-full ${avatarColor(owner.label)} flex items-center justify-center shrink-0`}>
+                                  <span className="text-white text-[8px] font-bold">{initials(owner.label)}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground truncate max-w-[70px]">{owner.label.split(" ")[0]}</span>
                               </div>
-                              <span className="text-xs text-muted-foreground truncate max-w-[70px]">{lead.assignedTo.split(" ")[0]}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-300">—</span>
-                          )}
+                            ) : (
+                              <div className="flex items-center gap-1.5 min-w-0" title={`Recorded as “${owner.label}”, which does not match a person yet`}>
+                                <div className="w-5 h-5 rounded-full border border-dashed border-border flex items-center justify-center shrink-0">
+                                  <span className="text-muted-foreground text-[9px] font-bold">?</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground italic truncate max-w-[70px]">{owner.label.split(" ")[0]}</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         {/* Phone */}
                         <td className="px-4 py-2.5">
@@ -567,7 +762,7 @@ export default function CrmLeads() {
                               </a>
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-300">—</span>
+                            <span className="text-xs text-muted-foreground/40">—</span>
                           )}
                         </td>
                       </tr>
@@ -575,6 +770,7 @@ export default function CrmLeads() {
                   })}
                 </tbody>
               </table>
+              </>
             )}
           </div>
         </div>
@@ -584,7 +780,7 @@ export default function CrmLeads() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-gray-100">
+            <div className="p-5 border-b border-border/60">
               <h2 className="font-semibold text-lg text-foreground">Add New Lead</h2>
             </div>
             <div className="p-5 space-y-3">
@@ -601,7 +797,7 @@ export default function CrmLeads() {
                     <label className="text-xs font-semibold text-muted-foreground block mb-1">{label}</label>
                     <input type={type} placeholder={placeholder}
                       className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${
-                        err ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-gray-200 focus:ring-foreground/20"
+                        err ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-input focus:ring-foreground/20"
                       }`}
                       value={(form as unknown as Record<string, string>)[key]}
                       onChange={e => {
@@ -615,35 +811,38 @@ export default function CrmLeads() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Source</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
                     {["Website Form","Discovery Form","Referral","Cold Outreach","Social Media","Manual Entry","Other"].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Stage</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
                     {STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Priority</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                    <option value="">Unassigned</option>
-                    <option>Claidy Taguran</option>
-                    <option>Shasta Greene</option>
-                    <option>Saisa Lorraigne</option>
-                  </select>
+                <div className="min-w-0">
+                  <label htmlFor="new-lead-owner" className="text-xs font-semibold text-muted-foreground block mb-1">Assigned To</label>
+                  <OwnerPicker
+                    id="new-lead-owner"
+                    value={form.assignedToStaffId}
+                    onChange={next => setForm(f => ({ ...f, assignedToStaffId: typeof next === "number" ? next : null }))}
+                    assignees={people.assignees}
+                    loading={people.loading}
+                    error={people.error}
+                    onRetry={people.reload}
+                  />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Service Interest</label>
-                <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                   value={form.serviceInterest}
                   onChange={e => setForm(f => ({ ...f, serviceInterest: e.target.value }))}>
                   <option value="">— Select service —</option>
@@ -652,13 +851,13 @@ export default function CrmLeads() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Notes</label>
-                <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none resize-none"
+                <textarea className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none resize-none"
                   rows={3} placeholder="Initial notes…"
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
             </div>
-            <div className="flex gap-2 p-5 border-t border-gray-100">
+            <div className="flex gap-2 p-5 border-t border-border/60">
               <Button variant="outline" className="flex-1" onClick={() => { setShowCreate(false); setFormErrors({}); setForm(emptyForm); }}>Cancel</Button>
               <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={createLead} disabled={saving}>
                 {saving ? "Saving…" : "Create Lead"}

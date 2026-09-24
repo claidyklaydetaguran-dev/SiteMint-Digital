@@ -6,7 +6,9 @@ import {
   RefreshCw, UserCheck, Star,
 } from "lucide-react";
 
-const tok = () => localStorage.getItem("adminToken") || "";
+import { type Load, readAdminResource } from "@/lib/adminLoad";
+import { LoadFailure, dataOf, reasonOf } from "@/components/crm/LoadState";
+
 const LAST_LEAD_KEY = "lastCrmLeadId";
 
 interface Lead {
@@ -23,8 +25,15 @@ interface Lead {
   createdAt?: string;
 }
 
+// A body that is not the shape this page expects is a failure too — not a
+// reason to render a workspace with nobody in it.
+function pickLeads(body: unknown): Lead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as Lead[] : undefined;
+}
+
 const AVATAR_COLORS = [
-  "bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500",
+  "bg-blue-500","bg-cyan-500","bg-teal-500","bg-teal-500",
   "bg-orange-400","bg-teal-500","bg-cyan-500","bg-emerald-500","bg-red-400","bg-yellow-500",
 ];
 function av(name: string) {
@@ -38,7 +47,7 @@ function ini(name: string) {
 function priorityColor(p?: string) {
   if (p === "High")   return "bg-red-100 text-red-700 border-red-200";
   if (p === "Medium") return "bg-amber-100 text-amber-700 border-amber-200";
-  return "bg-gray-100 text-gray-600 border-gray-200";
+  return "bg-muted text-muted-foreground border-border";
 }
 
 function timeAgo(iso?: string | null): string {
@@ -56,7 +65,7 @@ function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50/80 transition-colors text-left group"
+      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/80 transition-colors text-left group"
     >
       <div className={`w-9 h-9 rounded-full ${av(lead.name)} flex items-center justify-center shrink-0`}>
         <span className="text-white text-xs font-bold">{ini(lead.name)}</span>
@@ -87,62 +96,70 @@ function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
 export default function CrmWorkspaceLanding() {
   const [, navigate] = useLocation();
-  const [leads, setLeads]     = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The whole front door hangs off one request, and it had no failure path at
+  // all: `try { if (r.ok) {…} } finally { setLoading(false) }`. A refusal or an
+  // unreachable server left `leads` empty, so the page said "No contacts yet."
+  // with no hot leads and no overdue follow-ups — three claims about the
+  // business that nobody had managed to check.
+  const [leadsLoad, setLeadsLoad] = useState<Load<Lead[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
   const [search, setSearch]   = useState("");
-  const [lastLead, setLastLead] = useState<Lead | null>(null);
+  const [lastLeadId, setLastLeadId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/crm/leads?limit=50&sort=createdAt:desc", {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
-      if (r.ok) {
-        const data = await r.json() as { leads: Lead[] };
-        setLeads(data.leads ?? []);
-
-        const lastId = localStorage.getItem(LAST_LEAD_KEY);
-        if (lastId) {
-          const found = (data.leads ?? []).find(l => l.id === Number(lastId));
-          if (found) setLastLead(found);
-        }
-      }
-    } finally {
-      setLoading(false);
-    }
+    setReloading(true);
+    setLeadsLoad(await readAdminResource("/api/crm/leads?limit=50&sort=createdAt:desc", pickLeads));
+    setReloading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LAST_LEAD_KEY);
+      setLastLeadId(stored ? Number(stored) : null);
+    } catch { setLastLeadId(null); }
+  }, []);
+
   const openLead = (lead: Lead) => {
-    localStorage.setItem(LAST_LEAD_KEY, String(lead.id));
+    try { localStorage.setItem(LAST_LEAD_KEY, String(lead.id)); } catch { /* not worth failing the navigation */ }
     navigate(`/admin/crm/leads/${lead.id}`);
   };
 
+  /** The contacts, or null. Never an empty list standing in for a failed ask. */
+  const leads = dataOf(leadsLoad);
+  /** How many there are in total, or null — the "View all N" figure. */
+  const total = leads === null ? null : leads.length;
+
+  const lastLead = leads !== null && lastLeadId !== null
+    ? leads.find(l => l.id === lastLeadId) ?? null
+    : null;
+
   const q = search.toLowerCase();
-  const filtered = leads.filter(l =>
+  const filtered = leads === null ? null : leads.filter(l =>
     !q ||
     l.name.toLowerCase().includes(q) ||
     l.email.toLowerCase().includes(q) ||
     (l.company || "").toLowerCase().includes(q)
   );
 
-  const hotLeads = leads
+  // null, not [], when the contacts never arrived — so no panel below can
+  // count them and report a reassuring zero.
+  const hotLeads = leads === null ? null : leads
     .filter(l => l.priority === "High")
     .slice(0, 5);
 
-  const overdueLeads = leads
+  const overdueLeads = leads === null ? null : leads
     .filter(l => l.nextFollowUpAt && new Date(l.nextFollowUpAt) < new Date())
     .slice(0, 5);
 
-  const recentLeads = filtered.slice(0, 20);
+  const recentLeads = filtered === null ? null : filtered.slice(0, 20);
 
   return (
     <CrmLayout>
       <div className="flex flex-col h-full overflow-y-auto">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100">
+        <div className="px-6 py-5 border-b border-border/60">
           <div className="flex items-center gap-3 mb-1">
             <UserCheck className="w-5 h-5 text-muted-foreground" />
             <h1 className="text-xl font-bold font-serif text-foreground">Sales Workspace</h1>
@@ -156,33 +173,33 @@ export default function CrmWorkspaceLanding() {
 
           {/* Continue where you left off */}
           {lastLead && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center gap-4">
+            <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 flex items-center gap-4">
               <div className={`w-10 h-10 rounded-full ${av(lastLead.name)} flex items-center justify-center shrink-0`}>
                 <span className="text-white text-sm font-bold">{ini(lastLead.name)}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-indigo-600 mb-0.5">Continue where you left off</p>
+                <p className="text-xs font-semibold text-cyan-600 mb-0.5">Continue where you left off</p>
                 <p className="text-sm font-semibold text-foreground">{lastLead.name}</p>
                 <p className="text-xs text-muted-foreground">{lastLead.company || lastLead.email}</p>
               </div>
               <button
                 onClick={() => openLead(lastLead)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+                className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
               >
                 Open <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
 
-          {/* Hot leads */}
-          {hotLeads.length > 0 && (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          {/* Hot leads — shown only when the contacts behind them loaded. */}
+          {hotLeads && hotLeads.length > 0 && (
+            <div className="bg-white border border-border/60 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2">
                 <Flame className="w-4 h-4 text-red-500" />
                 <h2 className="text-sm font-semibold text-foreground">Hot Leads</h2>
                 <span className="ml-auto text-xs text-muted-foreground">{hotLeads.length} high priority</span>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {hotLeads.map(l => (
                   <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                 ))}
@@ -190,15 +207,15 @@ export default function CrmWorkspaceLanding() {
             </div>
           )}
 
-          {/* Overdue follow-ups */}
-          {overdueLeads.length > 0 && (
+          {/* Overdue follow-ups — likewise. An unanswered request is never "none overdue". */}
+          {overdueLeads && overdueLeads.length > 0 && (
             <div className="bg-white border border-amber-100 rounded-xl overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-amber-100 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-500" />
                 <h2 className="text-sm font-semibold text-foreground">Overdue Follow-ups</h2>
                 <span className="ml-auto text-xs text-muted-foreground">{overdueLeads.length} overdue</span>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-border/40">
                 {overdueLeads.map(l => (
                   <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                 ))}
@@ -207,11 +224,11 @@ export default function CrmWorkspaceLanding() {
           )}
 
           {/* Search + recent contacts */}
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+          <div className="bg-white border border-border/60 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b border-border/60 flex items-center gap-3">
               <Search className="w-4 h-4 text-muted-foreground shrink-0" />
               <input
-                className="flex-1 text-sm focus:outline-none placeholder-gray-400 bg-transparent"
+                className="flex-1 text-sm focus:outline-none placeholder:text-muted-foreground/60 bg-transparent"
                 placeholder="Search contacts by name, company, or email…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -225,13 +242,34 @@ export default function CrmWorkspaceLanding() {
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 title="Refresh"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${reloading ? "animate-spin" : ""}`} />
               </button>
             </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center py-16">
+            {leadsLoad.status === "loading" ? (
+              <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+                <span className="sr-only">Loading contacts…</span>
                 <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+              </div>
+            ) : recentLeads === null ? (
+              /*
+                Deliberately NOT the "No contacts yet." panel below: the person
+                has to be able to tell "you have none" from "we could not ask".
+                The words come from the response, so a refusal names the missing
+                grant and an unreachable server says so.
+              */
+              <div className="p-4 sm:p-5">
+                <LoadFailure
+                  what="Contacts"
+                  reason={reasonOf(leadsLoad) ?? ""}
+                  onRetry={() => { void load(); }}
+                  retrying={reloading}
+                >
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Hot leads and overdue follow-ups are not shown while this is unavailable — there
+                    may well be contacts waiting for you.
+                  </p>
+                </LoadFailure>
               </div>
             ) : recentLeads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
@@ -240,24 +278,24 @@ export default function CrmWorkspaceLanding() {
               </div>
             ) : (
               <>
-                <div className="px-4 py-2 border-b border-gray-50 flex items-center gap-2">
+                <div className="px-4 py-2 border-b border-border/40 flex items-center gap-2">
                   <Star className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     {search ? `${recentLeads.length} result${recentLeads.length !== 1 ? "s" : ""}` : "Recent Contacts"}
                   </span>
                 </div>
-                <div className="divide-y divide-gray-50">
+                <div className="divide-y divide-border/40">
                   {recentLeads.map(l => (
                     <LeadRow key={l.id} lead={l} onClick={() => openLead(l)} />
                   ))}
                 </div>
-                {!search && leads.length > 20 && (
-                  <div className="px-4 py-3 border-t border-gray-100 text-center">
+                {!search && total !== null && total > 20 && (
+                  <div className="px-4 py-3 border-t border-border/60 text-center">
                     <button
                       onClick={() => navigate("/admin/crm/leads")}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      View all {leads.length} contacts →
+                      View all {total} contacts →
                     </button>
                   </div>
                 )}
@@ -265,8 +303,12 @@ export default function CrmWorkspaceLanding() {
             )}
           </div>
 
-          {/* Overdue follow-up empty hint */}
-          {!loading && leads.length > 0 && overdueLeads.length === 0 && hotLeads.length === 0 && !search && (
+          {/*
+            The all-clear. It may only appear when the contacts actually
+            arrived: "nothing needs you" is the single most dangerous thing
+            this page can say about a request that failed.
+          */}
+          {total !== null && total > 0 && overdueLeads?.length === 0 && hotLeads?.length === 0 && !search && (
             <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
               <Clock className="w-4 h-4 text-green-600 shrink-0" />
               <p className="text-sm text-green-800">All caught up — no overdue follow-ups or high-priority alerts.</p>

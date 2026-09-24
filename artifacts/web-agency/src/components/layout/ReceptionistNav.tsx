@@ -35,7 +35,7 @@ function NavLink({ name, sectionId, mobile }: { name: string; sectionId: string;
           border: "none", cursor: "pointer",
           transition: "background 0.18s",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(6,46,113,0.06)")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(5,24,36,0.05)")}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         <span style={{ fontSize: 15, fontWeight: 500, color: "#374151", marginLeft: 15 }}>
@@ -100,12 +100,12 @@ export function ReceptionistNav() {
           maxWidth: 860, margin: "0 auto",
           background: isScrolled ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.76)",
           backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
-          border: `1px solid ${isScrolled ? "rgba(6,46,113,0.22)" : "rgba(6,46,113,0.13)"}`,
+          border: `1px solid ${isScrolled ? "rgba(5,24,36,0.18)" : "rgba(5,24,36,0.10)"}`,
           borderRadius: 100,
           padding: "7px 7px 7px 18px",
           boxShadow: isScrolled
-            ? "0 8px 40px rgba(6,46,113,0.18), 0 2px 8px rgba(0,0,0,0.07)"
-            : "0 4px 28px rgba(6,46,113,0.11)",
+            ? "0 8px 40px rgba(5,24,36,0.14), 0 2px 8px rgba(0,0,0,0.07)"
+            : "0 4px 28px rgba(5,24,36,0.08)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           transition: "background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
           pointerEvents: "auto",
@@ -118,7 +118,7 @@ export function ReceptionistNav() {
             <span style={{
               fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
               textTransform: "uppercase", color: "#fff",
-              background: "linear-gradient(135deg, #062e71 0%, #1249a8 100%)",
+              background: "linear-gradient(135deg, #051824 0%, #162936 100%)",
               padding: "2px 7px", borderRadius: 100,
               lineHeight: 1.5, flexShrink: 0,
             }}>
@@ -143,21 +143,19 @@ export function ReceptionistNav() {
           <Link href="/ai-receptionist/signup">
             <Button
               style={{
-                background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)",
-                color: "#fff", fontSize: 13, fontWeight: 700,
+                background: "#27E9B5",
+                color: "#051824", fontSize: 13, fontWeight: 700,
                 padding: "9px 18px", borderRadius: 100, height: "auto",
                 border: "none",
-                boxShadow: "0 2px 12px rgba(6,46,113,0.32), inset 0 1px 0 rgba(255,255,255,0.12)",
+                boxShadow: "0 2px 12px rgba(39,233,181,0.30)",
                 letterSpacing: "-0.01em", transition: "box-shadow 0.2s, transform 0.15s",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 6px 22px rgba(6,46,113,0.52), inset 0 1px 0 rgba(255,255,255,0.14)";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(39,233,181,0.45)";
                 (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 2px 12px rgba(6,46,113,0.32), inset 0 1px 0 rgba(255,255,255,0.12)";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 12px rgba(39,233,181,0.30)";
                 (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
               }}
             >
@@ -173,8 +171,8 @@ export function ReceptionistNav() {
           aria-label="Toggle menu"
           style={{
             width: 38, height: 38, borderRadius: "50%",
-            background: isOpen ? "rgba(6,46,113,0.10)" : "rgba(6,46,113,0.06)",
-            border: "1px solid rgba(6,46,113,0.14)", color: "#062e71",
+            background: isOpen ? "rgba(5,24,36,0.10)" : "rgba(5,24,36,0.06)",
+            border: "1px solid rgba(5,24,36,0.12)", color: "#162936",
             cursor: "pointer", transition: "background 0.2s",
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
@@ -209,9 +207,9 @@ export function ReceptionistNav() {
               maxWidth: 860, margin: "8px auto 0",
               background: "rgba(255,255,255,0.96)",
               backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
-              border: "1px solid rgba(6,46,113,0.16)", borderRadius: 20,
+              border: "1px solid rgba(5,24,36,0.12)", borderRadius: 20,
               padding: "12px 12px 16px",
-              boxShadow: "0 12px 40px rgba(6,46,113,0.16)", pointerEvents: "auto",
+              boxShadow: "0 12px 40px rgba(5,24,36,0.12)", pointerEvents: "auto",
             }}
           >
             {scrollLinks.map((link, i) => (
@@ -236,10 +234,10 @@ export function ReceptionistNav() {
                   size="lg"
                   style={{
                     width: "100%",
-                    background: "linear-gradient(135deg, #062e71 0%, #0a3d91 100%)",
-                    color: "#fff", fontSize: 14, fontWeight: 700,
+                    background: "#27E9B5",
+                    color: "#051824", fontSize: 14, fontWeight: 700,
                     borderRadius: 12, height: "auto", padding: "13px",
-                    border: "none", boxShadow: "0 4px 16px rgba(6,46,113,0.36)",
+                    border: "none", boxShadow: "0 4px 16px rgba(39,233,181,0.35)",
                   }}
                 >
                   Get early access

@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2, Trash2, Mail, X } from "lucide-react";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 interface Template { id:number; name:string; type:string; subject:string; body:string; }
 
@@ -19,70 +21,124 @@ const DEFAULT_TEMPLATES = [
 
 const emptyForm = { name:"", type:"Other", subject:"", body:"" };
 
+// A body that is not the shape this page expects is a failure too — not a
+// reason to report an empty library over templates that are really there.
+function pickTemplates(body: unknown): Template[] | undefined {
+  const list = body && typeof body === "object" ? (body as { templates?: unknown }).templates : undefined;
+  return Array.isArray(list) ? list as Template[] : undefined;
+}
+
 export default function CrmEmailTemplates() {
-  const [, navigate] = useLocation();
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The library is a `Load`. Before this there was no try/catch at all: a
+  // refused or failed read left the array empty, so the page stated "0
+  // templates" over "No email templates yet" and offered to seed six defaults
+  // — against a backend that may hold them already. A 401 was worse still: the
+  // early return left the loading flag set, so the spinner never stopped.
+  const [templatesLoad, setTemplatesLoad] = useState<Load<Template[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
+  /** A template action (save, delete, seed) the server refused. */
+  const [actionNotice, setActionNotice] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Template|null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const [seeding, setSeeding] = useState(false);
+  const confirmation = useConfirmDialog();
+
+  // What actually loaded, or null. Never an empty array standing in for a
+  // request nobody managed to complete.
+  const templates = templatesLoad.status === "ready" ? templatesLoad.data : null;
 
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const r = await fetch("/api/crm/email-templates", { headers: { Authorization: `Bearer ${token()}` } });
-    if (r.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const d = await r.json() as { templates: Template[] };
-    setTemplates(d.templates || []);
-    setLoading(false);
-  }, [navigate]);
+    setReloading(true);
+    setTemplatesLoad(await readAdminResource("/api/crm/email-templates", pickTemplates));
+    setReloading(false);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
-  const openEdit = (t: Template) => { setEditing(t); setForm({ name:t.name, type:t.type, subject:t.subject, body:t.body }); setShowForm(true); };
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setFormError(""); setShowForm(true); };
+  const openEdit = (t: Template) => { setEditing(t); setForm({ name:t.name, type:t.type, subject:t.subject, body:t.body }); setFormError(""); setShowForm(true); };
 
   const save = async () => {
     if (!form.name || !form.subject || !form.body) return;
     setSaving(true);
-    if (editing) {
-      await fetch(`/api/crm/email-templates/${editing.id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else {
-      await fetch("/api/crm/email-templates", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+    setFormError("");
+    try {
+      const res = editing
+        ? await adminFetch(`/api/crm/email-templates/${editing.id}`, {
+            method: "PUT",
+            body: JSON.stringify(form),
+          })
+        : await adminFetch("/api/crm/email-templates", {
+            method: "POST",
+            body: JSON.stringify(form),
+          });
+      if (!res.ok) { setFormError(`Template not saved. ${await responseFailureReason(res)}`); return; }
+      setShowForm(false);
+      load();
+    } catch {
+      setFormError(`Template not saved. ${failureReason(null)}`);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false); setShowForm(false); load();
   };
 
-  const deleteTemplate = async (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    await fetch(`/api/crm/email-templates/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
-    load();
+  // Both meanings kept: the dialog says what disappears, and `refusalMessage`
+  // means a delete the server refused never looks like one that worked.
+  const deleteTemplate = (template: Template) => {
+    void confirmation.ask({
+      title: `Delete the template "${template.name}"?`,
+      description: "It is removed for everyone, and this cannot be undone.",
+      consequences: [
+        "It disappears from this list, and from the template picker used when composing an email.",
+        "Emails already sent using it are not affected.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete template",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep template",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/email-templates/${template.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(await refusalMessage(res, "That template could not be deleted."));
+        await load();
+      },
+    });
   };
 
+  // Seeding is only ever offered when the library loaded AND came back empty.
+  // Seeding against a read that merely failed would duplicate every default
+  // template the backend already holds.
   const seedDefaults = async () => {
+    if (templates === null) return;
     setSeeding(true);
-    for (const t of DEFAULT_TEMPLATES) {
-      await fetch("/api/crm/email-templates", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-        body: JSON.stringify(t),
-      });
+    setActionNotice("");
+    let added = 0;
+    try {
+      for (const t of DEFAULT_TEMPLATES) {
+        const res = await adminFetch("/api/crm/email-templates", {
+          method: "POST",
+          body: JSON.stringify(t),
+        });
+        if (!res.ok) {
+          setActionNotice(`${added} of ${DEFAULT_TEMPLATES.length} default templates were added, then the rest stopped. ${await responseFailureReason(res)}`);
+          return;
+        }
+        added++;
+      }
+    } catch {
+      setActionNotice(`${added} of ${DEFAULT_TEMPLATES.length} default templates were added, then the rest stopped. ${failureReason(null)}`);
+    } finally {
+      setSeeding(false);
+      load();
     }
-    setSeeding(false); load();
   };
 
-  if (loading) return (
+  if (templatesLoad.status === "loading") return (
     <CrmLayout>
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
+        <span className="sr-only">Loading email templates…</span>
         <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
       </div>
     </CrmLayout>
@@ -92,12 +148,19 @@ export default function CrmEmailTemplates() {
     <CrmLayout>
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-serif font-bold text-foreground">Email Templates</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">{templates.length} templates · Use {"{{name}}"} for personalization</p>
+            {/* The count exists only when the library behind it loaded. */}
+            <p className="text-muted-foreground text-sm mt-0.5 break-words">
+              {templates
+                ? <>{templates.length} template{templates.length !== 1 ? "s" : ""}</>
+                : <><Figure value={null} /> templates</>}
+              {" · Use "}{"{{name}}"}{" for personalization"}
+            </p>
           </div>
-          <div className="flex gap-2">
-            {templates.length === 0 && (
+          <div className="flex flex-wrap gap-2">
+            {/* Offered only for a library that loaded and is genuinely empty. */}
+            {templates !== null && templates.length === 0 && (
               <Button variant="outline" size="sm" onClick={seedDefaults} disabled={seeding}>
                 {seeding ? "Loading…" : "Load Default Templates"}
               </Button>
@@ -108,31 +171,56 @@ export default function CrmEmailTemplates() {
           </div>
         </div>
 
-        {templates.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
-            <Mail className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        {/* A template action the server refused. */}
+        {actionNotice && (
+          <p role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-muted-foreground">
+            <span className="min-w-0 break-words">{actionNotice}</span>
+          </p>
+        )}
+
+        {templates === null ? (
+          /*
+            No library at all, rather than "0 templates · No email templates
+            yet" over a shelf that may be full — and crucially, no offer to
+            seed six defaults on top of them. A 401, 403, 404, 5xx or
+            unreachable server each reads differently here, because the words
+            come from the response.
+          */
+          <LoadFailure
+            what="Email templates"
+            reason={templatesLoad.status === "error" ? templatesLoad.reason : ""}
+            onRetry={() => { void load(); }}
+            retrying={reloading}
+          >
+            <p className="mt-2 text-sm text-muted-foreground">
+              No template count is shown while this is unavailable, and the default set is not offered — adding it now could duplicate templates you already have.
+            </p>
+          </LoadFailure>
+        ) : templates.length === 0 ? (
+          <div className="bg-white rounded-xl border border-border py-16 text-center">
+            <Mail className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-muted-foreground font-medium">No email templates yet</p>
             <p className="text-sm text-muted-foreground/70 mt-1">Click "Load Default Templates" to add 6 pre-built ones.</p>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
             {templates.map(t => (
-              <div key={t.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
+              <div key={t.id} className="bg-white rounded-xl border border-border shadow-sm p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
                     <h3 className="font-semibold text-sm text-foreground">{t.name}</h3>
                     <span className="text-xs text-muted-foreground">{t.type.replace(/_/g," ")}</span>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => openEdit(t)} className="p-1.5 text-gray-400 hover:text-foreground transition-colors rounded">
+                    <button onClick={() => openEdit(t)} className="p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => deleteTemplate(t.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded">
+                    <button onClick={() => deleteTemplate(t)} aria-label={`Delete ${t.name}`} className="p-1.5 text-muted-foreground/60 hover:text-red-500 transition-colors rounded">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-                <p className="text-xs font-medium text-muted-foreground mb-2 border-b border-gray-100 pb-2">{t.subject}</p>
+                <p className="text-xs font-medium text-muted-foreground mb-2 border-b border-border/60 pb-2">{t.subject}</p>
                 <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">{t.body}</p>
               </div>
             ))}
@@ -144,33 +232,36 @@ export default function CrmEmailTemplates() {
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <div className="flex items-center justify-between p-5 border-b border-border/60">
               <h2 className="font-serif font-bold text-lg">{editing ? "Edit Template" : "New Template"}</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-foreground"><X className="w-4 h-4"/></button>
+              <button onClick={() => setShowForm(false)} className="text-muted-foreground/60 hover:text-foreground"><X className="w-4 h-4"/></button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              {formError && (
+                <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 break-words">{formError}</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Template Name</label>
-                  <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" placeholder="e.g. Initial Outreach" value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} />
+                  <input className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" placeholder="e.g. Initial Outreach" value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1">Type</label>
-                  <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
+                  <select className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
                     {["initial_outreach","follow_up","discovery_reminder","proposal_sent","checking_in","thank_you","Other"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Subject</label>
-                <input className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" placeholder="Email subject" value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))} />
+                <input className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none" placeholder="Email subject" value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Body <span className="text-muted-foreground/60 font-normal">(use {"{{name}}"} for personalization)</span></label>
-                <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none resize-none" rows={10} placeholder="Email body…" value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))} />
+                <textarea className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none resize-none" rows={10} placeholder="Email body…" value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))} />
               </div>
             </div>
-            <div className="flex gap-2 p-5 border-t border-gray-100">
+            <div className="flex gap-2 p-5 border-t border-border/60">
               <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>Cancel</Button>
               <Button className="flex-1" onClick={save} disabled={saving||!form.name||!form.subject||!form.body}>
                 {saving ? "Saving…" : editing ? "Update Template" : "Create Template"}
@@ -179,6 +270,8 @@ export default function CrmEmailTemplates() {
           </div>
         </div>
       )}
+
+      {confirmation.element}
     </CrmLayout>
   );
 }

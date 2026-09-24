@@ -1,4 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+/* Frontend V2 Phase 1: the render-blocking Google Fonts @import (Plus Jakarta
+   Sans + Playfair Display) was removed here, and the Inter <link> was removed
+   from index.html. No self-hosted variable font exists in the repository, so
+   Phase 1 ships the approved system stack — zero font requests, no
+   invisible-text period, and no new dependency. See styles/tokens-v2.css. */
+@import "./styles/tokens-v2.css";
+/* Frontend V2 Phase 2: the shared public shell (header, drawer, footer, skip
+   link). Consumes only the --v2-* tokens imported above. */
+@import "./styles/v2-shell.css";
+/* Frontend V2 Phase 3: homepage presentation, same token-only rules. */
+@import "./styles/v2-home.css";
+/* Frontend V2 Phase 4: AI Receptionist landing presentation. Namespaced
+   `air-*`, and consumes the shared `.v2-*` roles rather than restating them. */
+@import "./styles/v2-air.css";
+/* Frontend V2 Phase 5: AI Receptionist signup presentation. Namespaced `sg-*`,
+   token-only, and carries no authentication logic of its own. */
+@import "./styles/v2-signup.css";
+/* Frontend V3 Phase 1: the Operational Editorial token layer + primitives,
+   namespaced `--v3-*` / `.v3-*`. Loaded after the V2 layer, changes no V2
+   pixel until a surface opts into the V3 classes. */
+@import "./styles/tokens-v3.css";
+/* Frontend V3 Phase 1: floating public chrome (header, sheet, footer). */
+@import "./styles/v3-chrome.css";
+/* Frontend V3 Phase 2: shared marketing sections + homepage presentation. */
+@import "./styles/v3-marketing.css";
+/* Frontend V3 Phase 2: homepage-only presentation. */
+@import "./styles/v3-home.css";
+/* Frontend V3 Phase 2: inner marketing pages (services, work, process, about,
+   insights, start, legal). */
+@import "./styles/v3-pages.css";
+/* Frontend V3 Phase 5: SiteMint Operations (internal /admin*) chrome. */
+@import "./styles/v3-ops.css";
+/* Frontend V4 "Signal" Phase 1: the four self-hosted type voices (approved
+   system, owner decision D5). Static woff2 subsets via @fontsource,
+   font-display: swap — same-origin only, no remote font host. */
+@import "@fontsource/space-grotesk/500.css";
+/* Space Grotesk 700 + DM Sans 400 are the above-the-fold critical faces
+   (h1 + body). They are self-hosted from public/fonts and declared inline
+   in index.html so they can be PRELOADED before the SPA renders (release
+   LCP gate, 2026-09-07) — the vietnamese subset is dropped (English site).
+   All other faces keep their @fontsource imports below unchanged. */
+@import "@fontsource/dm-sans/400-italic.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
+/* Client-approved professional redesign (2026-09-09): Manrope is the public
+   display voice (headings + typography wordmark). 700/800 are critical and
+   declared inline in index.html from public/fonts; 600 (the wordmark's
+   "Mint" emphasis weight) loads here like every other non-critical face. */
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/newsreader/400-italic.css";
+/* Frontend V4 Phase 1: Signal tokens + the .v4-shell remap of the V3 role
+   system. Loaded after V3; changes no V2/V3 pixel until a route opts into
+   chrome="v4". */
+@import "./styles/tokens-v4.css";
+/* Frontend V4 Phase 1: Signal public chrome (header, panel, sheet, footer). */
+@import "./styles/v4-chrome.css";
+/* Frontend V4 Phase 2: homepage presentation + shared V4 marketing
+   vocabulary (sections, reveal, journey, pillars, CTA band). */
+@import "./styles/v4-home.css";
+/* Frontend V4 Phase 3: AI Receptionist landing + staging-preview theater. */
+@import "./styles/v4-air.css";
+/* Frontend V4 Phase 4: Signal skin for the retained signup auth surface. */
+@import "./styles/v4-auth.css";
+/* Frontend V4 Phase 5: SiteMint Operations (internal /admin*) Signal skin. */
+@import "./styles/v4-ops.css";
+/* SiteMint V5 "Signal, mint-led" — System B semantic tokens (V5-BLUEPRINT §2)
+   and the global motion system (§11). Defines `--sm-*` only; changes no
+   pixel on its own. */
+@import "./styles/tokens-v5.css";
+/* SiteMint V5 Phase 1: override-only remap of the V4/V3 primitive layers to
+   the `--sm-*` System B palette inside the V4 public chrome, the auth shell,
+   and the CRM ops shell. Loaded last so it wins on source order at equal
+   specificity. ROLLBACK: remove this file's import to restore the V4 cyan
+   appearance byte-for-byte. */
+@import "./styles/v5-remap.css";
+/* Client-approved professional redesign (2026-09-09): the reference-derived
+   typography/spacing/hierarchy layer + the typography-only wordmark. Same
+   override-only mechanism as v5-remap.css, one layer later. ROLLBACK:
+   remove this import. */
+@import "./styles/v5-pro.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -142,20 +223,24 @@
   --input: 218 20% 85%;
   --ring: 218 90% 23%;
   --chart-1: 218 90% 23%;
-  --chart-2: 160 64% 50%;
+  --chart-2: 185 64% 51%; /* Glacier mint series (#32C5D2) */
   --chart-3: 220 10% 10%;
   --chart-4: 218 25% 90%;
   --chart-5: 218 15% 80%;
 
   /* CRM admin shell — fixed dark chrome, does not follow light/dark mode.
      Dedicated tokens because no existing light-mode token maps to this shade. */
-  --crm-sidebar: 222 34% 15%;
-  --crm-header: 222 47% 11%;
-  --crm-content: 210 17% 95%;
+  --crm-sidebar: 203 59% 20%; /* ink-950 #153E52 — was a fixed navy (222 34% 15%) never migrated to Glacier Mint */
+  --crm-header: 197 48% 17%; /* ink #173642 — was a fixed navy (222 47% 11%) never migrated to Glacier Mint */
+  --crm-content: 180 33% 98%; /* porcelain #F8FCFC — was a fixed cool-grey (210 17% 95%) never migrated to Glacier Mint */
 
-  --app-font-sans: 'Plus Jakarta Sans', sans-serif;
-  --app-font-serif: 'Playfair Display', serif;
-  --app-font-mono: Menlo, monospace;
+  /* Frontend V2 Phase 1: system stack, no remote font request. `--app-font-serif`
+     keeps its name (many components reference it) but no longer pulls Playfair
+     Display over the network — the editorial character comes from scale,
+     weight, and spacing instead. */
+  --app-font-sans: var(--v2-font-sans);
+  --app-font-serif: var(--v2-font-sans);
+  --app-font-mono: var(--v2-font-mono);
   --radius: 0rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.02);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.04);
@@ -231,9 +316,9 @@
   --chart-5: 220 10% 20%;
 
   /* CRM admin shell keeps the same fixed dark chrome in dark mode. */
-  --crm-sidebar: 222 34% 15%;
-  --crm-header: 222 47% 11%;
-  --crm-content: 210 17% 95%;
+  --crm-sidebar: 203 59% 20%; /* ink-950 #153E52 — was a fixed navy (222 34% 15%) never migrated to Glacier Mint */
+  --crm-header: 197 48% 17%; /* ink #173642 — was a fixed navy (222 47% 11%) never migrated to Glacier Mint */
+  --crm-content: 180 33% 98%; /* porcelain #F8FCFC — was a fixed cool-grey (210 17% 95%) never migrated to Glacier Mint */
 
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);

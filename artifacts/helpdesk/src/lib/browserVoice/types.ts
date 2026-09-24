@@ -1,0 +1,69 @@
+/**
+ * Milestone 1 / Checkpoint F1: provider-neutral contract for a browser
+ * voice-test client. No file in this module may import a provider SDK,
+ * read import.meta.env, call fetch/WebSocket, or call
+ * navigator.mediaDevices.getUserMedia — those all belong to a concrete
+ * provider client landing in Checkpoint F2.
+ */
+
+import type { BrowserVoiceErrorCategory } from "./errors";
+
+export type BrowserVoiceTestState =
+  | "idle"
+  | "preparing"
+  | "connecting"
+  | "connected"
+  | "ending"
+  | "ended"
+  | "permission_denied"
+  | "error";
+
+/**
+ * The exhaustive set of lifecycle events a BrowserVoiceClient may emit.
+ * Consumers must ignore any event whose `type` isn't one of these instead
+ * of throwing — a future provider client may emit additional event types
+ * this checkpoint doesn't yet know about.
+ */
+export type BrowserVoiceEvent =
+  | { type: "call-start" }
+  | { type: "call-end" }
+  | { type: "permission-denied" }
+  // AR-001V.2: `category` is a value from OUR closed enum, chosen by the
+  // provider client from the shape of the provider's failure. It is not
+  // provider text and never becomes provider text — the consumer still looks
+  // the displayed copy up in our own static table. Optional so a client that
+  // cannot classify a failure stays valid.
+  | { type: "error"; category?: BrowserVoiceErrorCategory; providerStatus?: number };
+
+/**
+ * Only the opaque provider assistant id crosses this boundary — never
+ * firmId, the database assistant id, assistant config, or prompt content.
+ */
+export interface BrowserVoiceStartInput {
+  provider: "vapi";
+  providerAssistantId: string;
+  /**
+   * AR-001V.3: the provider credential for THIS assistant, issued per session
+   * by the authenticated, firm-scoped browser-test-session endpoint. It
+   * replaces the build-time key, which could start any assistant in the
+   * organisation. There is deliberately no fallback to that shared key: if the
+   * server does not issue one, the test does not start.
+   */
+  publicKey: string;
+}
+
+export interface BrowserVoiceClient {
+  /** False for the safe default client; a real provider client sets this once it can actually start a call. */
+  readonly available: boolean;
+
+  start(input: BrowserVoiceStartInput): Promise<void>;
+
+  /** Safe to call even if a call was never started; idempotent. */
+  end(): Promise<void>;
+
+  /** Returns an unsubscribe function. Listeners must never throw for an unrecognized event type. */
+  subscribe(listener: (event: BrowserVoiceEvent) => void): () => void;
+
+  /** Releases any resources held by this client instance. Safe to call more than once. */
+  destroy(): Promise<void> | void;
+}

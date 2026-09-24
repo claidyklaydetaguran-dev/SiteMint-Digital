@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CrmLayout } from "./CrmLayout";
 import { BotMessageSquare, RefreshCw } from "lucide-react";
 
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
 
 interface IntakeCaseRow {
   id: number;
@@ -27,7 +27,7 @@ const TIER_STYLES: Record<string, string> = {
   Hot:           "bg-red-100 text-red-700 border border-red-200",
   Warm:          "bg-orange-100 text-orange-700 border border-orange-200",
   Cold:          "bg-blue-100 text-blue-700 border border-blue-200",
-  Disqualified:  "bg-gray-100 text-gray-500 border border-gray-200",
+  Disqualified:  "bg-muted text-muted-foreground border border-border",
   "Needs Review":"bg-yellow-100 text-yellow-700 border border-yellow-200",
 };
 
@@ -35,14 +35,14 @@ const TIER_DOTS: Record<string, string> = {
   Hot:           "bg-red-500",
   Warm:          "bg-orange-400",
   Cold:          "bg-blue-400",
-  Disqualified:  "bg-gray-400",
+  Disqualified:  "bg-muted-foreground/50",
   "Needs Review":"bg-yellow-400",
 };
 
 function TierBadge({ tier }: { tier: string | null }) {
   const label = tier ?? "Pending";
-  const style = TIER_STYLES[label] ?? "bg-gray-100 text-gray-500 border border-gray-200";
-  const dot   = TIER_DOTS[label]  ?? "bg-gray-400";
+  const style = TIER_STYLES[label] ?? "bg-muted text-muted-foreground border border-border";
+  const dot   = TIER_DOTS[label]  ?? "bg-muted-foreground/50";
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${style}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
@@ -73,9 +73,7 @@ export default function CrmIntakeCases() {
     setLoading(true);
     setError("");
     try {
-      const r = await fetch("/api/intake/cases", {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const r = await adminFetch("/api/intake/cases");
       if (!r.ok) throw new Error(`${r.status}`);
       const data = await r.json() as { cases: IntakeCaseRow[] };
       setCases(data.cases);
@@ -94,8 +92,8 @@ export default function CrmIntakeCases() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-violet-100 rounded-xl flex items-center justify-center">
-              <BotMessageSquare className="w-5 h-5 text-violet-600" />
+            <div className="w-9 h-9 bg-teal-100 rounded-xl flex items-center justify-center">
+              <BotMessageSquare className="w-5 h-5 text-teal-600" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">AI Intake Cases</h1>
@@ -104,7 +102,7 @@ export default function CrmIntakeCases() {
           </div>
           <button
             onClick={load}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-gray-200 rounded-lg px-3 py-1.5 transition-colors hover:bg-gray-50"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors hover:bg-accent"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -124,7 +122,7 @@ export default function CrmIntakeCases() {
                 </span>
               );
             })}
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
               {cases.length} total
             </span>
           </div>
@@ -143,8 +141,8 @@ export default function CrmIntakeCases() {
 
         {!loading && !error && cases.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center mb-4">
-              <BotMessageSquare className="w-7 h-7 text-violet-400" />
+            <div className="w-14 h-14 bg-teal-50 rounded-2xl flex items-center justify-center mb-4">
+              <BotMessageSquare className="w-7 h-7 text-teal-400" />
             </div>
             <p className="text-foreground font-semibold mb-1">No intake cases yet</p>
             <p className="text-sm text-muted-foreground max-w-xs">
@@ -155,11 +153,11 @@ export default function CrmIntakeCases() {
 
         {/* Table */}
         {!loading && !error && cases.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr className="border-b border-border/60 bg-muted">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-32">Tier</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Caller</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Incident Type</th>
@@ -167,9 +165,9 @@ export default function CrmIntakeCases() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide w-28">Received</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border/40">
                   {cases.map(c => (
-                    <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
+                    <tr key={c.id} className="hover:bg-accent/60 transition-colors">
                       <td className="px-4 py-3.5 align-top">
                         <TierBadge tier={c.tier} />
                         {c.disqualifyReason && (

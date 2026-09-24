@@ -333,32 +333,44 @@ All seeded data (intake_conversations 35–37, intake_cases 28–30, intake_mess
 - **SPA boundary**: web-agency (`/`) and helpdesk (`/ai-receptionist/dashboard`) are served as separate Vite SPAs. wouter `navigate()` cannot cross this boundary; cross-SPA navigation requires `window.location.href` (applied in Phase 1B).
 - **Signup 409 email enumeration**: accepted residual risk — see Phase 1C section above.
 - **Rate limit state lost on restart**: in-memory `Map` resets on server restart. Acceptable for development; documented as known limitation for production.
-- **AgentConfig form is a stub**: Phase 2B wires the page and loads existing config; save functionality deferred to Phase 3.
+- ~~**AgentConfig form is a stub**~~ — **correction 2026-07-17**: this bullet was stale
+  and contradicted Phase 2B test (g) above. AgentConfig save is fully wired
+  (`PATCH /api/receptionist/agent-config`, verified end-to-end in Phase 2B and re-polished
+  in Phase 2C). The remaining AgentConfig gap is only the disabled "Test" tab.
 
 ## What the Next Session Must Do
 
-**Next phase: Phase 3 — Agent Config Save + Billing page** (or Phase 1B Stripe E2E once credentials are ready).
+**Superseded 2026-07-17**: the "Phase 3" described here was replaced by the approved
+**Voice Platform Milestone 1** (foundation + first working assistant, Checkpoints A–G) —
+see ROADMAP.md and DECISION_LOG.md (2026-07-17 entries). Stripe Phase 1B deferred tests
+(d)/(e)/(f) still MUST run before onboarding any paying customer, once credentials exist.
 
-Before starting:
-- Read ARCHITECTURE.md, CURRENT_STATE.md, ROADMAP.md, and this file.
+Before starting any session:
+- Read root `CLAUDE.md`, then ARCHITECTURE.md, CURRENT_STATE.md, ROADMAP.md, and this file.
 - Run `pnpm run typecheck` and confirm zero errors.
-- If Stripe credentials are now set: run Phase 1B deferred tests (d)/(e)/(f) first, mark Phase 1B closed, then proceed to Phase 3.
 
-**Locked files — do not modify**:
+**Locked files — do not modify** (backend/SMS locks — still absolute):
 - `artifacts/api-server/src/routes/intakeAgent.ts`
 - `artifacts/api-server/src/lib/intakeOptOut.ts`
 - `artifacts/api-server/src/routes/receptionistBilling.ts`
 - `artifacts/api-server/src/lib/authRateLimit.ts`
 - `artifacts/api-server/src/routes/phone.ts`
-- `artifacts/web-agency/src/App.tsx` (Phase 2A frozen)
-- `artifacts/helpdesk/src/pages/Inbox.tsx` (Phase 2A frozen — opted_out handling must not regress)
+- `artifacts/web-agency/src/App.tsx` (Phase 2A frozen — web-agency is out of scope for the voice platform; still locked)
+- `artifacts/helpdesk/src/pages/Inbox.tsx` (UI freeze superseded 2026-07-17 — may be
+  retokenized in Milestone 1 Checkpoint B, but the Phase 2A behavioral requirement stands:
+  opted_out handling must not regress)
 
-**Phase 2B locked files** (do not modify):
+> **UI-freeze supersession (2026-07-17)**: the Phase 2B/2C helpdesk **UI** freeze lists
+> below are superseded by the approved voice-platform redesign (DECISION_LOG.md). These
+> files may be modified in Milestone 1 Checkpoint B, provided existing behavior is
+> preserved and regression-verified. The backend/SMS locks above are NOT superseded.
+
+**Phase 2B locked files** (UI freeze — superseded, see note above):
 - `artifacts/helpdesk/src/App.tsx`
 - `artifacts/helpdesk/src/hooks/useConversations.ts`
 - `artifacts/helpdesk/src/lib/conversationUi.ts`
 
-**Phase 2C locked files** (do not modify):
+**Phase 2C locked files** (UI freeze — superseded, see note above):
 - `artifacts/helpdesk/src/index.css`
 - `artifacts/helpdesk/src/lib/agentTemplates.ts`
 - `artifacts/helpdesk/src/components/layout/AppLayout.tsx`

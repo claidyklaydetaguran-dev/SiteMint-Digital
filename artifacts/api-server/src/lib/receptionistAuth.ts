@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { receptionistSessions } from "@workspace/db/schema";
+import { ACCESS_DENIED_MESSAGES, accessDecision, resolvePrincipal, type ReceptionistRole } from "./receptionistRoles.js";
 
 // ── Type augmentation ──────────────────────────────────────────────────────────
 declare global {
@@ -11,6 +12,12 @@ declare global {
     interface Request {
       firmId?: number;
       firmEmail?: string;
+      /** The signed-in person's role in the business (team access). */
+      receptionistRole?: ReceptionistRole;
+      /** True for the business's own account, false for a team member. */
+      accountHolder?: boolean;
+      /** The team member's id, or null for the account holder. */
+      memberId?: number | null;
     }
   }
 }
@@ -90,7 +97,25 @@ export async function requireReceptionistAuth(
     return;
   }
 
-  req.firmId    = session.firmId;
-  req.firmEmail = session.email;
+  // Team access: the session's address must still belong to the business,
+  // and the role it holds must allow this route. A revoked member is refused
+  // here on their next request.
+  const principal = await resolvePrincipal(session.firmId, session.email);
+  if (!principal) {
+    await destroySession(token);
+    res.status(401).json({ error: "Session expired or invalid" });
+    return;
+  }
+  const decision = accessDecision(req.method, req.route?.path as string | undefined, principal);
+  if (decision !== "allow") {
+    res.status(403).json({ error: ACCESS_DENIED_MESSAGES[decision], code: decision });
+    return;
+  }
+
+  req.firmId           = session.firmId;
+  req.firmEmail        = session.email;
+  req.receptionistRole = principal.role;
+  req.accountHolder    = principal.accountHolder;
+  req.memberId         = principal.memberId;
   next();
 }

@@ -1,0 +1,713 @@
+/**
+ * Frontend V2 Phase 9 — the Current SMS Receptionist workspace layer.
+ *
+ * Companion to `v2-dashboard.css` (Phase 7) and `v2-conversations.css`
+ * (Phase 8), and subject to the same rules. This file **defines no colour of
+ * its own**: every value below is an `--sd-*` token from the shell, so the
+ * route inherits the palette, the dark counterpart, the focus ring, the 8-point
+ * spacing, the 44px minimum target and the motion system without restating any
+ * of them. No new colour family, no remote request, no font, no image, no
+ * gradient, no glow, no decorative loop.
+ *
+ * Namespaced `sr-*` (SiteMint receptionist) so it cannot collide with `sd-*`,
+ * `si-*`, `sc-*`, the `--v2-*` public tokens or the app's shadcn variables. It
+ * is imported *alongside* the shell stylesheet, never instead of it.
+ *
+ * ── Composition ───────────────────────────────────────────────────────────
+ * One editorial column on a warm-white canvas. A configuration console is read
+ * top to bottom and typed into, so the column is capped at a comfortable
+ * measure and centred rather than stretched — at 1920 the extra width becomes
+ * margin, not longer lines. Groups are separated by a single hairline and
+ * generous space rather than by nested cards; the only card on the page is the
+ * status band, which is the one element whose shape changes with the truth.
+ *
+ * ── Motion ────────────────────────────────────────────────────────────────
+ * Inherited, not extended. The shell's single 8px entrance runs once on the
+ * page container. Beyond that this layer transitions only `background-color`,
+ * `border-color`, `color` and `opacity` on controls, and rotates one spinner
+ * while a save is genuinely in flight. Nothing loops otherwise, nothing is
+ * staggered, nothing animates on scroll, and `prefers-reduced-motion` removes
+ * all of it — including the spinner, which becomes a static mark.
+ */
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
+
+.sr-page {
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--sd-space-8) var(--sd-space-6) var(--sd-space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+/* ── Status band ───────────────────────────────────────────────────────── */
+
+.sr-status .sd-status__head {
+  padding-bottom: var(--sd-space-4);
+}
+
+/* Phase 7's status band knows four states; this route adds a fifth,
+   `unconfigured`. Without this it would fall through to the neutral default
+   and print a *mint* dot — the colour this system reserves for something being
+   right — next to "Nothing is configured yet". It is a genuine call for
+   attention, so it takes the same amber the incomplete state does. */
+.sr-status[data-state="unconfigured"] {
+  background: var(--sd-warn-surface);
+  border-color: var(--sd-warn-border);
+}
+.sr-status[data-state="unconfigured"] .sd-status__dot {
+  background: var(--sd-warn);
+}
+.sr-status[data-state="unconfigured"] .sd-status__detail {
+  color: var(--sd-warn);
+}
+
+/* The ledger: the three settings, and whether each is actually saved. This is
+   a reading of the configuration, not a score or a progress bar. */
+.sr-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--sd-space-5) var(--sd-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+}
+.sr-ledger__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-2) 0;
+  border-top: 1px solid var(--sd-border);
+  font-size: var(--sd-text-small);
+}
+.sr-ledger__mark {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--sd-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sd-accent-ink);
+}
+.sr-ledger__item[data-set="true"] .sr-ledger__mark {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+}
+.sr-ledger__icon {
+  width: 11px;
+  height: 11px;
+}
+.sr-ledger__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--sd-text);
+}
+/* State is words, never colour alone. */
+.sr-ledger__state {
+  flex: 0 0 auto;
+  font-size: var(--sd-text-micro);
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-text-muted);
+}
+
+.sr-status__next {
+  margin: 0;
+  padding: 0 var(--sd-space-5) var(--sd-space-4);
+}
+.sr-status__link {
+  min-height: 44px;
+}
+
+/* ── Groups ────────────────────────────────────────────────────────────── */
+
+.sr-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+.sr-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+  padding-top: var(--sd-space-6);
+  border-top: 1px solid var(--sd-border);
+}
+/* The example picker is a utility, not a section of the configuration. It gets
+   the same hairline as everything else rather than a card of its own — one
+   fewer box competing with the status band, which is the page's only card. */
+.sr-group--quiet .sd-h2 {
+  font-size: var(--sd-text-body);
+  color: var(--sd-text-muted);
+}
+
+.sr-group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+  flex-wrap: wrap;
+}
+.sr-group__head .sd-h2:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+  border-radius: var(--sd-radius-control);
+}
+.sr-group__head .sd-h2:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Read-only is stated in words, not implied by a greyed-out control. */
+.sr-group__badge {
+  font-size: var(--sd-text-micro);
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-muted-text);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-control);
+  padding: 2px var(--sd-space-2);
+  background: var(--sd-muted-surface);
+}
+.sr-group__changed {
+  font-size: var(--sd-text-micro);
+  letter-spacing: var(--sd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--sd-warn);
+  border-bottom: 1px solid var(--sd-warn-border);
+}
+.sr-group__help {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text-muted);
+}
+
+/* ── Read-only facts ───────────────────────────────────────────────────── */
+
+.sr-facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+}
+.sr-facts__row {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: var(--sd-space-4);
+  align-items: baseline;
+}
+.sr-facts__label {
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+.sr-facts__value {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+  overflow-wrap: anywhere;
+}
+.sr-facts__note {
+  display: block;
+  margin-top: var(--sd-space-1);
+  font-size: var(--sd-text-small);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--sd-text-muted);
+}
+
+/* ── Fields ────────────────────────────────────────────────────────────── */
+
+.sr-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+}
+.sr-field__label {
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sr-field__help {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text-muted);
+}
+.sr-field__foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+  min-height: 1.25rem;
+}
+
+.sr-input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sd-space-3);
+  font: inherit;
+  font-size: var(--sd-text-body);
+  line-height: 1.55;
+  color: var(--sd-text);
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  transition: border-color var(--sd-dur-control) var(--sd-ease),
+    background-color var(--sd-dur-control) var(--sd-ease);
+}
+.sr-input--area {
+  /* Long content stays readable and resizable vertically; horizontal resize
+     would let a textarea break the column. */
+  resize: vertical;
+  min-height: 6rem;
+}
+.sr-input:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+  border-color: var(--sd-accent);
+}
+.sr-input[aria-invalid="true"] {
+  border-color: var(--sd-danger-border);
+  background: var(--sd-danger-surface);
+}
+.sr-select {
+  min-width: 0;
+  /* A native select keeps the platform's own picker, which is what makes this
+     usable with a mobile keyboard and with a screen reader. */
+  appearance: auto;
+}
+
+.sr-count {
+  flex: 0 0 auto;
+  font-size: var(--sd-text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text-muted);
+}
+.sr-count[data-over="true"] {
+  color: var(--sd-danger);
+  font-weight: 600;
+}
+
+.sr-fielderror {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.5;
+  color: var(--sd-danger);
+}
+
+.sr-empty {
+  margin: 0;
+  padding: var(--sd-space-4);
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+  background: var(--sd-surface-alt);
+  border: 1px dashed var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+}
+
+/* ── Questions ─────────────────────────────────────────────────────────── */
+
+.sr-questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-4);
+}
+.sr-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+}
+.sr-question__label {
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sr-question__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sd-space-2);
+}
+.sr-question__tools {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--sd-space-1);
+}
+
+.sr-iconbtn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--sd-text-body);
+  color: var(--sd-text-muted);
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-control);
+  cursor: pointer;
+  transition: color var(--sd-dur-fast) var(--sd-ease),
+    border-color var(--sd-dur-fast) var(--sd-ease),
+    background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sr-iconbtn__icon {
+  width: 16px;
+  height: 16px;
+}
+.sr-iconbtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sr-iconbtn:not(:disabled):hover {
+    color: var(--sd-text);
+    border-color: var(--sd-border-strong);
+    background: var(--sd-surface-alt);
+  }
+  .sr-iconbtn--danger:not(:disabled):hover {
+    color: var(--sd-danger);
+    border-color: var(--sd-danger-border);
+    background: var(--sd-danger-surface);
+  }
+}
+.sr-iconbtn:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+
+.sr-addbtn {
+  align-self: flex-start;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  padding: 0 var(--sd-space-4);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-control);
+  cursor: pointer;
+  transition: border-color var(--sd-dur-fast) var(--sd-ease),
+    background-color var(--sd-dur-fast) var(--sd-ease);
+}
+.sr-addbtn__icon {
+  width: 15px;
+  height: 15px;
+}
+.sr-addbtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sr-addbtn:not(:disabled):hover {
+    border-color: var(--sd-accent);
+    background: var(--sd-surface-accent);
+  }
+}
+.sr-addbtn:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+
+/* ── Template control ──────────────────────────────────────────────────── */
+
+.sr-template {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+}
+.sr-template__row {
+  display: flex;
+  gap: var(--sd-space-3);
+  flex-wrap: wrap;
+}
+/* Six short labels do not need half the column. */
+.sr-template__row .sr-select {
+  flex: 0 1 18rem;
+}
+
+.sr-confirm {
+  margin-top: var(--sd-space-3);
+  padding: var(--sd-space-4);
+  border: 1px solid var(--sd-warn-border);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-warn-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+}
+.sr-confirm__text {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-warn);
+}
+.sr-confirm__actions {
+  display: flex;
+  gap: var(--sd-space-2);
+  flex-wrap: wrap;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+
+.sr-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sd-space-2);
+  padding: 0 var(--sd-space-5);
+  font: inherit;
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  border-radius: var(--sd-radius-control);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--sd-dur-control) var(--sd-ease),
+    border-color var(--sd-dur-control) var(--sd-ease),
+    color var(--sd-dur-control) var(--sd-ease);
+}
+.sr-btn:focus-visible {
+  outline: var(--sd-focus-width) solid var(--sd-focus-color);
+  outline-offset: var(--sd-focus-offset);
+}
+.sr-btn--primary {
+  background: var(--sd-accent);
+  color: var(--sd-accent-ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sr-btn--primary:not(:disabled):hover {
+    background: var(--sd-accent-ink);
+    color: var(--sd-accent);
+  }
+}
+/* Disabled is legible, not a ghost: the owner has to be able to read the label
+   to understand why it is off. */
+.sr-btn--primary:disabled {
+  background: var(--sd-muted-surface);
+  color: var(--sd-muted-text);
+  border-color: var(--sd-border-strong);
+  cursor: not-allowed;
+}
+.sr-btn--quiet {
+  background: var(--sd-surface);
+  color: var(--sd-text);
+  border-color: var(--sd-border-strong);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sr-btn--quiet:not(:disabled):hover {
+    border-color: var(--sd-accent);
+    background: var(--sd-surface-accent);
+  }
+}
+
+/* ── Save bar ──────────────────────────────────────────────────────────── */
+/*
+ * Sticky to the bottom of the scroll container so the primary action is always
+ * reachable, but it is a *flow* element, not a fixed overlay: it occupies its
+ * own space at the end of the form, so it can never cover a field, and the
+ * mobile keyboard pushes it rather than trapping content behind it.
+ */
+/* A sticky bar necessarily has content pass beneath it while scrolling. Two
+   things make that safe rather than a trap: the bar is the last element in the
+   form, so at the end of the scroll nothing is under it; and the scroll
+   container is told to keep focused fields clear of it, so tabbing can never
+   land a field behind the bar. Scoped by `:has` so only this route is affected
+   — the shell's own rule is untouched. */
+.sd-workspace:has(.sr-page) {
+  scroll-padding-bottom: 7rem;
+}
+
+.sr-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: var(--sd-space-2);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--sd-canvas);
+  border-top: 1px solid var(--sd-border);
+}
+.sr-savebar[data-dirty="true"] {
+  border-top-color: var(--sd-border-strong);
+}
+.sr-savebar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-4);
+  padding: var(--sd-space-4) 0;
+  flex-wrap: wrap;
+}
+.sr-savebar__state {
+  min-width: 0;
+}
+.sr-savebar__text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  font-size: var(--sd-text-small);
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.sr-savebar__text[data-tone="quiet"] {
+  font-weight: 400;
+  color: var(--sd-text-muted);
+}
+.sr-savebar__text[data-tone="ok"] {
+  color: var(--sd-accent-ink);
+}
+.sr-savebar__icon {
+  width: 15px;
+  height: 15px;
+}
+.sr-savebar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  flex-wrap: wrap;
+}
+
+.sr-savefail {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-4);
+  margin-bottom: var(--sd-space-4);
+  border: 1px solid var(--sd-danger-border);
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-danger-surface);
+  flex-wrap: wrap;
+}
+.sr-savefail__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--sd-danger);
+}
+.sr-savefail__title {
+  display: block;
+  font-size: var(--sd-text-body);
+  font-weight: 600;
+  color: var(--sd-danger);
+}
+.sr-savefail__detail {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-text-small);
+  line-height: 1.55;
+  color: var(--sd-text);
+}
+
+/* ── Loading ───────────────────────────────────────────────────────────── */
+
+.sr-loading {
+  margin: 0;
+  font-size: var(--sd-text-small);
+  color: var(--sd-text-muted);
+}
+.sr-skeleton {
+  border-radius: var(--sd-radius-card);
+  background: var(--sd-surface-alt);
+  border: 1px solid var(--sd-border);
+}
+.sr-skeleton--band {
+  height: 9rem;
+}
+.sr-skeleton--group {
+  height: 12rem;
+}
+
+.sr-spin {
+  width: 15px;
+  height: 15px;
+  animation: sr-spin 900ms linear infinite;
+}
+@keyframes sr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Narrow viewports ──────────────────────────────────────────────────── */
+
+@media (max-width: 40rem) {
+  .sr-page {
+    padding: var(--sd-space-6) var(--sd-space-4) var(--sd-space-8);
+    gap: var(--sd-space-5);
+  }
+  /* The label column would squeeze the value to a few characters. */
+  .sr-facts__row {
+    grid-template-columns: 1fr;
+    gap: var(--sd-space-1);
+  }
+  .sr-ledger,
+  .sr-status__next {
+    padding-left: var(--sd-space-4);
+    padding-right: var(--sd-space-4);
+  }
+  .sr-savebar__inner {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--sd-space-3);
+  }
+  .sr-savebar__actions {
+    flex-direction: row-reverse;
+    justify-content: stretch;
+  }
+  /* The primary action takes the width it needs to be an easy target. */
+  .sr-savebar__actions .sr-btn {
+    flex: 1 1 auto;
+  }
+  /* On a phone the bar costs real reading height, so when there is genuinely
+     nothing to save it collapses to its one status line and stops covering the
+     form. The moment anything changes — or a save is running, or has just
+     finished — the action returns. Desktop always keeps the button visible. */
+  .sr-savebar[data-actions="false"] .sr-savebar__actions {
+    display: none;
+  }
+  .sr-question__row {
+    flex-wrap: wrap;
+  }
+  .sr-question__tools {
+    margin-left: auto;
+  }
+}
+
+/* A short viewport — a landscape phone, or 200% zoom — cannot afford a sticky
+   bar eating a third of the height, so it becomes a normal flow element. */
+@media (max-height: 34rem) {
+  .sr-savebar {
+    position: static;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .sr-page *,
+  .sr-page *::before,
+  .sr-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* The spinner stops entirely; "Saving…" beside it carries the meaning. */
+  .sr-spin {
+    animation: none;
+  }
+}

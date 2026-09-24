@@ -1,0 +1,54 @@
+Run the FIRST REAL VAPI + TWILIO DEVELOPMENT CALL checkpoint from inside this Replit workspace.
+
+Authorized repository branch:
+feature/ai-receptionist-visible-progress
+
+Required starting commit:
+8583f35
+
+Important: This checkpoint must use the Replit Development runtime because the Development secrets and public callback URL are stored here.
+
+First verify:
+1. Correct branch and commit.
+2. Replit Development secrets are configured, reporting only configured or missing.
+3. The app’s public Development URL is reachable.
+4. The authenticated Vapi webhook route from commit 8583f35 is reachable from the internet.
+5. The existing Twilio number has Voice capability.
+6. The number is not connected to an unrelated or Production workflow.
+
+Authorization:
+- Use the existing Twilio number.
+- Connect/import it to Vapi if it is safe and no purchase is required.
+- Assign only the SiteMint Development assistant.
+- Configure the authenticated Replit Development webhook.
+- Prepare one inbound call lasting under one minute.
+- Do not purchase a number.
+- Do not configure SMS or email.
+- Do not book a calendar appointment.
+- Do not create migrations.
+- Do not deploy to Production.
+- Do not merge or modify main.
+- Never print or expose secrets or full telephone numbers.
+
+Before the call:
+- Verify callback authentication with a sanitized, non-chargeable request.
+- Confirm invalid authentication is rejected.
+- Confirm duplicate events remain idempotent.
+- Confirm the existing schema can store the genuine call.
+- Show me the masked Twilio number to call.
+- Give me a fictional caller scenario.
+- Pause and wait for me to make the call.
+
+After one genuine call, verify:
+- Twilio received it.
+- Vapi answered.
+- Authenticated events reached SiteMint.
+- The genuine record appeared in Call Logs.
+- The transcript and structured outcome arrived.
+- The appointment remained “requested,” not “booked.”
+- SMS, email, calendar, and transfer remained unverified/not sent.
+- The record is labeled Vapi + Twilio Development—not Demo Mode or sample data.
+
+Do not make an outbound call to the user’s Philippine number. The user will call the existing US Twilio number inbound.
+
+If any required secret or public callback is missing, stop before the chargeable call and report the exact missing item without revealing values.

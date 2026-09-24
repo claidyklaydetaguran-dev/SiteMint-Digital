@@ -1,299 +1,421 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
-import { ReceptionistNav } from "@/components/layout/ReceptionistNav";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertCircle,
-  Loader2,
-  ArrowLeft,
-  Zap,
-  MessageSquare,
-  Users,
-  ShieldCheck,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+/**
+ * AI Receptionist account creation.
+ *
+ * Ordinary registration — owner name, business name, work email, password,
+ * timezone, and a required Terms/Privacy acknowledgement — with no invite code.
+ * Creating the account signs the owner in, sends the email-verification
+ * message, and opens the dashboard's guided setup. An email that already has
+ * an account is recovered through sign-in or password reset, never duplicated.
+ *
+ * States: submitting; per-field validation errors; an existing account (409,
+ * with Sign in / Reset password); too many attempts (429); registration
+ * switched off (503); and success, which hard-navigates into the dashboard SPA
+ * once the server has set the session cookie.
+ *
+ * Accessibility: persistent visible labels, explicit Required text,
+ * `autocomplete` on every field, an accessible password-visibility toggle,
+ * inline errors tied to inputs by `aria-describedby`, a form-level alert that
+ * takes focus on failure, and 44px minimum control heights.
+ */
 
-const FEATURES = [
-  { icon: Zap,           title: "Answers in seconds",      body: "The moment a customer texts or chats, they get a reply — not a voicemail, not silence." },
-  { icon: MessageSquare, title: "Qualifies every caller",   body: "Asks the right questions for your business before your team ever picks up the phone." },
-  { icon: Users,         title: "Keeps your team in sync", body: "Every conversation is logged. Nothing falls through the cracks, even on your busiest days." },
-  { icon: ShieldCheck,   title: "Always on-brand",         body: "Consistent tone, your service list, your process — 24 hours a day, no off days." },
+import { useRef, useState } from "react";
+import { Link } from "wouter";
+import { ROUTES, DASHBOARD_URLS } from "@/lib/routes";
+import { CAPABILITY_STATUS, READINESS } from "@/components/v2/home/readiness";
+import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { PolicyDialog } from "@/components/legal/PolicyDialog";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import {
+  detectTimezone,
+  emptySignupForm,
+  SIGNUP_ENDPOINT,
+  SIGNUP_METHOD,
+  SIGNUP_NETWORK_ERROR,
+  TIMEZONE_OPTIONS,
+  buildSignupPayload,
+  mapSignupError,
+  validateSignup,
+  type SignupFormValues,
+  type SignupOutcome,
+} from "./signup/signupContract";
+
+/** Verified consequences of creating an account. Nothing speculative. */
+const NEXT_STEPS = [
+  {
+    title: "You're signed in straight away",
+    body: "Creating the account signs you in and opens your guided setup.",
+  },
+  {
+    title: "Setup happens after signup",
+    body: "Business details, your assistant's prompt and voice, availability, and your phone number are all configured in the setup hub — not on this form.",
+  },
+  {
+    title: "Test before you take real calls",
+    body: "You can publish your assistant and talk to it from your browser as soon as setup is saved. Answering a real business phone number is connected separately, when you are ready.",
+  },
 ];
 
-interface SignupState {
-  name: string;
-  businessName: string;
-  email: string;
-  phone: string;
-  businessType: string;
-  password: string;
-}
-const empty: SignupState = { name: "", businessName: "", email: "", phone: "", businessType: "", password: "" };
-
 export default function LandingReceptionistSignup() {
-  const [, navigate]    = useLocation();
-  const [form, setForm] = useState<SignupState>(empty);
+  // Launch audit (2026-09-24): this route inherited the homepage <title>.
+  usePageMeta({
+    title: "Create your AI Receptionist account — SiteMint Digital",
+    description: "Set up your SiteMint AI Receptionist account. We email you a link to confirm your address, then you finish setup at your own pace.",
+  });
+  const [form, setForm] = useState<SignupFormValues>(() => emptySignupForm(detectTimezone()));
   const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState("");
-  const [googleNote, setGoogleNote] = useState(false);
-  const [showPw,     setShowPw]     = useState(false);
+  const [outcome, setOutcome] = useState<SignupOutcome | null>(null);
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<SignupFormValuesErrors>({});
 
-  const set = (k: keyof SignupState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const [showPw, setShowPw] = useState(false);
+
+  const alertRef = useRef<HTMLDivElement | null>(null);
+  const fieldRefs = {
+    ownerName: useRef<HTMLInputElement | null>(null),
+    businessName: useRef<HTMLInputElement | null>(null),
+    email: useRef<HTMLInputElement | null>(null),
+    password: useRef<HTMLInputElement | null>(null),
+    acceptedTerms: useRef<HTMLInputElement | null>(null),
+  };
+
+  const set =
+    (k: "ownerName" | "businessName" | "email" | "password" | "timezone") =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!form.name.trim() || !form.email.trim()) {
-      setError("Name and email are required.");
+    setOutcome(null);
+    setFieldErrors({});
+
+    const result = validateSignup(form);
+    if (!result.ok) {
+      setError(result.formError);
+      setFieldErrors(result.fieldErrors);
+      const target = result.focusField;
+      if (target && target in fieldRefs) {
+        (fieldRefs as Record<string, React.RefObject<HTMLInputElement | null>>)[target]?.current?.focus();
+      }
       return;
     }
-    if (!form.password.trim() || form.password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
+
     setSubmitting(true);
     try {
-      // ── Real account creation ──────────────────────────────────────────────
-      const r = await fetch("/api/receptionist/auth/signup", {
-        method: "POST",
+      const r = await fetch(SIGNUP_ENDPOINT, {
+        method: SIGNUP_METHOD,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          fullName:     form.name,
-          businessName: form.businessName,
-          email:        form.email,
-          phone:        form.phone,
-          industry:     form.businessType,
-          password:     form.password,
-        }),
+        body: JSON.stringify(buildSignupPayload(form)),
       });
-      const d = await r.json() as { error?: string };
-      if (!r.ok) { setError(d.error ?? "Signup failed — please try again."); return; }
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string; code?: string };
+        const mapped = mapSignupError(r.status, d.error, d.code);
+        setOutcome(mapped.outcome);
+        setError(mapped.message);
+        window.requestAnimationFrame(() => alertRef.current?.focus());
+        return;
+      }
 
-      // ── Fire-and-forget lead capture (non-blocking) ─────────────────────
-      void fetch("/api/landing-test/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vertical:     "receptionist",
-          name:         form.name,
-          businessName: form.businessName,
-          email:        form.email,
-          phone:        form.phone,
-          extra:        { source: "get-early-access", businessType: form.businessType },
-          utmSource:    new URLSearchParams(window.location.search).get("utm_source") ?? "direct",
-          utmMedium:    new URLSearchParams(window.location.search).get("utm_medium") ?? "direct",
-          utmCampaign:  new URLSearchParams(window.location.search).get("utm_campaign") ?? null,
-        }),
-      }).catch(() => {});
-
-      window.location.href = "/ai-receptionist/dashboard/";
+      // Real account creation succeeded — the server set the session cookie.
+      // Cross-application navigation into the dashboard SPA, resolved
+      // through the centralised path layer. Redirect target unchanged from
+      // the previous implementation.
+      window.location.href = DASHBOARD_URLS.root;
     } catch {
-      setError("Network error — please try again.");
+      setOutcome("error");
+      setError(SIGNUP_NETWORK_ERROR);
+      window.requestAnimationFrame(() => alertRef.current?.focus());
     } finally {
       setSubmitting(false);
     }
   };
 
+  const describedBy = (
+    field: "ownerName" | "businessName" | "email" | "password" | "acceptedTerms",
+    ...extra: string[]
+  ) => {
+    const ids = [...extra];
+    if (fieldErrors[field]) ids.unshift(`${field}-error`);
+    return ids.length ? ids.join(" ") : undefined;
+  };
+
   return (
-    <div className="min-h-screen bg-background font-sans overflow-x-hidden">
-      <ReceptionistNav />
-      {/* spacer for fixed nav */}
-      <div className="h-[82px]" />
+    <div className="sg-page">
+      <header className="sg-bar">
+        <div className="sg-bar__inner">
+          <Link href={ROUTES.aiReceptionist} className="sg-bar__brand">
+            SiteMint <span className="sg-bar__brand-accent">Digital</span>
+          </Link>
+          <a href={DASHBOARD_URLS.login} className="sg-bar__signin">
+            Sign in
+          </a>
+        </div>
+      </header>
 
-      <div className="min-h-[calc(100vh-82px)] flex flex-col md:flex-row">
-
-        {/* ── Left — form ────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col px-6 py-10 md:px-12 md:py-16 max-w-xl w-full mx-auto md:mx-0 md:max-w-none md:basis-[480px] md:shrink-0">
-          {/* Back link */}
-          <div className="flex items-center mb-10">
-            <Link href="/ai-receptionist" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back
+      <main className="sg-main" id="signup-main">
+        <div className="sg-grid">
+          <div className="sg-intro">
+            <Link href={ROUTES.aiReceptionist} className="sg-back">
+              <ArrowLeft aria-hidden="true" className="sg-back__icon" />
+              Back to AI Receptionist
             </Link>
+
+            <p className="v2-eyebrow">AI Receptionist</p>
+            <h1 className="sg-title">Set up your AI Receptionist</h1>
+            <p className="sg-lede">
+              Create your account to set up and test your receptionist. We&rsquo;ll email you a link
+              to confirm your address, and you can finish setup at your own pace.
+            </p>
+
+            <ul className="sg-readiness">
+              {CAPABILITY_STATUS.map((item) => (
+                <li key={item.capability} className={`sg-readiness__item sg-readiness__item--${item.tier}`}>
+                  <span className="sg-readiness__name">{item.capability}</span>
+                  <span className={`v2-tier v2-tier--${item.tier}`}>{READINESS[item.tier].label}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* ── Form ── */}
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="mb-8 space-y-1.5">
-              <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground leading-tight">
-                Get early access
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Create your account — your AI receptionist will be configured personally by our team.
-              </p>
-            </div>
+          <div className="sg-form-col">
+            <form className="sg-form" onSubmit={submit} noValidate>
+              <h2 className="sg-form__title">Your account</h2>
 
-            {/* Google sign-in — honest "coming soon" */}
-            <div className="mb-6">
-              <button
-                type="button"
-                onClick={() => setGoogleNote(true)}
-                className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-2.5 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M17.64 9.2045C17.64 8.5663 17.5827 7.9527 17.4764 7.3636H9V10.845H13.8436C13.635 11.97 13.0009 12.9231 12.0477 13.5613V15.8195H14.9564C16.6582 14.2527 17.64 11.9454 17.64 9.2045Z" fill="#4285F4"/>
-                  <path d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="#34A853"/>
-                  <path d="M3.96409 10.71C3.78409 10.17 3.68182 9.5931 3.68182 9C3.68182 8.4068 3.78409 7.8299 3.96409 7.2899V4.9581H0.957275C0.347727 6.1731 0 7.5477 0 9C0 10.4522 0.347727 11.8268 0.957275 13.0418L3.96409 10.71Z" fill="#FBBC05"/>
-                  <path d="M9 3.5795C10.3214 3.5795 11.5077 4.0336 12.4405 4.9254L15.0218 2.344C13.4632 0.891772 11.4259 0 9 0C5.48182 0 2.43818 2.01681 0.957275 4.9581L3.96409 7.2899C4.67182 5.1627 6.65591 3.5795 9 3.5795Z" fill="#EA4335"/>
-                </svg>
-                Continue with Google
-              </button>
-              {googleNote && (
-                <motion.p
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="text-xs text-muted-foreground mt-2 text-center px-2"
-                >
-                  Google sign-in is coming soon — please use the form below for now.
-                </motion.p>
+              {error && (
+                <div ref={alertRef} className="sg-alert" role="alert" tabIndex={-1} aria-live="assertive">
+                  <span className="sg-alert__label">
+                    {outcome === "unavailable" || outcome === "limited" ? "Not available" : outcome === "duplicate" ? "Account exists" : "Error"}
+                  </span>
+                  <span className="sg-alert__text">
+                    {error}
+                    {outcome === "duplicate" && (
+                      <>
+                        {" "}
+                        <a href={DASHBOARD_URLS.login} className="sg-alert__link">
+                          Sign in instead
+                        </a>
+                        {" or "}
+                        <a href={DASHBOARD_URLS.passwordReset} className="sg-alert__link">
+                          reset your password
+                        </a>
+                        .
+                      </>
+                    )}
+                  </span>
+                </div>
               )}
-            </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">or create your account</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            <form onSubmit={submit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="s-name" className="text-sm font-semibold">Full name *</Label>
-                  <Input id="s-name" value={form.name} onChange={set("name")} placeholder="Chris Rivera" className="mt-1.5" required />
+              <div className="sg-row">
+                <div className="sg-field">
+                  <label htmlFor="s-owner-name" className="sg-label">
+                    Your name <span className="sg-req">Required</span>
+                  </label>
+                  <input
+                    id="s-owner-name"
+                    ref={fieldRefs.ownerName}
+                    className={`sg-input${fieldErrors.ownerName ? " sg-input--invalid" : ""}`}
+                    type="text"
+                    value={form.ownerName}
+                    onChange={set("ownerName")}
+                    autoComplete="name"
+                    required
+                    aria-required="true"
+                    aria-invalid={fieldErrors.ownerName ? true : undefined}
+                    aria-describedby={describedBy("ownerName")}
+                  />
+                  {fieldErrors.ownerName && (
+                    <p className="sg-error" id="ownerName-error">
+                      {fieldErrors.ownerName}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <Label htmlFor="s-biz" className="text-sm font-semibold">Business name</Label>
-                  <Input id="s-biz" value={form.businessName} onChange={set("businessName")} placeholder="Rivera Plumbing" className="mt-1.5" />
+
+                <div className="sg-field">
+                  <label htmlFor="s-business-name" className="sg-label">
+                    Business name <span className="sg-req">Required</span>
+                  </label>
+                  <input
+                    id="s-business-name"
+                    ref={fieldRefs.businessName}
+                    className={`sg-input${fieldErrors.businessName ? " sg-input--invalid" : ""}`}
+                    type="text"
+                    value={form.businessName}
+                    onChange={set("businessName")}
+                    autoComplete="organization"
+                    required
+                    aria-required="true"
+                    aria-invalid={fieldErrors.businessName ? true : undefined}
+                    aria-describedby={describedBy("businessName")}
+                  />
+                  {fieldErrors.businessName && (
+                    <p className="sg-error" id="businessName-error">
+                      {fieldErrors.businessName}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="s-email" className="text-sm font-semibold">Email *</Label>
-                <Input id="s-email" type="email" value={form.email} onChange={set("email")} placeholder="chris@riveraplumbing.com" className="mt-1.5" autoComplete="email" required />
+              <div className="sg-field">
+                <label htmlFor="s-email" className="sg-label">
+                  Work email <span className="sg-req">Required</span>
+                </label>
+                <input
+                  id="s-email"
+                  ref={fieldRefs.email}
+                  className={`sg-input${fieldErrors.email ? " sg-input--invalid" : ""}`}
+                  type="email"
+                  value={form.email}
+                  onChange={set("email")}
+                  autoComplete="email"
+                  inputMode="email"
+                  required
+                  aria-required="true"
+                  aria-invalid={fieldErrors.email ? true : undefined}
+                  aria-describedby={describedBy("email", "email-help")}
+                />
+                {fieldErrors.email && (
+                  <p className="sg-error" id="email-error">
+                    {fieldErrors.email}
+                  </p>
+                )}
+                <p className="sg-help" id="email-help">
+                  You sign in with this address.
+                </p>
               </div>
 
-              <div>
-                <Label htmlFor="s-phone" className="text-sm font-semibold">Phone</Label>
-                <Input id="s-phone" type="tel" value={form.phone} onChange={set("phone")} placeholder="(555) 000-0000" className="mt-1.5" />
+              <div className="sg-field">
+                <label htmlFor="s-timezone" className="sg-label">
+                  Timezone <span className="sg-opt">Optional</span>
+                </label>
+                <select id="s-timezone" className="sg-input sg-select" value={form.timezone} onChange={set("timezone")}>
+                  <option value="">Select your timezone</option>
+                  {!TIMEZONE_OPTIONS.includes(form.timezone as (typeof TIMEZONE_OPTIONS)[number]) && form.timezone && (
+                    <option value={form.timezone}>{form.timezone}</option>
+                  )}
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div>
-                <Label htmlFor="s-industry" className="text-sm font-semibold">Industry</Label>
-                <Select value={form.businessType} onValueChange={(v) => setForm((f) => ({ ...f, businessType: v }))}>
-                  <SelectTrigger id="s-industry" className="mt-1.5 w-full">
-                    <SelectValue placeholder="Select your industry…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Real Estate">Real Estate</SelectItem>
-                    <SelectItem value="Law Firm">Law Firm</SelectItem>
-                    <SelectItem value="Home Services">Home Services (HVAC, Plumbing, Electrical…)</SelectItem>
-                    <SelectItem value="Med Spa">Med Spa / Aesthetics</SelectItem>
-                    <SelectItem value="Restaurant">Restaurant</SelectItem>
-                    <SelectItem value="Retail">Retail</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="s-password" className="text-sm font-semibold">Password *</Label>
-                <div className="relative mt-1.5">
-                  <Input
+              <div className="sg-field">
+                <label htmlFor="s-password" className="sg-label">
+                  Password <span className="sg-req">Required</span>
+                </label>
+                <div className="sg-password">
+                  <input
                     id="s-password"
+                    ref={fieldRefs.password}
+                    className={`sg-input sg-input--password${fieldErrors.password ? " sg-input--invalid" : ""}`}
                     type={showPw ? "text" : "password"}
                     value={form.password}
                     onChange={set("password")}
-                    placeholder="Min. 8 characters"
                     autoComplete="new-password"
                     required
+                    aria-required="true"
+                    aria-invalid={fieldErrors.password ? true : undefined}
+                    aria-describedby={describedBy("password", "password-help")}
                   />
                   <button
                     type="button"
-                    tabIndex={-1}
+                    className="sg-password__toggle"
                     onClick={() => setShowPw((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-pressed={showPw}
+                    aria-controls="s-password"
                   >
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPw ? (
+                      <EyeOff aria-hidden="true" className="sg-password__icon" />
+                    ) : (
+                      <Eye aria-hidden="true" className="sg-password__icon" />
+                    )}
+                    <span className="v2-visually-hidden">{showPw ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="sg-error" id="password-error">
+                    {fieldErrors.password}
+                  </p>
+                )}
+                <p className="sg-help" id="password-help">
+                  At least 8 characters.
+                </p>
               </div>
 
-              {error && (
-                <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-                </div>
+              <div className="sg-field" style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: "0.6rem" }}>
+                <input
+                  id="s-accept-terms"
+                  ref={fieldRefs.acceptedTerms}
+                  type="checkbox"
+                  checked={form.acceptedTerms}
+                  onChange={(e) => setForm((f) => ({ ...f, acceptedTerms: e.target.checked }))}
+                  required
+                  aria-required="true"
+                  aria-invalid={fieldErrors.acceptedTerms ? true : undefined}
+                  aria-describedby={describedBy("acceptedTerms")}
+                  style={{ width: 20, height: 20, minWidth: 20, marginTop: 2 }}
+                />
+                <label htmlFor="s-accept-terms" className="sg-label" style={{ fontWeight: 400 }}>
+                  I have read and agree to the Terms of Service and the Privacy Policy.{" "}
+                  <span className="sg-req">Required</span>
+                </label>
+              </div>
+              <p className="sg-help" id="policy-links">
+                Read the <PolicyDialog policy="terms" label="Terms of Service" /> and the{" "}
+                <PolicyDialog policy="privacy" label="Privacy Policy" />. They open on this page, and
+                everything you have entered stays as it is.
+              </p>
+              {fieldErrors.acceptedTerms && (
+                <p className="sg-error" id="acceptedTerms-error">
+                  {fieldErrors.acceptedTerms}
+                </p>
               )}
 
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11 rounded-xl"
-              >
-                {submitting
-                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Creating account…</>
-                  : "Create account & get access"}
-              </Button>
+              <button type="submit" className="sg-submit" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 aria-hidden="true" className="sg-submit__spinner" />
+                    Creating your account…
+                  </>
+                ) : (
+                  "Create account"
+                )}
+              </button>
 
-              <p className="text-[11px] text-muted-foreground text-center">
+              <p className="sg-alt">
                 Already have an account?{" "}
-                <a href="/ai-receptionist/dashboard/login" className="text-primary hover:underline">Sign in</a>
+                <a href={DASHBOARD_URLS.login} className="sg-alt__link">
+                  Sign in
+                </a>
               </p>
             </form>
           </div>
-        </div>
 
-        {/* ── Right — navy brand panel ────────────────────────────────────── */}
-        <div className="hidden md:flex flex-1 bg-primary text-primary-foreground flex-col justify-center px-12 py-16 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-[0.06]"
-            style={{ backgroundImage: "radial-gradient(circle at 30% 20%, white 1px, transparent 1px), radial-gradient(circle at 70% 80%, white 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-
-          <div className="relative space-y-10 max-w-md">
-            <div className="space-y-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary-foreground/50">AI Receptionist</p>
-              <h2 className="font-serif text-3xl md:text-4xl font-bold leading-tight">
-                Never miss a<br />customer moment.
-              </h2>
-              <p className="text-primary-foreground/65 text-sm leading-relaxed">
-                An AI receptionist that works exactly the way your business does —
-                configured by us, reviewed by you, running 24/7.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {FEATURES.map((f) => (
-                <div key={f.title} className="flex items-start gap-4 bg-white/8 rounded-xl p-4 border border-white/10">
-                  <div className="w-8 h-8 rounded-lg bg-white/12 flex items-center justify-center shrink-0 mt-0.5">
-                    <f.icon className="w-4 h-4 text-emerald-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold mb-0.5">{f.title}</p>
-                    <p className="text-xs text-primary-foreground/60 leading-relaxed">{f.body}</p>
-                  </div>
-                </div>
+          <aside className="sg-next" aria-labelledby="sg-next-heading">
+            <h2 className="sg-next__title" id="sg-next-heading">
+              What happens after you create it
+            </h2>
+            <ul className="sg-next__list">
+              {NEXT_STEPS.map((step) => (
+                <li key={step.title} className="sg-next__item">
+                  <h3 className="sg-next__name">{step.title}</h3>
+                  <p className="sg-next__body">{step.body}</p>
+                </li>
               ))}
-            </div>
-
-            <p className="text-xs text-primary-foreground/35">
-              SiteMint Digital · info.sitemint@gmail.com
-            </p>
-          </div>
+            </ul>
+          </aside>
         </div>
-
-      </div>
+      </main>
     </div>
   );
+}
+
+interface SignupFormValuesErrors {
+  ownerName?: string;
+  businessName?: string;
+  email?: string;
+  password?: string;
+  acceptedTerms?: string;
 }

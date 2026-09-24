@@ -14,9 +14,9 @@ import {
   type SitemintCampaignBlueprint,
 } from "../../lib/campaignTaxonomy";
 import { CrmCopilot, type ParsedStep } from "./CrmCopilot";
-
-const tok = () => localStorage.getItem("adminToken") || "";
-const authH = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure, PageLoadFailures, failedParts } from "@/components/crm/LoadState";
 
 // ── Step Intelligence (embedded metadata) ─────────────────────────────────────
 // crm_campaign_steps has no metadata column, so per-step strategy metadata is
@@ -212,6 +212,49 @@ interface Lead {
   status: string;
 }
 
+/** The parts of the campaign-detail response this screen shows. */
+interface CampaignDetail {
+  stopOnReply: boolean | null;
+  autoSend: boolean | null;
+  recipients: EnrolledRecipient[];
+}
+
+// A body that is not the shape this page expects is a failure too — not a
+// reason to render an empty sequence over steps that are really there. This
+// screen used to read both answers with `.then(r => r.json())` and no `r.ok`
+// check, so a JSON error body flowed straight into state as zero steps and
+// zero enrolled contacts.
+function pickSteps(body: unknown): CampaignStep[] | undefined {
+  const list = body && typeof body === "object" ? (body as { steps?: unknown }).steps : undefined;
+  return Array.isArray(list) ? list as CampaignStep[] : undefined;
+}
+
+function pickLeads(body: unknown): Lead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as Lead[] : undefined;
+}
+
+function pickCampaignDetail(body: unknown): CampaignDetail | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as { campaign?: unknown; recipients?: unknown };
+  // Older backends answer with the campaign at the top level.
+  const camp = (b.campaign && typeof b.campaign === "object" ? b.campaign : body) as {
+    stopOnReply?: unknown; autoSend?: unknown;
+  };
+  const raw = Array.isArray(b.recipients) ? b.recipients : [];
+  return {
+    stopOnReply: typeof camp.stopOnReply === "boolean" ? camp.stopOnReply : null,
+    autoSend:    typeof camp.autoSend    === "boolean" ? camp.autoSend    : null,
+    // Enrolled contacts are embedded in the campaign detail response rather
+    // than served by a separate endpoint.
+    recipients: raw.map((r: EnrolledRecipient & { leadName?: string; leadEmail?: string; name?: string; email?: string }) => ({
+      ...r,
+      leadName:  r.leadName  ?? r.name  ?? `Lead #${r.leadId}`,
+      leadEmail: r.leadEmail ?? r.email ?? "",
+    })),
+  };
+}
+
 // ── Channel helpers ───────────────────────────────────────────────────────────
 
 const CHANNELS = ["email", "sms", "call_prompt", "task"] as const;
@@ -226,9 +269,9 @@ function ChannelIcon({ ch, cls = "w-4 h-4" }: { ch: string; cls?: string }) {
 
 const CH_COLOR: Record<string, string> = {
   email:       "bg-blue-100 text-blue-700 border-blue-200",
-  sms:         "bg-violet-100 text-violet-700 border-violet-200",
+  sms:         "bg-teal-100 text-teal-700 border-teal-200",
   call_prompt: "bg-amber-100 text-amber-700 border-amber-200",
-  task:        "bg-gray-100 text-gray-600 border-gray-200",
+  task:        "bg-muted text-muted-foreground border-border",
 };
 
 const ENROLL_COLOR: Record<string, string> = {
@@ -278,12 +321,12 @@ function StepCard({
   const branchLine = branchSummary(step, allSteps);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+    <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60 bg-muted/60">
         <div className="w-7 h-7 rounded-full bg-[#1e293b] text-white flex items-center justify-center text-xs font-bold shrink-0">
           {step.stepNumber}
         </div>
-        <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${CH_COLOR[step.channel] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+        <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${CH_COLOR[step.channel] ?? "bg-muted text-muted-foreground border-border"}`}>
           <ChannelIcon ch={step.channel} cls="w-3 h-3" />
           {step.channel.replace("_", " ")}
         </div>
@@ -339,14 +382,14 @@ function StepCard({
           <p className="text-xs text-amber-700 font-medium">Prompt: {step.callPrompt}</p>
         )}
         {step.taskDescription && (
-          <p className="text-xs text-gray-600">Task: {step.taskDescription}</p>
+          <p className="text-xs text-muted-foreground">Task: {step.taskDescription}</p>
         )}
         {intelChips.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-0.5">
             {intelChips.map(([label, val]) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100"
+                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100"
                 title={`${label}: ${val}`}
               >
                 <Brain className="w-2.5 h-2.5 shrink-0" />
@@ -433,9 +476,8 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
       const method = existing ? "PATCH" : "POST";
       // Step Intelligence is embedded back into the body (no metadata column).
       const mergedBody = serializeStepBody(body, intel);
-      const r = await fetch(url, {
+      const r = await adminFetch(url, {
         method,
-        headers: authH(),
         body: JSON.stringify({
           stepNumber, dayOffset, channel, subject: subject || null,
           body: mergedBody || null,
@@ -449,11 +491,12 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           branchFalseNextStepId: showBranch && branchFalseNextStepId !== "" ? branchFalseNextStepId : null,
         }),
       });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error ?? "Failed to save step"); return; }
+      if (!r.ok) { setError(`Step not saved. ${await responseFailureReason(r)}`); return; }
+      const d = await r.json().catch(() => ({})) as { step?: CampaignStep };
+      if (!d.step) { setError("Step not saved. The server's answer was not in the expected shape."); return; }
       onSaved(d.step);
     } catch {
-      setError("Network error — please try again");
+      setError(`Step not saved. ${failureReason(null)}`);
     } finally {
       setSaving(false);
     }
@@ -469,7 +512,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           <input
             type="number" min={1} value={stepNumber}
             onChange={e => setStepNumber(Number(e.target.value))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
           />
         </div>
         <div>
@@ -477,7 +520,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           <input
             type="number" min={0} value={dayOffset}
             onChange={e => setDayOffset(Number(e.target.value))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
           />
         </div>
         <div>
@@ -485,7 +528,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           <select
             value={sendTime}
             onChange={e => setSendTime(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
           >
             {SEND_TIMES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
           </select>
@@ -502,7 +545,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
               className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
                 channel === ch
                   ? `${CH_COLOR[ch]} shadow-sm`
-                  : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                  : "bg-white border-border text-muted-foreground hover:bg-accent"
               }`}
             >
               <ChannelIcon ch={ch} cls="w-3.5 h-3.5" />
@@ -521,7 +564,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
                 value={subject}
                 onChange={e => setSubject(e.target.value)}
                 placeholder="Email subject line…"
-                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
               />
             </div>
           )}
@@ -532,7 +575,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
               onChange={e => setBody(e.target.value)}
               rows={4}
               placeholder={channel === "sms" ? "SMS message text…" : "Email body (plain text)…"}
-              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+              className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
             />
           </div>
         </>
@@ -546,7 +589,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
             onChange={e => setCallPrompt(e.target.value)}
             rows={3}
             placeholder="What should the rep say on this call?…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
           />
         </div>
       )}
@@ -559,22 +602,22 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
             onChange={e => setTaskDescription(e.target.value)}
             rows={2}
             placeholder="What task should be completed?…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
+            className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white resize-none"
           />
         </div>
       )}
 
       {/* ── Step Intelligence (collapsible) ── */}
-      <div className="border border-indigo-200 rounded-lg overflow-hidden bg-indigo-50/40">
+      <div className="border border-cyan-200 rounded-lg overflow-hidden bg-cyan-50/40">
         <button
           type="button"
           onClick={() => setShowIntel(s => !s)}
-          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-indigo-50 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-cyan-50 transition-colors"
         >
-          <Brain className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          <span className="text-xs font-bold text-indigo-900">Step Intelligence</span>
-          <span className="text-[9px] text-indigo-500 font-medium">optional · strategy metadata</span>
-          {showIntel ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-indigo-500" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-indigo-500" />}
+          <Brain className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+          <span className="text-xs font-bold text-cyan-900">Step Intelligence</span>
+          <span className="text-[9px] text-cyan-500 font-medium">optional · strategy metadata</span>
+          {showIntel ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-cyan-500" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-cyan-500" />}
         </button>
         {showIntel && (
           <div className="px-3 pb-3 pt-1 space-y-2">
@@ -586,16 +629,16 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
               ["routingHint", "Routing hint", "e.g. If clicked, move to CRM/Automation campaign"],
             ] as Array<[keyof StepIntel, string, string]>).map(([k, label, ph]) => (
               <div key={k}>
-                <label className="block text-[10px] font-semibold text-indigo-700/80 mb-0.5">{label}</label>
+                <label className="block text-[10px] font-semibold text-cyan-700/80 mb-0.5">{label}</label>
                 <input
                   value={intel[k]}
                   onChange={e => setIntelField(k, e.target.value)}
                   placeholder={ph}
-                  className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
+                  className="w-full border border-cyan-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-200 bg-white"
                 />
               </div>
             ))}
-            <p className="text-[9px] text-indigo-500/80 leading-relaxed pt-0.5">
+            <p className="text-[9px] text-cyan-500/80 leading-relaxed pt-0.5">
               Stored inside the step body under a marked <span className="font-mono">[Step Intelligence]</span> block — no schema change. Strategy metadata only; no AI generation yet.
             </p>
           </div>
@@ -608,7 +651,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
           value={intentLabel}
           onChange={e => setIntentLabel(e.target.value)}
           placeholder="e.g. re-engagement nudge"
-          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+          className="w-full border border-input rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
         />
       </div>
 
@@ -696,7 +739,7 @@ function StepForm({ campaignId, existing, stepCount, allSteps, onSaved, onCancel
       <div className="flex gap-2 pt-1">
         <button
           onClick={onCancel}
-          className="flex-1 px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          className="flex-1 px-4 py-2 border border-border text-xs font-medium rounded-lg hover:bg-accent transition-colors"
         >
           Cancel
         </button>
@@ -722,20 +765,27 @@ function LeadPicker({
   campaignId: number;
   onEnrolled: () => void;
 }) {
-  const [leads,    setLeads]    = useState<Lead[]>([]);
+  const [leadsLoad, setLeadsLoad] = useState<Load<Lead[]>>({ status: "loading" });
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [loading,  setLoading]  = useState(true);
+  const [reloading, setReloading] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [error,    setError]    = useState("");
   const [result,   setResult]   = useState<{ enrolled: number; scheduled: number } | null>(null);
 
-  useEffect(() => {
-    fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${tok()}` } })
-      .then(r => r.json())
-      .then(d => setLeads((d.leads ?? []).filter((l: Lead) => l.email && !l.email.includes("@imported.local"))))
-      .catch(() => setError("Failed to load leads"))
-      .finally(() => setLoading(false));
+  // Contacts that actually loaded, or null. "No leads with valid email
+  // addresses found" is a claim about the CRM; a read that failed is not.
+  const leads = leadsLoad.status === "ready" ? leadsLoad.data : null;
+
+  const loadLeads = useCallback(async () => {
+    setReloading(true);
+    const next = await readAdminResource("/api/crm/leads", pickLeads);
+    setLeadsLoad(next.status === "ready"
+      ? { status: "ready", data: next.data.filter(l => l.email && !l.email.includes("@imported.local")) }
+      : next);
+    setReloading(false);
   }, []);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
 
   const toggle = (id: number) => {
     const s = new Set(selected);
@@ -747,24 +797,28 @@ function LeadPicker({
     setError("");
     setEnrolling(true);
     try {
-      const r = await fetch(`/api/crm/campaigns/${campaignId}/enroll`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/enroll`, {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({ leadIds: Array.from(selected) }),
       });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error ?? "Failed to enroll"); return; }
+      if (!r.ok) { setError(`Nobody was enrolled. ${await responseFailureReason(r)}`); return; }
+      const d = await r.json().catch(() => ({})) as { enrolled?: unknown; scheduled?: unknown };
+      if (typeof d.enrolled !== "number" || typeof d.scheduled !== "number") {
+        setError("The enrollment ran, but the server's answer was not in the expected shape."); return;
+      }
       setResult({ enrolled: d.enrolled, scheduled: d.scheduled });
       setSelected(new Set());
       onEnrolled();
     } catch {
-      setError("Network error");
+      setError(`Nobody was enrolled. ${failureReason(null)}`);
     } finally {
       setEnrolling(false);
     }
   };
 
-  if (loading) return <div className="text-xs text-muted-foreground p-4 animate-pulse">Loading contacts…</div>;
+  if (leadsLoad.status === "loading") {
+    return <div className="text-xs text-muted-foreground p-4 animate-pulse" role="status" aria-live="polite">Loading contacts…</div>;
+  }
 
   return (
     <div className="space-y-3">
@@ -779,29 +833,43 @@ function LeadPicker({
           <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
         </div>
       )}
-      <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
-        {leads.map(l => (
-          <label key={l.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={selected.has(l.id)}
-              onChange={() => toggle(l.id)}
-              className="rounded"
-            />
-            <div>
-              <p className="text-xs font-semibold text-foreground">{l.name}</p>
-              <p className="text-[10px] text-muted-foreground">{l.email}</p>
-            </div>
-            {l.company && <span className="ml-auto text-[10px] text-muted-foreground truncate max-w-[100px]">{l.company}</span>}
-          </label>
-        ))}
-        {leads.length === 0 && (
-          <p className="text-xs text-muted-foreground p-4 text-center">No leads with valid email addresses found.</p>
-        )}
-      </div>
+      {leads === null ? (
+        /* An empty picker would say "you have no contacts". Say which it is. */
+        <LoadFailure
+          what="Contacts"
+          reason={leadsLoad.status === "error" ? leadsLoad.reason : ""}
+          onRetry={() => { void loadLeads(); }}
+          retrying={reloading}
+        >
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nobody can be enrolled while this is unavailable — there may well be contacts to enroll.
+          </p>
+        </LoadFailure>
+      ) : (
+        <div className="max-h-56 overflow-y-auto border border-border rounded-xl divide-y divide-border/60">
+          {leads.map(l => (
+            <label key={l.id} className="flex items-center gap-3 px-3 py-2 hover:bg-accent cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.has(l.id)}
+                onChange={() => toggle(l.id)}
+                className="rounded"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground break-words">{l.name}</p>
+                <p className="text-[10px] text-muted-foreground break-words">{l.email}</p>
+              </div>
+              {l.company && <span className="ml-auto text-[10px] text-muted-foreground truncate max-w-[100px]">{l.company}</span>}
+            </label>
+          ))}
+          {leads.length === 0 && (
+            <p className="text-xs text-muted-foreground p-4 text-center">No leads with valid email addresses found.</p>
+          )}
+        </div>
+      )}
       <button
         onClick={enroll}
-        disabled={!selected.size || enrolling}
+        disabled={!selected.size || enrolling || leads === null}
         className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
         {enrolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
@@ -824,8 +892,8 @@ function JourneyView({
 }) {
   if (steps.length === 0) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-        <Route className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+      <div className="bg-muted border border-border rounded-xl p-6 text-center">
+        <Route className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
         <p className="text-sm font-semibold text-muted-foreground">No journey to preview yet</p>
         <p className="text-xs text-muted-foreground mt-1">Add steps or generate them from a blueprint to see the contact journey.</p>
       </div>
@@ -844,20 +912,20 @@ function JourneyView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <Route className="w-4 h-4 text-indigo-500" />
+        <Route className="w-4 h-4 text-cyan-500" />
         <span>Read-only preview of the contact journey. Cadence tapers as the relationship matures — later touches sit further apart.</span>
       </div>
 
       <div className="relative pl-4">
-        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-indigo-300 via-indigo-200 to-transparent" />
+        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-cyan-300 via-cyan-200 to-transparent" />
         <div className="space-y-5">
           {weekKeys.map(wk => {
             const wkSteps = weeks.get(wk)!;
             return (
               <div key={wk} className="relative">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-indigo-500 border-2 border-white shadow" />
-                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide">Week {wk}</span>
+                  <span className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-cyan-500 border-2 border-white shadow" />
+                  <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wide">Week {wk}</span>
                   <span className="text-[10px] text-muted-foreground">· {wkSteps.length} touch{wkSteps.length !== 1 ? "es" : ""}</span>
                 </div>
                 <div className="space-y-2">
@@ -865,8 +933,8 @@ function JourneyView({
                     const { cleanBody, intel } = parseStepBody(s.body);
                     const firstLine = (cleanBody.split("\n").find(l => l.trim()) ?? "").trim();
                     return (
-                      <div key={s.id} className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-start gap-2 shadow-sm">
-                        <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${CH_COLOR[s.channel] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                      <div key={s.id} className="bg-white border border-border rounded-lg px-3 py-2 flex items-start gap-2 shadow-sm">
+                        <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${CH_COLOR[s.channel] ?? "bg-muted text-muted-foreground border-border"}`}>
                           <ChannelIcon ch={s.channel} cls="w-2.5 h-2.5" />
                           {s.channel.replace("_", " ")}
                         </div>
@@ -875,7 +943,7 @@ function JourneyView({
                             {s.subject ?? intel.objective ?? firstLine ?? s.channel.replace("_", " ")}
                           </p>
                           {intel.desiredBehavior && (
-                            <p className="text-[10px] text-indigo-600 truncate">Goal: {intel.desiredBehavior}</p>
+                            <p className="text-[10px] text-cyan-600 truncate">Goal: {intel.desiredBehavior}</p>
                           )}
                         </div>
                         <span className="text-[10px] text-muted-foreground shrink-0">Day {s.dayOffset}</span>
@@ -891,7 +959,7 @@ function JourneyView({
 
       {/* Journey end marker */}
       <div className="flex items-center gap-2 pl-4 text-[11px] text-muted-foreground">
-        <GitBranch className="w-3.5 h-3.5 text-gray-400" />
+        <GitBranch className="w-3.5 h-3.5 text-muted-foreground/60" />
         <span>
           Journey ends after the last step{stopOnReply ? ", or earlier if the contact replies" : ""}.
           {autoSend === false ? " Sending is manual — nothing leaves without queue approval." : ""}
@@ -937,12 +1005,12 @@ function CampaignEndsPanel({
       icon: GitBranch,
       label: "Branch / switch logic",
       detail: "Not configured — contacts follow a single linear path. Cross-campaign routing is a strategy note only.",
-      tone: "text-gray-500",
+      tone: "text-muted-foreground",
     },
   ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+    <div className="bg-white border border-border rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Target className="w-4 h-4 text-[#1e293b]" />
         <p className="text-xs font-bold text-foreground">Campaign ends when…</p>
@@ -958,7 +1026,7 @@ function CampaignEndsPanel({
           </div>
         ))}
       </div>
-      <div className="flex items-start gap-2 text-[10px] text-muted-foreground border-t border-gray-100 pt-2.5">
+      <div className="flex items-start gap-2 text-[10px] text-muted-foreground border-t border-border/60 pt-2.5">
         <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px text-emerald-500" />
         <span>Safety: scheduler behaviour is unchanged. No contact is enrolled and no message is sent without explicit action.</span>
       </div>
@@ -976,9 +1044,12 @@ interface Props {
 }
 
 export default function CrmCampaignSequence({ campaignId, campaignName, campaignType, onBack }: Props) {
-  const [steps,      setSteps]      = useState<CampaignStep[]>([]);
-  const [recipients, setRecipients] = useState<EnrolledRecipient[]>([]);
-  const [loading,    setLoading]    = useState(true);
+  // The sequence's steps and its campaign detail (enrolled contacts, stop-on-
+  // reply, auto-send) are two separate answers, and each one is a `Load`.
+  const [stepsLoad,  setStepsLoad]  = useState<Load<CampaignStep[]>>({ status: "loading" });
+  const [detailLoad, setDetailLoad] = useState<Load<CampaignDetail>>({ status: "loading" });
+  const [reloading,  setReloading]  = useState(false);
+  /** A sequence action (save, delete, generate) the server refused. */
   const [error,      setError]      = useState("");
 
   const [activeTab,    setActiveTab]    = useState<"steps" | "enroll" | "recipients" | "copilot">("steps");
@@ -1003,44 +1074,38 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   const [aiAdding,      setAiAdding]      = useState(false);
   const [aiResult,      setAiResult]      = useState("");
 
+  // What actually loaded, or null. Never an empty array standing in for a
+  // request nobody managed to complete.
+  const steps      = stepsLoad.status === "ready" ? stepsLoad.data : null;
+  const detail     = detailLoad.status === "ready" ? detailLoad.data : null;
+  const recipients = detail ? detail.recipients : null;
   // Campaign settings (read-only here) for the "Campaign ends when…" panel.
-  const [stopOnReply, setStopOnReply] = useState<boolean | null>(null);
-  const [autoSend,    setAutoSend]    = useState<boolean | null>(null);
+  const stopOnReply = detail ? detail.stopOnReply : null;
+  const autoSend    = detail ? detail.autoSend : null;
 
+  /** Apply a local change to the steps, only when there are steps to change. */
+  const updateSteps = (fn: (prev: CampaignStep[]) => CampaignStep[]) =>
+    setStepsLoad(prev => (prev.status === "ready" ? { status: "ready", data: fn(prev.data) } : prev));
+
+  // Each part keeps its own answer: the steps can load while the campaign
+  // detail fails, and the page says so instead of silently reporting that
+  // nobody is enrolled.
   const load = useCallback(async () => {
+    setReloading(true);
     setError("");
-    try {
-      const h = { Authorization: `Bearer ${tok()}` };
-      const [sr, cr] = await Promise.all([
-        fetch(`/api/crm/campaigns/${campaignId}/steps`, { headers: h }).then(r => r.json()),
-        fetch(`/api/crm/campaigns/${campaignId}`,       { headers: h }).then(r => r.json()).catch(() => null),
-      ]);
-      const camp = cr?.campaign ?? cr ?? null;
-      if (camp) {
-        setStopOnReply(typeof camp.stopOnReply === "boolean" ? camp.stopOnReply : null);
-        setAutoSend(typeof camp.autoSend === "boolean" ? camp.autoSend : null);
-      }
-      setSteps(sr.steps ?? []);
-      // Enrich recipients (embedded in the campaign detail response, not a separate endpoint)
-      const recs = (cr?.recipients ?? []);
-      setRecipients(
-        recs.map((r: EnrolledRecipient & { leadName?: string; leadEmail?: string; name?: string; email?: string }) => ({
-          ...r,
-          leadName:  r.leadName  ?? r.name  ?? `Lead #${r.leadId}`,
-          leadEmail: r.leadEmail ?? r.email ?? "",
-        }))
-      );
-    } catch {
-      setError("Failed to load sequence data");
-    } finally {
-      setLoading(false);
-    }
+    const [nextSteps, nextDetail] = await Promise.all([
+      readAdminResource(`/api/crm/campaigns/${campaignId}/steps`, pickSteps),
+      readAdminResource(`/api/crm/campaigns/${campaignId}`, pickCampaignDetail),
+    ]);
+    setStepsLoad(nextSteps);
+    setDetailLoad(nextDetail);
+    setReloading(false);
   }, [campaignId]);
 
   useEffect(() => { load(); }, [load]);
 
   const onStepSaved = (step: CampaignStep) => {
-    setSteps(prev => {
+    updateSteps(prev => {
       const idx = prev.findIndex(s => s.id === step.id);
       if (idx >= 0) {
         const next = [...prev];
@@ -1053,64 +1118,83 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     setEditingStep(null);
   };
 
+  // A delete that failed must not take the card off the screen: the step is
+  // still there, and the next reload would bring it back with no explanation.
   const deleteStep = async (id: number) => {
-    await fetch(`/api/crm/campaigns/${campaignId}/steps/${id}`, {
-      method: "DELETE",
-      headers: authH(),
-    });
-    setSteps(prev => prev.filter(s => s.id !== id));
+    setError("");
+    try {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps/${id}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) { setError(`Step not deleted. ${await responseFailureReason(r)}`); return; }
+      updateSteps(prev => prev.filter(s => s.id !== id));
+    } catch {
+      setError(`Step not deleted. ${failureReason(null)}`);
+    }
   };
 
   // Generate DRAFT steps from a blueprint. Appends to the existing sequence.
   // No AI copy, no auto-send, no auto-enroll — pure strategy scaffold.
   const generateFromBlueprint = async () => {
     const blueprint = getBlueprintById(selectedBlueprintId);
-    if (!blueprint) return;
+    if (!blueprint || steps === null) return;
+    const existing = steps;
     // Replace is only ever permitted when no contacts are enrolled — guard again
-    // here so the destructive path can never run on a live sequence.
-    const doReplace = genMode === "replace" && recipients.length === 0;
+    // here so the destructive path can never run on a live sequence. A
+    // recipients read that FAILED is not proof that nobody is enrolled, so it
+    // blocks the replace just as a live enrollment would.
+    const doReplace = genMode === "replace" && recipients !== null && recipients.length === 0;
     setGenerating(true);
     setGenResult("");
     setError("");
     try {
       // Clear existing steps first when safely replacing.
-      if (doReplace && steps.length > 0) {
-        for (const s of steps) {
-          await fetch(`/api/crm/campaigns/${campaignId}/steps/${s.id}`, {
+      if (doReplace && existing.length > 0) {
+        for (const s of existing) {
+          const dr = await adminFetch(`/api/crm/campaigns/${campaignId}/steps/${s.id}`, {
             method: "DELETE",
-            headers: authH(),
           });
+          if (!dr.ok) {
+            setError(`The existing steps were not cleared, so nothing was generated. ${await responseFailureReason(dr)}`);
+            return;
+          }
         }
-        setSteps([]);
+        setStepsLoad({ status: "ready", data: [] });
       }
-      const startNum = doReplace ? 1 : steps.reduce((m, s) => Math.max(m, s.stepNumber), 0) + 1;
+      const startNum = doReplace ? 1 : existing.reduce((m, s) => Math.max(m, s.stepNumber), 0) + 1;
       const payloads = buildStepsFromBlueprint(blueprint, startNum);
       const created: CampaignStep[] = [];
       let failed = false;
       for (const p of payloads) {
-        const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+        const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps`, {
           method: "POST",
-          headers: authH(),
           body: JSON.stringify(p),
         });
-        const d = await r.json();
         if (!r.ok) {
           failed = true;
-          setError(`${d.error ?? "Failed to create a generated step"} — ${created.length} of ${payloads.length} steps were created. Review the sequence and re-run or finish manually.`);
+          setError(`${created.length} of ${payloads.length} steps were created, then the rest stopped. ${await responseFailureReason(r)} Review the sequence and re-run or finish manually.`);
+          break;
+        }
+        const d = await r.json().catch(() => ({})) as { step?: CampaignStep };
+        if (!d.step) {
+          failed = true;
+          setError(`${created.length} of ${payloads.length} steps were created, then the server's answer was not in the expected shape. Review the sequence and re-run or finish manually.`);
           break;
         }
         created.push(d.step);
       }
       if (created.length) {
-        setSteps(prev =>
-          [...(doReplace ? [] : prev), ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset)
-        );
+        setStepsLoad(prev => ({
+          status: "ready",
+          data: [...(doReplace || prev.status !== "ready" ? [] : prev.data), ...created]
+            .sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset),
+        }));
         if (!failed) {
           setGenResult(`${doReplace ? "Replaced sequence with" : "Added"} ${created.length} draft step${created.length !== 1 ? "s" : ""} from "${blueprint.label}". Review and personalise before enrolling contacts.`);
         }
       }
     } catch {
-      setError("Network error while generating steps");
+      setError(`No steps were generated. ${failureReason(null)}`);
     } finally {
       setGenerating(false);
       setGenConfirm(false);
@@ -1129,9 +1213,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     try {
       const blueprint = getBlueprintById(selectedBlueprintId);
       const persona = blueprint ? getPersonaById(blueprint.personaId) : null;
-      const res = await fetch("/api/crm/campaigns/ai-generate", {
+      const res = await adminFetch("/api/crm/campaigns/ai-generate", {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({
           mode: "sequence",
           personaId: persona?.id,
@@ -1144,11 +1227,15 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
           stepCount: aiStepCount,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) { setAiError(data.error ?? "Generation failed — please try again."); return; }
-      setAiPreview(data.draft.steps as AiSequenceStepDraft[]);
+      if (!res.ok) { setAiError(`Nothing was generated. ${await responseFailureReason(res)}`); return; }
+      const data = await res.json().catch(() => ({})) as { draft?: { steps?: unknown } };
+      const drafted = data.draft?.steps;
+      if (!Array.isArray(drafted)) {
+        setAiError("The generation ran, but the server's answer was not in the expected shape."); return;
+      }
+      setAiPreview(drafted as AiSequenceStepDraft[]);
     } catch {
-      setAiError("Network error — please check your connection and try again.");
+      setAiError(`Nothing was generated. ${failureReason(null)}`);
     } finally {
       setAiGenerating(false);
     }
@@ -1157,7 +1244,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
   // Human explicitly confirmed the AI draft — now (and only now) persist the
   // steps, always appending after existing steps (never replaces/enrolls).
   const addAiDraftSteps = async () => {
-    if (!aiPreview || aiPreview.length === 0) return;
+    if (!aiPreview || aiPreview.length === 0 || steps === null) return;
     setAiAdding(true);
     setAiError("");
     try {
@@ -1167,9 +1254,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
       for (let i = 0; i < aiPreview.length; i++) {
         const s = aiPreview[i];
         const bodyWithIntel = s.intentLabel ? `${s.body}\n\n${INTEL_MARKER}\nObjective: ${s.intentLabel}` : s.body;
-        const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+        const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps`, {
           method: "POST",
-          headers: authH(),
           body: JSON.stringify({
             stepNumber: startNum + i,
             dayOffset: s.dayOffset,
@@ -1180,12 +1266,13 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             businessDaysOnly: true,
           }),
         });
-        const d = await r.json();
-        if (!r.ok) { failed = true; setAiError(`${d.error ?? "Failed to save step"} — ${created.length} of ${aiPreview.length} steps were added.`); break; }
+        if (!r.ok) { failed = true; setAiError(`${created.length} of ${aiPreview.length} steps were added, then the rest stopped. ${await responseFailureReason(r)}`); break; }
+        const d = await r.json().catch(() => ({})) as { step?: CampaignStep };
+        if (!d.step) { failed = true; setAiError(`${created.length} of ${aiPreview.length} steps were added, then the server's answer was not in the expected shape.`); break; }
         created.push(d.step);
       }
       if (created.length) {
-        setSteps(prev => [...prev, ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset));
+        updateSteps(prev => [...prev, ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset));
         if (!failed) setAiResult(`Added ${created.length} AI-drafted step${created.length !== 1 ? "s" : ""}. Review and personalise before enrolling contacts.`);
       }
       if (!failed) setAiPreview(null);
@@ -1220,9 +1307,8 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
     let failed = false;
     for (const p of parsed) {
       const mergedBody = serializeIntel(p.body, p.intel);
-      const r = await fetch(`/api/crm/campaigns/${campaignId}/steps`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/steps`, {
         method: "POST",
-        headers: authH(),
         body: JSON.stringify({
           stepNumber:      p.stepNumber,
           dayOffset:       p.dayOffset,
@@ -1235,49 +1321,56 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
           businessDaysOnly: p.businessDaysOnly,
         }),
       });
-      const d = await r.json();
-      if (!r.ok) { failed = true; setError(`Failed to save step ${p.stepNumber}: ${d.error ?? "unknown error"}`); break; }
+      if (!r.ok) { failed = true; setError(`Step ${p.stepNumber} was not saved. ${await responseFailureReason(r)}`); break; }
+      const d = await r.json().catch(() => ({})) as { step?: CampaignStep };
+      if (!d.step) { failed = true; setError(`Step ${p.stepNumber} was not saved. The server's answer was not in the expected shape.`); break; }
       created.push(d.step);
     }
     if (created.length > 0) {
-      setSteps(prev =>
-        [...prev, ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset)
-      );
+      setStepsLoad(prev => (prev.status === "ready"
+        ? { status: "ready", data: [...prev.data, ...created].sort((a, b) => a.stepNumber - b.stepNumber || a.dayOffset - b.dayOffset) }
+        : prev));
       if (!failed) setActiveTab("steps");
     }
   }, [campaignId]);
 
+  // A pause/stop/resume the server refused must not be shown as applied: the
+  // enrollment is unchanged, and the next reload would silently undo it.
   const updateEnrollmentStatus = async (rid: number, enrollmentStatus: string) => {
     setUpdatingRid(rid);
+    setError("");
     try {
-      await fetch(`/api/crm/campaigns/${campaignId}/recipients/${rid}/status`, {
+      const r = await adminFetch(`/api/crm/campaigns/${campaignId}/recipients/${rid}/status`, {
         method: "PATCH",
-        headers: authH(),
         body: JSON.stringify({ enrollmentStatus }),
       });
-      setRecipients(prev =>
-        prev.map(r => r.id === rid ? { ...r, enrollmentStatus } : r)
-      );
+      if (!r.ok) { setError(`The enrollment was not changed. ${await responseFailureReason(r)}`); return; }
+      setDetailLoad(prev => (prev.status === "ready"
+        ? { status: "ready", data: { ...prev.data, recipients: prev.data.recipients.map(x => x.id === rid ? { ...x, enrollmentStatus } : x) } }
+        : prev));
+    } catch {
+      setError(`The enrollment was not changed. ${failureReason(null)}`);
     } finally {
       setUpdatingRid(null);
     }
   };
 
-  if (loading) {
+  if (stepsLoad.status === "loading" || detailLoad.status === "loading") {
     return (
       <CrmLayout>
-        <div className="p-6 max-w-5xl mx-auto animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-gray-200 rounded" />
-          <div className="h-32 bg-gray-100 rounded-xl" />
+        <div className="p-6 max-w-5xl mx-auto animate-pulse space-y-4" role="status" aria-live="polite">
+          <span className="sr-only">Loading this sequence…</span>
+          <div className="h-8 w-48 bg-border rounded" />
+          <div className="h-32 bg-muted rounded-xl" />
         </div>
       </CrmLayout>
     );
   }
 
   const typeColor: Record<string, string> = {
-    nurture:   "bg-violet-100 text-violet-700 border border-violet-200",
+    nurture:   "bg-teal-100 text-teal-700 border border-teal-200",
     drip:      "bg-blue-100 text-blue-700 border border-blue-200",
-    broadcast: "bg-gray-100 text-gray-600 border border-gray-200",
+    broadcast: "bg-muted text-muted-foreground border border-border",
   };
 
   return (
@@ -1293,30 +1386,44 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             <ArrowLeft className="w-3.5 h-3.5" />
             All Campaigns
           </button>
-          <span className="text-gray-300">/</span>
+          <span className="text-muted-foreground/40">/</span>
           <h1 className="text-sm font-bold text-foreground truncate max-w-xs">{campaignName}</h1>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${typeColor[campaignType] ?? "bg-gray-100 text-gray-600 border border-gray-200"}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${typeColor[campaignType] ?? "bg-muted text-muted-foreground border border-border"}`}>
             {campaignType}
           </span>
         </div>
 
+        {/*
+          Which parts of this screen could not be loaded, named. It sits above
+          the tabs so a failure in a part you are not looking at is still
+          stated — the counts in the tab strip show an em dash rather than a 0.
+        */}
+        <PageLoadFailures
+          failures={failedParts([
+            ["Sequence steps", stepsLoad],
+            ["Enrolled contacts", detailLoad],
+          ])}
+          onRetry={() => { void load(); }}
+          retrying={reloading}
+        />
+
         {error && (
-          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+          <div role="alert" className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-px" /> <span className="min-w-0 break-words">{error}</span>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
+        <div className="flex gap-1 bg-muted rounded-xl p-1 w-fit flex-wrap">
           <button
             onClick={() => setActiveTab("steps")}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "steps" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Sequence Steps ({steps.length})
+            Sequence Steps (<Figure value={steps ? steps.length : null} />)
           </button>
           <button
             onClick={() => setActiveTab("copilot")}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "copilot" ? "bg-violet-600 text-white shadow-sm" : "text-violet-600 hover:bg-violet-50"}`}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "copilot" ? "bg-teal-600 text-white shadow-sm" : "text-teal-600 hover:bg-teal-50"}`}
           >
             <Sparkles className="w-3 h-3" />
             AI Copilot
@@ -1325,7 +1432,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             onClick={() => setActiveTab("recipients")}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "recipients" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Enrolled ({recipients.length})
+            Enrolled (<Figure value={recipients ? recipients.length : null} />)
           </button>
           <button
             onClick={() => setActiveTab("enroll")}
@@ -1341,7 +1448,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
 
             {/* View toggle + blueprint generator */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex gap-1 bg-muted rounded-lg p-1">
                 {([["sequence", "Sequence", ListOrdered], ["journey", "Journey", Route]] as const).map(([v, label, Icon]) => (
                   <button
                     key={v}
@@ -1361,7 +1468,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <select
                   value={selectedBlueprintId}
                   onChange={e => { setSelectedBlueprintId(e.target.value); setGenConfirm(false); setGenResult(""); }}
-                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 max-w-[220px]"
+                  className="border border-input rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-cyan-200 max-w-[220px]"
                 >
                   <option value="">Start from a blueprint…</option>
                   {SITEMINT_CAMPAIGN_BLUEPRINTS.map(bp => (
@@ -1371,7 +1478,9 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 {selectedBlueprintId && !genConfirm && (
                   <button
                     onClick={() => setGenConfirm(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                    disabled={steps === null}
+                    title={steps === null ? "The existing steps could not be loaded, so new ones cannot be numbered." : undefined}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white text-xs font-semibold rounded-lg hover:bg-cyan-700 disabled:opacity-40 transition-colors"
                   >
                     <Wand2 className="w-3.5 h-3.5" />
                     Generate Steps
@@ -1380,15 +1489,16 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                 <select
                   value={aiStepCount}
                   onChange={e => setAiStepCount(Number(e.target.value))}
-                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="border border-input rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-200"
                   title="Number of AI-drafted steps to generate"
                 >
                   {[3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} steps</option>)}
                 </select>
                 <button
                   onClick={generateSequenceWithAi}
-                  disabled={aiGenerating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                  disabled={aiGenerating || steps === null}
+                  title={steps === null ? "The existing steps could not be loaded, so new ones cannot be numbered." : undefined}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-40 transition-colors"
                 >
                   {aiGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   {aiGenerating ? "Generating…" : "Generate with AI"}
@@ -1404,26 +1514,26 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
 
             {/* AI sequence draft preview — nothing is saved until explicitly confirmed */}
             {aiPreview && (
-              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
+                  <Sparkles className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-violet-900">
+                    <p className="text-xs font-bold text-teal-900">
                       AI-drafted, review before saving — {aiPreview.length} step{aiPreview.length !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-[11px] text-violet-700 mt-0.5">
+                    <p className="text-[11px] text-teal-700 mt-0.5">
                       Nothing is created, enrolled, or sent yet. Review the copy below, then confirm to append these as draft steps.
                     </p>
                   </div>
                 </div>
                 <ul className="space-y-2">
                   {aiPreview.map((s, i) => (
-                    <li key={i} className="bg-white rounded-lg border border-violet-100 p-2.5 text-xs">
-                      <div className="flex items-center gap-2 text-[10px] font-semibold text-violet-700 mb-1">
+                    <li key={i} className="bg-white rounded-lg border border-teal-100 p-2.5 text-xs">
+                      <div className="flex items-center gap-2 text-[10px] font-semibold text-teal-700 mb-1">
                         <span>Day {s.dayOffset}</span>
-                        <span className="text-violet-300">·</span>
+                        <span className="text-teal-300">·</span>
                         <span className="capitalize">{s.channel}</span>
-                        {s.intentLabel && <><span className="text-violet-300">·</span><span className="text-muted-foreground font-normal">{s.intentLabel}</span></>}
+                        {s.intentLabel && <><span className="text-teal-300">·</span><span className="text-muted-foreground font-normal">{s.intentLabel}</span></>}
                       </div>
                       {s.subject && <p className="font-semibold text-foreground mb-0.5">{s.subject}</p>}
                       <p className="text-muted-foreground whitespace-pre-line">{s.body}</p>
@@ -1434,7 +1544,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                   <button
                     onClick={addAiDraftSteps}
                     disabled={aiAdding}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-40 transition-colors"
                   >
                     {aiAdding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                     {aiAdding ? "Adding…" : "Add these draft steps"}
@@ -1442,7 +1552,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                   <button
                     onClick={() => setAiPreview(null)}
                     disabled={aiAdding}
-                    className="px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
+                    className="px-4 py-2 border border-border text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
                   >
                     Discard
                   </button>
@@ -1457,20 +1567,22 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             )}
 
             {/* Generate confirm panel */}
-            {selectedBlueprintId && genConfirm && (() => {
+            {selectedBlueprintId && genConfirm && steps !== null && (() => {
               const bp = getBlueprintById(selectedBlueprintId);
               const persona = bp ? getPersonaById(bp.personaId) : null;
-              // Replace is only offered when there are existing steps AND no one is enrolled.
-              const replaceSafe = recipients.length === 0;
+              // Replace is only offered when there are existing steps AND we can
+              // SEE that no one is enrolled. A recipients read that failed is not
+              // evidence of an empty enrollment.
+              const replaceSafe = recipients !== null && recipients.length === 0;
               const canReplace  = steps.length > 0 && replaceSafe;
               const effectiveMode = genMode === "replace" && canReplace ? "replace" : "append";
               return (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
+                <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-start gap-2">
-                    <Wand2 className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+                    <Wand2 className="w-4 h-4 text-cyan-600 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-indigo-900">Generate {bp?.exampleSteps.length ?? 0} draft step{(bp?.exampleSteps.length ?? 0) !== 1 ? "s" : ""} from "{bp?.label}"</p>
-                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                      <p className="text-xs font-bold text-cyan-900">Generate {bp?.exampleSteps.length ?? 0} draft step{(bp?.exampleSteps.length ?? 0) !== 1 ? "s" : ""} from "{bp?.label}"</p>
+                      <p className="text-[11px] text-cyan-700 mt-0.5">
                         {bp?.goal}{persona ? ` · Audience: ${persona.label}` : ""}
                       </p>
                     </div>
@@ -1485,7 +1597,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                           onChange={() => setGenMode("append")}
                           className="mt-0.5"
                         />
-                        <span className="text-[11px] text-indigo-900">
+                        <span className="text-[11px] text-cyan-900">
                           <span className="font-semibold">Append</span> after your existing {steps.length} step{steps.length !== 1 ? "s" : ""} — nothing is removed.
                         </span>
                       </label>
@@ -1496,17 +1608,21 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                           onChange={() => setGenMode("replace")}
                           className="mt-0.5"
                         />
-                        <span className="text-[11px] text-indigo-900">
+                        <span className="text-[11px] text-cyan-900">
                           <span className="font-semibold">Replace</span> all existing draft steps with this blueprint.
                           {!replaceSafe && (
-                            <span className="block text-[10px] text-amber-700">Disabled — contacts are enrolled. Replacing is only allowed before anyone is enrolled.</span>
+                            <span className="block text-[10px] text-amber-700">
+                              {recipients === null
+                                ? "Disabled — the enrolled contacts could not be loaded, so replacing cannot be shown to be safe."
+                                : "Disabled — contacts are enrolled. Replacing is only allowed before anyone is enrolled."}
+                            </span>
                           )}
                         </span>
                       </label>
                     </div>
                   )}
 
-                  <ul className="text-[10px] text-indigo-700/90 space-y-1 pl-6 list-disc">
+                  <ul className="text-[10px] text-cyan-700/90 space-y-1 pl-6 list-disc">
                     <li>These are <span className="font-semibold">strategy drafts</span> — no AI copy is generated.</li>
                     <li>No contacts are enrolled and nothing is sent. Review &amp; personalise each step first.</li>
                   </ul>
@@ -1514,7 +1630,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                     <button
                       onClick={generateFromBlueprint}
                       disabled={generating}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 text-white text-xs font-semibold rounded-lg hover:bg-cyan-700 disabled:opacity-40 transition-colors"
                     >
                       {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                       {generating ? "Generating…" : effectiveMode === "replace" ? "Replace draft steps" : "Append draft steps"}
@@ -1522,7 +1638,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
                     <button
                       onClick={() => { setGenConfirm(false); setGenMode("append"); }}
                       disabled={generating}
-                      className="px-4 py-2 border border-gray-200 text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
+                      className="px-4 py-2 border border-border text-xs font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-40"
                     >
                       Cancel
                     </button>
@@ -1545,7 +1661,25 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
               </span>
             </div>
 
-            {stepView === "journey" ? (
+            {steps === null ? (
+              /*
+                No sequence at all, rather than "Sequence Steps (0)" over "No
+                steps yet". An empty sequence and an unanswered request must
+                never look alike — and a 401, 403, 404, 5xx or unreachable
+                server each reads differently here, because the words come from
+                the response.
+              */
+              <LoadFailure
+                what="Sequence steps"
+                reason={stepsLoad.status === "error" ? stepsLoad.reason : ""}
+                onRetry={() => { void load(); }}
+                retrying={reloading}
+              >
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No step count and no journey are shown while this is unavailable — this sequence may well have steps.
+                </p>
+              </LoadFailure>
+            ) : stepView === "journey" ? (
               <JourneyView steps={steps} stopOnReply={stopOnReply} autoSend={autoSend} />
             ) : (<>
             {steps.length === 0 && !showStepForm && (
@@ -1599,7 +1733,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             {!showStepForm && !editingStep && steps.length > 0 && (
               <button
                 onClick={() => setShowStepForm(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-semibold text-muted-foreground rounded-xl hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-card-border text-xs font-semibold text-muted-foreground rounded-xl hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Another Step
@@ -1607,7 +1741,7 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             )}
 
             {steps.length > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div className="bg-muted border border-border rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-muted-foreground mb-2">SEQUENCE TIMELINE</p>
                 <div className="flex flex-col gap-1">
                   {steps.map((s, i) => {
@@ -1635,48 +1769,79 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
             </>)}
 
             {/* Campaign ends when… */}
-            {steps.length > 0 && <CampaignEndsPanel stopOnReply={stopOnReply} autoSend={autoSend} />}
+            {steps !== null && steps.length > 0 && <CampaignEndsPanel stopOnReply={stopOnReply} autoSend={autoSend} />}
           </div>
         )}
 
         {/* ── AI Copilot Tab ──────────────────────────────────────────────────── */}
         {activeTab === "copilot" && (
-          <CrmCopilot
-            campaignId={campaignId}
-            campaignName={campaignName}
-            existingSteps={steps}
-            onBuildSequence={handleCopilotBuildSequence}
-          />
+          steps === null ? (
+            /*
+              Not `steps ?? []`: the copilot reads the existing steps to decide
+              what to add, so handing it an empty array for a read that failed
+              would have it plan a sequence from scratch over one that already
+              has steps in it.
+            */
+            <LoadFailure
+              what="This sequence's steps"
+              reason={detailLoad.status === "error" ? detailLoad.reason : ""}
+              onRetry={() => { void load(); }}
+              retrying={reloading}
+            >
+              <p className="mt-2 text-sm text-muted-foreground">
+                The copilot is not offered while the current steps are unknown — it would plan as though the sequence were empty.
+              </p>
+            </LoadFailure>
+          ) : (
+            <CrmCopilot
+              campaignId={campaignId}
+              campaignName={campaignName}
+              existingSteps={steps}
+              onBuildSequence={handleCopilotBuildSequence}
+            />
+          )
         )}
 
         {/* ── Enrolled Recipients Tab ─────────────────────────────────────────── */}
         {activeTab === "recipients" && (
           <div className="space-y-3">
-            {recipients.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-                <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+            {recipients === null ? (
+              /* "No contacts enrolled yet" is a claim about this sequence. */
+              <LoadFailure
+                what="Enrolled contacts"
+                reason={detailLoad.status === "error" ? detailLoad.reason : ""}
+                onRetry={() => { void load(); }}
+                retrying={reloading}
+              >
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No enrolled count is shown while this is unavailable — people may well be enrolled in this sequence.
+                </p>
+              </LoadFailure>
+            ) : recipients.length === 0 ? (
+              <div className="bg-muted border border-border rounded-xl p-6 text-center">
+                <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
                 <p className="text-sm font-semibold text-muted-foreground">No contacts enrolled yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Switch to "Enroll Contacts" to add people to this sequence.</p>
               </div>
             ) : (
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50">
+                    <tr className="border-b border-border/60 bg-muted">
                       {["Contact", "Email", "Enrollment", "Step", "Enrolled On", "Actions"].map(h => (
                         <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-border/40">
                     {recipients.map(r => {
                       const isBusy = updatingRid === r.id;
                       return (
-                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                        <tr key={r.id} className="hover:bg-accent/50 transition-colors">
                           <td className="px-4 py-3 font-semibold text-xs text-foreground">{r.leadName}</td>
                           <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[160px]">{r.leadEmail}</td>
                           <td className="px-4 py-3">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ENROLL_COLOR[r.enrollmentStatus] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ENROLL_COLOR[r.enrollmentStatus] ?? "bg-muted text-muted-foreground border-border"}`}>
                               {r.enrollmentStatus}
                             </span>
                           </td>
@@ -1729,13 +1894,27 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
         {/* ── Enroll Tab ──────────────────────────────────────────────────────── */}
         {activeTab === "enroll" && (
           <div className="space-y-3">
-            {steps.length === 0 && (
+            {/* "You have no steps" only when we could actually read the steps. */}
+            {steps !== null && steps.length === 0 && (
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 You must add at least one step before enrolling contacts.
               </div>
             )}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+            {steps === null && (
+              <LoadFailure
+                what="Sequence steps"
+                reason={stepsLoad.status === "error" ? stepsLoad.reason : ""}
+                variant="inline"
+                onRetry={() => { void load(); }}
+                retrying={reloading}
+              >
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enrolling is held back until the steps can be read — this sequence may well have steps.
+                </p>
+              </LoadFailure>
+            )}
+            <div className="bg-white border border-border rounded-xl shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-foreground">Enroll Contacts</h2>
                 <button
@@ -1749,14 +1928,14 @@ export default function CrmCampaignSequence({ campaignId, campaignName, campaign
               <p className="text-xs text-muted-foreground">
                 Contacts selected here will be enrolled into this sequence. A scheduled message is created for each step × contact.
               </p>
-              {expandEnroll && steps.length > 0 && (
+              {expandEnroll && steps !== null && steps.length > 0 && (
                 <LeadPicker campaignId={campaignId} onEnrolled={() => { load(); setActiveTab("recipients"); }} />
               )}
               {!expandEnroll && (
                 <button
                   onClick={() => setExpandEnroll(true)}
-                  disabled={steps.length === 0}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 text-xs font-semibold text-muted-foreground rounded-xl hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  disabled={steps === null || steps.length === 0}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-card-border text-xs font-semibold text-muted-foreground rounded-xl hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Select Contacts to Enroll

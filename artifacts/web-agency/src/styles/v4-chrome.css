@@ -1,0 +1,878 @@
+/**
+ * Frontend V4 — Signal public chrome (header, What We Build panel, mobile
+ * sheet, footer).
+ *
+ * Behaviour contract carried from V3 verbatim (keyboard operability, focus
+ * restore, 44px targets, focus never suppressed). V4 changes:
+ * - The services disclosure becomes a click-operated full-width panel — it
+ *   never opens or closes from pointer movement alone.
+ * - "Client Sign In" is a quiet utility link, visually subordinate to the
+ *   single filled CTA.
+ * - The AI Receptionist product entry is a distinct outlined pill with a
+ *   live signal dot.
+ */
+
+:root {
+  --v4-hdr-h: 64px;
+}
+
+/* ── Shell ─────────────────────────────────────────────────────────────── */
+.v4-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--v4-cloud);
+  color: var(--v4-text);
+}
+
+.v4-shell__main {
+  flex: 1;
+  outline: none;
+  /* CLS root-cause fix (R1): while a lazy route loads, only the 60vh
+     RouteFallback occupied <main>, so the footer laid out inside the initial
+     viewport and then moved ~4500px when the page mounted — that jump was
+     the dominant layout-shift source (~0.35–0.43), not font swapping.
+     Reserving one viewport of main height keeps the footer below the fold
+     at first paint, so its later move has zero viewport impact. Every V4
+     route is taller than one viewport, so no permanent blank space is
+     introduced; short states simply pin the footer to the fold. */
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* The shared route fallback inherits the shell's ground inside V4 (no V2
+   canvas flash) and stretches to the reserved height. */
+.v4-shell .v2-route-fallback {
+  background: transparent;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+/* Anchor targets settle below the fixed bar, for pointer and keyboard. */
+.v4-shell [id] {
+  scroll-margin-top: calc(var(--v4-hdr-h) + 12px);
+}
+
+/* Light-opening pages pad below the fixed bar; ink heroes run beneath it. */
+.v4-shell[data-hero-tone="light"] .v4-shell__main {
+  padding-top: var(--v4-hdr-h);
+}
+
+.v4-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 400;
+  background: var(--v4-paper);
+  color: var(--v4-text);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 8px 0;
+}
+
+.v4-skip:focus {
+  left: 0;
+}
+
+/* ── Header bar ────────────────────────────────────────────────────────── */
+.v4-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--v4-hdr-h);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  transition: background 320ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    border-color 320ms cubic-bezier(0.22, 0.9, 0.28, 1);
+  border-bottom: 1px solid transparent;
+}
+
+.v4-header[data-surface="dark"] {
+  background: rgba(7, 19, 36, 0.72);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom-color: rgba(27, 58, 94, 0.6);
+}
+
+.v4-header[data-surface="light"] {
+  background: rgba(244, 248, 251, 0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom-color: var(--v4-mist);
+}
+
+.v4-header__inner {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.v4-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  font-family: var(--v4-font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  text-decoration: none;
+  color: var(--v4-text);
+}
+
+.v4-header[data-surface="dark"] .v4-header__brand {
+  color: var(--v4-cloud);
+}
+
+/* ── Desktop nav ───────────────────────────────────────────────────────── */
+.v4-nav {
+  margin-left: auto;
+}
+
+.v4-nav__list {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.v4-nav__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--v4-mute);
+  cursor: pointer;
+}
+
+.v4-header[data-surface="dark"] .v4-nav__link {
+  color: var(--v4-mute-dark);
+}
+
+.v4-nav__link:hover {
+  color: var(--v4-text);
+}
+
+.v4-header[data-surface="dark"] .v4-nav__link:hover {
+  color: var(--v4-cloud);
+}
+
+.v4-nav__link[aria-current="page"] {
+  color: var(--v4-text);
+}
+
+.v4-header[data-surface="dark"] .v4-nav__link[aria-current="page"] {
+  color: var(--v4-cloud);
+}
+
+.v4-nav__link[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--v4-cyan);
+}
+
+.v4-nav__chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 160ms ease-out;
+}
+
+.v4-nav__link[aria-expanded="true"] .v4-nav__chevron {
+  transform: rotate(180deg);
+}
+
+.v4-nav__prod {
+  border: 1px solid var(--v4-cyan-deep);
+  border-radius: 999px;
+  padding-inline: 1rem;
+  color: var(--v4-cyan-deep);
+}
+
+.v4-header[data-surface="dark"] .v4-nav__prod {
+  border-color: var(--v4-cyan);
+  color: var(--v4-cyan);
+}
+
+.v4-nav__prod-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v4-turquoise);
+  animation: v4-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes v4-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.v4-header__sep {
+  width: 1px;
+  height: 22px;
+  background: var(--v4-mist);
+  margin-inline: 0.35rem;
+}
+
+.v4-header[data-surface="dark"] .v4-header__sep {
+  background: var(--v4-navy-line);
+}
+
+/* Quiet utility action — deliberately subordinate to the CTA. */
+.v4-header__signin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--v4-mute);
+}
+
+.v4-header[data-surface="dark"] .v4-header__signin {
+  color: var(--v4-mute-dark);
+}
+
+.v4-header__signin:hover {
+  color: var(--v4-text);
+}
+
+.v4-header[data-surface="dark"] .v4-header__signin:hover {
+  color: var(--v4-cloud);
+}
+
+/* ── Buttons (V4 vocabulary, used by chrome + pages) ───────────────────── */
+.v4-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.65rem 1.4rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 160ms ease-out, transform 160ms ease-out,
+    background 160ms ease-out;
+}
+
+.v4-btn--primary {
+  background: var(--v4-cyan-deep);
+  color: #ffffff;
+}
+
+.v4-btn--primary:hover {
+  box-shadow: 0 6px 24px -8px rgba(14, 116, 144, 0.55);
+}
+
+[data-tone="ink"] .v4-btn--primary,
+[data-tone="charcoal"] .v4-btn--primary,
+.v4-on-dark .v4-btn--primary {
+  background: var(--v4-cyan);
+  color: var(--v4-ink);
+}
+
+.v4-btn--outline {
+  border-color: var(--v4-line-strong-l);
+  color: var(--v4-text);
+  background: transparent;
+}
+
+[data-tone="ink"] .v4-btn--outline,
+[data-tone="charcoal"] .v4-btn--outline,
+.v4-on-dark .v4-btn--outline {
+  border-color: var(--v4-navy-line);
+  color: var(--v4-cloud);
+}
+
+/* Shared with company mode — keep labels on one line at any width the row
+   is actually rendered at. `.v4-nav__link`/`.v4-nav__prod` are company-mode
+   only; `.v4-header__signin`/`.v4-header__cta` are shared by both modes. */
+.v4-nav__link,
+.v4-nav__prod,
+.v4-header__signin,
+.v4-header__cta {
+  white-space: nowrap;
+}
+
+/* ── Product-mode header (owner review: "the nav bar on AI Receptionist,
+   it's too messy") ────────────────────────────────────────────────────────
+   The old product-mode row reused the *entire* company nav (What We Build
+   panel + Work/Process/Company + the redundant AI Receptionist pill) and
+   bolted two extra CTAs on the end — seven interactive targets. SiteHeaderV4
+   now renders a dedicated, lean row for product mode instead (see the
+   component): brand → quiet separator → "AI Receptionist" as plain text →
+   the product sub-nav (`productSubNavV4`, seven links) → "Sign in" → one
+   primary CTA. Every rule below either targets a class that exists only in
+   the product-mode DOM, or is scoped under `[data-mode="product"]` —
+   company mode is untouched.
+
+   Sub-nav repair (owner review, 2026-09-06): the original three quick
+   links only reached three sections and had no mobile presence at all —
+   below 1024px the whole row vanished with nothing replacing it. The
+   mobile sheet now renders the SAME seven-item sub-nav in product mode
+   (see the component's mobile-sheet branch), so no destination is lost
+   below the breakpoint that hides this row — only its layout changes.
+
+   Collapse strategy (content-width reasoned against real font metrics for
+   360/480/768/1024/1280/1440/1920 — the Windows worktree cannot run the Vite
+   dev server itself, see docs/ai-receptionist SESSION_HANDOFF/QA notes on the
+   pruned win32 native bindings, so this was not re-confirmed in a live
+   render):
+     ≥1024px  full row: brand + wordmark, separator, product name, the
+              seven sub-nav links, "Sign in", the CTA.
+     640–1023 the sub-nav folds away from the bar (a seven-item inline row
+              has no room at this width) — the mobile sheet carries the
+              identical links instead, so nothing is lost, only relocated.
+              Brand, product name, "Sign in" and the CTA stay exactly where
+              they are; only the mobile toggle joins them.
+     <640     "Sign in" folds away too — the mobile sheet still reaches
+              sign-in cross-app navigation, and the page's own hero repeats
+              it. Brand, product name and the CTA remain.
+     <480     the "SiteMint" wordmark hides (icon-only brand, a common
+              pattern once a header is this narrow); horizontal rhythm
+              tightens further. Product name and the CTA never shrink to
+              the point of truncation — they are the two things this
+              redesign is protecting. */
+
+.v4-header__product-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--v4-mist);
+  flex: 0 0 auto;
+}
+
+.v4-header[data-surface="dark"] .v4-header__product-sep {
+  background: var(--v4-navy-line);
+}
+
+.v4-header__product-name {
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--v4-mute);
+  white-space: nowrap;
+}
+
+.v4-header[data-surface="dark"] .v4-header__product-name {
+  color: var(--v4-mute-dark);
+}
+
+.v4-product-nav {
+  margin-left: auto;
+}
+
+.v4-product-nav__list {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.v4-product-nav__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--v4-mute);
+  white-space: nowrap;
+}
+
+.v4-header[data-surface="dark"] .v4-product-nav__link {
+  color: var(--v4-mute-dark);
+}
+
+.v4-product-nav__link:hover {
+  color: var(--v4-text);
+}
+
+.v4-header[data-surface="dark"] .v4-product-nav__link:hover {
+  color: var(--v4-cloud);
+}
+
+/* Scrollspy active state (owner review fix, product sub-nav repair) — a
+   distinct attribute value (`"true"`, not `"page"`) from the existing
+   route-active indicator above, since a sub-nav link's "current" section
+   changes with scroll position on the SAME route rather than with the
+   route itself. */
+.v4-product-nav__link[aria-current="true"] {
+  color: var(--v4-text);
+  font-weight: 700;
+  position: relative;
+}
+
+.v4-header[data-surface="dark"] .v4-product-nav__link[aria-current="true"] {
+  color: var(--v4-cloud);
+}
+
+.v4-product-nav__link[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.v4-sheet__link[aria-current="true"] {
+  color: var(--v4-cyan);
+  font-weight: 700;
+}
+
+.v4-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* The short CTA label ("Beta") only ever shows below 480px — see that tier
+   further down. */
+.v4-header__cta-short {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .v4-header[data-mode="product"] .v4-header__inner {
+    gap: 0.85rem;
+  }
+  .v4-header[data-mode="product"] .v4-product-nav__list {
+    gap: 0.1rem;
+  }
+  .v4-header[data-mode="product"] .v4-product-nav__link {
+    padding-inline: 0.6rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  /* The inline sub-nav has no room at this width and is the first thing to
+     go — not the CTA or the product name. The mobile sheet renders the
+     identical seven links (see the component), so this is a relocation,
+     not a loss. */
+  .v4-header[data-mode="product"] .v4-product-nav {
+    display: none;
+  }
+  /* `.v4-header__actions` (not `.v4-product-nav`) is now the last row
+     child, so it — not the links — carries the push-right margin. */
+  .v4-header[data-mode="product"] .v4-header__actions {
+    margin-left: auto;
+  }
+  /* Undo the generic company-mode mobile hide immediately below: product
+     mode keeps "Sign in" and the primary CTA in the bar itself rather than
+     folding everything behind the hamburger. */
+  .v4-header[data-mode="product"] .v4-header__signin,
+  .v4-header[data-mode="product"] .v4-header__cta {
+    display: inline-flex;
+  }
+  /* Tightened rhythm buys back the width the brand + product name + CTA
+     need once the quick links are gone but the row is still narrower than
+     desktop. */
+  .v4-header[data-mode="product"] .v4-header__inner {
+    gap: 0.45rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__brand-word {
+    font-size: 1.05rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__product-name {
+    font-size: 0.85rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__cta {
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 639px) {
+  /* "Sign in" folds away next — the mobile sheet and the page's own hero
+     both still offer it. */
+  .v4-header[data-mode="product"] .v4-header__signin {
+    display: none;
+  }
+}
+
+@media (max-width: 479px) {
+  /* Icon-only brand at the narrowest widths — a common, well-understood
+     pattern — protects the product name and the CTA from crowding. */
+  .v4-header[data-mode="product"] .v4-header__brand-word {
+    display: none;
+  }
+  .v4-header[data-mode="product"] .v4-header__inner {
+    gap: 0.4rem;
+    padding-inline: 1rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__product-name {
+    font-size: 0.8rem;
+  }
+  .v4-header[data-mode="product"] .v4-header__cta {
+    padding-inline: 0.85rem;
+  }
+  /* The short CTA label buys back the width the product name needs to
+     never truncate at the narrowest supported width. One constant
+     accessible name either way, via the Link's own aria-label. */
+  .v4-header[data-mode="product"] .v4-header__cta-full {
+    display: none;
+  }
+  .v4-header[data-mode="product"] .v4-header__cta-short {
+    display: inline;
+  }
+}
+
+/* ── What We Build panel (click-operated) ──────────────────────────────── */
+.v4-panel {
+  position: fixed;
+  top: var(--v4-hdr-h);
+  left: 0;
+  right: 0;
+  z-index: 119;
+  background: var(--v4-paper);
+  border-bottom: 1px solid var(--v4-mist);
+  box-shadow: 0 24px 64px -32px rgba(7, 19, 36, 0.4);
+}
+
+.v4-panel__inner {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+}
+
+.v4-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  padding-block: 2rem 1.25rem;
+}
+
+.v4-panel__card {
+  display: block;
+  border: 1px solid var(--v4-mist);
+  border-radius: 10px;
+  padding: 1.1rem;
+  color: var(--v4-text);
+  text-decoration: none;
+  transition: border-color 160ms ease-out, transform 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.v4-panel__card:hover,
+.v4-panel__card:focus-visible {
+  border-color: var(--v4-cyan-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 24px 64px -32px rgba(7, 19, 36, 0.4);
+}
+
+.v4-panel__glyph {
+  width: 44px;
+  height: 44px;
+  display: block;
+  margin-bottom: 0.7rem;
+  color: var(--v4-cyan-deep);
+}
+
+.v4-glyph-anim {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  transition: stroke-dashoffset 500ms cubic-bezier(0.22, 0.9, 0.28, 1);
+}
+
+.v4-panel__card:hover .v4-glyph-anim,
+.v4-panel__card:focus-visible .v4-glyph-anim {
+  stroke-dashoffset: 0;
+}
+
+.v4-panel__outcome {
+  display: block;
+  font-family: var(--v4-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--v4-cyan-deep);
+}
+
+.v4-panel__title {
+  display: block;
+  font-family: var(--v4-font-display);
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin: 0.35rem 0 0.3rem;
+}
+
+.v4-panel__desc {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--v4-mute);
+}
+
+.v4-panel__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--v4-mist);
+  padding-block: 0.85rem 1.4rem;
+  font-size: 0.9rem;
+  color: var(--v4-mute);
+}
+
+/* ── Mobile toggle + sheet ─────────────────────────────────────────────── */
+.v4-header__toggle {
+  display: none;
+  margin-left: auto;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  color: var(--v4-text);
+  cursor: pointer;
+}
+
+.v4-header[data-surface="dark"] .v4-header__toggle {
+  color: var(--v4-cloud);
+}
+
+.v4-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--v4-ink);
+  color: var(--v4-cloud);
+  overflow: auto;
+}
+
+.v4-sheet__panel {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.v4-sheet__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.2rem;
+}
+
+.v4-sheet__close {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--v4-cloud);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.v4-sheet__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.v4-sheet__group-btn,
+.v4-sheet__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.85rem 0.25rem;
+  border: 0;
+  border-bottom: 1px solid var(--v4-navy-line);
+  background: none;
+  font-family: var(--v4-font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--v4-cloud);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.v4-sheet__link[aria-current="page"] {
+  color: var(--v4-cyan);
+}
+
+.v4-sheet__sub {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.v4-sheet__sub .v4-sheet__link {
+  font-family: var(--v4-font-body);
+  font-size: 1rem;
+  color: var(--v4-mute-dark);
+  border-bottom: 0;
+  padding: 0.6rem 1rem;
+}
+
+.v4-sheet__sub .v4-sheet__link[aria-current="page"] {
+  color: var(--v4-cyan);
+}
+
+.v4-sheet__quiet {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 1.2rem;
+  color: var(--v4-mute-dark);
+  text-decoration: none;
+  font-size: 1rem;
+}
+
+.v4-sheet__cta {
+  margin-top: 0.9rem;
+  width: 100%;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+.v4-footer {
+  background: var(--v4-ink);
+  color: var(--v4-mute-dark);
+  border-top: 1px solid var(--v4-navy-line);
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.v4-footer::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--v4-signal-gradient);
+  opacity: 0.85;
+}
+
+.v4-footer__inner {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: 2.5rem clamp(1.25rem, 4vw, 3rem) 3rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.v4-footer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--v4-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--v4-cloud);
+  text-decoration: none;
+}
+
+.v4-footer__tag {
+  max-width: 26em;
+  margin: 0.8rem 0 0;
+}
+
+.v4-footer__cols {
+  display: flex;
+  gap: 3rem;
+  flex-wrap: wrap;
+}
+
+.v4-footer__col-title {
+  color: var(--v4-cloud);
+  font-weight: 700;
+  font-family: var(--v4-font-display);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.v4-footer__col a {
+  display: block;
+  color: var(--v4-mute-dark);
+  text-decoration: none;
+  padding-block: 0.22rem;
+  min-height: 28px;
+}
+
+.v4-footer__col a:hover {
+  color: var(--v4-cloud);
+}
+
+.v4-footer__legal {
+  width: 100%;
+  border-top: 1px solid var(--v4-navy-line);
+  padding-top: 1.1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-family: var(--v4-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .v4-nav,
+  .v4-header__signin,
+  .v4-header__cta,
+  .v4-header__sep {
+    display: none;
+  }
+
+  .v4-header__toggle {
+    display: inline-flex;
+  }
+
+  .v4-panel__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .v4-nav__prod-dot {
+    animation: none;
+  }
+
+  .v4-glyph-anim {
+    stroke-dashoffset: 0 !important;
+    transition: none;
+  }
+}

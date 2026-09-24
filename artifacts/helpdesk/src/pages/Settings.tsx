@@ -1,174 +1,651 @@
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Users, Globe, UserCog } from "lucide-react";
+/**
+ * V5 customer-shell foundation — the Settings workspace (D-7).
+ *
+ * Editable now: business name, business type/industry, primary contact (name
+ * + email), timezone, default business location — all through
+ * `GET/PATCH /api/receptionist/agent-config` via `lib/accountApi.ts` — and
+ * account password, through `POST /api/receptionist/account/password/change`
+ * (current password required; other sessions are signed out. A server
+ * without the route answers 404, which `changePassword` in `accountApi.ts`
+ * reads as "not available yet", never as a password error). Team membership
+ * stays out of scope, per the brief ("Team later").
+ *
+ * Also reads `?calendar=connected|error` (set by the OAuth return trip from
+ * Scheduling → Calendar) and renders a one-time banner, per D-7 / B-4.
+ *
+ * Sign-out is unchanged from Phase 11: the same `useLogout` hook, the same
+ * bounded wait, the same focus-return-on-failure behaviour.
+ */
 
-type Panel = "members" | "language";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useLocation, useSearchParams } from "wouter";
+import { ArrowRight } from "lucide-react";
+import { useSession, useLogout, SESSION_KEY } from "@/hooks/useSession";
+import { useQueryClient } from "@tanstack/react-query";
+import { fetchBusinessProfile, readBusinessProfile, updateAccountProfile, changePassword, changeAccountEmail } from "@/lib/accountApi";
+import {
+  accountFields,
+  accountNote,
+  buildProfilePatch,
+  calendarBannerCopy,
+  destinations,
+  EMAIL_CHANGE,
+  emailChangeDetail,
+  EMPTY_EMAIL_CHANGE_FORM,
+  EMPTY_PASSWORD_FORM,
+  NOT_AVAILABLE,
+  pageCopy,
+  PROFILE_SAVE_ERROR,
+  readCalendarParam,
+  saveButtonLabel,
+  sessionCopy,
+  signOutLabel,
+  SIGN_OUT_TIMEOUT_MS,
+  TIMEZONE_OPTIONS,
+  validateEmailChange,
+  validatePasswordChange,
+  validateProfile,
+  type EmailChangeForm,
+  type EmailChangeFieldErrors,
+  type PasswordFormValues,
+  type ProfileFormValues,
+  type SaveState,
+  type SignOutState,
+  PROFILE_FIELD_LIMITS,
+} from "@/pages/settings/settingsContract";
+import "@/styles/v2-dashboard.css";
+import "@/styles/v2-settings.css";
+import "@/styles/v2-signin.css";
 
-const NAV: {
-  section: string;
-  items: { id: Panel; label: string; icon: React.ElementType; description?: string }[];
-}[] = [
-  {
-    section: "People",
-    items: [
-      { id: "members", label: "Members", icon: Users, description: "Manage team members" },
-    ],
-  },
-  {
-    section: "Account",
-    items: [
-      {
-        id: "language",
-        label: "Language Settings",
-        icon: Globe,
-        description: "Locale and timezone",
-      },
-    ],
-  },
-];
+const EMPTY_PROFILE_FORM: ProfileFormValues = {
+  name: "",
+  industry: "",
+  timezone: "",
+  contactName: "",
+  contactEmail: "",
+  defaultLocation: "",
+};
+
+function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "";
+  }
+}
 
 export default function Settings() {
-  const [activePanel, setActivePanel] = useState<Panel>("members");
+  const { data: me, isLoading } = useSession();
+  const [, navigate] = useLocation();
+  const [searchParams] = useSearchParams();
+  const logout = useLogout();
+  const qc = useQueryClient();
+
+  const [signOut, setSignOut] = useState<SignOutState>("idle");
+  const signOutRef = useRef<HTMLButtonElement | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    if (signOut === "failed") signOutRef.current?.focus();
+  }, [signOut]);
+
+  const handleSignOut = useCallback(async () => {
+    if (signOut === "pending") return;
+    setSignOut("pending");
+    try {
+      await Promise.race([
+        logout(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), SIGN_OUT_TIMEOUT_MS)),
+      ]);
+      if (!alive.current) return;
+      navigate("/login");
+    } catch {
+      if (!alive.current) return;
+      setSignOut("failed");
+    }
+  }, [logout, navigate, signOut]);
+
+  // ── Profile form ──────────────────────────────────────────────────────
+  const [profile, setProfile] = useState<ProfileFormValues>(EMPTY_PROFILE_FORM);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileFieldError, setProfileFieldError] = useState<string | undefined>(undefined);
+  const [contactEmailError, setContactEmailError] = useState<string | undefined>(undefined);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+
+  useEffect(() => {
+    if (!me) return;
+    let cancelled = false;
+    fetchBusinessProfile()
+      .then((body) => {
+        if (cancelled) return;
+        const account = readBusinessProfile(body);
+        setProfile({
+          name: account.name,
+          industry: account.industry,
+          // The stored timezone wins. The browser's is only a first guess for a
+          // business that has never chosen one — never an override of one it has.
+          timezone: account.timezone || browserTimezone(),
+          contactName: account.primaryContact.name,
+          contactEmail: account.primaryContact.email,
+          defaultLocation: account.defaultLocation,
+        });
+        setProfileLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // A read failure leaves the form blank with the browser timezone
+        // preselected — never a fabricated business name or address.
+        setProfile((f) => ({ ...f, timezone: f.timezone || browserTimezone() }));
+        setProfileLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [me]);
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError("");
+    setProfileFieldError(undefined);
+    setContactEmailError(undefined);
+    const validation = validateProfile(profile);
+    if (!validation.ok) {
+      setProfileError(validation.formError);
+      setProfileFieldError(validation.fieldErrors.name);
+      setContactEmailError(validation.fieldErrors.contactEmail);
+      return;
+    }
+    setSaveState("saving");
+    try {
+      const saved = readBusinessProfile(await updateAccountProfile(buildProfilePatch(profile)));
+      // Show what the server stored, not what was typed: it trims, lowercases
+      // the email, and turns an emptied field into "not set".
+      setProfile((f) => ({
+        ...f,
+        name: saved.name || f.name,
+        industry: saved.industry,
+        contactName: saved.primaryContact.name,
+        contactEmail: saved.primaryContact.email,
+        defaultLocation: saved.defaultLocation,
+      }));
+      setSaveState("saved");
+      qc.invalidateQueries({ queryKey: ["agent-config"] });
+      // The business day's timezone lives in the scheduling settings, and
+      // Setup's "Business information" step reads name + industry — both are
+      // now stale. Without these, saving here leaves Availability showing the
+      // old timezone and Setup still calling step 1 unfinished.
+      qc.invalidateQueries({ queryKey: ["availability"] });
+      qc.invalidateQueries({ queryKey: ["setup"] });
+      window.setTimeout(() => setSaveState("idle"), 2500);
+    } catch {
+      setSaveState("error");
+      setProfileError(PROFILE_SAVE_ERROR);
+    }
+  };
+
+  // ── Password form ─────────────────────────────────────────────────────
+  const [pwForm, setPwForm] = useState<PasswordFormValues>(EMPTY_PASSWORD_FORM);
+  const [pwError, setPwError] = useState("");
+  const [pwFieldErrors, setPwFieldErrors] = useState<{ currentPassword?: string; newPassword?: string; confirmPassword?: string }>({});
+  const [pwState, setPwState] = useState<"idle" | "saving" | "done" | "unavailable">("idle");
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError("");
+    setPwFieldErrors({});
+    const validation = validatePasswordChange(pwForm);
+    if (!validation.ok) {
+      setPwError(validation.formError);
+      setPwFieldErrors(validation.fieldErrors);
+      return;
+    }
+    setPwState("saving");
+    const result = await changePassword(pwForm.currentPassword, pwForm.newPassword);
+    if (result.ok) {
+      setPwState("done");
+      setPwForm(EMPTY_PASSWORD_FORM);
+    } else if (result.reason === "unavailable") {
+      setPwState("unavailable");
+      setPwError(result.message);
+    } else {
+      setPwState("idle");
+      setPwError(result.message);
+    }
+  };
+
+  // ── changing the sign-in / notification address ──────────────────────────
+  const [emailForm, setEmailForm] = useState<EmailChangeForm>(EMPTY_EMAIL_CHANGE_FORM);
+  const [emailFieldErrors, setEmailFieldErrors] = useState<EmailChangeFieldErrors>({});
+  const [emailError, setEmailError] = useState("");
+  const [emailState, setEmailState] = useState<"idle" | "saving" | "done">("idle");
+  // Held separately from the form: the outcome has to survive the form being
+  // cleared, and "changed" and "code sent" are two different facts.
+  const [emailOutcome, setEmailOutcome] = useState<{ email: string; verificationSent: boolean } | null>(null);
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError("");
+    setEmailFieldErrors({});
+    const validation = validateEmailChange(emailForm);
+    if (!validation.ok) {
+      setEmailFieldErrors(validation.errors);
+      return;
+    }
+    setEmailState("saving");
+    const result = await changeAccountEmail(validation.payload.email, validation.payload.currentPassword);
+    if (result.ok) {
+      setEmailState("done");
+      setEmailOutcome({ email: result.email, verificationSent: result.verificationSent });
+      setEmailForm(EMPTY_EMAIL_CHANGE_FORM);
+      // The session's cached firm still carries the old address, and this page
+      // shows it in the Account block above.
+      void qc.invalidateQueries({ queryKey: SESSION_KEY });
+    } else {
+      setEmailState("idle");
+      setEmailError(result.message);
+    }
+  };
+
+  const page = pageCopy();
+  const session = sessionCopy();
+  const calendarState = readCalendarParam(searchParams.get("calendar"));
+
+  if (isLoading) {
+    return (
+      <div className="sg-page">
+        <p className="sg-loading" role="status" aria-live="polite">
+          Loading account information…
+        </p>
+      </div>
+    );
+  }
+
+  if (!me) return null;
+
+  const fields = accountFields(me.firm);
+  const places = destinations();
 
   return (
-    <div className="flex h-full bg-slate-50">
-      {/* Secondary sidebar */}
-      <div className="w-[220px] flex-shrink-0 border-r border-slate-200 bg-white flex flex-col shadow-sm">
-        <div className="px-4 py-4 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-900">Settings</h2>
+    <div className="sg-page sd-enter">
+      <div className="sd-page__head">
+        <div>
+          <span className="sd-eyebrow">{page.eyebrow}</span>
+          <h1 className="sd-page__title">{page.title}</h1>
+          <p className="sg-lede">{page.detail}</p>
         </div>
-        <div className="flex-1 overflow-y-auto py-3">
-          {NAV.map((group) => (
-            <div key={group.section} className="mb-5">
-              <div className="px-4 mb-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {group.section}
-                </span>
-              </div>
-              {group.items.map((item) => (
-                <button
-                  key={item.id}
-                  className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors text-left ${
-                    activePanel === item.id
-                      ? "bg-indigo-50 text-indigo-700 font-medium"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                  onClick={() => setActivePanel(item.id)}
-                >
-                  <item.icon
-                    className={`h-4 w-4 flex-shrink-0 ${
-                      activePanel === item.id ? "text-indigo-600" : "text-slate-400"
-                    }`}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              ))}
+      </div>
+
+      {calendarState && (
+        <div
+          className="sd-status"
+          data-state={calendarState === "connected" ? "answering" : "incomplete"}
+          role="status"
+          style={{ marginBottom: "var(--sd-space-4, 1rem)" }}
+        >
+          <div className="sd-status__head">
+            <span className="sd-status__dot" aria-hidden="true" />
+            <div className="sd-status__body">
+              <h2 className="sd-status__title">{calendarBannerCopy(calendarState).title}</h2>
+              <p className="sd-status__detail">{calendarBannerCopy(calendarState).detail}</p>
+            </div>
+          </div>
+          <div className="sd-status__foot">
+            <Link href="/scheduling/calendar" className="sd-step__action">
+              Go to Calendar
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <section className="sd-section" aria-labelledby="sg-account-title">
+        <div className="sd-section__head">
+          <div>
+            <h2 className="sd-h2" id="sg-account-title">
+              Account
+            </h2>
+            <p className="sg-note">{accountNote()}</p>
+          </div>
+        </div>
+        <dl className="sg-fields">
+          {fields.map((field) => (
+            <div className="sg-fields__row" key={field.label}>
+              <dt className="sg-fields__label">{field.label}</dt>
+              <dd className="sg-fields__value" data-missing={field.value === null}>
+                {field.value ?? NOT_AVAILABLE}
+              </dd>
             </div>
           ))}
+        </dl>
+      </section>
+
+      {/* Editable business profile (D-7). */}
+      <section className="sd-section" aria-labelledby="sg-profile-title">
+        <div className="sd-section__head">
+          <h2 className="sd-h2" id="sg-profile-title">
+            Business profile
+          </h2>
         </div>
-      </div>
-
-      {/* Panel content */}
-      <div className="flex-1 min-w-0 overflow-hidden">
-        {activePanel === "members"  && <MembersPanel />}
-        {activePanel === "language" && <LanguagePanel />}
-      </div>
-    </div>
-  );
-}
-
-// ─── Members ─────────────────────────────────────────────────────────────────
-
-function MembersPanel() {
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-8 py-16">
-      <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center mb-5">
-        <UserCog className="h-8 w-8 text-slate-300" />
-      </div>
-      <h3 className="text-base font-semibold text-slate-900 mb-2">Team Members</h3>
-      <p className="text-sm text-slate-500 max-w-xs leading-relaxed mb-3">
-        Multi-user access is coming soon. Right now each AI Receptionist account supports
-        one login per business.
-      </p>
-      <Badge className="bg-slate-100 text-slate-500 border-transparent text-xs">
-        Coming Soon
-      </Badge>
-    </div>
-  );
-}
-
-// ─── Language ─────────────────────────────────────────────────────────────────
-
-function LanguagePanel() {
-  return (
-    <div className="p-6 max-w-lg">
-      <h2 className="text-base font-semibold text-slate-900 mb-1">Language Settings</h2>
-      <p className="text-sm text-slate-500 mb-6">
-        Configure locale, date format, and timezone for your workspace.
-      </p>
-      <div className="space-y-4">
-        <SettingsSection title="Locale">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="text-sm font-medium text-slate-900">Display Language</div>
-              <div className="text-xs text-slate-500">English (United States)</div>
+        <form className="si-form" onSubmit={handleProfileSubmit} noValidate>
+          {profileError && (
+            <div className="si-alert" role="alert">
+              <span className="si-alert__label">Error</span>
+              <span className="si-alert__text">{profileError}</span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs border-slate-200"
+          )}
+          {saveState === "saved" && (
+            <div className="si-alert" role="status" data-tone="confirmed">
+              <span className="si-alert__label">Saved</span>
+              <span className="si-alert__text">Your business profile was updated.</span>
+            </div>
+          )}
+
+          <div className="si-field">
+            <label htmlFor="settings-name" className="si-label">
+              Business name <span className="si-req">Required</span>
+            </label>
+            <input
+              id="settings-name"
+              className={`si-input${profileFieldError ? " si-input--invalid" : ""}`}
+              type="text"
+              value={profile.name}
+              onChange={(e) => setProfile((f) => ({ ...f, name: e.target.value }))}
+              disabled={!profileLoaded}
+              aria-invalid={profileFieldError ? true : undefined}
+            />
+            {profileFieldError && <p className="si-error">{profileFieldError}</p>}
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="settings-industry" className="si-label">
+              Business type / industry <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-industry"
+              className="si-input"
+              type="text"
+              value={profile.industry}
+              onChange={(e) => setProfile((f) => ({ ...f, industry: e.target.value }))}
+              disabled={!profileLoaded}
+            />
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="settings-timezone" className="si-label">
+              Timezone <span className="si-req">Optional</span>
+            </label>
+            <select
+              id="settings-timezone"
+              className="si-input"
+              value={profile.timezone}
+              onChange={(e) => setProfile((f) => ({ ...f, timezone: e.target.value }))}
+              disabled={!profileLoaded}
             >
-              Change
-            </Button>
+              {!TIMEZONE_OPTIONS.includes(profile.timezone as (typeof TIMEZONE_OPTIONS)[number]) && profile.timezone && (
+                <option value={profile.timezone}>{profile.timezone}</option>
+              )}
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="text-sm font-medium text-slate-900">Timezone</div>
-              <div className="text-xs text-slate-500">UTC-8 (Pacific Time)</div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs border-slate-200"
-            >
-              Change
-            </Button>
-          </div>
-        </SettingsSection>
-        <SettingsSection title="Date & Time">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="text-sm font-medium text-slate-900">Date Format</div>
-              <div className="text-xs text-slate-500">MM/DD/YYYY</div>
-            </div>
-            <Switch defaultChecked />
-          </div>
-          <div className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="text-sm font-medium text-slate-900">24-hour Time</div>
-              <div className="text-xs text-slate-500">Show time in 24-hour format</div>
-            </div>
-            <Switch />
-          </div>
-        </SettingsSection>
-      </div>
-    </div>
-  );
-}
 
-// ─── Section wrapper ───────────────────────────────────────────────────────────
+          <div className="si-field">
+            <label htmlFor="settings-contact-name" className="si-label">
+              Primary contact name <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-contact-name"
+              className="si-input"
+              type="text"
+              autoComplete="name"
+              maxLength={PROFILE_FIELD_LIMITS.contactName}
+              value={profile.contactName}
+              onChange={(e) => setProfile((f) => ({ ...f, contactName: e.target.value }))}
+              disabled={!profileLoaded}
+            />
+          </div>
 
-function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-        {title}
-      </h3>
-      <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 shadow-sm">
-        {children}
-      </div>
+          <div className="si-field">
+            <label htmlFor="settings-contact-email" className="si-label">
+              Primary contact email <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-contact-email"
+              className={`si-input${contactEmailError ? " si-input--invalid" : ""}`}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              maxLength={PROFILE_FIELD_LIMITS.contactEmail}
+              value={profile.contactEmail}
+              onChange={(e) => setProfile((f) => ({ ...f, contactEmail: e.target.value }))}
+              disabled={!profileLoaded}
+              aria-invalid={contactEmailError ? true : undefined}
+              aria-describedby="settings-contact-email-help"
+            />
+            <p className="si-help" id="settings-contact-email-help">
+              Who your team should reach about this account. This is not the address you sign in with.
+            </p>
+            {contactEmailError && <p className="si-error">{contactEmailError}</p>}
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="settings-location" className="si-label">
+              Default business location <span className="si-req">Optional</span>
+            </label>
+            <input
+              id="settings-location"
+              className="si-input"
+              type="text"
+              autoComplete="street-address"
+              maxLength={PROFILE_FIELD_LIMITS.defaultLocation}
+              value={profile.defaultLocation}
+              onChange={(e) => setProfile((f) => ({ ...f, defaultLocation: e.target.value }))}
+              disabled={!profileLoaded}
+            />
+          </div>
+
+          <button type="submit" className="si-submit" disabled={!profileLoaded || saveState === "saving"}>
+            {saveButtonLabel(saveState)}
+          </button>
+        </form>
+      </section>
+
+      {/* Change password (S-2). */}
+      {/*
+        Changing the sign-in / notification address. Placed before the password
+        section because it is the one that unblocks everything else: nothing is
+        ever sent to an unverified address, so a business whose address cannot
+        receive mail hears nothing from the product at all.
+      */}
+      <section className="sd-section" aria-labelledby="sg-email-title">
+        <div className="sd-section__head">
+          <div>
+            <h2 className="sd-h2" id="sg-email-title">{EMAIL_CHANGE.heading}</h2>
+            <p className="sg-note">{EMAIL_CHANGE.note}</p>
+          </div>
+        </div>
+        <form className="si-form" onSubmit={handleEmailSubmit} noValidate>
+          {emailError !== "" && (
+            <div className="si-alert" role="alert">
+              <span className="si-alert__label">{EMAIL_CHANGE.failedTitle}</span>
+              <span className="si-alert__text">{emailError}</span>
+            </div>
+          )}
+          {emailState === "done" && emailOutcome !== null && (
+            <div className="si-alert" role="status" data-tone={emailOutcome.verificationSent ? "confirmed" : undefined}>
+              <span className="si-alert__label">{EMAIL_CHANGE.changedTitle}</span>
+              <span className="si-alert__text">
+                {emailOutcome.email} — {emailChangeDetail(emailOutcome.verificationSent)}
+              </span>
+            </div>
+          )}
+
+          <div className="si-field">
+            <label htmlFor="em-new" className="si-label">
+              {EMAIL_CHANGE.newLabel} <span className="si-req">Required</span>
+            </label>
+            <input
+              id="em-new"
+              className={`si-input${emailFieldErrors.email ? " si-input--invalid" : ""}`}
+              type="email"
+              autoComplete="email"
+              value={emailForm.email}
+              onChange={(e) => setEmailForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            {emailFieldErrors.email && <p className="si-error">{emailFieldErrors.email}</p>}
+          </div>
+
+          <div className="si-field">
+            <label htmlFor="em-pw" className="si-label">
+              {EMAIL_CHANGE.passwordLabel} <span className="si-req">Required</span>
+            </label>
+            <input
+              id="em-pw"
+              className={`si-input${emailFieldErrors.currentPassword ? " si-input--invalid" : ""}`}
+              type="password"
+              autoComplete="current-password"
+              value={emailForm.currentPassword}
+              aria-describedby="em-pw-help"
+              onChange={(e) => setEmailForm((f) => ({ ...f, currentPassword: e.target.value }))}
+            />
+            {emailFieldErrors.currentPassword
+              ? <p className="si-error">{emailFieldErrors.currentPassword}</p>
+              : <p className="sg-note" id="em-pw-help">{EMAIL_CHANGE.passwordHelp}</p>}
+          </div>
+
+          <button type="submit" className="si-submit" disabled={emailState === "saving"}>
+            {emailState === "saving" ? EMAIL_CHANGE.submitPending : EMAIL_CHANGE.submit}
+          </button>
+        </form>
+        <Link href={EMAIL_CHANGE.verifyHref} className="sd-link">{EMAIL_CHANGE.verifyLinkLabel}</Link>
+      </section>
+
+      <section className="sd-section" aria-labelledby="sg-password-title">
+        <div className="sd-section__head">
+          <h2 className="sd-h2" id="sg-password-title">
+            Change password
+          </h2>
+        </div>
+        {pwState === "unavailable" ? (
+          <p className="sg-note">{pwError}</p>
+        ) : (
+          <form className="si-form" onSubmit={handlePasswordSubmit} noValidate>
+            {pwError && (
+              <div className="si-alert" role="alert">
+                <span className="si-alert__label">Error</span>
+                <span className="si-alert__text">{pwError}</span>
+              </div>
+            )}
+            {pwState === "done" && (
+              <div className="si-alert" role="status" data-tone="confirmed">
+                <span className="si-alert__label">Password changed</span>
+                <span className="si-alert__text">Your password has been updated.</span>
+              </div>
+            )}
+
+            <div className="si-field">
+              <label htmlFor="pw-current" className="si-label">
+                Current password <span className="si-req">Required</span>
+              </label>
+              <input
+                id="pw-current"
+                className={`si-input${pwFieldErrors.currentPassword ? " si-input--invalid" : ""}`}
+                type="password"
+                autoComplete="current-password"
+                value={pwForm.currentPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+              />
+              {pwFieldErrors.currentPassword && <p className="si-error">{pwFieldErrors.currentPassword}</p>}
+            </div>
+
+            <div className="si-field">
+              <label htmlFor="pw-new" className="si-label">
+                New password <span className="si-req">Required</span>
+              </label>
+              <input
+                id="pw-new"
+                className={`si-input${pwFieldErrors.newPassword ? " si-input--invalid" : ""}`}
+                type="password"
+                autoComplete="new-password"
+                value={pwForm.newPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+              />
+              {pwFieldErrors.newPassword && <p className="si-error">{pwFieldErrors.newPassword}</p>}
+            </div>
+
+            <div className="si-field">
+              <label htmlFor="pw-confirm" className="si-label">
+                Confirm new password <span className="si-req">Required</span>
+              </label>
+              <input
+                id="pw-confirm"
+                className={`si-input${pwFieldErrors.confirmPassword ? " si-input--invalid" : ""}`}
+                type="password"
+                autoComplete="new-password"
+                value={pwForm.confirmPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+              />
+              {pwFieldErrors.confirmPassword && <p className="si-error">{pwFieldErrors.confirmPassword}</p>}
+            </div>
+
+            <button type="submit" className="si-submit" disabled={pwState === "saving"}>
+              {pwState === "saving" ? "Changing…" : "Change password"}
+            </button>
+          </form>
+        )}
+      </section>
+
+      <section className="sd-section" aria-labelledby="sg-config-title">
+        <div className="sd-section__head">
+          <h2 className="sd-h2" id="sg-config-title">
+            Configuration
+          </h2>
+        </div>
+        <ul className="sg-places">
+          {places.map((place) => (
+            <li className="sg-place" key={place.href}>
+              <div className="sg-place__body">
+                <h3 className="sg-place__title">{place.title}</h3>
+                <p className="sg-place__detail">{place.detail}</p>
+              </div>
+              <Link href={place.href} className="sd-link sg-place__action">
+                {place.action}
+                <ArrowRight className="sg-icon" aria-hidden="true" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="sd-section" aria-labelledby="sg-session-title">
+        <div className="sd-section__head">
+          <h2 className="sd-h2" id="sg-session-title">
+            {session.title}
+          </h2>
+        </div>
+        <div className="sg-session">
+          <p className="sg-session__detail">{session.detail}</p>
+          <button
+            ref={signOutRef}
+            type="button"
+            className="sg-signout"
+            onClick={handleSignOut}
+            disabled={signOut === "pending"}
+            aria-busy={signOut === "pending"}
+          >
+            {signOutLabel(signOut)}
+          </button>
+        </div>
+        {signOut === "failed" && (
+          <div className="sg-failure" role="alert">
+            <p className="sg-failure__title">{session.errorTitle}</p>
+            <p className="sg-failure__detail">{session.errorDetail}</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

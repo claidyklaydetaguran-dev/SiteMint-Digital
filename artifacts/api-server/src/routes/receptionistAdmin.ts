@@ -1,32 +1,41 @@
 /**
  * CRM-admin oversight of AI Receptionist customer accounts.
- * Auth: same requireAdmin (Bearer token) as crm.ts / intakeAgent.ts.
- * NOT using receptionist customer cookie auth — these are internal-facing routes.
+ *
+ * Auth: the shared CRM gate, `requireCrmAuth` — a per-person `crm_staff_session`
+ * with its CSRF check, MFA challenge and named permission, or the legacy shared
+ * bearer while `CRM_LEGACY_BEARER_ENABLED` is not "false". That is a superset of
+ * the bearer-only guard this file used to define locally, so no existing caller
+ * loses access; what changes is that a member of staff signed in as themselves
+ * is no longer refused.
+ *
+ * NOT using receptionist customer cookie auth — these are internal-facing
+ * routes, and the two systems stay separate.
  */
 
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, sql, isNotNull, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { intakeFirms, intakeConversations } from "@workspace/db/schema";
-import { validateToken } from "../lib/admin-session.js";
+import { requireCrmAuth } from "../lib/staffAuth.js";
 
 const router: IRouter = Router();
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth  = req.headers.authorization ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  if (!validateToken(token)) { res.status(401).json({ error: "Unauthorized" }); return; }
-  next();
-}
 
 // ── GET /api/admin/receptionist-accounts ──────────────────────────────────────
 // Returns all intake_firms rows with a real email (i.e. actual customer signups).
 // Each entry includes conversation count + trial info.
 // Sorted by signup date (newest first).
+//
+// Permission: `settings.read`. This is operational state about the service —
+// which firms exist, what they are on, how much they have used — which is the
+// same class as `/crm/operations/jobs`, `/crm/operations/deliveries` and
+// `/crm/phone/status`, all of which read `settings.read`. It is not
+// `reports.read`, which in this CRM means business analytics (revenue summary,
+// sales forecast). Every staff role holds `settings.read`, so anyone who can
+// run the operation can open the page.
 
 router.get(
   "/admin/receptionist-accounts",
-  requireAdmin,
+  requireCrmAuth("settings.read"),
   async (req: Request, res: Response) => {
     try {
       // Subquery: count conversations per firm

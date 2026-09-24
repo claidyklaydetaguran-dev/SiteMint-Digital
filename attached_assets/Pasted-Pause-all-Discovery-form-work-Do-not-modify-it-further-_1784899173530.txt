@@ -1,0 +1,70 @@
+Pause all Discovery form work. Do not modify it further.
+
+Redesign only the AI Receptionist frontend so it matches SiteMint Digital’s current production design system.
+
+DESIGN DIRECTION
+
+Use:
+
+- Ocean navy: #051824, #162936, #3B5265
+- Mint accent: #27E9B5
+- Light surfaces: #E8F8F5, #F6FBFA, #FFFFFF
+- Clean white and sea-glass cards
+- Soft borders, subtle shadows, rounded corners
+- Mint only as an accent—not large neon backgrounds
+- Premium, modern, friendly, and easy to understand
+- Consistent typography, buttons, spacing, and navigation from the main SiteMint website
+
+FRONTEND IMPROVEMENTS
+
+Update the AI Receptionist interface, including:
+
+- Page header and navigation
+- Dashboard layout
+- Assistant setup experience
+- Call activity and conversation history
+- Phone-number or voice settings
+- Status indicators
+- Empty, loading, error, and disabled states
+- Forms, dropdowns, tabs, tables, and buttons
+- Responsive desktop, tablet, and 390px mobile layouts
+- Clear explanations and short examples for technical settings
+
+Make the setup feel guided and practical. Users should easily understand:
+
+1. What the AI receptionist does
+2. How to configure it
+3. What happens when someone calls
+4. Where calls, messages, and appointments appear
+5. Whether the receptionist is active, inactive, or still being configured
+
+IMPORTANT
+
+- Inspect and reuse the existing AI Receptionist components and functionality.
+- Preserve all existing routes, APIs, data structures, and working behavior.
+- This is a frontend redesign only.
+- Do not change the database, backend, authentication, integrations, voice provider, environment variables, or deployment configuration.
+- Do not place real calls, send messages, purchase phone numbers, or create real records.
+- Do not modify the Discovery form or unrelated pages.
+- Do not commit, push, publish, or deploy.
+
+VERIFICATION
+
+Run the existing typecheck and frontend build.
+
+Preview and return screenshots of:
+
+- Main AI Receptionist dashboard
+- Setup/configuration screen
+- Call history or activity view
+- Empty and error states
+- 390px mobile layout
+
+Also return:
+
+- Changed-file list
+- Summary of visual improvements
+- Confirmation that existing functionality was preserved
+- Any pre-existing frontend or API errors discovered
+
+Stop after preview for my approval.

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb, boolean, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, boolean, index, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { crmLeads } from "./crmLeads";
@@ -61,7 +61,13 @@ export const crmCampaignRecipients = pgTable("crm_campaign_recipients", {
   // active | paused | completed | stopped
   enrollmentStatus: text("enrollment_status").notNull().default("active"),
   currentStep: integer("current_step").default(0),
-});
+}, (table) => [
+  // Push packet 0003 (2026-09-24 performance audit): recipients are listed per
+  // campaign, looked up per lead, and counted per send status.
+  index("ix_crm_campaign_recipients_campaign_id").on(table.campaignId),
+  index("ix_crm_campaign_recipients_lead_id").on(table.leadId),
+  index("ix_crm_campaign_recipients_status").on(table.status),
+]);
 
 export const insertCrmCampaignRecipientSchema = createInsertSchema(crmCampaignRecipients).omit({
   id: true, createdAt: true,
@@ -120,7 +126,11 @@ export const crmCampaignSteps = pgTable("crm_campaign_steps", {
   branchWindowHours: integer("branch_window_hours"),
   branchTrueNextStepId: integer("branch_true_next_step_id").references((): AnyPgColumn => crmCampaignSteps.id, { onDelete: "set null" }),
   branchFalseNextStepId: integer("branch_false_next_step_id").references((): AnyPgColumn => crmCampaignSteps.id, { onDelete: "set null" }),
-});
+}, (table) => [
+  // Push packet 0003 (2026-09-24 performance audit): steps are always read as
+  // "the steps of this campaign".
+  index("ix_crm_campaign_steps_campaign_id").on(table.campaignId),
+]);
 
 export const insertCrmCampaignStepSchema = createInsertSchema(crmCampaignSteps).omit({
   id: true, createdAt: true,
@@ -161,7 +171,14 @@ export const crmCampaignScheduledMessages = pgTable("crm_campaign_scheduled_mess
   resendEmailId: text("resend_email_id"),
   lastError: text("last_error"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
-});
+}, (table) => [
+  // Push packet 0003 (2026-09-24 performance audit): the queue is filtered by
+  // campaign, by lead, by status, and swept by scheduled_at to find what is due.
+  index("ix_crm_campaign_scheduled_messages_campaign_id").on(table.campaignId),
+  index("ix_crm_campaign_scheduled_messages_lead_id").on(table.leadId),
+  index("ix_crm_campaign_scheduled_messages_status").on(table.status),
+  index("ix_crm_campaign_scheduled_messages_scheduled_at").on(table.scheduledAt),
+]);
 
 export const insertCrmCampaignScheduledMessageSchema = createInsertSchema(crmCampaignScheduledMessages).omit({
   id: true, createdAt: true,

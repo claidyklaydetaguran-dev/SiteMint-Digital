@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { enqueueSignupJobs } from "../lib/signupPipeline/pipeline.js";
 import bcrypt from "bcryptjs";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
@@ -18,12 +19,25 @@ import {
   getClientIp,
   maskEmail,
 } from "../lib/authRateLimit.js";
+import {
+  isPublicRegistrationEnabled,
+  PUBLIC_REGISTRATION_DISABLED_MESSAGE,
+} from "../lib/publicWriteFlags.js";
+import { findMemberLogins } from "../lib/receptionistRoles.js";
 
 const router = Router();
 
 // ── POST /api/receptionist/auth/signup ────────────────────────────────────────
 
 router.post("/receptionist/auth/signup", async (req: Request, res: Response) => {
+  // Fail-closed public-write gate. FIRST statement in the handler: no
+  // validation, no rate-limit budget, no database read, no bcrypt work, no
+  // firm insert, no session creation, no availability provisioning, and no
+  // email can happen while self-registration is disabled.
+  if (!isPublicRegistrationEnabled()) {
+    res.status(503).json({ error: PUBLIC_REGISTRATION_DISABLED_MESSAGE });
+    return;
+  }
   try {
     const { fullName, businessName, email, phone, industry, password } = req.body as {
       fullName?: string;
@@ -108,6 +122,29 @@ router.post("/receptionist/auth/signup", async (req: Request, res: Response) => 
     const token = await createSession(firm.id, firm.email!);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
 
+    // Owner directive 2026-09-10 §3 — the one explicitly authorized edit to
+    // this protected route: durably enqueue the post-registration work (one
+    // private-CRM record, one verification email; the welcome email follows
+    // confirmation). The jobs table is unique per firm × kind, so a retried
+    // or double-submitted signup cannot duplicate either. An enqueue failure
+    // must never lose the account that was just created — it logs loudly and
+    // the signup still succeeds.
+    try {
+      await enqueueSignupJobs(
+        firm.id,
+        {
+          fullName: fullName.trim(),
+          businessName: businessName?.trim() || undefined,
+          phone: phone?.trim() || undefined,
+          industry: industry?.trim() || undefined,
+          email: firm.email ?? undefined,
+        },
+        ["crm_link", "verification_email"],
+      );
+    } catch (enqueueErr) {
+      req.log.error({ err: enqueueErr, firmId: firm.id }, "[receptionist] signup pipeline enqueue failed");
+    }
+
     res.status(201).json({ firm });
   } catch (err) {
     req.log.error({ err }, "[receptionist] signup error");
@@ -147,6 +184,34 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
       .from(intakeFirms)
       .where(eq(intakeFirms.email, emailNorm));
 
+    // ── Team members sign in with their own password ───────────────────────────
+    // Tried only when the business account itself does not accept this
+    // password, so an account holder's sign-in is unchanged. Failures fall
+    // through to the same 401 and the same limiter records below.
+    const firmAccepts = !!firm?.passwordHash && (await bcrypt.compare(password, firm.passwordHash));
+    if (!firmAccepts) {
+      for (const member of await findMemberLogins(emailNorm)) {
+        if (!(await bcrypt.compare(password, member.passwordHash))) continue;
+        const [memberFirm] = await db.select().from(intakeFirms).where(eq(intakeFirms.id, member.firmId));
+        if (!memberFirm) continue;
+        loginEmailLimiter.reset(emailNorm);
+        const memberToken = await createSession(member.firmId, member.email);
+        res.cookie(COOKIE_NAME, memberToken, COOKIE_OPTIONS);
+        res.json({
+          firm: {
+            id:                      memberFirm.id,
+            name:                    memberFirm.name,
+            email:                   memberFirm.email,
+            planTier:                memberFirm.planTier,
+            trialConversationsLimit: memberFirm.trialConversationsLimit,
+            createdAt:               memberFirm.createdAt,
+          },
+          member: { email: member.email },
+        });
+        return;
+      }
+    }
+
     // ── Failure: unknown account ───────────────────────────────────────────────
     if (!firm || !firm.passwordHash) {
       loginIpLimiter.record(ip);
@@ -159,7 +224,7 @@ router.post("/receptionist/auth/login", async (req: Request, res: Response) => {
       return;
     }
 
-    const valid = await bcrypt.compare(password, firm.passwordHash);
+    const valid = firmAccepts;
 
     // ── Failure: wrong password ────────────────────────────────────────────────
     if (!valid) {
@@ -230,7 +295,15 @@ router.get("/receptionist/auth/me", requireReceptionistAuth, async (req: Request
       .from(intakeConversations)
       .where(eq(intakeConversations.firmId, req.firmId!));
 
-    res.json({ firm, conversationCount: Number(countRow?.count ?? 0) });
+    res.json({
+      firm,
+      conversationCount: Number(countRow?.count ?? 0),
+      viewer: {
+        email:         req.firmEmail,
+        role:          req.receptionistRole,
+        accountHolder: req.accountHolder,
+      },
+    });
   } catch (err) {
     req.log.error({ err }, "[receptionist] /me error");
     res.status(500).json({ error: "Internal server error" });

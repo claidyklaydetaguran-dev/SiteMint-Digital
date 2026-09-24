@@ -1,0 +1,835 @@
+/**
+ * Frontend V5 — the SiteMint homepage (owner amendment, workbook W-1,
+ * V5-BLUEPRINT.md §4/§6). Supersedes `HomeV4` as the routed `/` page.
+ *
+ * `HomeV4.tsx` stays in the repository, unrouted, as the rollback reference
+ * — see App.tsx. This page reuses `HomeV4`'s hero mechanics (particle
+ * canvas, scroll-linked phase HUD, node lighting — `SignalHeroV4`, now
+ * prop-driven so the mechanism can be reused with amended copy) and
+ * `SignalJourneyV4` (extended in place to the six-step connected-system
+ * story, not replaced) rather than re-implementing them.
+ *
+ * Fifteen sections, one continuous system story (V5-BLUEPRINT §4). Sections
+ * may be visually adjacent but every one keeps its own information — nothing
+ * from the approved architecture is dropped.
+ */
+
+import { useState } from "react";
+import { Link } from "wouter";
+import { HOME_SECTIONS, ROUTES, dashboardUrl } from "@/lib/routes";
+import { useReveal } from "@/components/v3/useReveal";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { SignalHeroV4 } from "@/pages/HomeV4";
+import { SignalJourneyV4 } from "@/components/v4/SignalJourneyV4";
+import { HeroMedia } from "@/components/v5/HeroMedia";
+import { MintSignalCorner } from "@/components/v5/MintSignal";
+import { Reveal } from "@/components/v5/Reveal";
+import { BuildPreview } from "@/components/v5/BuildPreview";
+import { AutomationDemo } from "@/components/v5/AutomationDemo";
+import { ConnectedOpsMap } from "@/components/v5/ConnectedOpsMap";
+import {
+  pricingTiersV5,
+  PRICING_DISCLAIMER_V5,
+  AI_RECEPTIONIST_PRICING_NOTE_V5,
+  ADVERTISING_SERVICES_NOTE_V5,
+} from "@/components/v5/pricingTiersV5";
+import { teamV5, type TeamMemberV5 } from "@/components/v5/teamV5";
+import { TeamMemberDialog } from "@/components/v5/TeamMemberDialog";
+import { capabilityLabelsV5 } from "@/components/v5/capabilityLabelsV5";
+import discoveryStepShot from "@/assets/product/discovery-step.png";
+import hdCallsShot from "@/assets/product/hd-calls.png";
+import homeHeroLoop from "@/assets/media/home-hero-loop.mp4";
+import "@/styles/v5-home.css";
+// Connected Operations Map (CRM & Internal Systems section, below) shares
+// its styling with AiSystemsV5 via v5-pages.css rather than duplicating it
+// into v5-home.css — see the ".opsmap" rules there, deliberately unscoped
+// to `.sm-v5page` so they apply equally on this `.sm-home-v5` page.
+import "@/styles/v5-pages.css";
+
+const PAGE_TITLE = "SiteMint Digital | Websites, CRM, and AI Systems Built to Connect";
+const PAGE_DESCRIPTION =
+  "SiteMint builds websites, web apps and AI systems that work together, so customer inquiries get answered, followed up and turned into booked work.";
+
+/* ── Section 2 — What SiteMint builds (typographic ledger, not cards) ──── */
+
+interface LedgerRow {
+  label: string;
+  outcome: string;
+}
+
+/* Business-owner communication redesign (owner directive 2026-09-08): the
+   nine delivery capabilities are grouped into the four things a business
+   owner is actually trying to do. Nothing was removed — every capability
+   sits inside its group, and "View details" opens the full service page. */
+interface CapabilityGroup {
+  title: string;
+  promise: string;
+  items: LedgerRow[];
+  detailsHref: string;
+  detailsLabel: string;
+}
+
+const CAPABILITY_GROUPS: CapabilityGroup[] = [
+  {
+    title: "Attract customers",
+    promise: "Bring the right people to your business, and make it easy for them to act.",
+    items: [
+      { label: "Websites", outcome: "A credible front door that turns attention into inquiries." },
+      { label: "Search foundations", outcome: "Show up when people look for what you do." },
+      { label: "Advertising & campaigns", outcome: "Meta and Google campaigns planned, launched, and reported on honestly — separately scoped, never bundled by default." },
+      { label: "Know what's working", outcome: "See which marketing actually brings customers, before you spend more on it." },
+    ],
+    detailsHref: "/websites-apps",
+    detailsLabel: "View website & application details",
+  },
+  {
+    title: "Organize the business",
+    promise: "One place for customer details, work in progress, and what happens next.",
+    items: [
+      { label: "Customer information", outcome: "Every customer's details and follow-up in one place the team trusts, instead of five." },
+      { label: "Projects & tasks", outcome: "Who's doing what, by when — visible at a glance." },
+      { label: "Custom internal tools", outcome: "Software shaped to how your business actually works." },
+      { label: "Reporting", outcome: "Honest numbers on inquiries, follow-ups, and wins." },
+    ],
+    detailsHref: "/ai-systems",
+    detailsLabel: "View business-system details",
+  },
+  {
+    title: "Follow up consistently",
+    promise: "Every inquiry gets a next step — even when your team is busy.",
+    items: [
+      { label: "Forms & inquiry handling", outcome: "A structured brief instead of a two-line email — read properly before anyone calls you back." },
+      { label: "Reminders", outcome: "Follow-up happens on time, every time — and stops when a human replies." },
+      { label: "Customer communication", outcome: "Messages in your voice, with your rules." },
+      { label: "AI Receptionist", outcome: "Help every caller, even when your team is busy — early access." },
+    ],
+    detailsHref: "/discovery-systems",
+    detailsLabel: "View follow-up system details",
+  },
+  {
+    title: "Improve over time",
+    promise: "Launch is the start — the system keeps getting tuned to reality.",
+    items: [
+      { label: "Performance monitoring", outcome: "Know when something needs attention before customers tell you." },
+      { label: "Marketing insights", outcome: "Learn which channels deserve more of your budget." },
+      { label: "Website optimization", outcome: "Pages improved from real visitor behaviour, not guesses." },
+      { label: "Ongoing support", outcome: "The system tuned after launch, not abandoned at it." },
+    ],
+    detailsHref: "/automation",
+    detailsLabel: "View improvement & support details",
+  },
+];
+
+function WhatWeBuildLedger() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section sm-ledger" id="what-we-build" data-tone="white">
+      <div className="v4-container">
+        <div className="v4-chapter-head" ref={reveal} data-v4-reveal>
+          <span className="v4-kicker">01 — What we build</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <Reveal as="h2" className="v4-h2" words>
+          Everything your business needs to grow and stay organized.
+        </Reveal>
+        <p className="v4-lede reveal-fade-up" ref={reveal} data-v4-reveal>
+          Start with one service or connect everything—from your website and
+          customer inquiries to follow-up, daily operations, and AI-assisted
+          support.
+        </p>
+        <div className="sm-capgroups" ref={reveal} data-v4-reveal>
+          {CAPABILITY_GROUPS.map((group, gi) => (
+            <section className="sm-capgroup reveal-scale-settle" key={group.title} aria-label={group.title}>
+              <header className="sm-capgroup__head">
+                <span className="sm-ledger__no">{String(gi + 1).padStart(2, "0")}</span>
+                <h3 className="sm-capgroup__title">{group.title}</h3>
+                <p className="sm-capgroup__promise">{group.promise}</p>
+              </header>
+              <ul className="sm-capgroup__items">
+                {group.items.map((row) => (
+                  <li className="sm-capgroup__item" key={row.label}>
+                    <span className="sm-ledger__label">{row.label}</span>
+                    <span className="sm-ledger__outcome">{row.outcome}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href={group.detailsHref} className="sm-capgroup__details">
+                {group.detailsLabel} →
+              </Link>
+            </section>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Real-product proof frame — an actual SiteMint screenshot in a labelled
+ * browser chrome, used wherever a section claims a capability the product
+ * already delivers (container-completion "real proof" step). Every caption
+ * says plainly that the data shown is preview/demo data, never a client's.
+ */
+function ShotFrame({ src, alt, caption }: { src: string; alt: string; caption: string }) {
+  return (
+    <figure className="sm-shot-frame">
+      <div className="sm-shot-frame__bar" aria-hidden="true">
+        <span className="sm-shot-frame__dot" />
+        <span className="sm-shot-frame__dot" />
+        <span className="sm-shot-frame__dot" />
+      </div>
+      <img
+        className="sm-shot-frame__img"
+        src={src}
+        alt={alt}
+        loading="lazy"
+        width={1600}
+        height={1000}
+      />
+      <figcaption className="sm-shot-frame__caption">{caption}</figcaption>
+    </figure>
+  );
+}
+
+/* ── Section 4 — Websites & Web Apps (layered browser/device frames, CSS only) */
+
+function WebsitesAppsSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section sm-corner-host" id="websites-apps" data-tone="porcelain">
+      <MintSignalCorner />
+      <div className="v4-container sm-split">
+        <div className="sm-split__copy reveal-h-left" ref={reveal} data-v4-reveal>
+          <span className="v4-kicker">03 — Websites & Web Apps</span>
+          <h2 className="v4-h2 reveal-clip">A site that knows what happens after the click.</h2>
+          <p className="v4-lede reveal-fade-up">
+            For businesses whose current site is a brochure nobody acts on:
+            marketing sites and custom applications built around the action a
+            real visitor should take next — a form that reaches an inbox, a
+            tracked event, a clean hand-off to the next system.
+          </p>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
+            A Starter Site System ships with the pages and lead capture most
+            businesses need as-is; a custom application is scoped and built
+            around your specific workflow. Either way, every form and event
+            on the site feeds straight into the CRM below — nothing waits in
+            an inbox to be typed in twice.
+          </p>
+          <Link href={ROUTES.websitesApps} className="v3-btn v3-btn--outline">
+            Explore Websites &amp; Web Apps →
+          </Link>
+        </div>
+        <div className="sm-buildpreview-wrap reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <BuildPreview />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 5 — CRM & internal systems (Connected Operations Map) ──────── */
+
+function CrmSystemsSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id="crm-systems" data-tone="white">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">04 — CRM &amp; Internal Systems</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">Where the business runs, in one place.</h2>
+        <p className="v4-lede reveal-fade-up">
+          For teams whose leads live in a spreadsheet, an inbox, and
+          someone's memory: the customer list, tasks, and follow-up the owner actually
+          looks at — built around how the business already works instead of
+          forcing a generic template onto it. The map below walks the same
+          seven steps a real project moves through — every name in it is
+          invented for illustration; the real Operations CRM is never shown
+          publicly.
+        </p>
+        <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
+          A customer-records connection is part of the Growth and Custom
+          systems above, set up around how you work during discovery — it's
+          the record every website form, automated follow-up, and
+          receptionist call below writes to, so nothing lives in two places.
+        </p>
+        <ConnectedOpsMap />
+        <div className="sm-crm-cta">
+          <Link href={`${ROUTES.aiSystems}#crm-systems`} className="v3-btn v3-btn--outline">
+            See CRM &amp; internal systems →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 6 — AI Systems & Automation (connected node sequence) ──────── */
+
+/* Owner correction (2026-09-09): the small route line with three nodes was
+   "incomplete, too subtle, visually empty". The section now leads with the
+   owner-approved plain heading and a working three-stage demonstration
+   (AutomationDemo) a business owner can read and click. */
+function AiSystemsSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id="ai-systems" data-tone="ink">
+      <div className="v4-container sm-split">
+        <div className="sm-split__copy reveal-h-left" ref={reveal} data-v4-reveal>
+          <span className="v4-kicker">05 — AI &amp; Automation</span>
+          <h2 className="v4-h2 reveal-clip">Let routine work move forward automatically.</h2>
+          <p className="v4-lede reveal-fade-up">
+            SiteMint can organize new inquiries, prepare follow-up, create
+            reminders, and send the right task to the right person — while
+            important decisions stay with your team.
+          </p>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
+            Everything automated is set up with you, works by your rules,
+            and can be paused any time. Anything that needs judgment lands
+            with a person — never handled silently.
+          </p>
+          <Link href={ROUTES.aiSystems} className="v3-btn v3-btn--outline">
+            See How Automation Can Help →
+          </Link>
+        </div>
+        <div className="sm-autodemo-wrap reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <AutomationDemo />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 7 — AI Receptionist spotlight (waveform ring) ──────────────── */
+
+function ReceptionistSpotlight() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id="ai-receptionist" data-tone="porcelain">
+      <div className="v4-container sm-split sm-split--reverse">
+        <div className="sm-split__copy reveal-h-right" ref={reveal} data-v4-reveal>
+          <span className="v4-kicker">06 — AI Receptionist</span>
+          <span className="sm-badge sm-badge--beta">Early access — create an account</span>
+          <h2 className="v4-h2 reveal-clip">Never let a good opportunity end at a missed call.</h2>
+          <p className="v4-lede reveal-fade-up">
+            SiteMint AI Receptionist is built to answer incoming calls, handle
+            routine questions, and help callers reach the right next step
+            using the business's actual rules and availability.
+          </p>
+          <p className="v4-lede reveal-fade-up" style={{ fontSize: "1rem" }}>
+            Every call it handles becomes a customer record and, where
+            automation is in scope, a follow-up — the same connected system
+            the rest of this page describes, by phone instead of by form.
+          </p>
+          <Link href={ROUTES.aiReceptionist} className="v3-btn v3-btn--primary">
+            See the AI Receptionist →
+          </Link>
+        </div>
+        <div className="sm-visual-stack reveal-scale-settle" ref={reveal} data-v4-reveal>
+          {/* Owner correction (2026-09-09): the pale concentric rings were
+              "too subtle and unnoticeable". The signal now tells the story
+              in three outcomes, with one controlled pulse and a visible
+              handoff into the dashboard preview below. */}
+          <div
+            className="sm-callsignal"
+            role="img"
+            aria-label="Illustration: an incoming call is answered, the caller's details are captured, and a next step is ready in the dashboard"
+          >
+            <div className="sm-callsignal__head">
+              <span className="sm-callsignal__pulse" aria-hidden="true" />
+              <span className="sm-callsignal__wave" aria-hidden="true">
+                <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
+              </span>
+              <span className="sm-callsignal__status">Incoming call — answered</span>
+            </div>
+            <ul className="sm-callsignal__steps">
+              <li className="sm-callsignal__step" data-done>
+                <span className="sm-callsignal__step-title">Call answered</span>
+                <span className="sm-callsignal__step-sub">
+                  Greeted with your business's own information
+                </span>
+              </li>
+              <li className="sm-callsignal__step" data-done>
+                <span className="sm-callsignal__step-title">Details captured</span>
+                <span className="sm-callsignal__step-sub">
+                  Name, number, and the reason they called
+                </span>
+              </li>
+              <li className="sm-callsignal__step" data-next>
+                <span className="sm-callsignal__step-title">Next step ready</span>
+                <span className="sm-callsignal__step-sub">
+                  Summary and follow-up waiting in your dashboard
+                </span>
+              </li>
+            </ul>
+            <span className="sm-callsignal__thread" aria-hidden="true" />
+            <p className="sm-callsignal__note">Simulated preview</p>
+          </div>
+          <ShotFrame
+            src={hdCallsShot}
+            alt="SiteMint AI Receptionist dashboard showing a logged call"
+            caption="AI Receptionist dashboard — preview data"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 8 — Discovery & lead capture ────────────────────────────────── */
+
+function DiscoverySection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id="discovery" data-tone="white">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">07 — Discovery &amp; lead capture</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">A structured brief, not a contact form.</h2>
+        <p className="v4-lede reveal-fade-up">
+          Every project starts with a guided, structured intake — the same
+          one live on this site right now. It saves as you go, and a person
+          reads every answer before you hear back.
+        </p>
+        <div className="sm-discovery-grid">
+          <ol className="sm-steps-inline">
+            <li className="reveal-fade-up">Answer structured questions about the business and the goal</li>
+            <li className="reveal-fade-up">Save and resume any time — nothing is lost</li>
+            <li className="reveal-fade-up">SiteMint reviews the brief and replies with a straight answer</li>
+          </ol>
+          <ShotFrame
+            src={discoveryStepShot}
+            alt="A structured discovery brief step, mid-flow, with save-and-resume progress"
+            caption="SiteMint discovery intake — the flow live on this site"
+          />
+        </div>
+        <div className="sm-actions">
+          <Link href={ROUTES.discovery} className="v3-btn v3-btn--primary">
+            Start the discovery brief
+          </Link>
+          <Link href={ROUTES.discoverySystems} className="v3-btn v3-btn--outline">
+            See Discovery Systems →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 9 — Selected work / capability demonstrations ──────────────── */
+
+interface WorkItem {
+  title: string;
+  desc: string;
+  status: keyof typeof capabilityLabelsV5;
+}
+
+const SELECTED_WORK: WorkItem[] = [
+  {
+    title: "SiteMint discovery intake",
+    desc: "The structured project-intake flow on this website — guided steps, branching questions, save-and-resume drafts.",
+    status: "available",
+  },
+  {
+    title: "AI Receptionist",
+    desc: "SiteMint's own voice and SMS receptionist product — answering, qualifying, and routing callers.",
+    status: "private-beta",
+  },
+  {
+    title: "SiteMint operations engine",
+    desc: "The internal CRM and automation system that runs SiteMint's own follow-up — lead scoring, sequences, task routing.",
+    status: "in-development",
+  },
+];
+
+function SelectedWorkSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id={HOME_SECTIONS.work} data-tone="porcelain">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">08 — Selected work</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">What SiteMint has actually built and run.</h2>
+        <div className="sm-work-grid">
+          {SELECTED_WORK.map((item) => (
+            <article className="sm-work-card reveal-scale-settle" key={item.title}>
+              <span className={`sm-badge sm-badge--${item.status}`}>
+                {capabilityLabelsV5[item.status]}
+              </span>
+              <h3 className="sm-work-card__title">{item.title}</h3>
+              <p className="sm-work-card__desc">{item.desc}</p>
+            </article>
+          ))}
+        </div>
+        <Link href={ROUTES.workV3} className="v3-btn v3-btn--outline">
+          See all of our work →
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 10 — How SiteMint works ─────────────────────────────────────── */
+
+const PROCESS_STEPS = [
+  { title: "Discover", output: "A structured brief we both work from." },
+  { title: "Design", output: "Real pages and flows you see before they ship." },
+  { title: "Build", output: "Working software at every checkpoint." },
+  { title: "Validate", output: "Verified — typechecked, tested, reviewed." },
+  { title: "Launch & Improve", output: "A human handoff, then ongoing tuning." },
+];
+
+function HowItWorksSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id={HOME_SECTIONS.process} data-tone="ink">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">09 — How SiteMint works</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">Five stages, each with a visible outcome.</h2>
+        <ol className="sm-timeline">
+          {PROCESS_STEPS.map((step, i) => (
+            <li className="sm-timeline__step reveal-scale-settle" key={step.title}>
+              <span className="sm-timeline__no">{String(i + 1).padStart(2, "0")}</span>
+              <span className="sm-timeline__title">{step.title}</span>
+              <span className="sm-timeline__output">{step.output}</span>
+            </li>
+          ))}
+        </ol>
+        <Link href={ROUTES.process} className="v3-btn v3-btn--outline">
+          See the full process →
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 11 — Pricing estimates ──────────────────────────────────────── */
+
+function PricingSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section" id="pricing-estimates" data-tone="white">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">10 — Pricing estimates</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">Three starting points. Every system is scoped.</h2>
+        <div className="sm-pricing-grid">
+          {pricingTiersV5.map((tier) => (
+            <div className={`sm-pricing-card reveal-scale-settle${tier.recommended ? " is-recommended" : ""}`} key={tier.id}>
+              {tier.recommended && <span className="sm-badge sm-badge--available">Most common</span>}
+              <h3 className="sm-pricing-card__name">{tier.name}</h3>
+              <p className="sm-pricing-card__price">{tier.priceFrom}</p>
+              <p className="sm-pricing-card__tagline">{tier.tagline}</p>
+            </div>
+          ))}
+        </div>
+        <p className="sm-disclaimer">{PRICING_DISCLAIMER_V5}</p>
+        <p className="sm-disclaimer">{AI_RECEPTIONIST_PRICING_NOTE_V5}</p>
+        <p className="sm-disclaimer">{ADVERTISING_SERVICES_NOTE_V5}</p>
+        <Link href={ROUTES.pricing} className="v3-btn v3-btn--primary">
+          Configure your scope →
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 12 — Why SiteMint ───────────────────────────────────────────── */
+
+const WHY_POINTS = [
+  {
+    title: "Connected, not collected",
+    body: "One system carries the work between the website, the CRM, and automation — not five disconnected tools.",
+  },
+  {
+    title: "AI-assisted, human-reviewed",
+    body: "We use AI to build faster and to automate routine work — every judgment call still lands with a person.",
+  },
+  {
+    title: "Honest about capability",
+    body: "Every feature on this site is labelled available, early access, in development, or planned. Nothing planned looks live.",
+  },
+  {
+    title: "A small, senior team",
+    body: "The people who design the system are the people who build it and the people who answer when something needs attention.",
+  },
+];
+
+function WhySiteMintSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section sm-corner-host" id="why-sitemint" data-tone="porcelain">
+      <MintSignalCorner flip />
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">11 — Why SiteMint</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <div className="sm-why-grid">
+          {WHY_POINTS.map((point) => (
+            <div className="sm-why-item reveal-scale-settle" key={point.title}>
+              <h3 className="sm-why-item__title">{point.title}</h3>
+              <p className="sm-why-item__body">{point.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 13 — Team ────────────────────────────────────────────────────── */
+
+function TeamSection() {
+  const reveal = useReveal();
+  const [activeMember, setActiveMember] = useState<TeamMemberV5 | null>(null);
+  return (
+    <section className="v4-section" id="team" data-tone="white">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">12 — Team</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">The people doing the work.</h2>
+        <div className="sm-team-grid">
+          {/* Owner final polish (2026-09-06): real people must read as real,
+              credible, and active — larger portrait, one owner-verbatim
+              ownership sentence, three responsibility tags, and an explicit
+              "Meet …" affordance. No invented credentials or statistics. */}
+          {teamV5.map((member) => (
+            <button
+              type="button"
+              className="sm-team-card reveal-scale-settle"
+              key={member.name}
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setActiveMember(member);
+              }}
+            >
+              <span className="sm-team-card__avatar">
+                {/* Per-person focal point (owner correction 2026-09-09):
+                    the crop window, never a zoom — see teamV5.ts. */}
+                <img
+                  src={member.photo}
+                  alt={`Portrait of ${member.name}`}
+                  loading="lazy"
+                  style={{ objectPosition: member.portraitPosition }}
+                />
+              </span>
+              <span className="sm-team-card__name">{member.name}</span>
+              <span className="sm-team-card__role">{member.role}</span>
+              <span className="sm-team-card__summary">{member.summary}</span>
+              <span className="sm-team-card__tags">
+                {member.tags.map((tag) => (
+                  <span className="sm-team-card__tag" key={tag}>{tag}</span>
+                ))}
+              </span>
+              <span className="sm-team-card__cta" aria-hidden="true">
+                Meet {member.name.split(" ")[0]} →
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <TeamMemberDialog member={activeMember} onClose={() => setActiveMember(null)} />
+    </section>
+  );
+}
+
+/* ── Section 14 — FAQ ─────────────────────────────────────────────────────── */
+
+interface FaqItem {
+  q: string;
+  a: string;
+}
+
+const FAQ_ITEMS: FaqItem[] = [
+  {
+    q: "What's actually included in the scope you quote?",
+    a: "Every project starts with the discovery brief, so scope is written down before work starts — pages, integrations, and what's explicitly out of scope. Nothing is assumed.",
+  },
+  {
+    q: "How long does a typical project take?",
+    a: "It depends on scope. A Starter Site System is typically the fastest to launch; a Custom Connected System takes longer because it includes a custom application and CRM/automation work. You'll get a real timeline after discovery, not before.",
+  },
+  {
+    q: "Who owns the website, code, and data when we're done?",
+    a: "You do. Credentials, content, and records belong to the business from day one — that's a standing rule of every SiteMint project, not a launch-day handoff.",
+  },
+  {
+    q: "How is AI actually used in what you build?",
+    a: "Two ways: AI-assisted development (we use AI tools to build faster, with human review and testing on everything that ships) and, where it's in scope, AI automation inside your system — evaluation, routing, drafting. Judgment calls stay with a person.",
+  },
+  {
+    q: "Can I try the AI Receptionist?",
+    a: "Yes. Create an account from the AI Receptionist page to set up your assistant and test it from your browser. It does not retain call audio or full transcripts. Connecting a real business phone number is a separate step completed with SiteMint.",
+  },
+];
+
+function FaqSection() {
+  const reveal = useReveal();
+  const [open, setOpen] = useState<number | null>(0);
+
+  return (
+    <section className="v4-section" id={HOME_SECTIONS.faq} data-tone="ink">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <div className="v4-chapter-head">
+          <span className="v4-kicker">13 — FAQ</span>
+          <span className="v4-chapter-rule" aria-hidden="true" />
+        </div>
+        <h2 className="v4-h2 reveal-clip">Straight answers to common questions.</h2>
+        <div className="sm-faq">
+          {FAQ_ITEMS.map((item, i) => {
+            const isOpen = open === i;
+            return (
+              <div className="sm-faq__item reveal-fade-up" key={item.q}>
+                <button
+                  type="button"
+                  className="sm-faq__question"
+                  aria-expanded={isOpen}
+                  aria-controls={`sm-faq-panel-${i}`}
+                  onClick={() => setOpen(isOpen ? null : i)}
+                >
+                  {item.q}
+                  <span className="sm-faq__chevron" aria-hidden="true">{isOpen ? "−" : "+"}</span>
+                </button>
+                {isOpen && (
+                  <p className="sm-faq__answer" id={`sm-faq-panel-${i}`}>
+                    {item.a}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Section 15 — Final CTA ───────────────────────────────────────────────── */
+
+function FinalCtaSection() {
+  const reveal = useReveal();
+  return (
+    <section className="v4-section v4-cta-band" id="final-cta" data-tone="ink">
+      <div className="v4-container" ref={reveal} data-v4-reveal>
+        <span className="v4-kicker">14 — Start</span>
+        <h2 className="v4-h2 reveal-clip">
+          Tell us where attention leaks out of your business. We'll design
+          the system that catches it.
+        </h2>
+        <div className="v4-cta-band__actions">
+          {/* Professional redesign: one consistent conversion phrase. */}
+          <Link href={ROUTES.start} className="v4-btn v4-btn--primary">
+            Plan My Project
+          </Link>
+          <Link href={ROUTES.aiReceptionist} className="v4-btn v4-btn--outline">
+            Explore the AI Receptionist
+          </Link>
+        </div>
+        <p className="sm-final-cta__signin">
+          Already a client? <a href={dashboardUrl("/login")}>Sign in</a>
+        </p>
+      </div>
+      <span className="v4-signal-rule v4-cta-band__thread" aria-hidden="true" />
+    </section>
+  );
+}
+
+/* ── The page ─────────────────────────────────────────────────────────────── */
+
+export default function HomeV5() {
+  const reveal = useReveal();
+  usePageMeta({ title: PAGE_TITLE, description: PAGE_DESCRIPTION });
+
+  return (
+    <div className="v4-home sm-home-v5">
+      {/* Section 1 — Hero. Reuses SignalHeroV4's particle canvas / scroll
+          transition / phase HUD unchanged; only the copy region and CTAs are
+          overridden (W-1 amendment). `showFilm` (wp-herofilm; revised
+          2026-09-05 per owner correction) adds the cinematic film band, a
+          full-width horizontal strip stacked between the copy and the
+          particle field at every breakpoint — never beside either — by this
+          page's own stylesheet (`styles/v5-home.css`); SignalHeroV4 itself
+          carries no layout logic for it. */}
+      <div id="hero">
+        {/* Professional redesign (2026-09-09): fewer labels above the fold —
+            the header wordmark now establishes "SiteMint Digital", so the
+            hero eyebrow speaks the reference's category line instead, and
+            the extra brand line is retired. One primary + one secondary CTA;
+            the secondary goes to real work (owner-approved label). */}
+        <SignalHeroV4
+          hideKicker
+          brandEyebrow="Websites · Systems · Automation"
+          showServiceRail
+          title={
+            <>
+              Websites and business systems built to{" "}
+              <span className="sm-mark">help you grow.</span>
+            </>
+          }
+          hideSub1
+          sub={
+            <>
+              SiteMint helps you attract customers, organize inquiries,
+              follow up faster, and reduce repetitive work—all through one
+              carefully planned digital experience.
+            </>
+          }
+          primaryHref={ROUTES.start}
+          primaryLabel="Plan My Project"
+          secondaryHref={ROUTES.workV3}
+          secondaryLabel="See Our Work"
+          secondaryIsRoute
+          showFilm
+        />
+      </div>
+
+      <WhatWeBuildLedger />
+
+      {/* Poster-first hero media (V5-BLUEPRINT §6/§17): a below-the-fold,
+          non-LCP visual break before the interactive diagram. Plays the
+          produced ambient studio loop (owner-approved asset, 2026-09-05);
+          `HeroMedia` still gates playback behind window-load + idle,
+          ≥768px, and prefers-reduced-motion, falling back to its poster. */}
+      <section className="v4-section sm-media-break" data-tone="ink" aria-label="SiteMint connected system, visualised">
+        <div className="v4-container reveal-scale-settle" ref={reveal} data-v4-reveal>
+          <HeroMedia
+            videoSrc={homeHeroLoop}
+            label="SiteMint brand film — representative studio scene"
+          />
+        </div>
+      </section>
+
+      {/* Section 3 — the interactive connected-system explanation. Reuses
+          SignalJourneyV4 (extended to six stages in place, not replaced). */}
+      <div id="connected-system">
+        <SignalJourneyV4 reveal={reveal} />
+      </div>
+
+      <WebsitesAppsSection />
+      <CrmSystemsSection />
+      <AiSystemsSection />
+      <ReceptionistSpotlight />
+      <DiscoverySection />
+      <SelectedWorkSection />
+      <HowItWorksSection />
+      <PricingSection />
+      <WhySiteMintSection />
+      <TeamSection />
+      <FaqSection />
+      <FinalCtaSection />
+    </div>
+  );
+}

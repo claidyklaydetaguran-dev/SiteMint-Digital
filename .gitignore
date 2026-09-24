@@ -47,3 +47,14 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local environment secrets (never commit; .env.example files remain tracked)
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# Database dumps and release scratch must never be committed or published.
+backups/
+.relstage/

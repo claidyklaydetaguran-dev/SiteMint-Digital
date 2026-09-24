@@ -1,0 +1,362 @@
+// V7 — saved caller requests, and the two properties that make them
+// trustworthy:
+//
+//   1. The caller is told "saved" only after a durable write succeeded.
+//   2. The business a message belongs to comes from verified provider context,
+//      never from anything the model produced.
+//
+// Plus the browser-token minting guarantee that a conditional write alone could
+// not give: the provider is contacted at most once per assistant, so a race
+// cannot leave a live credential referenced by nothing.
+//
+// Everything runs against injected fakes; no database is touched.
+
+import { describe, expect, it, vi } from "vitest";
+
+// `@workspace/db` throws at IMPORT time when DATABASE_URL is unset, and
+// browserTestSession.ts statically imports the assistant repository. Without
+// this hoisted stub, merely importing this file would fail and the suite would
+// silently disappear from the run rather than fail visibly.
+vi.mock("@workspace/db", () => ({ db: {}, pool: {} }));
+
+import {
+  dispatchToolCalls,
+  type ToolCallContext,
+  type ToolSchedulingDeps,
+} from "../voice/tools/toolDispatcher.js";
+import { saveMessageArgs } from "../voice/tools/toolCatalog.js";
+import {
+  getBrowserTestSession,
+  type BrowserTestSessionDependencies,
+} from "../voiceAssistants/browserTestSession.js";
+
+const FIRM = 7;
+const OTHER_FIRM = 8;
+
+const CTX: ToolCallContext = {
+  provider: "vapi",
+  providerCallId: "call_abc_123",
+  assistantRowId: 42,
+};
+
+type SavedInput = Parameters<NonNullable<ToolSchedulingDeps["saveVoiceMessage"]>>[0];
+
+function messageDeps(options: { failWrite?: boolean; omitSaver?: boolean } = {}) {
+  const saved: SavedInput[] = [];
+  const issues: string[] = [];
+  const unreachable = () => {
+    throw new Error("scheduling collaborators must not be reached by save_message");
+  };
+  const deps: ToolSchedulingDeps = {
+    // Message-taking is the authorized capability throughout these cases.
+    authorizedCapabilities: () => ["messages"],
+    getDayAvailability: unreachable,
+    getSchedulingContext: unreachable,
+    findRequestByPublicId: unreachable,
+    submitAppointmentRequest: unreachable,
+    cancelAppointmentRequestByPublicId: unreachable,
+    openIssue: async (input) => {
+      issues.push(input.code);
+    },
+    ...(options.omitSaver
+      ? {}
+      : {
+          saveVoiceMessage: async (input: SavedInput) => {
+            if (options.failWrite) throw new Error("write failed");
+            // Idempotent by (firmId, toolCallId), like the real table's unique index.
+            const existing = saved.find((s) => s.firmId === input.firmId && s.toolCallId === input.toolCallId);
+            if (existing) return { inserted: false };
+            saved.push(input);
+            return { inserted: true };
+          },
+        }),
+  };
+  return { deps, saved, issues };
+}
+
+const GOOD_ARGS = {
+  callerName: "Dana Rivera",
+  topic: "Quote for kitchen rewire",
+  details: "Wants a quote for rewiring a kitchen; available weekday mornings.",
+  callbackPhone: "+15550001111",
+};
+
+describe("save_message", () => {
+  it("persists the message and only then confirms it out loud", async () => {
+    const { deps, saved } = messageDeps();
+    const results = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "tc_1", name: "save_message", args: GOOD_ARGS }],
+      CTX,
+      deps,
+    );
+
+    expect(saved).toHaveLength(1);
+    expect(results[0]!.result).toMatch(/saved/i);
+  });
+
+  it("says nothing that implies a save when the write fails", async () => {
+    const { deps, saved, issues } = messageDeps({ failWrite: true });
+    const results = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "tc_1", name: "save_message", args: GOOD_ARGS }],
+      CTX,
+      deps,
+    );
+
+    expect(saved).toHaveLength(0);
+    expect(results[0]!.result).not.toMatch(/saved/i);
+    // The caller is told the office will follow up, and an operator can see why.
+    expect(results[0]!.result).toMatch(/office/i);
+    expect(issues).toContain("tool_execution_failed");
+  });
+
+  it("says nothing that implies a save when the capability is attached but unwired", async () => {
+    const { deps } = messageDeps({ omitSaver: true });
+    const results = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "tc_1", name: "save_message", args: GOOD_ARGS }],
+      CTX,
+      deps,
+    );
+    expect(results[0]!.result).not.toMatch(/\bsaved\b/i);
+  });
+
+  it("takes the business, call and assistant from context, never from arguments", async () => {
+    const { deps, saved } = messageDeps();
+    await dispatchToolCalls(
+      FIRM,
+      [
+        {
+          toolCallId: "tc_1",
+          name: "save_message",
+          // A model trying to name a tenant, a call, or a destination.
+          args: {
+            ...GOOD_ARGS,
+            firmId: OTHER_FIRM,
+            providerCallId: "call_someone_else",
+            assistantId: 999,
+            transferTo: "+15557654321",
+          },
+        },
+      ],
+      CTX,
+      deps,
+    );
+
+    // `.strict()` refuses the whole argument object rather than stripping the
+    // extra keys, so an attempt to name a tenant is a rejected call, not a
+    // quietly-cleaned one.
+    expect(saved).toHaveLength(0);
+
+    // And the well-formed path records only the context's identities.
+    const clean = messageDeps();
+    await dispatchToolCalls(FIRM, [{ toolCallId: "tc_2", name: "save_message", args: GOOD_ARGS }], CTX, clean.deps);
+    expect(clean.saved[0]).toMatchObject({
+      firmId: FIRM,
+      providerCallId: CTX.providerCallId,
+      assistantId: CTX.assistantRowId,
+      toolCallId: "tc_2",
+    });
+  });
+
+  it("is idempotent: a redelivered tool call yields one message, still confirmed", async () => {
+    const { deps, saved } = messageDeps();
+    const first = await dispatchToolCalls(FIRM, [{ toolCallId: "tc_1", name: "save_message", args: GOOD_ARGS }], CTX, deps);
+    const again = await dispatchToolCalls(FIRM, [{ toolCallId: "tc_1", name: "save_message", args: GOOD_ARGS }], CTX, deps);
+
+    expect(saved).toHaveLength(1);
+    expect(first[0]!.result).toMatch(/saved/i);
+    expect(again[0]!.result).toMatch(/saved/i);
+  });
+
+  it("never treats a stated email address as permission to email the caller", () => {
+    // Address given, no request for a copy: the flag stays false.
+    const stated = saveMessageArgs.safeParse({ ...GOOD_ARGS, callbackEmail: "dana@example.com" });
+    expect(stated.success).toBe(true);
+    if (stated.success) expect(stated.data.emailCopyRequested).toBeUndefined();
+
+    // A copy requested with no address is refused rather than silently dropped.
+    const noAddress = saveMessageArgs.safeParse({ ...GOOD_ARGS, emailCopyRequested: true });
+    expect(noAddress.success).toBe(false);
+
+    // Both together is the only shape that carries consent.
+    const consented = saveMessageArgs.safeParse({
+      ...GOOD_ARGS,
+      callbackEmail: "dana@example.com",
+      emailCopyRequested: true,
+    });
+    expect(consented.success).toBe(true);
+  });
+
+  // Found by exercising the deployed webhook: the provider only ADVERTISES the
+  // authorized tools, so a model cannot ask for anything else — but an
+  // authenticated request carrying an unauthorized tool name reached the
+  // scheduling executor anyway. "The model can't" is not "we won't".
+  it("refuses a tool whose capability this deployment has not authorized", async () => {
+    const { deps, saved } = messageDeps();
+    const results = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "tc_1", name: "book_appointment", args: { appointmentTypeId: "3", startIso: "2026-09-20T14:00:00.000Z", customerName: "Dana Rivera" } }],
+      CTX,
+      deps, // authorizes "messages" only
+    );
+    // The scheduling collaborators throw if reached, so a safe answer here also
+    // proves nothing was attempted.
+    expect(results[0]!.result).toMatch(/office/i);
+    expect(saved).toHaveLength(0);
+  });
+
+  it("authorizes nothing when the allowlist is absent or unparseable", async () => {
+    for (const capabilities of [[], ["bookings" as never]]) {
+      const { deps, saved } = messageDeps();
+      const results = await dispatchToolCalls(
+        FIRM,
+        [{ toolCallId: "tc_1", name: "save_message", args: GOOD_ARGS }],
+        CTX,
+        { ...deps, authorizedCapabilities: () => capabilities },
+      );
+      expect(results[0]!.result).not.toMatch(/\bsaved\b/i);
+      expect(saved).toHaveLength(0);
+    }
+  });
+
+  it("bounds every field and rejects control characters", () => {
+    expect(saveMessageArgs.safeParse({ ...GOOD_ARGS, details: "x".repeat(2001) }).success).toBe(false);
+    expect(saveMessageArgs.safeParse({ ...GOOD_ARGS, callerName: "" }).success).toBe(false);
+    expect(saveMessageArgs.safeParse({ ...GOOD_ARGS, topic: "a b" }).success).toBe(false);
+    expect(saveMessageArgs.safeParse({ ...GOOD_ARGS, urgency: "critical" }).success).toBe(false);
+  });
+});
+
+// ─── Browser token: one provider token per assistant, even under a race ──────
+
+describe("browser token minting", () => {
+  const ASSISTANT_ID = 42;
+
+  function tokenWorld(initial: { tokenId: string | null; tokenValue: string | null }) {
+    // One shared mutable row, so claim/set/clear race against each other the
+    // way they would in the database.
+    const row = {
+      id: ASSISTANT_ID,
+      firmId: FIRM,
+      status: "published",
+      provider: "vapi",
+      providerAssistantId: "prov-abc-123",
+      browserTokenId: initial.tokenId,
+      browserTokenValue: initial.tokenValue,
+      browserTokenMintLeaseAt: null as Date | null,
+    };
+    const counters = { mints: 0, revokes: 0 };
+    let nextToken = 0;
+
+    const deps: BrowserTestSessionDependencies = {
+      isEnabled: () => true,
+      findByIdForFirm: async (firmId, id) =>
+        firmId === row.firmId && id === row.id ? (row as never) : null,
+      claimBrowserTokenMint: async (firmId, id, leaseSeconds, now = new Date()) => {
+        if (firmId !== row.firmId || id !== row.id) return null;
+        if (row.browserTokenValue !== null) return null;
+        const stale =
+          row.browserTokenMintLeaseAt === null ||
+          row.browserTokenMintLeaseAt.getTime() < now.getTime() - leaseSeconds * 1000;
+        if (!stale) return null;
+        row.browserTokenMintLeaseAt = now;
+        return row as never;
+      },
+      setBrowserToken: async (firmId, id, tokenId, tokenValue) => {
+        if (firmId !== row.firmId || id !== row.id) return null;
+        if (row.browserTokenValue !== null) return null;
+        row.browserTokenId = tokenId;
+        row.browserTokenValue = tokenValue;
+        return row as never;
+      },
+      clearBrowserToken: async (firmId, id, expectedTokenId) => {
+        if (firmId !== row.firmId || id !== row.id) return null;
+        if (row.browserTokenId !== expectedTokenId) return null;
+        row.browserTokenId = null;
+        row.browserTokenValue = null;
+        row.browserTokenMintLeaseAt = null;
+        return row as never;
+      },
+      mintBrowserToken: async () => {
+        counters.mints += 1;
+        nextToken += 1;
+        return { tokenId: `tok_${nextToken}`, tokenValue: `pk_${nextToken}` };
+      },
+      revokeBrowserToken: async () => {
+        counters.revokes += 1;
+        return true;
+      },
+    };
+    return { deps, row, counters };
+  }
+
+  it("mints exactly once for concurrent first requests, orphaning no provider token", async () => {
+    const { deps, counters, row } = tokenWorld({ tokenId: null, tokenValue: null });
+
+    const [a, b, c] = await Promise.all([
+      getBrowserTestSession(FIRM, ASSISTANT_ID, deps),
+      getBrowserTestSession(FIRM, ASSISTANT_ID, deps),
+      getBrowserTestSession(FIRM, ASSISTANT_ID, deps),
+    ]);
+
+    // The whole point: three simultaneous requests, ONE provider token.
+    expect(counters.mints).toBe(1);
+    expect(counters.revokes).toBe(0);
+
+    // The winner gets the token; the losers get either the same token or a
+    // retryable "try again" — never a different token, and never a broader one.
+    const issued = [a, b, c].filter((r) => r.ok).map((r) => (r.ok ? r.session.publicKey : ""));
+    expect(new Set(issued).size).toBeLessThanOrEqual(1);
+    for (const r of [a, b, c]) {
+      if (!r.ok) expect(r.error.code).toBe("browser_token_unavailable");
+    }
+    expect(row.browserTokenValue).toBe("pk_1");
+  });
+
+  it("reuses the stored token on later requests without contacting the provider", async () => {
+    const { deps, counters } = tokenWorld({ tokenId: "tok_existing", tokenValue: "pk_existing" });
+
+    const result = await getBrowserTestSession(FIRM, ASSISTANT_ID, deps);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.session.publicKey).toBe("pk_existing");
+    expect(counters.mints).toBe(0);
+  });
+
+  it("replaces a rejected token only when asked, revoking the old one", async () => {
+    const { deps, counters, row } = tokenWorld({ tokenId: "tok_stale", tokenValue: "pk_stale" });
+
+    const result = await getBrowserTestSession(FIRM, ASSISTANT_ID, deps, { replaceExistingToken: true });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.session.publicKey).toBe("pk_1");
+    expect(counters.mints).toBe(1);
+    // The credential the provider stopped accepting is not left live.
+    expect(counters.revokes).toBe(1);
+    expect(row.browserTokenValue).toBe("pk_1");
+  });
+
+  it("has no shared-key fallback: an unmintable assistant is unavailable, not downgraded", async () => {
+    const { deps } = tokenWorld({ tokenId: null, tokenValue: null });
+    const result = await getBrowserTestSession(FIRM, ASSISTANT_ID, {
+      ...deps,
+      // A provider that offers no scoped credential.
+      mintBrowserToken: async () => null,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("browser_token_unavailable");
+  });
+
+  it("stays firm-scoped: another business cannot claim, mint, or replace", async () => {
+    const { deps, counters } = tokenWorld({ tokenId: null, tokenValue: null });
+
+    const cross = await getBrowserTestSession(OTHER_FIRM, ASSISTANT_ID, deps, { replaceExistingToken: true });
+
+    expect(cross.ok).toBe(false);
+    if (!cross.ok) expect(cross.error.code).toBe("assistant_not_found");
+    expect(counters.mints).toBe(0);
+  });
+});

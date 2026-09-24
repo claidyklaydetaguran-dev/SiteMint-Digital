@@ -1,0 +1,303 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  BrowserVoiceClient,
+  BrowserVoiceEvent,
+  BrowserVoiceStartInput,
+  BrowserVoiceTestState,
+} from "@/lib/browserVoice/types";
+import { useBrowserVoiceClientSource } from "@/lib/browserVoice/context";
+import {
+  browserVoiceErrorNeedsSupportReference,
+  newBrowserVoiceSupportReference,
+  safeBrowserVoiceErrorMessage,
+} from "@/lib/browserVoice/errors";
+import type { BrowserVoiceErrorCategory } from "@/lib/browserVoice/errors";
+import { browserVoiceDiagnosticLine } from "@/lib/browserVoice/vapi/VapiBrowserVoiceClient";
+
+const ACTIVE_STATES: ReadonlySet<BrowserVoiceTestState> = new Set([
+  "preparing",
+  "connecting",
+  "connected",
+  "ending",
+]);
+
+/**
+ * Milestone 1 / Checkpoint F1 (correction pass): the only call site allowed
+ * to invoke `client.destroy()`. Safely absorbs every shape a well- or
+ * badly-behaved client might return — void, a resolved Promise, a rejected
+ * Promise, a synchronous throw, or a non-Promise thenable — so a destroy
+ * failure can never surface as an unhandled promise rejection, a console
+ * error, or a raw error message in the UI. Never retries.
+ */
+function safelyDestroyClient(client: BrowserVoiceClient): void {
+  try {
+    const result = client.destroy();
+    if (result && typeof (result as Promise<void>).then === "function") {
+      void (result as Promise<void>).then(
+        () => undefined,
+        () => undefined,
+      );
+    }
+  } catch {
+    // Destroy must never throw into the caller; nothing to do here.
+  }
+}
+
+export interface UseBrowserVoiceTestResult {
+  state: BrowserVoiceTestState;
+  errorMessage: string | null;
+  /**
+   * AR-001V.3 recovery: the classified category of the last failure, so a
+   * caller can distinguish a credential the provider REFUSED — which a fresh
+   * scoped token can fix — from a microphone or network problem, which it
+   * cannot. Our own enum, never provider text.
+   */
+  errorCategory: BrowserVoiceErrorCategory | null;
+  /** Present only for a failure our copy could not already explain. Safe to display. */
+  supportReference: string | null;
+  elapsedSeconds: number;
+  /** Whether the configured client can run a real browser voice test. */
+  clientAvailable: boolean;
+  /** True while preparing/connecting/connected/ending — used to keep Test disabled during an active test. */
+  isActive: boolean;
+  /** Guarded: a second call while already starting/active is a no-op. */
+  start: (input: BrowserVoiceStartInput) => void;
+  /** Guarded: a second call while not connected is a no-op. */
+  end: () => void;
+  /** Returns a terminal state (ended/permission_denied/error) to idle. No client operation. */
+  dismiss: () => void;
+  /** Forced teardown for a session/tenant boundary — destroys any active client and returns to idle immediately. */
+  reset: () => void;
+  /** Best-effort, non-blocking client teardown for pagehide/beforeunload. Never awaited. */
+  bestEffortUnloadCleanup: () => void;
+}
+
+/**
+ * Milestone 1 / Checkpoint F1: the browser-test lifecycle state machine.
+ * Owns at most one BrowserVoiceClient instance at a time. All start/end
+ * guards are synchronous refs (not React state) so a duplicate click in the
+ * same tick can never produce two client operations.
+ */
+export function useBrowserVoiceTest(): UseBrowserVoiceTestResult {
+  const source = useBrowserVoiceClientSource();
+  const [state, setState] = useState<BrowserVoiceTestState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [supportReference, setSupportReference] = useState<string | null>(null);
+  const [errorCategory, setErrorCategory] = useState<BrowserVoiceErrorCategory | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  /**
+   * Records one failure: our own static copy for the classified category,
+   * plus a support reference when that copy cannot already tell the customer
+   * what to do. Never stores or renders provider text.
+   */
+  const recordFailure = useCallback((category: BrowserVoiceErrorCategory, providerStatus?: number) => {
+    setErrorMessage(safeBrowserVoiceErrorMessage(category));
+    setErrorCategory(category);
+    const reference = browserVoiceErrorNeedsSupportReference(category) ? newBrowserVoiceSupportReference() : null;
+    setSupportReference(reference);
+    // One sanitized console line so a failure is diagnosable from a customer's
+    // browser without the provider's text ever being shown or stored. Carries
+    // the classification, the HTTP status and the reference — nothing else.
+    try {
+      console.warn(
+        browserVoiceDiagnosticLine(category, providerStatus === undefined ? null : { statusCode: providerStatus }, reference),
+      );
+    } catch {
+      // Diagnostics must never break the failure path.
+    }
+  }, []);
+
+  const clientRef = useRef<BrowserVoiceClient | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const startGuardRef = useRef(false);
+  const endGuardRef = useRef(false);
+  // Starts true: no client exists yet, so any stray event must be ignored.
+  const liveRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    startedAtRef.current = null;
+  }, []);
+
+  /** Tears down the current client instance. Does not itself change `state`. */
+  const teardownClient = useCallback(() => {
+    liveRef.current = false;
+    clearTimer();
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
+    startGuardRef.current = false;
+    endGuardRef.current = false;
+    const client = clientRef.current;
+    clientRef.current = null;
+    if (client) {
+      safelyDestroyClient(client);
+    }
+  }, [clearTimer]);
+
+  const handleEvent = useCallback(
+    (event: BrowserVoiceEvent) => {
+      if (!liveRef.current) return;
+      switch (event.type) {
+        case "call-start":
+          setState((prev) => {
+            if (prev !== "connecting") return prev;
+            startedAtRef.current = Date.now();
+            setElapsedSeconds(0);
+            if (timerRef.current === null) {
+              timerRef.current = window.setInterval(() => {
+                if (startedAtRef.current !== null) {
+                  setElapsedSeconds(
+                    Math.floor((Date.now() - startedAtRef.current) / 1000),
+                  );
+                }
+              }, 1000);
+            }
+            return "connected";
+          });
+          break;
+        case "call-end":
+          setState((prev) => {
+            if (prev !== "connected" && prev !== "ending") return prev;
+            teardownClient();
+            return "ended";
+          });
+          break;
+        case "permission-denied":
+          setState((prev) => {
+            if (
+              prev === "ended" ||
+              prev === "error" ||
+              prev === "permission_denied"
+            )
+              return prev;
+            teardownClient();
+            return "permission_denied";
+          });
+          break;
+        case "error":
+          setState((prev) => {
+            if (
+              prev === "ended" ||
+              prev === "error" ||
+              prev === "permission_denied"
+            )
+              return prev;
+            recordFailure(event.category ?? "unexpected_browser_voice_error", event.providerStatus);
+            teardownClient();
+            return "error";
+          });
+          break;
+        default:
+          // Unknown event types are ignored safely.
+          break;
+      }
+    },
+    [teardownClient, recordFailure],
+  );
+
+  const start = useCallback(
+    (input: BrowserVoiceStartInput) => {
+      if (startGuardRef.current) return;
+      startGuardRef.current = true;
+      setErrorMessage(null);
+      setSupportReference(null);
+      setErrorCategory(null);
+      setState("preparing");
+
+      const client = source.create();
+      clientRef.current = client;
+      liveRef.current = true;
+      unsubscribeRef.current = client.subscribe(handleEvent);
+
+      setState("connecting");
+      client.start(input).catch(() => {
+        if (!liveRef.current || clientRef.current !== client) return;
+        recordFailure("start_failed");
+        teardownClient();
+        setState("error");
+      });
+    },
+    [source, handleEvent, teardownClient, recordFailure],
+  );
+
+  const end = useCallback(() => {
+    if (endGuardRef.current) return;
+    if (state !== "connected") return;
+    endGuardRef.current = true;
+    setState("ending");
+    const client = clientRef.current;
+    if (!client) {
+      teardownClient();
+      setState("ended");
+      return;
+    }
+    client
+      .end()
+      .then(() => {
+        if (!liveRef.current || clientRef.current !== client) return;
+        teardownClient();
+        setState("ended");
+      })
+      .catch(() => {
+        if (!liveRef.current || clientRef.current !== client) return;
+        recordFailure("end_failed");
+        teardownClient();
+        setState("error");
+      });
+  }, [state, teardownClient, recordFailure]);
+
+  const dismiss = useCallback(() => {
+    setState((prev) => {
+      if (prev !== "ended" && prev !== "error" && prev !== "permission_denied")
+        return prev;
+      setErrorMessage(null);
+      setSupportReference(null);
+      setErrorCategory(null);
+      setElapsedSeconds(0);
+      return "idle";
+    });
+  }, []);
+
+  const reset = useCallback(() => {
+    teardownClient();
+    setErrorMessage(null);
+    setSupportReference(null);
+    setErrorCategory(null);
+    setElapsedSeconds(0);
+    setState("idle");
+  }, [teardownClient]);
+
+  const bestEffortUnloadCleanup = useCallback(() => {
+    teardownClient();
+  }, [teardownClient]);
+
+  useEffect(() => () => teardownClient(), [teardownClient]);
+
+  // A plain, side-effect-free config read (flags + public key presence) —
+  // never constructs a BrowserVoiceClient or the provider SDK, so this is
+  // safe to read on every render regardless of the current assistant's
+  // eligibility status.
+  const clientAvailable = source.available;
+  const isActive = ACTIVE_STATES.has(state);
+
+  return {
+    state,
+    errorMessage,
+    errorCategory,
+    supportReference,
+    elapsedSeconds,
+    clientAvailable,
+    isActive,
+    start,
+    end,
+    dismiss,
+    reset,
+    bestEffortUnloadCleanup,
+  };
+}

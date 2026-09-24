@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useLocation } from "wouter";
 import { CrmLayout } from "./CrmLayout";
 import { Plus, X, Trash2, Edit2, Check, DollarSign, Calendar, User, CreditCard, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const token = () => localStorage.getItem("adminToken") || "";
+import { adminFetch } from "@/lib/adminFetch";
+import { type Load, failureReason, readAdminResource, responseFailureReason } from "@/lib/adminLoad";
+import { Figure, LoadFailure } from "@/components/crm/LoadState";
+import { useConfirmDialog } from "@/components/crm/ConfirmDialog";
+import { refusalMessage } from "@/components/crm/confirmDialogModel";
 
 const TXN_METHODS = [
   { value: "manual_cash", label: "Cash" },
@@ -26,10 +28,12 @@ interface Transaction {
 const STAGES = ["Lead", "Qualified", "Proposal", "Won", "Lost"] as const;
 type Stage = typeof STAGES[number];
 
+// Deal stages follow the ops mint ramp (crmTaxonomy.ts): cool mint/ocean
+// hues carry progress; amber = action pending; green/red stay semantic.
 const STAGE_COLORS: Record<Stage, { bg: string; text: string; border: string; accent: string }> = {
-  Lead:      { bg: "bg-indigo-50",  text: "text-indigo-700",  border: "border-indigo-200", accent: "#6366f1" },
-  Qualified: { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200",    accent: "#0ea5e9" },
-  Proposal:  { bg: "bg-orange-50",  text: "text-orange-700",  border: "border-orange-200", accent: "#f97316" },
+  Lead:      { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200",    accent: "#0ea5e9" },
+  Qualified: { bg: "bg-teal-50",    text: "text-teal-700",    border: "border-teal-200",   accent: "#14b8a6" },
+  Proposal:  { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",  accent: "#f59e0b" },
   Won:       { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",accent: "#10b981" },
   Lost:      { bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",    accent: "#ef4444" },
 };
@@ -59,6 +63,23 @@ interface CreateDealForm {
   name: string; value: string; stage: Stage; closeDate: string; notes: string; leadId: string;
 }
 
+// A body that is not the shape this page expects is a failure too — not a
+// reason to render an empty pipeline.
+function pickDeals(body: unknown): Deal[] | undefined {
+  const list = body && typeof body === "object" ? (body as { deals?: unknown }).deals : undefined;
+  return Array.isArray(list) ? list as Deal[] : undefined;
+}
+
+function pickLeads(body: unknown): Lead[] | undefined {
+  const list = body && typeof body === "object" ? (body as { leads?: unknown }).leads : undefined;
+  return Array.isArray(list) ? list as Lead[] : undefined;
+}
+
+function pickTransactions(body: unknown): Transaction[] | undefined {
+  const list = body && typeof body === "object" ? (body as { transactions?: unknown }).transactions : undefined;
+  return Array.isArray(list) ? list as Transaction[] : undefined;
+}
+
 const emptyForm: CreateDealForm = { name: "", value: "", stage: "Lead", closeDate: "", notes: "", leadId: "" };
 
 function DealCard({ deal, onDragStart, onDelete, onEdit }: {
@@ -72,16 +93,37 @@ function DealCard({ deal, onDragStart, onDelete, onEdit }: {
     <div
       draggable
       onDragStart={() => onDragStart(deal.id)}
-      className="bg-white rounded-xl border border-gray-200 shadow-sm p-3.5 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group select-none"
+      className="bg-white rounded-xl border border-border shadow-sm p-3.5 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group select-none"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="font-semibold text-sm text-foreground leading-snug flex-1">{deal.name}</p>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button onClick={() => onEdit(deal)} className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors">
-            <Edit2 className="w-3 h-3" />
+        {/*
+          Edit and delete used to be `opacity-0 group-hover:opacity-100` at
+          24px. On a touch screen there is no hover, so they were not merely
+          small — they were invisible and unreachable, and a phone user could
+          not edit or delete a deal at all.
+
+          The reveal is now keyed on `(hover: hover)` rather than on screen
+          width: what decides is whether the device can hover, not how wide it
+          is. A hover-capable device keeps the tidy reveal; everything else
+          shows the controls permanently at a 40px target.
+        */}
+        <div className="flex items-center gap-1 shrink-0 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
+          <button
+            type="button"
+            aria-label={`Edit ${deal.name}`}
+            onClick={() => onEdit(deal)}
+            className="w-10 h-10 [@media(hover:hover)]:w-7 [@media(hover:hover)]:h-7 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+          >
+            <Edit2 className="w-4 h-4 [@media(hover:hover)]:w-3 [@media(hover:hover)]:h-3" />
           </button>
-          <button onClick={() => onDelete(deal.id)} className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-red-500 rounded transition-colors">
-            <Trash2 className="w-3 h-3" />
+          <button
+            type="button"
+            aria-label={`Delete ${deal.name}`}
+            onClick={() => onDelete(deal.id)}
+            className="w-10 h-10 [@media(hover:hover)]:w-7 [@media(hover:hover)]:h-7 flex items-center justify-center text-muted-foreground hover:text-red-500 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4 [@media(hover:hover)]:w-3 [@media(hover:hover)]:h-3" />
           </button>
         </div>
       </div>
@@ -103,7 +145,7 @@ function DealCard({ deal, onDragStart, onDelete, onEdit }: {
         )}
       </div>
 
-      <div className="mt-2.5 pt-2 border-t border-gray-100">
+      <div className="mt-2.5 pt-2 border-t border-border/60">
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${col.bg} ${col.text}`}>
           {deal.stage}
         </span>
@@ -113,10 +155,16 @@ function DealCard({ deal, onDragStart, onDelete, onEdit }: {
 }
 
 export default function CrmDealsPage() {
-  const [, navigate] = useLocation();
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The board, the contact list and a deal's payments are three separate
+  // answers, and each one is a `Load`. Before this, a failed request left the
+  // arrays empty and the page reported "0 deals · $0 total value" with every
+  // stage reading "0 / No deals" and no failure message at all — it told the
+  // owner they had no pipeline and no money.
+  const [dealsLoad, setDealsLoad] = useState<Load<Deal[]>>({ status: "loading" });
+  const [leadsLoad, setLeadsLoad] = useState<Load<Lead[]>>({ status: "loading" });
+  const [reloading, setReloading] = useState(false);
+  /** A board action (move, delete) the server refused. */
+  const [boardNotice, setBoardNotice] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateDealForm>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -126,8 +174,7 @@ export default function CrmDealsPage() {
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
   const savingRef = useRef(false);
 
-  const [txns, setTxns] = useState<Transaction[]>([]);
-  const [txnsLoading, setTxnsLoading] = useState(false);
+  const [txnsLoad, setTxnsLoad] = useState<Load<Transaction[]>>({ status: "loading" });
   const [showPayForm, setShowPayForm] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("manual_cash");
@@ -139,18 +186,26 @@ export default function CrmDealsPage() {
   const [stripeLoading, setStripeLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // What actually loaded, or null. Never an empty array standing in for a
+  // request nobody managed to complete.
+  const deals = dealsLoad.status === "ready" ? dealsLoad.data : null;
+  const leads = leadsLoad.status === "ready" ? leadsLoad.data : null;
+  const txns = txnsLoad.status === "ready" ? txnsLoad.data : null;
+
+  /** Apply a local change to the board, only when there is a board to change. */
+  const updateDeals = (fn: (prev: Deal[]) => Deal[]) =>
+    setDealsLoad(prev => (prev.status === "ready" ? { status: "ready", data: fn(prev.data) } : prev));
+
   const loadTxns = useCallback(async (dealId: number) => {
-    setTxnsLoading(true);
-    try {
-      const r = await fetch(`/api/crm/deals/${dealId}/transactions`, { headers: { Authorization: `Bearer ${token()}` } });
-      const d = await r.json() as { transactions: Transaction[] };
-      setTxns(d.transactions || []);
-    } finally {
-      setTxnsLoading(false);
-    }
+    setTxnsLoad({ status: "loading" });
+    setTxnsLoad(await readAdminResource(`/api/crm/deals/${dealId}/transactions`, pickTransactions));
   }, []);
 
-  const totalReceived = txns.filter(t => t.status === "completed").reduce((s, t) => s + Number(t.amount), 0);
+  // Money actually received, or null. A flat "$0.00" for a read that failed
+  // told an owner a client had paid nothing when nobody had managed to ask.
+  const totalReceived = txns
+    ? txns.filter(t => t.status === "completed").reduce((s, t) => s + Number(t.amount), 0)
+    : null;
 
   const recordPayment = async () => {
     if (!editDeal) return;
@@ -158,20 +213,24 @@ export default function CrmDealsPage() {
     setPaySaving(true);
     setPayError("");
     try {
-      const res = await fetch(`/api/crm/deals/${editDeal.id}/transactions/manual`, {
+      const res = await adminFetch(`/api/crm/deals/${editDeal.id}/transactions/manual`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: payAmount, method: payMethod,
           receivedAt: payReceivedAt || undefined,
           notes: payNotes || undefined,
         }),
       });
-      const d = await res.json().catch(() => ({})) as { error?: string; transaction?: Transaction };
-      if (!res.ok) { setPayError(d.error || "Failed to record payment."); return; }
-      setTxns(prev => [d.transaction as Transaction, ...prev]);
+      if (!res.ok) { setPayError(`Payment not recorded. ${await responseFailureReason(res)}`); return; }
+      const d = await res.json().catch(() => ({})) as { transaction?: Transaction };
+      if (d.transaction) {
+        const added = d.transaction;
+        setTxnsLoad(prev => (prev.status === "ready" ? { status: "ready", data: [added, ...prev.data] } : prev));
+      }
       setShowPayForm(false);
       setPayAmount(""); setPayNotes(""); setPayReceivedAt(""); setPayMethod("manual_cash");
+    } catch {
+      setPayError(`Payment not recorded. ${failureReason(null)}`);
     } finally {
       setPaySaving(false);
     }
@@ -182,15 +241,20 @@ export default function CrmDealsPage() {
     setStripeLoading(true);
     setPayError("");
     try {
-      const res = await fetch(`/api/crm/deals/${editDeal.id}/transactions/stripe-checkout`, {
+      const res = await adminFetch(`/api/crm/deals/${editDeal.id}/transactions/stripe-checkout`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const d = await res.json().catch(() => ({})) as { error?: string; url?: string; transaction?: Transaction };
-      if (!res.ok || !d.url) { setPayError(d.error || "Failed to create payment link."); return; }
+      if (!res.ok) { setPayError(`Payment link not created. ${await responseFailureReason(res)}`); return; }
+      const d = await res.json().catch(() => ({})) as { url?: string; transaction?: Transaction };
+      if (!d.url) { setPayError("Payment link not created. The server's answer was not in the expected shape."); return; }
       setStripeUrl(d.url);
-      setTxns(prev => [d.transaction as Transaction, ...prev]);
+      if (d.transaction) {
+        const added = d.transaction;
+        setTxnsLoad(prev => (prev.status === "ready" ? { status: "ready", data: [added, ...prev.data] } : prev));
+      }
+    } catch {
+      setPayError(`Payment link not created. ${failureReason(null)}`);
     } finally {
       setStripeLoading(false);
     }
@@ -204,20 +268,21 @@ export default function CrmDealsPage() {
     } catch { /* ignore */ }
   };
 
+  // Each part keeps its own answer: the board can load while the contact list
+  // fails, and the page says so instead of silently offering no contacts.
+  // (The previous version returned early on a 401 and left the page spinning
+  // for ever.)
   const load = useCallback(async () => {
-    if (!token()) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    setLoading(true);
-    const [dealsRes, leadsRes] = await Promise.all([
-      fetch("/api/crm/deals", { headers: { Authorization: `Bearer ${token()}` } }),
-      fetch("/api/crm/leads", { headers: { Authorization: `Bearer ${token()}` } }),
+    setReloading(true);
+    setBoardNotice("");
+    const [nextDeals, nextLeads] = await Promise.all([
+      readAdminResource("/api/crm/deals", pickDeals),
+      readAdminResource("/api/crm/leads", pickLeads),
     ]);
-    if (dealsRes.status === 401) { navigate(`/admin?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-    const dealsData = await dealsRes.json() as { deals: Deal[] };
-    const leadsData = await leadsRes.json() as { leads: Lead[] };
-    setDeals(dealsData.deals || []);
-    setLeads(leadsData.leads || []);
-    setLoading(false);
-  }, [navigate]);
+    setDealsLoad(nextDeals);
+    setLeadsLoad(nextLeads);
+    setReloading(false);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -240,7 +305,7 @@ export default function CrmDealsPage() {
     });
     setFormError("");
     setShowCreate(true);
-    setTxns([]);
+    setTxnsLoad({ status: "loading" });
     setShowPayForm(false);
     setStripeUrl("");
     setPayError("");
@@ -263,67 +328,112 @@ export default function CrmDealsPage() {
         leadId: form.leadId ? Number(form.leadId) : null,
       };
       const res = editDeal
-        ? await fetch(`/api/crm/deals/${editDeal.id}`, {
+        ? await adminFetch(`/api/crm/deals/${editDeal.id}`, {
             method: "PATCH",
-            headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
             body: JSON.stringify(body),
           })
-        : await fetch("/api/crm/deals", {
+        : await adminFetch("/api/crm/deals", {
             method: "POST",
-            headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
       if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        setFormError(d.error || "Failed to save deal.");
+        setFormError(`Deal not saved. ${await responseFailureReason(res)}`);
       } else {
         setShowCreate(false);
         setForm(emptyForm);
         setEditDeal(null);
         load();
       }
+    } catch {
+      setFormError(`Deal not saved. ${failureReason(null)}`);
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
 
-  const deleteDeal = async (id: number) => {
-    if (!confirm("Delete this deal?")) return;
-    await fetch(`/api/crm/deals/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token()}` },
+  const confirmation = useConfirmDialog();
+
+  // Both meanings kept: the dialog says what will be lost, and `refusalMessage`
+  // means a delete the server refused never looks like one that worked. The
+  // board list is a Load now, so the row is removed through `updateDeals`.
+  const deleteDeal = (id: number) => {
+    const deal = deals?.find(d => d.id === id);
+    if (!deal) return;
+    void confirmation.ask({
+      title: `Delete the deal "${deal.name}"?`,
+      description: `It comes off the board and out of every pipeline total, including the ${fmt(deal.value)} it carries. This cannot be undone.`,
+      consequences: [
+        "Payments, quotes and invoices recorded against it are not deleted.",
+      ],
+      tone: "destructive",
+      confirmLabel: "Delete deal",
+      busyLabel: "Deleting…",
+      cancelLabel: "Keep deal",
+      action: async () => {
+        const res = await adminFetch(`/api/crm/deals/${id}`, { method: "DELETE" });
+        // The old path removed the card whatever the server answered, so a
+        // refused delete looked exactly like a successful one until a reload.
+        if (!res.ok) throw new Error(await refusalMessage(res, "That deal could not be deleted."));
+        updateDeals(d => d.filter(x => x.id !== id));
+      },
     });
-    setDeals(d => d.filter(x => x.id !== id));
   };
 
+  // The card moves at once, but a refused move is put back where it was and
+  // said out loud. Leaving it in the new column showed the operator a stage
+  // change that never happened.
   const handleDrop = async (targetStage: Stage) => {
-    if (dragId === null) return;
-    const deal = deals.find(d => d.id === dragId);
+    if (dragId === null || deals === null) return;
+    const movedId = dragId;
+    const deal = deals.find(d => d.id === movedId);
     if (!deal || deal.stage === targetStage) { setDragId(null); setDragOverStage(null); return; }
-    setDeals(prev => prev.map(d => d.id === dragId ? { ...d, stage: targetStage } : d));
+    const previousStage = deal.stage;
+    const revert = () => updateDeals(prev => prev.map(d => d.id === movedId ? { ...d, stage: previousStage } : d));
+    updateDeals(prev => prev.map(d => d.id === movedId ? { ...d, stage: targetStage } : d));
     setDragId(null);
     setDragOverStage(null);
-    await fetch(`/api/crm/deals/${dragId}`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ stage: targetStage }),
-    }).catch(() => load());
+    setBoardNotice("");
+    try {
+      const res = await adminFetch(`/api/crm/deals/${movedId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ stage: targetStage }),
+      });
+      if (!res.ok) {
+        revert();
+        setBoardNotice(`"${deal.name}" was not moved to ${targetStage}. ${await responseFailureReason(res)}`);
+      }
+    } catch {
+      revert();
+      setBoardNotice(`"${deal.name}" was not moved to ${targetStage}. ${failureReason(null)}`);
+    }
   };
 
-  const columnDeals = (stage: Stage) => deals.filter(d => d.stage === stage);
-  const columnValue = (stage: Stage) => columnDeals(stage).reduce((s, d) => s + Number(d.value), 0);
+  const columnDeals = (list: Deal[], stage: Stage) => list.filter(d => d.stage === stage);
 
   return (
     <CrmLayout>
+      {confirmation.element}
       <div className="flex flex-col h-[calc(100vh-48px)]">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center gap-3 shrink-0">
+        <div className="bg-white border-b border-border px-6 py-3.5 flex items-center gap-3 shrink-0">
           <div>
             <h1 className="font-bold text-foreground">Deals Kanban</h1>
             <p className="text-xs text-muted-foreground">Track revenue opportunities and move deals through your sales stages.</p>
+            {/*
+              The figures exist only when the board behind them loaded. This
+              line is where the page used to say "0 deals · $0 total value"
+              about a request that had failed.
+            */}
             <p className="text-xs text-muted-foreground/60 mt-0.5">
-              {deals.length} deal{deals.length !== 1 ? "s" : ""} · {fmt(deals.reduce((s, d) => s + Number(d.value), 0))} total value
+              {deals ? (
+                <>{deals.length} deal{deals.length !== 1 ? "s" : ""} · {fmt(deals.reduce((s, d) => s + Number(d.value), 0))} total value</>
+              ) : (
+                <>
+                  <Figure value={null} loading={dealsLoad.status === "loading"} /> deals ·{" "}
+                  <Figure value={null} loading={dealsLoad.status === "loading"} /> total value
+                </>
+              )}
             </p>
           </div>
           <div className="ml-auto">
@@ -333,19 +443,46 @@ export default function CrmDealsPage() {
           </div>
         </div>
 
+        {/* A board action the server refused. */}
+        {boardNotice && (
+          <p role="alert" className="shrink-0 mx-5 mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-muted-foreground">
+            <span className="min-w-0 break-words">{boardNotice}</span>
+          </p>
+        )}
+
         {/* Kanban Board */}
-        {loading ? (
-          <div className="flex-1 flex gap-4 p-5 overflow-x-auto">
+        {dealsLoad.status === "loading" ? (
+          <div className="flex-1 flex gap-4 p-5 overflow-x-auto" role="status" aria-live="polite">
+            <span className="sr-only">Loading deals…</span>
             {STAGES.map(s => (
-              <div key={s} className="w-64 shrink-0 bg-gray-100 rounded-xl animate-pulse h-48" />
+              <div key={s} className="w-64 shrink-0 bg-muted rounded-xl animate-pulse h-48" />
             ))}
+          </div>
+        ) : deals === null ? (
+          /*
+            No board at all, rather than five columns each reading "0 / No
+            deals". An empty pipeline and an unanswered request must never
+            look alike — and a 401, 403, 404, 5xx or unreachable server each
+            reads differently here, because the words come from the response.
+          */
+          <div className="flex-1 overflow-y-auto p-5">
+            <LoadFailure
+              what="Deals"
+              reason={dealsLoad.status === "error" ? dealsLoad.reason : ""}
+              onRetry={() => { void load(); }}
+              retrying={reloading}
+            >
+              <p className="mt-2 text-sm text-muted-foreground">
+                No deal count, stage tally or total value is shown while this is unavailable — the pipeline may well be full.
+              </p>
+            </LoadFailure>
           </div>
         ) : (
           <div className="flex-1 flex gap-4 p-5 overflow-x-auto overflow-y-hidden">
             {STAGES.map(stage => {
               const col = STAGE_COLORS[stage];
-              const stageDeals = columnDeals(stage);
-              const total = columnValue(stage);
+              const stageDeals = columnDeals(deals, stage);
+              const total = stageDeals.reduce((s, d) => s + Number(d.value), 0);
               const isDragOver = dragOverStage === stage;
               return (
                 <div
@@ -390,7 +527,7 @@ export default function CrmDealsPage() {
                   {/* Cards area */}
                   <div
                     className={`flex-1 overflow-y-auto p-2 space-y-2 rounded-b-xl border border-t-0 ${col.border} transition-colors ${
-                      isDragOver ? `${col.bg} opacity-80` : "bg-gray-50/80"
+                      isDragOver ? `${col.bg} opacity-80` : "bg-muted/80"
                     }`}
                     style={{ minHeight: "120px" }}
                   >
@@ -433,7 +570,7 @@ export default function CrmDealsPage() {
           onClick={() => { setShowCreate(false); setEditDeal(null); }}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
               <h2 className="font-semibold text-foreground">{editDeal ? "Edit Deal" : "New Deal"}</h2>
               <button onClick={() => { setShowCreate(false); setEditDeal(null); }} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
@@ -450,7 +587,7 @@ export default function CrmDealsPage() {
                   value={form.name}
                   onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setFormError(""); }}
                   className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${
-                    formError && !form.name ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-gray-200 focus:ring-foreground/20"
+                    formError && !form.name ? "border-red-300 focus:ring-red-200 bg-red-50" : "border-input focus:ring-foreground/20"
                   }`}
                   placeholder="e.g. Website Redesign — Acme Corp"
                 />
@@ -461,7 +598,7 @@ export default function CrmDealsPage() {
                   <input
                     type="number" min="0" value={form.value}
                     onChange={e => setForm(f => ({ ...f, value: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                     placeholder="0"
                   />
                 </div>
@@ -470,7 +607,7 @@ export default function CrmDealsPage() {
                   <select
                     value={form.stage}
                     onChange={e => setForm(f => ({ ...f, stage: e.target.value as Stage }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white"
                   >
                     {STAGES.map(s => <option key={s}>{s}</option>)}
                   </select>
@@ -481,18 +618,27 @@ export default function CrmDealsPage() {
                 <select
                   value={form.leadId}
                   onChange={e => setForm(f => ({ ...f, leadId: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                  disabled={leads === null}
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none bg-white disabled:opacity-60"
                 >
                   <option value="">— No contact linked —</option>
-                  {leads.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  {(leads ?? []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
+                {/* An empty picker would say "you have no contacts". Say which it is. */}
+                {leads === null && (
+                  <p className="mt-1 text-xs text-muted-foreground break-words">
+                    {leadsLoad.status === "loading"
+                      ? "Loading contacts…"
+                      : `Contacts could not be loaded, so none can be linked. ${leadsLoad.status === "error" ? leadsLoad.reason : ""}`}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-1">Expected Close Date</label>
                 <input
                   type="date" value={form.closeDate}
                   onChange={e => setForm(f => ({ ...f, closeDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
               <div>
@@ -500,22 +646,27 @@ export default function CrmDealsPage() {
                 <textarea
                   rows={2} value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+                  className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
                   placeholder="Optional notes…"
                 />
               </div>
 
               {editDeal && (
-                <div className="pt-3 border-t border-gray-100 space-y-2.5">
+                <div className="pt-3 border-t border-border/60 space-y-2.5">
                   <div className="flex items-center justify-between flex-wrap gap-1.5">
                     <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       <CreditCard className="w-3.5 h-3.5 text-muted-foreground" /> Payments
                     </p>
-                    {!txnsLoading && (
-                      <p className="text-xs font-bold text-emerald-700">
-                        Total received: {`$${totalReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                      </p>
-                    )}
+                    {/* "$0.00" for a payments read that failed is a claim about a client's account. */}
+                    <p className="text-xs font-bold text-emerald-700">
+                      Total received:{" "}
+                      <Figure
+                        value={totalReceived === null
+                          ? null
+                          : `$${totalReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        loading={txnsLoad.status === "loading"}
+                      />
+                    </p>
                   </div>
 
                   {payError && (
@@ -553,14 +704,14 @@ export default function CrmDealsPage() {
                   )}
 
                   {showPayForm && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                    <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Amount ($)</label>
                           <input
                             type="number" min="0" value={payAmount}
                             onChange={e => setPayAmount(e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                            className="w-full px-2.5 py-1.5 border border-input rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
                             placeholder="0.00"
                           />
                         </div>
@@ -569,7 +720,7 @@ export default function CrmDealsPage() {
                           <select
                             value={payMethod}
                             onChange={e => setPayMethod(e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none bg-white"
+                            className="w-full px-2.5 py-1.5 border border-input rounded-lg text-xs focus:outline-none bg-white"
                           >
                             {TXN_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                           </select>
@@ -580,7 +731,7 @@ export default function CrmDealsPage() {
                         <input
                           type="date" value={payReceivedAt}
                           onChange={e => setPayReceivedAt(e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                          className="w-full px-2.5 py-1.5 border border-input rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
                         />
                       </div>
                       <div>
@@ -588,7 +739,7 @@ export default function CrmDealsPage() {
                         <input
                           value={payNotes}
                           onChange={e => setPayNotes(e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                          className="w-full px-2.5 py-1.5 border border-input rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
                           placeholder="Optional…"
                         />
                       </div>
@@ -606,10 +757,19 @@ export default function CrmDealsPage() {
                     </div>
                   )}
 
-                  {!txnsLoading && txns.length > 0 && (
+                  {txnsLoad.status === "error" && (
+                    <LoadFailure
+                      what="Payments"
+                      reason={txnsLoad.reason}
+                      variant="inline"
+                      onRetry={() => { if (editDeal) void loadTxns(editDeal.id); }}
+                    />
+                  )}
+
+                  {txns && txns.length > 0 && (
                     <div className="space-y-1 max-h-32 overflow-y-auto">
                       {txns.map(t => (
-                        <div key={t.id} className="flex items-center justify-between text-[11px] px-2.5 py-1.5 bg-white border border-gray-100 rounded-lg">
+                        <div key={t.id} className="flex items-center justify-between text-[11px] px-2.5 py-1.5 bg-white border border-border/60 rounded-lg">
                           <span className="text-muted-foreground truncate">
                             {t.method === "stripe" ? "Stripe" : TXN_METHODS.find(m => m.value === t.method)?.label || t.method}
                           </span>
@@ -617,7 +777,7 @@ export default function CrmDealsPage() {
                           <span className={`shrink-0 px-1.5 py-0.5 rounded-full font-semibold ${
                             t.status === "completed" ? "bg-emerald-100 text-emerald-700"
                               : t.status === "pending" ? "bg-amber-100 text-amber-700"
-                              : "bg-gray-100 text-gray-600"
+                              : "bg-muted text-muted-foreground"
                           }`}>{t.status}</span>
                         </div>
                       ))}

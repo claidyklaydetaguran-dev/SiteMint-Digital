@@ -50,6 +50,16 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      // @workspace/discovery-contract is not a compiled package — point Vite
+      // directly at its TypeScript source so the dev server and production
+      // build can resolve it without a separate build step. The package's own
+      // zod/v4 imports resolve fine via esbuild at runtime (zod 3.25.x
+      // exposes ./v4 in its exports map). TypeScript uses tsconfig paths
+      // for type-checking; this alias is for Vite/esbuild only.
+      "@workspace/discovery-contract": path.resolve(
+        import.meta.dirname,
+        "../../lib/discovery-contract/src/index.ts",
+      ),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -66,10 +76,23 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Local-only: on Replit an outer proxy maps /api to the api-server, so
+    // dev outside Replit has no backend unless this opt-in target is set
+    // (e.g. API_PROXY_TARGET=http://localhost:8080). Unset → unchanged.
+    ...(process.env.API_PROXY_TARGET
+      ? { proxy: { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: false } } }
+      : {}),
   },
   preview: {
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    // Same opt-in as `server` above. Without this the *built* application
+    // cannot reach a backend locally, so the only thing verifiable outside
+    // Replit was the dev server — and a dev-server-only check cannot catch a
+    // defect that only appears in the built chunk graph.
+    ...(process.env.API_PROXY_TARGET
+      ? { proxy: { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: false } } }
+      : {}),
   },
 });
