@@ -470,6 +470,69 @@ export async function listAppointmentRequests(firmId: number): Promise<Schedulin
     .limit(200);
 }
 
+/**
+ * One request by its durable public id, firm-scoped. The list above stops at
+ * the 200 newest, so looking a request up through it made an older request
+ * "not found" to approve, cancel, reschedule and the voice tools alike.
+ */
+export async function findAppointmentRequestByPublicId(
+  firmId: number,
+  publicId: string,
+): Promise<SchedulingAppointmentRequest | undefined> {
+  if (!/^[0-9a-fA-F-]{8,64}$/.test(publicId)) return undefined;
+  const [row] = await db
+    .select()
+    .from(schedulingAppointmentRequests)
+    .where(and(eq(schedulingAppointmentRequests.firmId, firmId), eq(schedulingAppointmentRequests.publicId, publicId)))
+    .limit(1);
+  return row;
+}
+
+/**
+ * What now overlaps one request's time, other than the request itself: other
+ * live requests, blocked periods, and busy time in the connected calendar.
+ * Used before approving an older pending request, whose time may have filled
+ * up since it was asked for. A calendar that cannot be read throws, so an
+ * approval is never granted on the strength of a read that did not happen.
+ */
+export async function countConflictsForRequest(
+  firmId: number,
+  request: Pick<SchedulingAppointmentRequest, "id" | "requestedStartAt" | "requestedEndAt">,
+  now: Date,
+  freeBusyProvider?: FreeBusyProvider,
+): Promise<number> {
+  const start = request.requestedStartAt;
+  const end = request.requestedEndAt;
+  const [others, blocked, busy] = await Promise.all([
+    db
+      .select({ id: schedulingAppointmentRequests.id })
+      .from(schedulingAppointmentRequests)
+      .where(
+        and(
+          eq(schedulingAppointmentRequests.firmId, firmId),
+          sql`${schedulingAppointmentRequests.id} <> ${request.id}`,
+          inArray(schedulingAppointmentRequests.status, BLOCKING_STATUSES),
+          or(isNull(schedulingAppointmentRequests.holdExpiresAt), gte(schedulingAppointmentRequests.holdExpiresAt, now)),
+          sql`${schedulingAppointmentRequests.requestedStartAt} < ${end}`,
+          sql`${schedulingAppointmentRequests.requestedEndAt} > ${start}`,
+        ),
+      ),
+    db
+      .select({ id: schedulingBlockedPeriods.id })
+      .from(schedulingBlockedPeriods)
+      .where(
+        and(
+          eq(schedulingBlockedPeriods.firmId, firmId),
+          sql`${schedulingBlockedPeriods.startsAt} < ${end}`,
+          sql`${schedulingBlockedPeriods.endsAt} > ${start}`,
+        ),
+      ),
+    freeBusyProvider ? freeBusyProvider.getBusyRanges(firmId, start, end) : Promise.resolve([]),
+  ]);
+  const busyOverlaps = busy.filter((b) => b.startUtc < end && b.endUtc > start).length;
+  return others.length + blocked.length + busyOverlaps;
+}
+
 /** Firm-scoped cancellation by the durable public_id — never a bare internal id, and never usable cross-firm. */
 export async function cancelAppointmentRequestByPublicId(firmId: number, publicId: string): Promise<boolean> {
   const now = new Date();

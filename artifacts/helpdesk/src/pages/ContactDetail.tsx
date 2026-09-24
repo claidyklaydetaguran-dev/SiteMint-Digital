@@ -24,6 +24,7 @@ import {
 } from "@/pages/contacts/contactsContract";
 import { relativeTime } from "@/lib/conversationUi";
 import { ContactFormDialog } from "@/pages/contacts/ContactFormDialog";
+import { ContactTexts } from "@/pages/contacts/ContactTexts";
 import { FORM } from "@/pages/contacts/contactsContract";
 import "@/styles/v2-dashboard.css";
 
@@ -158,6 +159,8 @@ export default function ContactDetail() {
           </ul>
         )}
       </section>
+
+      <ContactTexts contactId={params.id} />
 
       {/* Reached through this contact's own calls by foreign key — a saved
           message matches on (firm, call id), never on a caller's name. */}

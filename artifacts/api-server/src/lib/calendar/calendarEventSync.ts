@@ -46,6 +46,15 @@ export interface CalendarSyncDeps {
    * disbelieving something it had just done itself.
    */
   markConnectionUsed?: (firmId: number) => Promise<void>;
+  /**
+   * How many things now overlap this request's time, other than itself: other
+   * live requests, blocked periods, and busy time in the connected calendar.
+   * An older pending request can have been overtaken since it was asked for;
+   * approving it blind would double-book the business. Throws when the
+   * calendar cannot be read. Optional so existing test doubles keep working;
+   * production always supplies it.
+   */
+  countConflicts?: (firmId: number, request: SchedulingAppointmentRequest) => Promise<number>;
   openIssue: (input: {
     firmId: number;
     level: "warning" | "error";
@@ -71,7 +80,11 @@ export type ApproveOutcome =
    * retried until reconciliation has looked.
    */
   | "event_write_uncertain"
-  | "conflict_after_write";
+  | "conflict_after_write"
+  /** Something now occupies this time (another booking, a blocked period, or the calendar). Nothing was written. */
+  | "slot_conflict"
+  /** The calendar could not be read to check for conflicts. Nothing was written; try again. */
+  | "conflict_check_failed";
 
 /**
  * Approves one request into 'booked': writes the calendar event, then stamps
@@ -93,6 +106,19 @@ export async function approveRequestToBooked(
 
   const connection = await deps.getActiveConnection(firmId);
   if (!connection) return "no_connection";
+
+  if (deps.countConflicts) {
+    let conflicts: number;
+    try {
+      conflicts = await deps.countConflicts(firmId, request);
+    } catch {
+      return "conflict_check_failed";
+    }
+    if (conflicts > 0) {
+      deps.logger?.("calendar_approval_conflict", { firmId, requestId: request.id, conflicts });
+      return "slot_conflict";
+    }
+  }
 
   const written = await deps.writer.insertEvent(connection, {
     requestPublicId: request.publicId,
@@ -303,20 +329,32 @@ export async function cancelBookedRequest(
   return { outcome: "cancelled", calendar };
 }
 
-export type RescheduleOutcome = "not_found" | "not_booked" | "slot_unavailable" | "conflict" | "rescheduled";
+export type RescheduleOutcome =
+  | "not_found"
+  | "not_booked"
+  | "slot_unavailable"
+  /** The new time could not be confirmed in the calendar; the original appointment is unchanged. */
+  | "not_confirmed"
+  | "conflict"
+  | "rescheduled";
 
 /**
- * Reschedules one BOOKED request using the replacement-request model: a new
- * fully-validated pending_review request at the new time, then the old row's
- * status-guarded booked→rescheduled transition, then best-effort removal of
- * the old event. Ordering is deliberate:
- *   - replacement first, so an unavailable slot changes nothing at all;
- *   - the guarded transition second, so a lost race discards the replacement
- *     and leaves the winner's state untouched — never a partial move;
- *   - event removal last, so a provider failure degrades to an open issue
- *     plus reconciliation, never a lost cancellation.
- * The replacement goes through the normal approve path afterwards; nothing
- * here writes a calendar event.
+ * Reschedules one BOOKED request. The original appointment and its calendar
+ * event stay exactly as they are until the new time is itself booked:
+ *
+ *   1. a replacement request at the new time, availability-validated like any
+ *      new request — an unavailable slot changes nothing at all;
+ *   2. the replacement approved into the calendar — if that is not a
+ *      confirmed booking, the replacement is withdrawn and the caller still
+ *      has the appointment they had (outcome not_confirmed);
+ *   3. only then the original moves booked→rescheduled (status-guarded). If
+ *      it raced away — cancelled meanwhile — the new booking is cancelled
+ *      again, so one intent never leaves two appointments;
+ *   4. the original's event removed last, best-effort, with reconciliation as
+ *      the backstop.
+ *
+ * The earlier order released the original first and left the new time merely
+ * pending: a declined or overtaken replacement left the caller with nothing.
  */
 export async function rescheduleBookedRequest(
   firmId: number,
@@ -327,6 +365,7 @@ export async function rescheduleBookedRequest(
   outcome: RescheduleOutcome;
   calendar?: CancelSyncOutcome;
   replacement?: { publicId: string; startUtc: Date; endUtc: Date };
+  reason?: ApproveOutcome;
 }> {
   const request = await deps.findRequest(firmId, publicId);
   if (!request) return { outcome: "not_found" };
@@ -335,13 +374,29 @@ export async function rescheduleBookedRequest(
   const replacement = await deps.submitReplacement(firmId, request, newStartUtc);
   if (!replacement.ok) return { outcome: "slot_unavailable" };
 
-  const moved = await deps.markRescheduled(firmId, request.id);
-  if (!moved) {
+  let approved: ApproveOutcome;
+  try {
+    approved = await approveRequestToBooked(firmId, replacement.publicId, deps);
+  } catch {
+    approved = "event_write_failed";
+  }
+  if (approved !== "booked") {
+    // An unanswered write may still have landed; the pending replacement is
+    // withdrawn either way and reconciliation settles any stray event.
     try {
       await deps.discardReplacement(firmId, replacement.publicId);
     } catch {
-      // A lingering pending_review replacement is inert and operator-visible;
-      // losing it here must not mask the conflict outcome.
+      /* an inert pending row is operator-visible; the original is untouched */
+    }
+    return { outcome: "not_confirmed", reason: approved };
+  }
+
+  const moved = await deps.markRescheduled(firmId, request.id);
+  if (!moved) {
+    try {
+      await cancelBookedRequest(firmId, replacement.publicId, deps);
+    } catch {
+      /* reconciliation removes an orphaned event */
     }
     return { outcome: "conflict" };
   }

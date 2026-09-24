@@ -49,6 +49,17 @@ Branch: `claude/receptionist-operational-0925` (from
 | 2026-09-25 ~06:00 | all | Release candidate 5dcae921: Linux gate (typecheck, full test chain, api/helpdesk/web-agency builds, 20-variant voice matrix) and CI run 36051407581 | local Linux + GitHub CI | — | all green | all green | 5dcae921 |
 | 2026-09-25 ~06:10 | all | Production workspace: backup ref `backup/before-operational-0925` (= 7dd0b854 tree), checked out 5dcae921 as `release/operational-0925`, built api-server dist (new code present by grep) | production workspace (not published) | — | built | built; NOT published — deploy step stopped by the session permission classifier, awaiting owner | 5dcae921 |
 
+### Re-verification 2026-09-25 (session 2, before any change)
+
+| Check | Observed |
+|---|---|
+| Git | PR #36 open, head 0aff7620 (docs) on release candidate 5dcae921 |
+| Production code | Still the 7dd0b854 release: readiness "published" check reads "Publish your receptionist." (the new code would name the missing configuration); `provider-status.artifactPolicy = unknown` |
+| Production data | Assistant 1 still `draft`, not provider-linked; subscription `source: none` |
+| Publish | Nothing was published since 7dd0b854. The workspace is on `release/operational-0925` (5dcae921) with the API dist built, unpublished |
+| Vapi (production org) | Unchanged: one number +1 609 307 2692 → hand-built assistant ec5ae808 "AI Receptionist", no server URL; assistants "AI Receptionist", "Riley"; one credential, SiteMint production webhook HMAC (ab8f2204…) |
+| New finding | The app's **Configurations** (non-secret) panel holds `STRIPE_WEBHOOK_SECRET` with a CI placeholder value. If the deployment uses it, the checkout webhook signature is verifiable with a public string. Tracked as H-11 |
+
 ## 3. Issue register
 
 Severity: **C** critical, **H** high, **M** medium. Source "audit" = found by
@@ -77,6 +88,7 @@ is fixed or closed.
 | M-2 | M | 3 | `findRequest` scans only the 200 newest requests | audit | Open |
 | M-3 | M | 3 | Expired holds are never expired | audit | Open |
 | M-4 | M | 5 | Deprecated `/receptionist/voice/transfer-destinations` routes still live | audit | Open |
+| H-11 | H | 7 | `STRIPE_WEBHOOK_SECRET` appears as a non-secret configuration holding a CI placeholder value in the production app | Replit Secrets pane (value visible in the Configurations list) | Open: owner replaces it with the real Stripe endpoint secret as a Secret |
 | M-5 | M | 3 | Dashboard approval of an older pending request does not re-check the calendar | audit | Open |
 | M-6 | M | 6 | No recording retention, deletion or access rule existed | audit, confirmed | Fixed on branch: required disclosure/retention/access when policy is `full`; owner Delete; hourly retention sweep. Production stays `none` |
 | M-7 | M | 4 | Inbound replies other than STOP/START are not stored or shown | audit | Open (needs a table: reviewed migration) |

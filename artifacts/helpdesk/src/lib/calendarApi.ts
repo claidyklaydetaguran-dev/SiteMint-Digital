@@ -22,11 +22,15 @@ export type ApproveReason =
   | "event_write_failed"
   /** The calendar never confirmed; nothing was retried. */
   | "event_write_uncertain"
-  | "conflict_after_write";
+  | "conflict_after_write"
+  /** Something now occupies that time; nothing was written. */
+  | "slot_conflict"
+  /** The calendar couldn't be read to check; nothing was written. */
+  | "conflict_check_failed";
 
 export type CancelReason = "not_found" | "not_booked" | "conflict";
 
-export type RescheduleReason = "not_found" | "not_booked" | "slot_unavailable" | "conflict";
+export type RescheduleReason = "not_found" | "not_booked" | "slot_unavailable" | "not_confirmed" | "conflict";
 
 export type ReconcileReason = "disabled";
 

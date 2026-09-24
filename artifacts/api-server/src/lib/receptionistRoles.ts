@@ -51,6 +51,7 @@ const STAFF_WRITES = new Set<string>([
   "PATCH /receptionist/voice/messages/:id",
   "POST /receptionist/contacts",
   "PATCH /receptionist/contacts/:id",
+  "POST /receptionist/contacts/:id/texts/read",
   "PUT /receptionist/voice/calls/:callId/review",
   "DELETE /receptionist/voice/calls/:callId/review",
   "POST /receptionist/voice/issues/:id/resolve",

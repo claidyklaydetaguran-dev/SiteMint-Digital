@@ -26,6 +26,7 @@ import {
   contactDisplayName,
   dispositionLabel,
   sourceLabel,
+  unreadTextsLabel,
 } from "@/pages/contacts/contactsContract";
 import { ContactFormDialog } from "@/pages/contacts/ContactFormDialog";
 import "@/styles/v2-dashboard.css";
@@ -45,6 +46,7 @@ function ContactRow({ contact }: { contact: ContactSummary }) {
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium text-foreground">{contactDisplayName(contact)}</span>
         {contact.optedOut && <Badge variant="outline">{LIST.optedOutChip}</Badge>}
+        {(contact.unreadTexts ?? 0) > 0 && <Badge>{unreadTextsLabel(contact.unreadTexts ?? 0)}</Badge>}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{contact.phone}</p>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -135,6 +137,7 @@ export default function Contacts() {
                       </Link>
                       <div className="text-xs text-muted-foreground">{contact.phone}</div>
                       {contact.optedOut && <Badge variant="outline" className="mt-1">{LIST.optedOutChip}</Badge>}
+                      {(contact.unreadTexts ?? 0) > 0 && <Badge className="mt-1">{unreadTextsLabel(contact.unreadTexts ?? 0)}</Badge>}
                     </TableCell>
                     <TableCell>{sourceLabel(contact.source)}</TableCell>
                     <TableCell>{contact.lastInteractionAt ? relativeTime(contact.lastInteractionAt) : LIST.never}</TableCell>

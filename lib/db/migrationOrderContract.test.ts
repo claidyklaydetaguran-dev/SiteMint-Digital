@@ -652,8 +652,9 @@ check(
   // email nobody can see afterwards.
   // voice 0014 added voice_policy_acceptances (which Terms and Privacy
   // versions a business accepted, and when).
-  "the committed migrations create exactly thirty-seven domain tables",
-  domainTables.length === 37,
+  // voice 0015 added voice_sms_inbound (texts callers send to a voice number).
+  "the committed migrations create exactly thirty-eight domain tables",
+  domainTables.length === 38,
   domainTables.join(","),
 );
 check(

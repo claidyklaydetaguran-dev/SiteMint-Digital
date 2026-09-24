@@ -66,7 +66,7 @@ export interface EnqueueResult {
 async function enqueue(
   firmId: number,
   toE164: string,
-  kind: "booking_confirmation" | "missed_call_followup",
+  kind: "booking_confirmation" | "missed_call_followup" | "appointment_update",
   body: string,
   dedupeKey: string,
   initialStatus: "queued" | "blocked_no_consent",
@@ -99,6 +99,31 @@ export async function enqueueBookingConfirmation(input: {
     `booking_confirmation:${input.requestPublicId}`,
     "queued",
   );
+}
+
+/**
+ * A text telling the caller the business approved, declined, cancelled or
+ * moved their appointment from the dashboard. Only for a request whose row
+ * records the caller's text consent. A STOP recorded since always wins: this
+ * never re-grants consent over a stop, and the send loop re-checks at send
+ * time. When no ledger row exists yet (the consent was recorded on the
+ * request itself, not by an earlier text), the request's consent is written
+ * to the ledger so the send loop can honour it.
+ */
+export async function enqueueAppointmentUpdate(input: {
+  firmId: number;
+  rawPhone: string | null | undefined;
+  requestConsented: boolean;
+  dedupeKey: string;
+  body: string;
+}): Promise<EnqueueResult & { skipped?: "no_consent" | "stopped" }> {
+  if (!input.requestConsented) return { enqueued: false, skipped: "no_consent" };
+  const normalized = normalizePhoneE164(input.rawPhone);
+  if (!normalized) return { enqueued: false, reason: "unusable_number" };
+  const consent = await getConsent(input.firmId, normalized.e164);
+  if (consent === "stopped") return { enqueued: false, skipped: "stopped" };
+  if (consent === undefined) await recordConsent(input.firmId, normalized.e164, "granted", "booking_consent");
+  return enqueue(input.firmId, normalized.e164, "appointment_update", input.body, input.dedupeKey, "queued");
 }
 
 /**

@@ -191,10 +191,7 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
         types: config.appointmentTypes.map((t) => ({ id: t.id, name: t.name, durationMin: t.durationMin })),
       };
     },
-    findRequestByPublicId: async (firmId, publicId) => {
-      const rows = await repo.listAppointmentRequests(firmId);
-      return rows.find((r) => r.publicId === publicId);
-    },
+    findRequestByPublicId: (firmId, publicId) => repo.findAppointmentRequestByPublicId(firmId, publicId),
     submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId, providerCallId) =>
       repo.submitAppointmentRequest(
         firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, freeBusy, toolCallId, providerCallId,

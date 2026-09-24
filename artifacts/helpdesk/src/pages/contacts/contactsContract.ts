@@ -195,3 +195,58 @@ export function everyRenderableString(): string[] {
     resolvedContactName({ name: null }, null).name,
   ];
 }
+
+/* ── J4: the text thread on a contact ─────────────────────────────────────── */
+
+export const TEXTS = {
+  heading: "Texts",
+  loading: "Loading texts…",
+  failedTitle: "Texts couldn't be loaded",
+  failed: "This is a failed read, not an empty thread. Try again.",
+  empty: "No texts with this contact yet.",
+  fromCaller: "Caller",
+  fromBusiness: "Sent automatically",
+  newLabel: "New",
+  // Honest about what the page cannot do.
+  noReplyNote: "Replies aren't sent from SiteMint. To answer, call or text the caller from your own phone.",
+} as const;
+
+export interface TextStatusSource {
+  direction: "in" | "out";
+  status: string;
+  deliveryStatus: string | null;
+  errorCode: string | null;
+  keyword: "stop" | "start" | "help" | "other" | null;
+}
+
+const NOT_SENT_REASON: Record<string, string> = {
+  daily_cap_reached: "Not sent — the daily text limit was reached.",
+  interrupted: "Not sent — sending was interrupted, and it was not retried so the caller could not get it twice.",
+};
+
+/**
+ * What happened to one text, in words, or null when there is nothing to add.
+ * Only what the provider or SiteMint recorded — "Sent" is never upgraded to
+ * "Delivered" without a delivery report.
+ */
+export function textStatusLabel(m: TextStatusSource): { text: string; tone: "ok" | "waiting" | "problem" } | null {
+  if (m.direction === "in") {
+    if (m.keyword === "stop") return { text: "The caller opted out of texts.", tone: "problem" };
+    if (m.keyword === "start") return { text: "The caller opted back in to texts.", tone: "ok" };
+    if (m.keyword === "help") return { text: "The caller asked for help; the carrier sent its standard reply.", tone: "waiting" };
+    return null;
+  }
+  if (m.status === "blocked_no_consent") return { text: "Not sent — the caller hasn't agreed to texts, or opted out.", tone: "problem" };
+  if (m.status === "failed") {
+    return { text: m.errorCode && NOT_SENT_REASON[m.errorCode] ? NOT_SENT_REASON[m.errorCode] : "Not sent — the text provider refused it.", tone: "problem" };
+  }
+  if (m.status === "queued" || m.status === "sending") return { text: "Waiting to send.", tone: "waiting" };
+  if (m.deliveryStatus === "delivered" || m.deliveryStatus === "read") return { text: "Delivered.", tone: "ok" };
+  if (m.deliveryStatus === "undelivered" || m.deliveryStatus === "failed") return { text: "Not delivered — the carrier couldn't deliver it.", tone: "problem" };
+  return { text: "Sent. No delivery report yet.", tone: "waiting" };
+}
+
+/** J4: the list badge for texts nobody has opened. */
+export function unreadTextsLabel(n: number): string {
+  return n === 1 ? "1 new text" : `${n} new texts`;
+}

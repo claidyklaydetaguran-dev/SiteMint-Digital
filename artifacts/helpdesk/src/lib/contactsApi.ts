@@ -21,6 +21,8 @@ export interface ContactSummary {
   optedOut: boolean;
   callCount: number;
   conversationCount: number;
+  /** J4: texts from this contact nobody has opened yet. Optional for older backends. */
+  unreadTexts?: number;
   /** Optional so a dashboard deployed ahead of its backend still renders. */
   email?: string | null;
   /** Detail only. */
@@ -133,4 +135,31 @@ export function fetchContactDetail(id: string): Promise<ContactDetailResponse | 
     if (err instanceof Error && (err as Error & { status?: number }).status === 404) return undefined;
     throw err;
   });
+}
+
+/** J4: one text in the thread between the business's voice number and a contact. */
+export interface ContactText {
+  direction: "in" | "out";
+  body: string;
+  at: string;
+  /** Outbound: queued | sending | sent | failed | blocked_no_consent. Inbound: received. */
+  status: string;
+  deliveryStatus: string | null;
+  errorCode: string | null;
+  keyword: "stop" | "start" | "help" | "other" | null;
+  unread: boolean;
+}
+
+export function fetchContactTexts(id: string): Promise<{ items: ContactText[]; count: number; unread: number }> {
+  return apiFetch(`/receptionist/contacts/${encodeURIComponent(id)}/texts`);
+}
+
+export async function markContactTextsRead(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/receptionist/contacts/${encodeURIComponent(id)}/texts/read`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (!res.ok) throw Object.assign(new Error(`API ${res.status}`), { status: res.status });
 }

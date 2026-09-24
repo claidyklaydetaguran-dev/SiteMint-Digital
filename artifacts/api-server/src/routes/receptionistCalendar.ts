@@ -41,6 +41,8 @@ import {
   isCalendarWriteEnabled,
 } from "../lib/calendar/calendarEventSync.js";
 import { calendarSyncDeps } from "../lib/calendar/calendarSyncDeps.js";
+import { notifyCallerBestEffort } from "../lib/scheduling/callerUpdates.js";
+import { findAppointmentRequestByPublicId } from "../lib/scheduling/schedulingRepository.js";
 
 const router = Router();
 
@@ -260,6 +262,8 @@ const APPROVE_STATUS: Record<string, number> = {
   // is reconciliation rather than another approval.
   event_write_uncertain: 409,
   conflict_after_write: 409,
+  slot_conflict: 409,
+  conflict_check_failed: 503,
 };
 
 router.post("/receptionist/calendar/requests/:publicId/approve", requireReceptionistAuth, async (req: Request, res: Response) => {
@@ -267,6 +271,9 @@ router.post("/receptionist/calendar/requests/:publicId/approve", requireReceptio
   try {
     const outcome = await approveRequestToBooked(firmId, req.params.publicId as string, calendarSyncDeps());
     req.log.info({ firmId, outcome }, "[calendar] appointment approval");
+    if (outcome === "booked") {
+      await notifyCallerBestEffort(firmId, await findAppointmentRequestByPublicId(firmId, req.params.publicId as string), { stage: "booked" }, (meta, msg) => req.log.info(meta, msg));
+    }
     res
       .status(APPROVE_STATUS[outcome] ?? 500)
       .json(outcome === "booked" ? { ok: true, status: "booked" } : { ok: false, reason: outcome });
@@ -301,6 +308,9 @@ router.post("/receptionist/calendar/requests/:publicId/cancel", requireReception
   try {
     const result = await cancelBookedRequest(firmId, req.params.publicId as string, calendarSyncDeps());
     req.log.info({ firmId, ...result }, "[calendar] booked cancel");
+    if (result.outcome === "cancelled") {
+      await notifyCallerBestEffort(firmId, await findAppointmentRequestByPublicId(firmId, req.params.publicId as string), { stage: "cancelled" }, (meta, msg) => req.log.info(meta, msg));
+    }
     res
       .status(CANCEL_BOOKED_STATUS[result.outcome] ?? 500)
       .json(
@@ -330,6 +340,7 @@ const RESCHEDULE_STATUS: Record<string, number> = {
   not_found: 404,
   not_booked: 409,
   slot_unavailable: 409,
+  not_confirmed: 409,
   conflict: 409,
 };
 
@@ -343,6 +354,14 @@ router.post("/receptionist/calendar/requests/:publicId/reschedule", requireRecep
   try {
     const result = await rescheduleBookedRequest(firmId, req.params.publicId as string, new Date(startUtc), calendarSyncDeps());
     req.log.info({ firmId, outcome: result.outcome, calendar: result.calendar }, "[calendar] booked reschedule");
+    if (result.outcome === "rescheduled" && result.replacement) {
+      await notifyCallerBestEffort(
+        firmId,
+        await findAppointmentRequestByPublicId(firmId, req.params.publicId as string),
+        { stage: "rescheduled", newStartAt: result.replacement.startUtc, newReference: result.replacement.publicId },
+        (meta, msg) => req.log.info(meta, msg),
+      );
+    }
     res
       .status(RESCHEDULE_STATUS[result.outcome] ?? 500)
       .json(
@@ -357,7 +376,7 @@ router.post("/receptionist/calendar/requests/:publicId/reschedule", requireRecep
                 endUtc: result.replacement.endUtc.toISOString(),
               },
             }
-          : { ok: false, reason: result.outcome },
+          : { ok: false, reason: result.outcome, ...(result.reason ? { detail: result.reason } : {}) },
       );
   } catch (err) {
     req.log.error(
