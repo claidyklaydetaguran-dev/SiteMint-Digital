@@ -1,5 +1,12 @@
 # Active SiteMint Delivery
 
+> **ACTIVE (2026-09-24/25): Signed-in workspaces on Mint Clarity.** Owner
+> directive of 2026-09-24: redesign the AI Receptionist workspace, then the
+> staff CRM, on the approved Mint Clarity identity; preserve routes, data,
+> permissions and working actions; push and publish after checks. Record:
+> `docs/design/WORKSPACE-DESIGN-2026-09-25.md`. Branch
+> `claude/workspace-mint-design-0924` (PR #35). Published 7dd0b854.
+
 > **ACTIVE (2026-09-24): Launch audit and release candidate.** Owner directive
 > of 2026-09-24 (full audit, mobile hero/demo/receptionist films, wordmark
 > restart, CTA copy, performance, security, launch readiness). Canonical
