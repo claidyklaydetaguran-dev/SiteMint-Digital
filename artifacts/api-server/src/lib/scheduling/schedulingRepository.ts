@@ -261,10 +261,13 @@ export async function getDayAvailability(
   freeBusyProvider?: FreeBusyProvider,
 ): Promise<DayAvailabilityResult> {
   const config = await buildAvailabilityConfig(firmId);
-  // A full day window in UTC is a safe superset of the business-timezone day
-  // for the purpose of pulling candidate bookings/busy ranges to merge.
-  const rangeStart = new Date(`${dateKey}T00:00:00.000Z`);
-  const rangeEnd = new Date(new Date(rangeStart).setUTCDate(rangeStart.getUTCDate() + 2));
+  // The business-timezone day can start up to 14 hours before or end up to
+  // 12 hours after the UTC day of the same date, so read from the day before
+  // to two days after: a superset for every timezone, including those ahead
+  // of UTC, whose early-morning bookings sit on the previous UTC date.
+  const dayUtc = new Date(`${dateKey}T00:00:00.000Z`);
+  const rangeStart = new Date(new Date(dayUtc).setUTCDate(dayUtc.getUTCDate() - 1));
+  const rangeEnd = new Date(new Date(dayUtc).setUTCDate(dayUtc.getUTCDate() + 2));
   const bookings = await getBookingsForAvailability(firmId, rangeStart, rangeEnd, now, freeBusyProvider);
   return computeDayAvailability(config, bookings, dateKey, appointmentTypeId, now);
 }
@@ -285,15 +288,18 @@ export type SlotMutationResult =
     }
   | { ok: false; reason: "slot_no_longer_available" | "unknown_appointment_type" };
 
-function advisoryLockKeys(firmId: number, startUtc: Date): [number, number] {
-  // Two-int4 advisory lock key: firmId as-is (already a small positive int),
-  // and a stable hash of the ISO start time folded into a signed int4 range.
-  // Collisions across different (firmId, start) pairs would only cause
-  // extra serialization, never a correctness issue — the availability
-  // recheck inside the lock is still authoritative.
-  const hash = createHash("sha256").update(startUtc.toISOString()).digest();
-  const slotKey = hash.readInt32BE(0);
-  return [firmId, slotKey];
+/** Second half of the advisory lock key: one fixed namespace for bookings. */
+export const BOOKING_LOCK_NAMESPACE = createHash("sha256").update("scheduling:booking").digest().readInt32BE(0);
+
+export function advisoryLockKeys(firmId: number, _startUtc: Date): [number, number] {
+  // One lock per BUSINESS, not per start time. A per-start key let two
+  // overlapping requests with different starts (10:00 for 60 min and 10:30)
+  // take different locks, each re-check the book without seeing the other's
+  // uncommitted row, and both succeed. Serializing a business's bookings
+  // makes the availability re-check inside the lock authoritative for every
+  // overlap. Bookings for one business are rare enough that this costs
+  // nothing noticeable.
+  return [firmId, BOOKING_LOCK_NAMESPACE];
 }
 
 interface ContactInput {

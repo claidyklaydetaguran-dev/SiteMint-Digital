@@ -169,8 +169,13 @@ export interface ToolSchedulingDeps {
 async function defaultDeps(): Promise<ToolSchedulingDeps> {
   const repo = await import("../../scheduling/schedulingRepository.js");
   const issues = await import("../../voiceIssues/voiceIssueService.js");
+  // The business's connected calendar, exactly as the dashboard and the public
+  // booking page read it. Without it a caller could be offered, and booked
+  // into, a time the owner's Google Calendar already has taken.
+  const { getFreeBusyProvider } = await import("../../calendar/index.js");
+  const freeBusy = getFreeBusyProvider();
   return {
-    getDayAvailability: (firmId, dateKey, typeId, now) => repo.getDayAvailability(firmId, dateKey, typeId, now),
+    getDayAvailability: (firmId, dateKey, typeId, now) => repo.getDayAvailability(firmId, dateKey, typeId, now, freeBusy),
     getSchedulingContext: async (firmId) => {
       const config = await repo.buildAvailabilityConfig(firmId);
       return {
@@ -184,7 +189,7 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
     },
     submitAppointmentRequest: (firmId, typeId, startUtc, contact, consent, now, toolCallId, providerCallId) =>
       repo.submitAppointmentRequest(
-        firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, undefined, toolCallId, providerCallId,
+        firmId, typeId, startUtc, contact, consent, "ai_receptionist", now, freeBusy, toolCallId, providerCallId,
       ),
     cancelAppointmentRequestByPublicId: (firmId, publicId) => repo.cancelAppointmentRequestByPublicId(firmId, publicId),
     // The dashboard's Approve, called from the call instead of from a click.
