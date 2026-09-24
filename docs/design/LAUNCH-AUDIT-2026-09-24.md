@@ -65,6 +65,21 @@ Owner-reported after the launch. Scope limited to these three items; production 
 - **Live verification (no rows created; empty bodies only).** `/api/readyz` ready; discovery/contact/register empty bodies → 400 with the same validation messages as before; unsigned STOP → 403 empty TwiML. Seven empty contact posts, each with a different forged `X-Forwarded-For`, all returned 400 (the previous code returned 429 on the sixth); forged `x-sitemint-visitor`/`-sig` → 400 (ignored, no 500); a second client on a different egress (a Replit shell) → 400. Home: `?herodebug=1` readout renders, `mode: video`, `primed: true`, `readyState 4`; all 36 frame images are referenced by the deployed bundle and served (`leaf-01-*.webp` 200, image/webp). Deployed CSS: 4 mask arrows, 0 glyph `content` rules; pages /, /ai-receptionist, /pricing, /start, /services, /about contain 0 arrow glyphs and 0 occurrences of "pilot pricing"/"Assisted pilot"; `/start?service=ai-receptionist` renders the "Request pricing" block with both approved sentences and its primary action goes to `/discovery`. Brotli, ETag/304, hardening headers and byte-range 206 unchanged.
 - **Not verified here:** any real iPhone (owner device test in §0b.1), CRM, portal, receptionist calls, SMS, billing. Rate-limit keys are still the interim shared 20/hour bucket until `PROXY_VISITOR_SECRET` is set on both apps and both are republished (owner action above).
 
+### 5. Owner real-device acceptance (iPhone Safari, 2026-09-24, owner-reported)
+
+Tested by the owner on their own iPhone in Safari against the published release (19055af). Reported outcomes, recorded without any readout values the owner did not supply:
+
+- Homepage: the leaf **moves with scrolling** (the scroll-linked hero works on the real device; the earlier poster-only behaviour is resolved).
+- AI receptionist page: the **background video plays**.
+- The revised **arrow icons render correctly** (owner screenshots show the SVG/mask arrows on the hero buttons, the menu "Start a project" button and the receptionist CTAs; no emoji glyphs).
+- Not reported by the owner: the `?herodebug=1` readout values (mode / primed / readyState / error), whether Low Power Mode was on, and the demonstration video ("See how it comes together") autoplay. These remain unverified on a real device and are not claimed here.
+
+The Chromium readout in §0b.4 is a desktop result only and is not evidence of iPhone behaviour.
+
+### 6. Visitor-keyed limits — activation pending owner secret
+
+As of this record neither the SiteMint-Digital nor the Web Asset Builder workspace has `PROXY_VISITOR_SECRET` set (checked by presence only; no value read), so production still runs the interim shared 20/hour bucket. The intended public configuration is per-visitor 5/hour, which requires the same secret in both apps' deployment secrets and a republish of both. The owner enters the secret; this session never types, prints or logs it. Live acceptance after republish: visitor A (this workstation's egress) sends empty contact posts until 429 (expected after five); visitor B (a Replit shell egress) still gets 400; a forged `X-Forwarded-For` and forged `x-sitemint-visitor`/`-sig` from A neither open a new bucket nor cause a 500. A mismatched secret would show as B receiving 429 (every visitor collapsed onto the proxy egress at 5/hour), so the same test also proves the two secrets match.
+
 ## 1. Baseline reconciliation
 
 | Question | Answer (verified 2026-09-24) |
