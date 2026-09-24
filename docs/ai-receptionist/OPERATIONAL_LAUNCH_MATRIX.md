@@ -46,6 +46,8 @@ Branch: `claude/receptionist-operational-0925` (from
 |---|---|---|---|---|---|---|---|
 | 2026-09-25 03:00 | 0 | Read production state (above) | production | firm 2 owner session | — | as recorded in §0 | 7dd0b854 |
 | 2026-09-25 03:05 | 2 | Create Vapi HMAC webhook credential in the production organisation (x-vapi-signature / x-vapi-timestamp, sha256 hex, `{timestamp}.{body}`), secret read from the workspace env, never printed | production Vapi | — | 201 | 201, id ab8f2204-61cb-4587-9591-1cd5bb69506f | — |
+| 2026-09-25 ~06:00 | all | Release candidate 5dcae921: Linux gate (typecheck, full test chain, api/helpdesk/web-agency builds, 20-variant voice matrix) and CI run 36051407581 | local Linux + GitHub CI | — | all green | all green | 5dcae921 |
+| 2026-09-25 ~06:10 | all | Production workspace: backup ref `backup/before-operational-0925` (= 7dd0b854 tree), checked out 5dcae921 as `release/operational-0925`, built api-server dist (new code present by grep) | production workspace (not published) | — | built | built; NOT published — deploy step stopped by the session permission classifier, awaiting owner | 5dcae921 |
 
 ## 3. Issue register
 
@@ -78,6 +80,25 @@ is fixed or closed.
 | M-5 | M | 3 | Dashboard approval of an older pending request does not re-check the calendar | audit | Open |
 | M-6 | M | 6 | No recording retention, deletion or access rule existed | audit, confirmed | Fixed on branch: required disclosure/retention/access when policy is `full`; owner Delete; hourly retention sweep. Production stays `none` |
 | M-7 | M | 4 | Inbound replies other than STOP/START are not stored or shown | audit | Open (needs a table: reviewed migration) |
+
+## 3a. Production configuration for release 1 (to add in Adjust settings → Production app secrets, then Publish)
+
+| Name | Value | Why |
+|---|---|---|
+| VOICE_ARTIFACT_POLICY | none | publish refuses without it; the approved value (added to the form, not yet published) |
+| VOICE_SYNC_ENABLED | true | apply saved changes to a published receptionist |
+| VITE_VOICE_SYNC_ENABLED | true | the dashboard control for the same |
+| VOICE_BROWSER_TEST_ENABLED | true | browser test calls (the dashboard flag is already on) |
+| VOICE_SERVER_URL | https://sitemintdigital.replit.app/api/voice/webhooks/vapi | where Vapi reports calls and tool use |
+| VOICE_WEBHOOK_ATTACH_ENABLED | true | attach that URL at publish |
+| VAPI_WEBHOOK_CREDENTIAL_ID | ab8f2204-61cb-4587-9591-1cd5bb69506f | the HMAC credential created in the production Vapi org (an identifier, not a secret) |
+| VOICE_TOOLS_ATTACH_ENABLED | true | attach messages / booking / transfer tools |
+| VOICE_TOOLS_CAPABILITIES | messages,scheduling,transfer | transfer stays inactive until a consenting contact exists |
+| VOICE_RECONCILIATION_ENABLED | true | call-state reconciliation, usage backfill, grace expiry |
+| VOICE_SERVICE_ACCESS_REQUIRED | true | only activated businesses can publish or start test calls |
+| VOICE_PLAN_CATALOG_JSON | [{"planCode":"pilot","includedMinutes":300,"smsIncluded":false}] | the pilot plan SiteMint is activated on |
+
+Rollback: in the workspace `git checkout main` (= 7dd0b854), rebuild api-server, remove the rows above, Publish.
 
 ## 4. Owner decisions (asked only when a test is ready)
 
