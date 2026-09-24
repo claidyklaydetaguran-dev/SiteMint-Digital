@@ -1,6 +1,6 @@
 export type RecordingResult =
   | { status: "available"; url: string }
-  | { status: "disabled" | "pending" | "unavailable" };
+  | { status: "disabled" | "pending" | "unavailable" | "deleted" };
 
 export const RECORDING = {
   heading: "Conversation replay",
@@ -18,12 +18,20 @@ export const RECORDING = {
   speed: "Playback speed",
   player: "Conversation audio",
   unsupported: "This browser does not support audio playback.",
+  deleted: "This call's recording and transcript were deleted.",
+  ownerOnly: "Only an owner of this business can play call recordings.",
+  deleteAction: "Delete recording",
+  deleteConfirmPrompt: "Delete this call's recording and transcript for good? This can't be undone.",
+  deleteConfirm: "Delete permanently",
+  deleteCancel: "Keep it",
+  deleting: "Deleting…",
+  deleteFailed: "The recording couldn't be deleted just now. Nothing was removed — try again in a moment.",
 } as const;
 
 /** Treat mixed-version or malformed responses as a failure, never success. */
 export function parseRecordingResult(value: unknown): RecordingResult {
   if (value && typeof value === "object" && "status" in value) {
-    if (value.status === "disabled" || value.status === "pending" || value.status === "unavailable") {
+    if (value.status === "disabled" || value.status === "pending" || value.status === "unavailable" || value.status === "deleted") {
       return { status: value.status };
     }
     if (value.status === "available" && "url" in value && typeof value.url === "string") {

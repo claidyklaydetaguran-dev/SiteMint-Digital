@@ -80,6 +80,9 @@ const SECRETS: Array<[string, string, string]> = [
 
 const CONFIGS: Array<[string, string, string]> = [
   ["VOICE_ARTIFACT_POLICY", "pre", "Provider artifact capture: none | transcript_only | full — required for publish; only 'none' approved"],
+  ["VOICE_RECORDING_DISCLOSURE", "J6", "Sentence spoken before anything else on every call when VOICE_ARTIFACT_POLICY=full; required then (20-300 chars, must say the call is recorded)"],
+  ["VOICE_RECORDING_RETENTION_DAYS", "J6", "Days a recording is kept when VOICE_ARTIFACT_POLICY=full (1-365; required then); older recordings are deleted at the provider hourly"],
+  ["VOICE_RECORDING_ACCESS", "J6", "Who may play recordings back: owners (default) | team"],
   ["VOICE_RUNTIME_CATALOG_JSON", "pre", "Model/voice/transcriber catalog for publish"],
   ["VOICE_SERVER_URL", "P2", "Webhook URL sent to the provider when attachment is enabled"],
   ["VAPI_WEBHOOK_CREDENTIAL_ID", "P2", "Id of the Vapi HMAC Custom Credential attached to published assistants (identifier, not a secret)"],

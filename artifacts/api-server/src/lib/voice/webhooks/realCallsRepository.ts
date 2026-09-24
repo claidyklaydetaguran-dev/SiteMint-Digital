@@ -9,7 +9,7 @@
 // indexed insert per webhook) and keeps the "what really happened" data
 // exactly as delivered, rather than a derived summary that could drift.
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { providerWebhookEvents, voiceAssistants } from "@workspace/db/schema/voice";
 import type { ParsedVapiMessage } from "./vapiServerMessage.js";
@@ -87,6 +87,55 @@ function toStoredEvent(payload: unknown, createdAt: Date): StoredVapiEvent | und
   return { type: message.type, message, createdAt };
 }
 
+/**
+ * After a recording is deleted at the provider: removes the transcript and
+ * summary from every stored event of that call, and marks each event with
+ * when it happened. Firm-scoped. Returns how many events were touched.
+ */
+export async function scrubCallArtifacts(firmId: number, callId: string, at: Date): Promise<number> {
+  const rows = await db
+    .update(providerWebhookEvents)
+    .set({
+      payload: sql`(${providerWebhookEvents.payload} - 'transcript' - 'summary') || jsonb_build_object('siteMintRecordingDeletedAt', ${at.toISOString()}::text)`,
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(providerWebhookEvents.firmId, firmId),
+        eq(providerWebhookEvents.provider, VAPI_PROVIDER_NAME),
+        sql`${providerWebhookEvents.payload} -> 'call' ->> 'id' = ${callId}`,
+      ),
+    )
+    .returning({ id: providerWebhookEvents.id });
+  return rows.length;
+}
+
+/**
+ * Finished calls, across every business, whose end-of-call report is older
+ * than the cutoff and whose artifacts have not been deleted yet. Used only by
+ * the retention sweep.
+ */
+export async function listCallsPastRetention(cutoff: Date, limit = 50): Promise<Array<{ firmId: number; callId: string }>> {
+  const rows = await db
+    .select({ firmId: providerWebhookEvents.firmId, payload: providerWebhookEvents.payload })
+    .from(providerWebhookEvents)
+    .where(
+      and(
+        eq(providerWebhookEvents.provider, VAPI_PROVIDER_NAME),
+        sql`${providerWebhookEvents.payload} ->> 'type' = 'end-of-call-report'`,
+        sql`NOT (${providerWebhookEvents.payload} ? 'siteMintRecordingDeletedAt')`,
+        sql`${providerWebhookEvents.createdAt} < ${cutoff}`,
+      ),
+    )
+    .limit(limit);
+  const out: Array<{ firmId: number; callId: string }> = [];
+  for (const r of rows) {
+    const id = (r.payload as { call?: { id?: unknown } }).call?.id;
+    if (typeof id === "string" && r.firmId !== null) out.push({ firmId: r.firmId, callId: id });
+  }
+  return out;
+}
+
 /** All real-call records for one firm, most recently active first. Firm-scoped — cross-firm data can never appear here. */
 export async function listRealCallsForFirm(firmId: number): Promise<RealCallRecord[]> {
   const rows = await db
@@ -111,7 +160,11 @@ export async function listRealCallsForFirm(firmId: number): Promise<RealCallReco
   const records: RealCallRecord[] = [];
   for (const [callId, events] of byCallId) {
     const record = foldEventsIntoCallRecord(callId, events);
-    if (record) records.push(record);
+    if (!record) continue;
+    const deleted = events
+      .map((e) => (e.message as unknown as Record<string, unknown>)["siteMintRecordingDeletedAt"])
+      .find((v): v is string => typeof v === "string");
+    records.push(deleted ? { ...record, recordingDeletedAt: new Date(deleted) } : record);
   }
   return records.sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime());
 }

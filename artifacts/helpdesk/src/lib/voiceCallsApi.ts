@@ -128,6 +128,8 @@ export interface RealCallDetail extends RealCallSummary {
    * so a dashboard deployed ahead of its backend degrades safely.
    */
   artifactPolicy?: ArtifactPolicy;
+  /** J6: this call's recording and transcript were deleted. */
+  recordingDeleted?: boolean;
 }
 
 /**

@@ -11,6 +11,7 @@ import { listRealCallsForFirm, getRealCallForFirm } from "../lib/voice/webhooks/
 import { callStateLabel } from "../lib/voice/webhooks/callStateModel.js";
 import type { RealCallRecord } from "../lib/voice/webhooks/callStateModel.js";
 import { SlidingWindowLimiter } from "../lib/contactProtection.js";
+import { loadRecordingControls, mayPlayRecording } from "../lib/voiceRecording/recordingControls.js";
 
 const router = Router();
 const recordingLimiter = new SlidingWindowLimiter(120, 60 * 60 * 1000);
@@ -93,6 +94,9 @@ function serializeDetail(call: RealCallRecord) {
     // it — and without the call pages taking on a second request. Never a
     // credential: this is the policy's name and nothing else.
     artifactPolicy: readArtifactPolicy(),
+    // J6: once deleted (by the business or by retention) the call says so,
+    // rather than looking like a call that was never recorded.
+    recordingDeleted: call.recordingDeletedAt !== undefined,
   };
 }
 
@@ -142,6 +146,23 @@ router.get("/receptionist/voice/calls/:callId/recording", requireReceptionistAut
       res.json({ status: "disabled" });
       return;
     }
+    // J6: recording on without its access rule is a configuration fault, not
+    // permission for everyone.
+    let controls;
+    try {
+      controls = loadRecordingControls();
+    } catch {
+      res.status(503).json({ error: "Recordings cannot be played right now." });
+      return;
+    }
+    if (!controls || !mayPlayRecording(controls.access, req.receptionistRole)) {
+      res.status(403).json({ error: "Only an owner of this business can play call recordings." });
+      return;
+    }
+    if (call.recordingDeletedAt) {
+      res.json({ status: "deleted" });
+      return;
+    }
     if (call.synthetic) {
       res.json({ status: "unavailable" });
       return;
@@ -168,6 +189,40 @@ router.get("/receptionist/voice/calls/:callId/recording", requireReceptionistAut
   } catch (err) {
     req.log.warn({ firmId: req.firmId, errorClass: err instanceof Error ? err.constructor.name : typeof err }, "[receptionist] recording unavailable");
     res.status(503).json({ error: "The recording couldn't be loaded. Try again shortly." });
+  }
+});
+
+// ── DELETE /api/receptionist/voice/calls/:callId/recording ──────────────────
+// J6: the business deletes one call's recording and transcript. Owner-only
+// (not in the staff write list). The provider deletion happens first; the
+// call is marked deleted only after the provider confirms, so a failure is
+// reported as a failure and nothing claims a deletion that did not happen.
+router.delete("/receptionist/voice/calls/:callId/recording", requireReceptionistAuth, async (req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  try {
+    const call = await getRealCallForFirm(req.firmId!, req.params.callId as string);
+    if (!call) {
+      res.status(404).json({ error: "Call not found" });
+      return;
+    }
+    if (call.synthetic) {
+      res.status(400).json({ error: "Test events have no recording to delete." });
+      return;
+    }
+    if (call.recordingDeletedAt) {
+      res.json({ status: "deleted" });
+      return;
+    }
+    const { deleteCallRecording, productionRecordingDeletionDeps } = await import("../lib/voiceRecording/recordingDeletion.js");
+    const outcome = await deleteCallRecording(req.firmId!, call.callId, "business_request", await productionRecordingDeletionDeps());
+    if (!outcome.ok) {
+      res.status(502).json({ error: "The recording couldn't be deleted just now. Nothing was removed — try again in a moment." });
+      return;
+    }
+    res.json({ status: "deleted" });
+  } catch (err) {
+    req.log.warn({ firmId: req.firmId, errorClass: err instanceof Error ? err.constructor.name : typeof err }, "[receptionist] recording delete failed");
+    res.status(503).json({ error: "The recording couldn't be deleted just now. Nothing was removed — try again in a moment." });
   }
 });
 

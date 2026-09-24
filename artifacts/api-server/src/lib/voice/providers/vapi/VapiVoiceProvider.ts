@@ -218,6 +218,34 @@ export class VapiVoiceProvider implements VoiceProvider {
     }
   }
 
+  /** DELETE /call/{id}: removes the call and every artifact Vapi keeps for it. */
+  async deleteCallArtifacts(providerCallId: string): Promise<"deleted" | "not_found"> {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(providerCallId)) {
+      throw new VoiceProviderError("VALIDATION_FAILED", "Invalid call identifier.", { provider: VAPI_PROVIDER_KEY });
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    let response: Response | undefined;
+    try {
+      try {
+        response = await fetch(`${this.config.baseUrl}/call/${encodeURIComponent(providerCallId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${this.config.apiKey}` },
+          signal: controller.signal,
+        });
+      } catch (err) {
+        throw classifyTransportError(err, controller);
+      }
+      if (response.status === 404 || response.status === 410) return "not_found";
+      if (response.status === 200 || response.status === 204) return "deleted";
+      throw mapStatusToError(response.status);
+    } finally {
+      // The response body (the deleted call) is never read or logged.
+      if (response?.body) await response.body.cancel().catch(() => {});
+      clearTimeout(timer);
+    }
+  }
+
   /**
    * Performs one HTTP exchange under a single deadline.
    *

@@ -16,6 +16,7 @@ import { PublishFoundationError } from "./errors.js";
 import { isSiteMintPresetKey } from "./runtimeCatalog.js";
 import type { ExtractedAssistantPublishConfig, PublishFirstMessageMode, RuntimeCatalog } from "./types.js";
 import { getRuntimeCatalogPreset } from "./runtimeCatalog.js";
+import { composeRecordedGreeting, loadRecordingControls } from "../voiceRecording/recordingControls.js";
 
 /** Must match `CONFIG_SCHEMA_VERSION` in artifacts/helpdesk/src/lib/assistantConfig.ts. */
 export const SUPPORTED_CONFIG_SCHEMA_VERSION = 1;
@@ -70,6 +71,7 @@ function boundedOptionalString(value: unknown, label: string, maxLength: number)
 export function extractPublishableAssistantConfig(
   config: unknown,
   catalog: RuntimeCatalog,
+  env: Record<string, string | undefined> = process.env,
 ): ExtractedAssistantPublishConfig {
   if (!isPlainObject(config)) {
     fail("config must be a plain JSON object.");
@@ -135,11 +137,24 @@ export function extractPublishableAssistantConfig(
     fail('config "prompt.firstMessage" must not be empty when firstMessageMode is "assistant-speaks-first".');
   }
 
+  // J6: with recording on, the disclosure is the first thing every caller
+  // hears. Applied here, in the one mapper publish, sync and the payload
+  // digest all share, so the three can never disagree about the greeting.
+  const controls = loadRecordingControls(env);
+  let spokenFirst = firstMessage;
+  if (controls) {
+    const composed = composeRecordedGreeting(controls, firstMessage, firstMessageMode);
+    if (!composed.ok) {
+      fail("with call recording on, the receptionist must speak first so the recording notice is heard before anything else.");
+    }
+    spokenFirst = composed.firstMessage;
+  }
+
   return {
     presetKey,
     ...(voiceKey !== undefined ? { voiceKey } : {}),
     systemInstructions,
     firstMessageMode,
-    ...(firstMessage !== undefined ? { firstMessage } : {}),
+    ...(spokenFirst !== undefined ? { firstMessage: spokenFirst } : {}),
   };
 }

@@ -38,6 +38,7 @@ import type { ExtractedAssistantPublishConfig, PublishFirstMessageMode, RuntimeC
 import { createProductionVoiceProvider } from "./providerFactory.js";
 import { buildPublishRouteError, type PublishRouteError, type PublishRouteErrorCode } from "./publishHttpErrors.js";
 import type { PublishSyncErrorCode } from "./types.js";
+import { loadRecordingControls } from "../voiceRecording/recordingControls.js";
 
 /** Route error codes that are also valid database sync-error codes — the only codes this service ever persists via recordPublishError/recordPublishUncertain. */
 type PersistableFailureCode = Extract<PublishRouteErrorCode, PublishSyncErrorCode>;
@@ -154,6 +155,7 @@ export function isPublishConfigurationReady(
   try {
     deps.loadCatalog();
     deps.loadArtifactPolicy();
+    loadRecordingControls();
     const serverConfig = (deps.loadServerConfig ?? loadVoiceServerConfigFromEnv)();
     (deps.loadToolsConfig ?? loadVoiceToolsConfigFromEnv)(serverConfig, process.env);
     (deps.loadCallPolicy ?? loadVoiceCallPolicyFromEnv)();
@@ -413,6 +415,9 @@ export async function publishAssistant(
   // way for a policy validated here to differ from the one that is sent.
   try {
     deps.loadArtifactPolicy();
+    // J6: recording on without its disclosure, retention and access rule is
+    // a configuration that must not publish at all.
+    loadRecordingControls();
   } catch {
     return failure("publish_disabled");
   }

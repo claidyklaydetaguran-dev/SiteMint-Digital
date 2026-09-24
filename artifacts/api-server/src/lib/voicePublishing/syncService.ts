@@ -40,6 +40,7 @@ import { PublishFoundationError } from "./errors.js";
 import { computeProviderPayloadHash } from "./providerPayloadHash.js";
 import type { RuntimeCatalog, PublishFirstMessageMode } from "./types.js";
 import { createProductionVoiceProvider } from "./providerFactory.js";
+import { loadRecordingControls } from "../voiceRecording/recordingControls.js";
 import {
   buildSyncRouteError,
   type ProviderSyncErrorCode,
@@ -348,6 +349,9 @@ export async function synchronizePublishedAssistant(
   let artifactPolicy: VoiceArtifactPolicy;
   try {
     artifactPolicy = deps.loadArtifactPolicy();
+    // J6: recording on without its disclosure, retention and access rule
+    // must not reach the provider by a sync either.
+    loadRecordingControls();
   } catch {
     return failure("sync_disabled");
   }

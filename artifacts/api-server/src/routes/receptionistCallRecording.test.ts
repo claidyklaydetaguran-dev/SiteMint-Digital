@@ -3,15 +3,18 @@ import type { AddressInfo } from "node:net";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ read: vi.fn(), recording: vi.fn(), factory: vi.fn(), warn: vi.fn() }));
+const h = vi.hoisted(() => ({ read: vi.fn(), recording: vi.fn(), factory: vi.fn(), warn: vi.fn(), del: vi.fn(), scrub: vi.fn(), audit: vi.fn() }));
 vi.mock("../lib/receptionistAuth.js", () => ({
   requireReceptionistAuth: (req: Request, res: Response, next: NextFunction) => {
     const firm = req.headers["x-test-session"];
     if (firm !== "7" && firm !== "8") { res.sendStatus(401); return; }
-    req.firmId = Number(firm); next();
+    req.firmId = Number(firm);
+    req.receptionistRole = req.headers["x-test-role"] === "staff" ? "staff" : "owner";
+    next();
   },
 }));
-vi.mock("../lib/voice/webhooks/realCallsRepository.js", () => ({ getRealCallForFirm: h.read, listRealCallsForFirm: vi.fn() }));
+vi.mock("../lib/voice/webhooks/realCallsRepository.js", () => ({ getRealCallForFirm: h.read, listRealCallsForFirm: vi.fn(), scrubCallArtifacts: h.scrub }));
+vi.mock("../lib/voiceAccounts/auditLog.js", () => ({ recordAuditEvent: h.audit }));
 vi.mock("../lib/voicePublishing/providerFactory.js", () => ({ createProductionVoiceProvider: h.factory }));
 import router from "./receptionistVoiceCalls.js";
 
@@ -29,11 +32,19 @@ afterAll(async () => { vi.unstubAllEnvs(); await new Promise<void>((resolve) => 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("VOICE_ARTIFACT_POLICY", "full");
+  // J6: recording on requires its disclosure and retention period.
+  vi.stubEnv("VOICE_RECORDING_DISCLOSURE", "This call is recorded for quality and training purposes.");
+  vi.stubEnv("VOICE_RECORDING_RETENTION_DAYS", "30");
+  vi.stubEnv("VOICE_RECORDING_ACCESS", "");
   h.read.mockImplementation(async (firmId) => firmId === 7 ? { callId: "call-owned-by-7", isFinal: true, synthetic: false } : undefined);
-  h.factory.mockReturnValue({ getCallRecording: h.recording });
+  h.factory.mockReturnValue({ getCallRecording: h.recording, deleteCallArtifacts: h.del });
+  h.del.mockResolvedValue("deleted");
+  h.scrub.mockResolvedValue(2);
+  h.audit.mockResolvedValue(undefined);
   h.recording.mockResolvedValue({ url: "https://storage.googleapis.com/private/recording?signature=test" });
 });
-const get = (firm: string | null = "7") => fetch(base, { headers: firm ? { "x-test-session": firm } : {} });
+const get = (firm: string | null = "7", role = "owner") => fetch(base, { headers: firm ? { "x-test-session": firm, "x-test-role": role } : {} });
+const del = (firm = "7", role = "owner") => fetch(base, { method: "DELETE", headers: { "x-test-session": firm, "x-test-role": role } });
 
 describe("recording authorization over HTTP", () => {
   it("rejects an unauthenticated request without reading the provider", async () => {
@@ -77,5 +88,44 @@ describe("recording authorization over HTTP", () => {
     expect(response.status).toBe(503);
     expect(await response.text()).not.toMatch(/secret-key|signed-url/);
     expect(JSON.stringify(h.warn.mock.calls)).not.toMatch(/secret-key|signed-url/);
+  });
+});
+
+describe("J6 recording controls over HTTP", () => {
+  it("refuses playback when recording is on without its controls, before touching the provider", async () => {
+    vi.stubEnv("VOICE_RECORDING_RETENTION_DAYS", "");
+    expect((await get()).status).toBe(503);
+    expect(h.factory).not.toHaveBeenCalled();
+  });
+  it("staff cannot play recordings under the default owners-only rule", async () => {
+    expect((await get("7", "staff")).status).toBe(403);
+    expect(h.factory).not.toHaveBeenCalled();
+  });
+  it("staff can play them when the business shares recordings with its team", async () => {
+    vi.stubEnv("VOICE_RECORDING_ACCESS", "team");
+    expect(await (await get("7", "staff")).json()).toMatchObject({ status: "available" });
+  });
+  it("a deleted recording says so and never asks the provider for a link", async () => {
+    h.read.mockResolvedValue({ callId: "call-owned-by-7", isFinal: true, synthetic: false, recordingDeletedAt: new Date() });
+    expect(await (await get()).json()).toEqual({ status: "deleted" });
+    expect(h.recording).not.toHaveBeenCalled();
+  });
+  it("an owner deletes a recording: provider first, then the stored transcript, then the audit row", async () => {
+    const res = await del();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "deleted" });
+    expect(h.del).toHaveBeenCalledWith("call-owned-by-7");
+    expect(h.scrub).toHaveBeenCalledWith(7, "call-owned-by-7", expect.any(Date));
+    expect(h.del.mock.invocationCallOrder[0]).toBeLessThan(h.scrub.mock.invocationCallOrder[0]!);
+  });
+  it("a provider failure is reported and nothing here is scrubbed", async () => {
+    h.del.mockRejectedValue(new Error("503"));
+    const res = await del();
+    expect(res.status).toBe(502);
+    expect(h.scrub).not.toHaveBeenCalled();
+  });
+  it("another business gets 404 and nothing is deleted anywhere", async () => {
+    expect((await del("8")).status).toBe(404);
+    expect(h.del).not.toHaveBeenCalled();
   });
 });

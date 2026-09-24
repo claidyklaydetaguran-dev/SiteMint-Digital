@@ -3,12 +3,18 @@ import { RECORDING, parseRecordingResult, type RecordingResult } from "./recordi
 
 /** No autoplay, microphone, stored URLs, or background polling. A new call
  * mounts a new player, so navigation cannot play another customer's record. */
-export function CallRecording({ callId, policy, isFinal }: {
+export function CallRecording({ callId, policy, isFinal, deleted = false, canDelete = false }: {
   callId: string;
   policy: string | undefined;
   isFinal: boolean;
+  /** J6: the server says this call's recording was already deleted. */
+  deleted?: boolean;
+  /** J6: owners only; the server refuses anyone else anyway. */
+  canDelete?: boolean;
 }) {
-  const [result, setResult] = useState<RecordingResult | null>(null);
+  const [result, setResult] = useState<RecordingResult | null>(deleted ? { status: "deleted" } : null);
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [speed, setSpeed] = useState(1);
@@ -29,7 +35,8 @@ export function CallRecording({ callId, policy, isFinal }: {
         credentials: "include", cache: "no-store", signal: controller.signal,
       });
       if (!response.ok) {
-        setError(response.status === 401 || response.status === 403 ? RECORDING.unauthorized
+        setError(response.status === 401 ? RECORDING.unauthorized
+          : response.status === 403 ? RECORDING.ownerOnly
           : response.status === 429 ? RECORDING.rateLimited : RECORDING.failed);
         return;
       }
@@ -41,6 +48,33 @@ export function CallRecording({ callId, policy, isFinal }: {
     }
   }
 
+  async function deleteRecording() {
+    if (deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/receptionist/voice/calls/${encodeURIComponent(callId)}/recording`, {
+        method: "DELETE", credentials: "include", cache: "no-store",
+      });
+      if (!response.ok) {
+        setError(response.status === 401 ? RECORDING.unauthorized : response.status === 403 ? RECORDING.ownerOnly : RECORDING.deleteFailed);
+        return;
+      }
+      const body = (await response.json().catch(() => null)) as { status?: unknown } | null;
+      if (body?.status !== "deleted") {
+        setError(RECORDING.deleteFailed);
+        return;
+      }
+      setResult({ status: "deleted" });
+      setConfirming(false);
+    } catch {
+      setError(RECORDING.deleteFailed);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const isDeleted = result?.status === "deleted";
   const disabled = policy !== "full";
   return (
     <section className="sc-doc" aria-labelledby="sc-recording">
@@ -68,9 +102,27 @@ export function CallRecording({ callId, policy, isFinal }: {
           <p className={error ? "sc-absent" : "sc-note"} role="status" aria-live="polite">
             {error ?? (loading ? RECORDING.loading : result ? result.status === "available" ? RECORDING.ready : RECORDING[result.status] : "")}
           </p>
-          <button type="button" className="sc-retry" disabled={loading} aria-busy={loading} onClick={loadRecording}>
-            {loading ? RECORDING.loading : result || error ? RECORDING.retry : RECORDING.load}
-          </button>
+          {!isDeleted && (
+            <button type="button" className="sc-retry" disabled={loading || deleting} aria-busy={loading} onClick={loadRecording}>
+              {loading ? RECORDING.loading : result || error ? RECORDING.retry : RECORDING.load}
+            </button>
+          )}
+          {canDelete && !isDeleted && !confirming && (
+            <button type="button" className="sc-retry" disabled={loading || deleting} onClick={() => setConfirming(true)}>
+              {RECORDING.deleteAction}
+            </button>
+          )}
+          {canDelete && !isDeleted && confirming && (
+            <div role="group" aria-label={RECORDING.deleteAction}>
+              <p className="sc-note">{RECORDING.deleteConfirmPrompt}</p>
+              <button type="button" className="sc-retry" disabled={deleting} aria-busy={deleting} onClick={deleteRecording}>
+                {deleting ? RECORDING.deleting : RECORDING.deleteConfirm}
+              </button>
+              <button type="button" className="sc-retry" disabled={deleting} onClick={() => setConfirming(false)}>
+                {RECORDING.deleteCancel}
+              </button>
+            </div>
+          )}
         </>
       )}
     </section>
