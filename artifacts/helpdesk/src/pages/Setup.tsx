@@ -24,7 +24,13 @@ import {
   type ReadinessCheck,
   type ReadinessStep,
 } from "@/lib/readinessApi";
+// The next step names the real action ("Publish your receptionist"), the same
+// helper the overview uses, rather than the check label ("Published").
+import { readinessNextStep } from "@/pages/overview/overviewContract";
 import "@/styles/v2-dashboard.css";
+
+/** Details like "Saved." only repeat the state; they are shown for anything not yet done. */
+const ROUTINE_DETAIL = /^(Saved|Created|Chosen).$/;
 
 const CHECK_ICON = {
   done: CheckCircle2,
@@ -44,7 +50,7 @@ function CheckRow({ check }: { check: ReadinessCheck }) {
           <span className="setup4-check__label">{check.label}</span>
           <span className="setup4-check__state">{CHECK_STATE_LABEL[check.state]}</span>
         </div>
-        <p className="setup4-check__detail">{check.detail}</p>
+        {!(check.state === "done" && ROUTINE_DETAIL.test(check.detail)) && <p className="setup4-check__detail">{check.detail}</p>}
       </div>
       {check.fixPath && check.state !== "done" && (
         <Link href={check.fixPath} className="setup4-check__action">
@@ -58,6 +64,19 @@ function CheckRow({ check }: { check: ReadinessCheck }) {
 
 function StepCard({ step }: { step: ReadinessStep }) {
   const headingId = `setup-step-${step.key}`;
+  const doneChecks = step.checks.filter((c) => c.state === "done").length;
+  const offChecks = step.checks.filter((c) => c.state === "off").length;
+  const summary =
+    offChecks > 0
+      ? `${doneChecks} on, ${offChecks} optional ${offChecks === 1 ? "item" : "items"} off`
+      : `${doneChecks} of ${step.checks.length} items done`;
+  const checks = (
+    <ul className="setup4-checks">
+      {step.checks.map((c) => (
+        <CheckRow key={c.key} check={c} />
+      ))}
+    </ul>
+  );
   return (
     <section className="setup4-step" data-state={step.state} aria-labelledby={headingId}>
       <header className="setup4-step__head">
@@ -73,11 +92,16 @@ function StepCard({ step }: { step: ReadinessStep }) {
         </div>
         <span className="setup4-step__state">{STEP_STATE_LABEL[step.state]}</span>
       </header>
-      <ul className="setup4-checks">
-        {step.checks.map((c) => (
-          <CheckRow key={c.key} check={c} />
-        ))}
-      </ul>
+      {step.state === "done" ? (
+        <details className="ws-step-details">
+          <summary>
+            {summary} — show details
+          </summary>
+          {checks}
+        </details>
+      ) : (
+        checks
+      )}
     </section>
   );
 }
@@ -110,6 +134,7 @@ export default function Setup() {
 
   const r = readiness.data;
   const done = r.steps.filter((s) => s.state === "done").length;
+  const next = readinessNextStep(r);
 
   return (
     <div className="sd-page sd-enter">
@@ -119,13 +144,16 @@ export default function Setup() {
         <span className="setup4-overall__label">{r.label}</span>
         <span className="setup4-overall__detail">{r.detail}</span>
         <span className="setup4-overall__progress">
-          {done} of 4 steps complete
+          {done} of {r.steps.length} steps complete
+        </span>
+        <span className="ws-progress-inline" aria-hidden="true">
+          {r.steps.map((step) => (
+            <span key={step.key} data-state={step.state} />
+          ))}
         </span>
       </div>
 
-      {r.next && (
-        <NextActionCard title={r.next.label} detail={r.detail} actionLabel="Continue" href={r.next.path} />
-      )}
+      {next && <NextActionCard title={next.title} detail={next.detail} actionLabel={next.actionLabel} href={next.href} />}
 
       <div className="setup4-steps">
         {r.steps.map((step) => (

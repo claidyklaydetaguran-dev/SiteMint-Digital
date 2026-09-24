@@ -43,6 +43,14 @@ export interface ReadinessFacts {
   bookingGap: "appointment_type" | "opening_hours" | "timezone" | null;
   calendarState: "not_connected" | "revoked" | "failing" | "untested" | "healthy" | null;
   transfer: "off" | "on" | null;
+  /**
+   * Capabilities SiteMint has not switched on for this workspace (the
+   * capability report’s `platform_disabled` / `not_authorized` reason). When a
+   * capability is off for this reason the owner cannot turn it on themselves,
+   * so the check must say so instead of sending them to set things up that
+   * are already set up. Optional and additive: absent means "not known".
+   */
+  platformDisabled?: Array<"scheduling" | "transfer" | "messages">;
 
   published: Fact;
   /** The provider is running what is saved. */
@@ -145,6 +153,8 @@ export function deriveReadiness(f: ReadinessFacts, now: Date = new Date()): Read
   const bookingCheck: ReadinessCheck =
     f.booking === null
       ? { key: "booking", label: "Book appointments", state: "not_checked", detail: "Not checked — SiteMint couldn't read your booking setup.", fixPath: "/scheduling/availability" }
+      : f.booking === "off" && f.platformDisabled?.includes("scheduling")
+        ? { key: "booking", label: "Book appointments", state: "off", detail: "Off. Booking by phone isn’t switched on for your workspace yet — contact SiteMint to enable it. Your appointment types and hours stay saved.", fixPath: null }
       : f.booking === "off"
         ? { key: "booking", label: "Book appointments", state: "off", detail: "Off. Add an appointment type and opening hours to turn it on.", fixPath: "/scheduling/appointment-types" }
         : f.booking === "partial"
@@ -156,13 +166,17 @@ export function deriveReadiness(f: ReadinessFacts, now: Date = new Date()): Read
               : { key: "booking", label: "Book appointments", state: "done", detail: "On. Without a connected calendar, requests wait for you to confirm.", fixPath: "/scheduling/calendar" };
 
   const capabilities: ReadinessCheck[] = [
-    { key: "messages", label: "Take messages", state: "done", detail: "Always on. Callers can leave their details and what they need.", fixPath: null },
+    f.platformDisabled?.includes("messages")
+      ? { key: "messages", label: "Take messages", state: "done", detail: "Callers can leave their details during a call. Saving them to Inquiries isn’t switched on for your workspace yet — contact SiteMint to enable it.", fixPath: null }
+      : { key: "messages", label: "Take messages", state: "done", detail: "Always on. Callers can leave their details and what they need.", fixPath: null },
     bookingCheck,
     f.transfer === null
       ? { key: "transfer", label: "Transfer calls", state: "not_checked", detail: "Not checked — SiteMint couldn't read your transfer contacts.", fixPath: "/channels/transfer-contacts" }
       : f.transfer === "on"
         ? { key: "transfer", label: "Transfer calls", state: "done", detail: "On. Callers can be put through to a consenting contact.", fixPath: null }
-        : { key: "transfer", label: "Transfer calls", state: "off", detail: "Off. Add a contact who agreed to take calls, and test it with them, to turn it on.", fixPath: "/channels/transfer-contacts" },
+        : f.platformDisabled?.includes("transfer")
+          ? { key: "transfer", label: "Transfer calls", state: "off", detail: "Off. Putting callers through isn’t switched on for your workspace yet — contact SiteMint to enable it. You can still add contacts now.", fixPath: "/channels/transfer-contacts" }
+          : { key: "transfer", label: "Transfer calls", state: "off", detail: "Off. Add a contact who agreed to take calls, and test it with them, to turn it on.", fixPath: "/channels/transfer-contacts" },
   ];
 
   const errored = f.assistantErrored === true;
@@ -186,7 +200,7 @@ export function deriveReadiness(f: ReadinessFacts, now: Date = new Date()): Read
   const groups: Array<{ key: StepKey; number: 1 | 2 | 3 | 4; title: string; summary: string; checks: ReadinessCheck[] }> = [
     { key: "business", number: 1, title: "Business information", summary: "Who you are and where to reach you.", checks: business },
     { key: "greeting_voice", number: 2, title: "Greeting and voice", summary: "What callers hear, and how it sounds.", checks: greeting },
-    { key: "capabilities", number: 3, title: "What it can do", summary: "Messages are always on. Booking and transfer are optional.", checks: capabilities },
+    { key: "capabilities", number: 3, title: "What it can do", summary: f.platformDisabled?.includes("messages") ? "Taking messages, booking and transfer. Booking and transfer are optional." : "Messages are always on. Booking and transfer are optional.", checks: capabilities },
     { key: "test_activate", number: 4, title: "Test and activate", summary: "Publish, test in the browser, then connect a number.", checks: testing },
   ];
 

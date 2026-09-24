@@ -66,7 +66,11 @@ export async function loadReadinessFacts(firmId: number): Promise<ReadinessFacts
   let booking: ReadinessFacts["booking"] = null;
   let bookingGap: ReadinessFacts["bookingGap"] = null;
   let transfer: ReadinessFacts["transfer"] = null;
+  let platformDisabled: ReadinessFacts["platformDisabled"];
   if (capabilities) {
+    platformDisabled = capabilities.reports
+      .filter((r) => (r.key === "scheduling" || r.key === "transfer" || r.key === "messages") && r.state !== "active" && (r.reason === "platform_disabled" || r.reason === "not_authorized"))
+      .map((r) => r.key as "scheduling" | "transfer" | "messages");
     const scheduling = capabilities.reports.find((r) => r.key === "scheduling");
     if (scheduling?.state === "active") booking = "on";
     else if (scheduling?.reason === "platform_disabled" || scheduling?.reason === "not_authorized") booking = "off";
@@ -103,6 +107,7 @@ export async function loadReadinessFacts(firmId: number): Promise<ReadinessFacts
     assistantErrored: assistants ? latest?.status === "error" : null,
     booking,
     bookingGap,
+    platformDisabled,
     calendarState: calendar ? calendar.state : null,
     transfer,
     published: assistants ? latest?.status === "published" : null,

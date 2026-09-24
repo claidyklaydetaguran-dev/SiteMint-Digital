@@ -90,6 +90,22 @@ describe("four steps", () => {
     ]);
   });
 
+  it("a capability SiteMint has not switched on says so, instead of asking the owner to set up what is already set up", () => {
+    const blocked = { ...configured, booking: "off" as const, transfer: "off" as const, platformDisabled: ["scheduling", "transfer", "messages"] as Array<"scheduling" | "transfer" | "messages"> };
+    const booking = checkOf(blocked, "booking");
+    expect(booking.state).toBe("off");
+    expect(booking.detail).toMatch(/isn’t switched on for your workspace yet/);
+    expect(booking.detail).not.toMatch(/Add an appointment type/);
+    expect(booking.fixPath).toBeNull();
+    expect(checkOf(blocked, "transfer").detail).toMatch(/isn’t switched on for your workspace yet/);
+    const messages = checkOf(blocked, "messages");
+    expect(messages.state).toBe("done");
+    expect(messages.detail).toMatch(/Saving them to Inquiries isn’t switched on/);
+    // Without the platform reason the original guidance is unchanged.
+    expect(checkOf({ ...configured, booking: "off" }, "booking").detail).toMatch(/Add an appointment type and opening hours/);
+    expect(derive(blocked).steps.find((s) => s.key === "capabilities")?.state).toBe("done");
+  });
+
   it("booking started but unfinished needs attention and says what is missing", () => {
     const r = derive({ ...configured, booking: "partial", bookingGap: "opening_hours" });
     expect(r.state).toBe("needs_attention");

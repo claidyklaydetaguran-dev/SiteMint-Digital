@@ -201,6 +201,7 @@ function RowActions({
   onDelete,
   duplicatePending,
   menuTriggerRef,
+  showOpen = true,
 }: {
   assistant: AssistantDto;
   onOpen: () => void;
@@ -208,12 +209,14 @@ function RowActions({
   onDelete: () => void;
   duplicatePending: boolean;
   menuTriggerRef: (el: HTMLButtonElement | null) => void;
+  /** The summary card already has a primary "Open the builder" button. */
+  showOpen?: boolean;
 }) {
   const deletable = isEligibleForDelete(assistant);
 
   return (
     <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: "var(--sd-space-2, .5rem)" }}>
-      <button
+      {showOpen && <button
         type="button"
         onClick={onOpen}
         aria-label={openAccessibleName(assistant.name)}
@@ -222,7 +225,7 @@ function RowActions({
       >
         {LIST.open}
         <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
-      </button>
+      </button>}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -278,7 +281,7 @@ function AssistantSummary({
   const cardStatus = assistantCardStatus(assistant);
 
   return (
-    <section className="sd-section" aria-labelledby="assistant-summary-title">
+    <section className="ws-card ws-assistant" aria-labelledby="assistant-summary-title">
       <div className="sd-section__head">
         <div style={{ minWidth: 0 }}>
           <h2 className="sd-h2" id="assistant-summary-title" style={{ overflowWrap: "anywhere" }}>
@@ -288,6 +291,12 @@ function AssistantSummary({
         </div>
         <StatusChip label={cardStatus.label} tone={CARD_CHIP_TONE[cardStatus.key]} />
       </div>
+
+      <p className="ws-assistant__lede">
+        {assistant.status === "published"
+          ? "Callers who reach your receptionist hear this published version. Changes you save go live when you publish again."
+          : "This receptionist is saved as a draft. Nobody can reach it until you publish it from the builder and test it in your browser."}
+      </p>
 
       <dl className="sd-figures">
         <div className="sd-figure">
@@ -305,8 +314,8 @@ function AssistantSummary({
       </dl>
 
       <div>
-        <p style={{ ...MUTED, marginTop: 0 }}>{CARD.quickLinksLabel}</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sd-space-2, .5rem)" }}>
+        <p className="ws-assistant__label">{CARD.quickLinksLabel}</p>
+        <div className="ws-assistant__links">
           <Button variant="outline" size="sm" onClick={() => onOpenTab("configuration")}>
             {SECTIONS.configuration}
           </Button>
@@ -322,8 +331,11 @@ function AssistantSummary({
         </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--sd-space-3, .75rem)" }}>
-        <Button onClick={onOpen}>{CARD.openLabel}</Button>
+      <div className="ws-assistant__actions">
+        <Button onClick={onOpen}>
+          {CARD.openLabel}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
         <RowActions
           assistant={assistant}
           onOpen={onOpen}
@@ -331,6 +343,7 @@ function AssistantSummary({
           onDelete={onDelete}
           duplicatePending={duplicatePending}
           menuTriggerRef={menuTriggerRef}
+          showOpen={false}
         />
       </div>
 

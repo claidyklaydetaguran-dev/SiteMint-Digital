@@ -1,29 +1,34 @@
 /**
- * V5 customer-shell foundation — the redesigned dashboard overview (D-1).
+ * The workspace overview (SiteMint Workspace, 2026-09-24).
  *
- * Answers four questions, in this order: is the receptionist live and
- * healthy? what happened recently? what needs attention? what's next? A
- * status header (state chip, assigned number, calendar connection), a setup
- * progress pointer while incomplete, a needs-attention list, today's
- * activity, recent calls and recent conversations, a compact usage tile, and
- * exactly one next-best-action button. No fabricated metric: every value
- * traces to a real response, and an unknown count is never shown as zero.
+ * Built for a busy owner and ordered by the four questions they arrive with:
+ *
+ *   1. What is working?          — one status card: overall state in words,
+ *                                  setup progress, and every connection with
+ *                                  its real state (connected, off, not checked)
+ *   2. What should I do next?    — exactly one next step inside that card,
+ *                                  named as an action, never as a check label
+ *   3. What needs my attention?  — the needs-attention list, only when real
+ *   4. What happened today?      — today's figures, recent activity, calls
+ *
+ * No fabricated metric: every value traces to a real response, an unknown
+ * count is never shown as zero, and a disconnected calendar, inactive number
+ * or unverified channel is never styled as active.
  *
  * Voice-platform data (assistant status, assigned number, open issues,
- * recent calls) is fetched only when `voicePlatformEnabled` is true — the
- * same gating pattern `useAssistantsList` already uses — so this page
- * degrades gracefully to its SMS-only sections in the canonical build.
+ * recent calls) is fetched only when `voicePlatformEnabled` is true, so this
+ * page degrades to its SMS-only sections in the canonical build.
  */
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, Mail, Mic, Phone, PhoneForwarded, CalendarCheck } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
 import { useSession } from "@/hooks/useSession";
 import { relativeTime } from "@/lib/conversationUi";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
-import { StatusChip, type StatusTone } from "@/components/common/StatusChip";
 import { NextActionCard } from "@/components/common/NextActionCard";
+import { StatusChip, type StatusTone } from "@/components/common/StatusChip";
 import { PageHeader } from "@/components/common/PageHeader";
 import {
   useOpenIssuesCount,
@@ -31,11 +36,11 @@ import {
   useRecentCalls,
   countCallsToday,
 } from "@/pages/overview/overviewApi";
-// Readiness is measured once, on the server, and read here and by Setup, so the
-// two screens cannot disagree about whether an account is ready.
-import { useReadiness, overallTone, type Readiness } from "@/lib/readinessApi";
-// The needs-attention email signal and the assigned number still come from the
-// shared setup module until those reads move server-side as well.
+// Readiness is measured once, on the server, and read here, by Setup and by
+// the rail, so the three cannot disagree about whether an account is ready.
+import { useReadiness, type Readiness, type ReadinessCheck } from "@/lib/readinessApi";
+// The needs-attention email signal, the calendar connection and the assigned
+// number come from the shared setup module.
 import { useSetupData } from "@/pages/setup/setupApi";
 import {
   buildActivityFigures,
@@ -44,7 +49,9 @@ import {
   buildTodayFigures,
   buildUsage,
   countToday,
-  recentCalls as recentCallsOf,
+  readinessHeadline,
+  readinessNextStep,
+  readinessProgress,
   recentConversations,
   type ReceptionistState,
 } from "@/pages/overview/overviewContract";
@@ -58,6 +65,11 @@ const DashboardPanel = voicePlatformEnabled
 
 function todayLabel(): string {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 }
 
 // ─── Loading ───────────────────────────────────────────────────────────────
@@ -76,36 +88,207 @@ function OverviewSkeleton() {
   );
 }
 
-const READINESS_TONE: Record<ReturnType<typeof overallTone>, StatusTone> = {
-  live: "live",
-  ready: "next",
-  working: "next",
-  warning: "warn",
-  muted: "pending",
-};
+// ─── Status ────────────────────────────────────────────────────────────────
 
-// ─── Status header ───────────────────────────────────────────────────────
+type Tone = "live" | "progress" | "attention" | "off" | "neutral";
 
-function StatusHeader({ readiness, numberDisplay }: { readiness: Readiness | undefined; numberDisplay: string | null }) {
-  const live = readiness?.state === "live_call_verified";
+const CHIP_TONE: Record<Tone, StatusTone> = { live: "live", progress: "next", attention: "blocked", off: "pending", neutral: "neutral" };
+
+function overallTone(r: Readiness | undefined): Tone {
+  if (!r) return "neutral";
+  if (r.state === "live_call_verified") return "live";
+  if (r.state === "needs_attention" || r.state === "paused") return "attention";
+  if (r.state === "not_checked") return "neutral";
+  return "progress";
+}
+
+interface ConnectionRow {
+  key: string;
+  icon: ComponentType<{ "aria-hidden"?: boolean | "true" }>;
+  label: string;
+  state: string;
+  tone: Tone;
+  detail: string;
+  href: string | null;
+}
+
+/** A check's state as a word and a tone. A word always carries the state. */
+function checkWord(check: ReadinessCheck | undefined, words: { done: string; todo: string; off?: string }): { state: string; tone: Tone } {
+  if (!check) return { state: "Not checked", tone: "neutral" };
+  switch (check.state) {
+    case "done":
+      return { state: words.done, tone: "live" };
+    case "attention":
+      return { state: "Needs attention", tone: "attention" };
+    case "off":
+      return { state: words.off ?? "Off", tone: "off" };
+    case "not_checked":
+      return { state: "Not checked", tone: "neutral" };
+    default:
+      return { state: words.todo, tone: "off" };
+  }
+}
+
+function connectionRows(
+  r: Readiness | undefined,
+  calendarReady: boolean | null,
+  numberDisplay: string | null,
+): ConnectionRow[] {
+  const checks = r?.steps.flatMap((s) => s.checks) ?? [];
+  const find = (key: string) => checks.find((c) => c.key === key);
+  const published = find("published");
+  const phone = find("phone");
+  const booking = find("booking");
+  const email = find("email");
+  const transfer = find("transfer");
+
+  const rows: ConnectionRow[] = [
+    {
+      key: "assistant",
+      icon: Mic,
+      label: "Voice receptionist",
+      ...checkWord(published, { done: "Published", todo: "Draft" }),
+      detail: published?.state === "done" ? "Callers reach the published version." : "Not published yet, so it can't answer calls.",
+      href: "/assistants",
+    },
+    {
+      key: "phone",
+      icon: Phone,
+      label: "Phone number",
+      ...(numberDisplay ? { state: "Connected", tone: "live" as Tone } : checkWord(phone, { done: "Connected", todo: "Not connected" })),
+      detail: numberDisplay ? numberDisplay : phone?.detail ?? "Not checked.",
+      href: "/channels/phone-number",
+    },
+    {
+      key: "calendar",
+      icon: CalendarDays,
+      label: "Google Calendar",
+      state: calendarReady === true ? "Connected" : calendarReady === false ? "Not connected" : "Not checked",
+      tone: calendarReady === true ? "live" : calendarReady === false ? "off" : "neutral",
+      detail:
+        calendarReady === true
+          ? "Connected and working. Confirmed bookings can be added to it."
+          : calendarReady === false
+            ? "Connect a calendar so bookings land in it."
+            : "SiteMint couldn't check your calendar just now.",
+      href: "/scheduling/calendar",
+    },
+    {
+      key: "booking",
+      icon: CalendarCheck,
+      label: "Booking by phone",
+      ...checkWord(booking, { done: "On", todo: "Off" }),
+      detail: booking?.detail ?? "Not checked.",
+      href: booking?.fixPath ?? "/scheduling/appointment-types",
+    },
+    {
+      key: "transfer",
+      icon: PhoneForwarded,
+      label: "Call transfers",
+      ...checkWord(transfer, { done: "On", todo: "Off" }),
+      detail: transfer?.detail ?? "Not checked.",
+      href: "/channels/transfer-contacts",
+    },
+    {
+      key: "email",
+      icon: Mail,
+      label: "Email summaries",
+      ...checkWord(email, { done: "Email confirmed", todo: "Not confirmed" }),
+      detail: email?.detail ?? "Not checked.",
+      href: null,
+    },
+  ];
+  return voicePlatformEnabled ? rows : rows.filter((row) => row.key === "calendar" || row.key === "email");
+}
+
+function StatusCard({
+  readiness,
+  calendarReady,
+  numberDisplay,
+  next,
+}: {
+  readiness: Readiness | undefined;
+  calendarReady: boolean | null;
+  numberDisplay: string | null;
+  next: { title: string; detail: string; actionLabel: string; href: string };
+}) {
+  const tone = overallTone(readiness);
+  const progress = readinessProgress(readiness);
+  const rows = connectionRows(readiness, calendarReady, numberDisplay);
+
   return (
-    <section className="sd-status" data-state={live ? "answering" : "incomplete"} aria-labelledby="sd-status-title">
-      <div className="sd-status__head">
-        <span className="sd-status__dot" aria-hidden="true" />
-        <div className="sd-status__body">
-          <h2 className="sd-status__title" id="sd-status-title">
-            Receptionist status
-          </h2>
-          <p className="sd-status__detail">
-            {readiness ? readiness.detail : "Not checked — SiteMint couldn't read your setup just now."}
-            {" "}
-            {numberDisplay ? `Number: ${numberDisplay}.` : "No phone number connected yet."}
-          </p>
-        </div>
+    <section className="ws-card ws-hero" aria-labelledby="sd-status-title">
+      <div className="ws-hero__main">
         <StatusChip
           label={readiness ? readiness.label : "Not checked"}
-          tone={readiness ? READINESS_TONE[overallTone(readiness.state)] : "pending"}
+          tone={CHIP_TONE[tone]}
+          dot
+          srPrefix="Receptionist status: "
         />
+        <h2 className="ws-hero__title" id="sd-status-title">
+          {readinessHeadline(readiness?.state)}
+        </h2>
+        <p className="ws-hero__detail">
+          {readiness ? readiness.detail : "SiteMint couldn't read your setup just now."}{" "}
+          {numberDisplay ? `Callers reach you on ${numberDisplay}.` : "No phone number is connected yet, so no real calls reach it."}
+        </p>
+
+        {readiness && progress && (
+          <div>
+            <ol className="ws-progress" style={{ ["--ws-steps" as string]: String(progress.total) }} aria-label={`Setup: ${progress.done} of ${progress.total} steps complete`}>
+              {readiness.steps.map((step) => (
+                <li key={step.key} className="ws-progress__step" data-state={step.state}>
+                  <span className="ws-progress__bar" aria-hidden="true" />
+                  <span className="ws-progress__label">
+                    {step.title}
+                    <span className="sd-sr">: {step.state === "done" ? "complete" : step.state === "current" ? "in progress" : step.state === "attention" ? "needs attention" : "not started"}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        <NextActionCard title={next.title} detail={next.detail} actionLabel={next.actionLabel} href={next.href} />
+      </div>
+
+      <div className="ws-hero__side">
+        <div className="sd-section__head" style={{ marginBottom: 4 }}>
+          <h2 className="ws-side-title">Connections</h2>
+          <Link href="/setup" className="sd-link">
+            Setup
+            <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
+          </Link>
+        </div>
+        <ul className="ws-connections">
+          {rows.map(({ key, icon: Icon, label, state, tone: rowTone, detail, href }) => {
+            const body = (
+              <>
+                <span className="ws-connection__icon">
+                  <Icon aria-hidden="true" />
+                </span>
+                <span className="ws-connection__text">
+                  <span className="ws-connection__label">{label}</span>
+                  <span className="ws-connection__detail">{detail}</span>
+                </span>
+              </>
+            );
+            return (
+              <li key={key} className="ws-connection">
+                {href ? (
+                  <Link href={href} className="ws-connection__main">
+                    {body}
+                  </Link>
+                ) : (
+                  <span className="ws-connection__main">{body}</span>
+                )}
+                <span className="ws-pill" data-tone={rowTone}>
+                  {state}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
@@ -175,240 +358,187 @@ export default function Overview() {
     pendingAppointmentRequests: pendingRequests,
   });
 
-  const nextAction = buildNextBestAction({ receptionistState: state, attentionCount: attention.length });
-  const recentVoiceCalls = recentCallsOf(recentCallsQuery.items);
+  // One next step. While setup is unfinished it is the first real action the
+  // server's readiness asks for; once something needs attention, that wins.
+  const fallback = buildNextBestAction({ receptionistState: state, attentionCount: attention.length });
+  const setupStep = attention.length === 0 ? readinessNextStep(r) : null;
+  const next = setupStep ?? fallback;
+
+  const progress = readinessProgress(r);
 
   return (
     <div className="sd-page sd-enter">
-      <PageHeader eyebrow="Your business workspace" title="Your day, at a glance." />
-      <div className="sd-page__head" style={{ marginTop: "calc(-1 * var(--sd-space-4, 1rem))" }}>
-        <span className="sd-page__meta">{todayLabel()}</span>
-      </div>
+      <PageHeader
+        eyebrow={todayLabel()}
+        title={greeting()}
+        description={
+          progress && progress.done < progress.total
+            ? `Here is where ${session.firm.name}'s receptionist stands. ${progress.done} of ${progress.total} setup steps are complete.`
+            : `Here is what is happening with ${session.firm.name}'s receptionist.`
+        }
+      />
 
-      <StatusHeader readiness={r} numberDisplay={setup.assignedNumberDisplay} />
-
-      {/* Exactly one next-best-action control (D-1) — its content already
-          covers every state (setup incomplete, ready for activation, live
-          with attention, live and healthy), so it is rendered once rather
-          than duplicated per branch. */}
-      <div style={{ marginTop: "var(--sd-space-4, 1rem)" }}>
-        <NextActionCard
-          title={r?.next && attention.length === 0 ? r.next.label : nextAction.title}
-          detail={r?.next && attention.length === 0 ? r.detail : nextAction.detail}
-          actionLabel={r?.next && attention.length === 0 ? "Continue" : nextAction.actionLabel}
-          href={r?.next && attention.length === 0 ? r.next.path : nextAction.href}
+      <div className="ws-overview">
+        <StatusCard
+          readiness={r}
+          calendarReady={setup.signals.calendarReady}
+          numberDisplay={setup.assignedNumberDisplay}
+          next={next}
         />
-      </div>
 
-      {DashboardPanel && (
-        <Suspense fallback={<div className="sd-skel sd-skel--figures" aria-hidden="true" />}>
-          <DashboardPanel readiness={r} />
-        </Suspense>
-      )}
-
-      {attention.length > 0 && (
-        <section className="sd-section" aria-labelledby="sd-attention-title">
-          <h2 className="sd-h2" id="sd-attention-title">
-            Needs your attention
-          </h2>
-          <ul className="sd-attention">
-            {attention.map((item) => (
-              <li className="sd-attention__item" key={item.key}>
-                <AlertTriangle className="sd-attention__icon" aria-hidden="true" />
-                <div className="sd-attention__body">
-                  <span className="sd-attention__title">{item.title}</span>
-                  <p className="sd-attention__detail">{item.detail}</p>
-                </div>
-                <Link href={item.href} className="sd-attention__action">
-                  {item.action}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {convsError ? (
-        <section className="sd-error" role="alert" aria-labelledby="sd-error-title">
-          <AlertTriangle className="sd-error__icon" aria-hidden="true" />
-          <div className="sd-error__body">
-            <span className="sd-error__title" id="sd-error-title">
-              Conversations didn&rsquo;t load
-            </span>
-            <p className="sd-error__detail">
-              The request failed. Nothing was lost — your conversations are still on the server.
-            </p>
-          </div>
-          <button type="button" className="sd-error__action" onClick={() => refetchConversations()}>
-            Try again
-          </button>
-        </section>
-      ) : (
-        <>
-          {!DashboardPanel && <>
-          <section className="sd-section" aria-labelledby="sd-today-title">
-            <h2 className="sd-h2" id="sd-today-title">
-              Today&rsquo;s activity
+        {attention.length > 0 && (
+          <section className="sd-section" aria-labelledby="sd-attention-title">
+            <h2 className="sd-h2" id="sd-attention-title">
+              Needs your attention
             </h2>
-            <div className="sd-figures">
-              {todayFigures.map((figure) => (
-                <Link
-                  key={figure.key}
-                  href={figure.href}
-                  className="sd-figure"
-                  data-emphasis={figure.emphasis ? "true" : "false"}
-                  data-nonzero={figure.value ? "true" : "false"}
-                >
-                  <span
-                    className="sd-figure__value"
-                    data-empty={figure.value === null && !figure.unavailable ? "true" : "false"}
-                    data-unavailable={figure.unavailable ? "true" : "false"}
-                  >
-                    {figure.unavailable ? "—" : figure.value === null ? "None yet" : figure.value}
-                  </span>
-                  <span className="sd-figure__label">{figure.label}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="sd-section" aria-labelledby="sd-activity-title">
-            <h2 className="sd-h2 sd-sr" id="sd-activity-title">
-              Conversation activity
-            </h2>
-            <div className="sd-figures">
-              {figures.map((figure) => (
-                <Link
-                  key={figure.key}
-                  href={figure.href}
-                  className="sd-figure"
-                  data-emphasis={figure.emphasis ? "true" : "false"}
-                  data-nonzero={figure.value ? "true" : "false"}
-                >
-                  <span
-                    className="sd-figure__value"
-                    data-empty={figure.value === null && !figure.unavailable ? "true" : "false"}
-                    data-unavailable={figure.unavailable ? "true" : "false"}
-                  >
-                    {figure.unavailable ? "—" : figure.value === null ? "None yet" : figure.value}
-                  </span>
-                  <span className="sd-figure__label">{figure.label}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          </>}
-          {voicePlatformEnabled && (
-            <section className="sd-section" aria-labelledby="sd-calls-title">
-              <div className="sd-section__head">
-                <h2 className="sd-h2" id="sd-calls-title">
-                  Recent calls
-                </h2>
-                {recentVoiceCalls.length > 0 && (
-                  <Link href="/activity/calls" className="sd-link">
-                    View all
-                    <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
+            <ul className="sd-attention">
+              {attention.map((item) => (
+                <li className="sd-attention__item" key={item.key}>
+                  <AlertTriangle className="sd-attention__icon" aria-hidden="true" />
+                  <div className="sd-attention__body">
+                    <span className="sd-attention__title">{item.title}</span>
+                    <p className="sd-attention__detail">{item.detail}</p>
+                  </div>
+                  <Link href={item.href} className="sd-attention__action">
+                    {item.action}
                   </Link>
-                )}
-              </div>
-              {recentCallsQuery.isError ? (
-                <section className="sd-error" role="alert">
-                  <div className="sd-error__body">
-                    <span className="sd-error__title">We couldn&rsquo;t load your calls</span>
-                    <p className="sd-error__detail">
-                      This doesn&rsquo;t mean nobody called. We couldn&rsquo;t reach the server just now — nothing
-                      has been lost.
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {DashboardPanel && (
+          <Suspense fallback={<div className="sd-skel sd-skel--figures" aria-hidden="true" />}>
+            <DashboardPanel readiness={r} />
+          </Suspense>
+        )}
+
+        {convsError ? (
+          <section className="sd-error" role="alert" aria-labelledby="sd-error-title">
+            <AlertTriangle className="sd-error__icon" aria-hidden="true" />
+            <div className="sd-error__body">
+              <span className="sd-error__title" id="sd-error-title">
+                Conversations didn&rsquo;t load
+              </span>
+              <p className="sd-error__detail">
+                The request failed. Nothing was lost — your conversations are still on the server.
+              </p>
+            </div>
+            <button type="button" className="sd-error__action" onClick={() => refetchConversations()}>
+              Try again
+            </button>
+          </section>
+        ) : (
+          <>
+            {!DashboardPanel && (
+              <>
+                <section className="sd-section" aria-labelledby="sd-today-title">
+                  <h2 className="sd-h2" id="sd-today-title">
+                    Today&rsquo;s activity
+                  </h2>
+                  <div className="ws-stats">
+                    {todayFigures.map((figure) => (
+                      <Link key={figure.key} href={figure.href} className="ws-stat">
+                        <span
+                          className="ws-stat__value"
+                          data-empty={figure.value === null && !figure.unavailable ? "true" : "false"}
+                          data-zero={figure.value === 0 ? "true" : "false"}
+                        >
+                          {figure.unavailable ? "—" : figure.value === null ? "None yet" : figure.value}
+                        </span>
+                        <span className="ws-stat__label">{figure.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="sd-section" aria-labelledby="sd-activity-title">
+                  <h2 className="sd-h2" id="sd-activity-title">
+                    Conversation activity
+                  </h2>
+                  <div className="ws-stats">
+                    {figures.map((figure) => (
+                      <Link key={figure.key} href={figure.href} className="ws-stat">
+                        <span
+                          className="ws-stat__value"
+                          data-empty={figure.value === null && !figure.unavailable ? "true" : "false"}
+                          data-zero={figure.value === 0 ? "true" : "false"}
+                        >
+                          {figure.unavailable ? "—" : figure.value === null ? "None yet" : figure.value}
+                        </span>
+                        <span className="ws-stat__label">{figure.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
+
+            {(!DashboardPanel || recent.length > 0) && (
+              <section className="sd-section" aria-labelledby="sd-recent-title" style={{ marginTop: 0 }}>
+                <div className="sd-section__head">
+                  <h2 className="sd-h2" id="sd-recent-title">
+                    Recent conversations
+                  </h2>
+                  {recent.length > 0 && (
+                    <Link href="/activity/conversations" className="sd-link">
+                      View all
+                      <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
+                    </Link>
+                  )}
+                </div>
+
+                {recent.length === 0 ? (
+                  <div className="sd-empty">
+                    <h3 className="sd-empty__title">No conversations yet</h3>
+                    <p className="sd-empty__detail">
+                      Messages appear here when a supported messaging channel is configured.
+                      Caller SMS is not included yet; review calls and
+                      appointment requests in their own sections.
                     </p>
                   </div>
-                  <button type="button" className="sd-error__action" onClick={() => recentCallsQuery.refetch()}>
-                    Try again
-                  </button>
-                </section>
-              ) : recentVoiceCalls.length === 0 ? (
-                <div className="sd-empty">
-                  <h3 className="sd-empty__title">No calls yet</h3>
-                  <p className="sd-empty__detail">Calls to your assigned number will appear here.</p>
-                </div>
-              ) : (
-                <ul className="sd-list">
-                  {recentVoiceCalls.map((call) => (
-                    <li className="sd-list__item" key={call.callId}>
-                      <Link href="/activity/calls" className="sd-row">
-                        <span className="sd-row__who">{call.callerNumberDisplay}</span>
-                        <span className="sd-chip">{call.stateLabel}</span>
-                        <span className="sd-row__when">{relativeTime(call.startedAt)}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          )}
-
-          <section className="sd-section" aria-labelledby="sd-recent-title">
-            <div className="sd-section__head">
-              <h2 className="sd-h2" id="sd-recent-title">
-                Recent conversations
-              </h2>
-              {recent.length > 0 && (
-                <Link href="/activity/conversations" className="sd-link">
-                  View all
-                  <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
-                </Link>
-              )}
-            </div>
-
-            {recent.length === 0 ? (
-              <div className="sd-empty">
-                <h3 className="sd-empty__title">No conversations yet</h3>
-                <p className="sd-empty__detail">
-                  Messages appear here when a supported messaging channel is configured.
-                  Caller SMS is not included yet; review calls and
-                  appointment requests in their own sections.
-                </p>
-              </div>
-            ) : (
-              <ul className="sd-list">
-                {recent.map((conversation) => (
-                  <li className="sd-list__item" key={conversation.id}>
-                    <Link href="/activity/conversations" className="sd-row">
-                      <span className="sd-row__who">{conversation.callerPhone}</span>
-                      {conversation.tier && (
-                        <span className="sd-chip" data-tier={conversation.tier}>
-                          {conversation.tier}
-                        </span>
-                      )}
-                      <span className="sd-row__when">{relativeTime(conversation.lastMessageAt)}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                ) : (
+                  <ul className="sd-list">
+                    {recent.map((conversation) => (
+                      <li className="sd-list__item" key={conversation.id}>
+                        <Link href="/activity/conversations" className="sd-row">
+                          <span className="sd-row__who">{conversation.callerPhone}</span>
+                          {conversation.tier && (
+                            <span className="sd-chip" data-tier={conversation.tier}>
+                              {conversation.tier}
+                            </span>
+                          )}
+                          <span className="sd-row__when">{relativeTime(conversation.lastMessageAt)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             )}
-          </section>
-        </>
-      )}
+          </>
+        )}
 
-      {/* Compact usage tile (D-1). Trial percentage only; a paid plan carries
-          no percentage, per overviewContract.buildUsage. */}
-      <section className="sd-section" aria-labelledby="sd-usage-title">
-        <div className="sd-section__head">
-          <h2 className="sd-h2" id="sd-usage-title">
+        {/* Compact usage line. Trial percentage only; a paid plan carries no
+            percentage, per overviewContract.buildUsage. */}
+        <section className="ws-note ws-usage-line" aria-labelledby="sd-usage-title">
+          <h2 className="sd-sr" id="sd-usage-title">
             Usage
           </h2>
+          <span>
+            {/* Text-message (SMS) intake conversations, counted for the life of
+                the account. Not calls, and not "this period" — voice minutes
+                are a separate allowance shown on Usage. */}
+            {usage.isPaid
+              ? `${usage.used} SMS conversations recorded, all time.`
+              : `Trial: ${usage.used} of ${usage.limit} SMS conversations used, all time${usage.percent !== null ? ` (${usage.percent}%)` : ""}.`}
+          </span>
           <Link href="/account/billing" className="sd-link">
             View billing
           </Link>
-        </div>
-        <p style={{ margin: 0, fontSize: "var(--sd-text-small, .8125rem)", color: "var(--sd-text-muted, #3b5265)" }}>
-          {/* Text-message (SMS) intake conversations, counted for the life of
-              the account. Not calls, and not "this period" — voice minutes are
-              a separate allowance shown on Usage. */}
-          {usage.isPaid
-            ? `${usage.used} SMS conversations recorded, all time.`
-            : `${usage.used} of ${usage.limit} trial SMS conversations used, all time${usage.percent !== null ? ` (${usage.percent}%)` : ""}.`}
-        </p>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

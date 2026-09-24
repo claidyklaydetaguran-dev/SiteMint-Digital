@@ -1,12 +1,13 @@
 /**
- * V5 customer-shell foundation — a page head with a title, a one-line purpose
- * statement, an optional breadcrumb slot (C-6 / D-2 breadcrumbs) and an
- * optional primary-action slot. Reuses the `sd-page__head` / `sd-page__title`
- * / `sd-eyebrow` classes already shipped in `v2-dashboard.css` so it drops
- * into any page inside `DashboardShell` without a new stylesheet.
+ * The workspace page head: an eyebrow, a title, a one-line purpose statement,
+ * an optional breadcrumb (return path) and an optional primary-action slot.
+ * Reuses the `sd-page__head` / `sd-page__title` / `sd-eyebrow` classes and is
+ * styled by the SiteMint Workspace system (`styles/workspace.css`), so every
+ * page inside `DashboardShell` gets the same header rhythm.
  */
 
 import type { ReactNode } from "react";
+import { Link } from "wouter";
 
 export interface PageHeaderProps {
   title: string;
@@ -24,21 +25,9 @@ export function PageHeader({ title, description, eyebrow, breadcrumb, action }: 
         {breadcrumb}
         {eyebrow && <span className="sd-eyebrow">{eyebrow}</span>}
         <h1 className="sd-page__title">{title}</h1>
-        {description && (
-          <p
-            style={{
-              margin: "var(--sd-space-1, .25rem) 0 0",
-              maxWidth: "42rem",
-              fontSize: "var(--sd-text-small, .8125rem)",
-              lineHeight: 1.55,
-              color: "var(--sd-text-muted, #3b5265)",
-            }}
-          >
-            {description}
-          </p>
-        )}
+        {description && <p className="ws-page-lede">{description}</p>}
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="ws-page-actions">{action}</div>}
     </div>
   );
 }
@@ -47,29 +36,15 @@ export interface BreadcrumbProps {
   items: Array<{ label: string; href?: string }>;
 }
 
-/** Plain text breadcrumb, e.g. "Assistant / Ava / Prompt" (C-6). No route change. */
+/** Breadcrumb, e.g. "Assistant / Ava / Prompt" (C-6). Items with an href are return links. */
 export function Breadcrumb({ items }: BreadcrumbProps) {
   return (
-    <nav aria-label="Breadcrumb" style={{ marginBottom: "var(--sd-space-1, .25rem)" }}>
-      <ol
-        style={{
-          listStyle: "none",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 4,
-          margin: 0,
-          padding: 0,
-          fontSize: "var(--sd-text-micro, .6875rem)",
-          fontWeight: 600,
-          letterSpacing: "var(--sd-tracking-eyebrow, .1em)",
-          textTransform: "uppercase",
-          color: "var(--sd-text-muted, #3b5265)",
-        }}
-      >
+    <nav aria-label="Breadcrumb" className="ws-crumbs">
+      <ol>
         {items.map((item, i) => (
-          <li key={`${item.label}-${i}`} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <li key={`${item.label}-${i}`}>
             {i > 0 && <span aria-hidden="true">/</span>}
-            <span>{item.label}</span>
+            {item.href ? <Link href={item.href}>{item.label}</Link> : <span>{item.label}</span>}
           </li>
         ))}
       </ol>

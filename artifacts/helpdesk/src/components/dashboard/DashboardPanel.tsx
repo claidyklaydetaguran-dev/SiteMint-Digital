@@ -1,7 +1,7 @@
 /**
- * The receptionist dashboard: summary cards that open their records, a
- * fourteen-day call trend, a merged activity feed, integration status and a
- * shortcut to the browser test.
+ * The receptionist dashboard: a compact "Today" strip whose figures open their
+ * records, a merged activity feed, a fourteen-day call trend and a shortcut to
+ * the browser test. Connection status lives in the overview's status card.
  *
  * Every number comes from `GET /api/receptionist/dashboard`, which builds it
  * from the business's own records. A source the server couldn't read shows
@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CalendarDays, Mail, Mic, Phone } from "lucide-react";
+import { ArrowRight, Mic } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuthenticatedFirmId } from "@/hooks/useSession";
 import { relativeTime } from "@/lib/conversationUi";
@@ -63,6 +63,14 @@ function TrendChart({ trend }: { trend: NonNullable<DashboardSummary["trend"]> }
   const total = trend.reduce((n, d) => n + all(d), 0);
   const shown = focus === null ? null : trend[focus]!;
   const label = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+
+  if (total === 0) {
+    return (
+      <p className="ws-trend-empty">
+        No calls in the last 14 days. Test calls from the browser and calls to your number will show here.
+      </p>
+    );
+  }
 
   return (
     <figure className="dash-trend">
@@ -119,7 +127,7 @@ function ActivityFeed({ summary }: { summary: DashboardSummary }) {
   const [filter, setFilter] = useState<(typeof KIND_FILTERS)[number]["key"]>("all");
   const items = summary.activity.filter((a) => filter === "all" || a.kind === filter);
   return (
-    <section className="sd-section" aria-labelledby="dash-activity-title">
+    <section aria-labelledby="dash-activity-title" style={{ minWidth: 0 }}>
       <div className="sd-section__head">
         <h2 className="sd-h2" id="dash-activity-title">Recent activity</h2>
         <div className="dash-filters" role="group" aria-label="Show">
@@ -132,8 +140,8 @@ function ActivityFeed({ summary }: { summary: DashboardSummary }) {
       </div>
       {items.length === 0 ? (
         <div className="sd-empty">
-          <p className="sd-empty__title">Nothing here yet</p>
-          <p className="sd-empty__detail">Calls, messages, bookings and new contacts from the last 30 days appear here.</p>
+          <p className="sd-empty__title">{filter === "all" ? "Nothing in the last 30 days" : "Nothing of this kind yet"}</p>
+          <p className="sd-empty__detail">Calls, messages, bookings and new contacts from the last 30 days appear here as they happen.</p>
         </div>
       ) : (
         <ul className="sd-list">
@@ -151,38 +159,6 @@ function ActivityFeed({ summary }: { summary: DashboardSummary }) {
           ))}
         </ul>
       )}
-    </section>
-  );
-}
-
-function IntegrationStatus({ readiness }: { readiness: Readiness | undefined }) {
-  const checks = readiness?.steps.flatMap((s) => s.checks) ?? [];
-  const find = (key: string) => checks.find((c) => c.key === key);
-  const rows = [
-    { key: "phone", icon: Phone, label: "Phone number", check: find("phone") },
-    { key: "booking", icon: CalendarDays, label: "Calendar and booking", check: find("booking") },
-    { key: "email", icon: Mail, label: "Email summaries", check: find("email") },
-    { key: "published", icon: Mic, label: "Voice receptionist", check: find("published") },
-  ];
-  return (
-    <section className="sd-section" aria-labelledby="dash-integrations-title">
-      <h2 className="sd-h2" id="dash-integrations-title">Connections</h2>
-      <ul className="dash-integrations">
-        {rows.map(({ key, icon: Icon, label, check }) => (
-          <li key={key} className="dash-integration" data-state={check?.state ?? "not_checked"}>
-            <Icon className="dash-integration__icon" aria-hidden="true" />
-            <div>
-              <span className="dash-integration__label">{label}</span>
-              <span className="dash-integration__detail">{check ? check.detail : "Not available"}</span>
-            </div>
-            {check?.fixPath && check.state !== "done" && (
-              <Link href={check.fixPath} className="sd-link">
-                Open <span className="sd-sr">{label}</span>
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
@@ -207,28 +183,33 @@ export function DashboardPanel({ readiness }: { readiness: Readiness | undefined
 
   return (
     <>
-      <section className="sd-section" aria-labelledby="dash-cards-title">
-        <h2 className="sd-h2" id="dash-cards-title">At a glance</h2>
+      <section aria-labelledby="dash-cards-title">
+        <div className="sd-section__head">
+          <h2 className="sd-h2" id="dash-cards-title">Today</h2>
+          <span className="dash-note">Updated {relativeTime(s.generatedAt)}</span>
+        </div>
         {s.unavailable.length > 0 && (
           <p className="dash-note" role="status">
             Some figures are not available right now ({s.unavailable.join(", ")}). They are shown as “Not available”, not as zero.
           </p>
         )}
-        <div className="dash-cards">
+        <div className="ws-stats">
           {s.cards.map((c) => (
-            <Link key={c.key} href={c.href} className="dash-card" data-empty={c.value === null ? "true" : "false"}>
-              <span className="dash-card__value">{c.value === null ? "Not available" : c.value}</span>
-              <span className="dash-card__label">{c.label}</span>
-              <span className="dash-card__detail">{readable(c.detail, s.timezone)}</span>
-              <ArrowRight className="dash-card__go" aria-hidden="true" />
+            <Link key={c.key} href={c.href} className="ws-stat" data-empty={c.value === null ? "true" : "false"}>
+              <span className="ws-stat__value" data-empty={c.value === null ? "true" : "false"} data-zero={c.value === 0 ? "true" : "false"}>
+                {c.value === null ? "Not available" : c.value}
+              </span>
+              <span className="ws-stat__label">{c.label}</span>
+              <span className="ws-stat__detail">{readable(c.detail, s.timezone)}</span>
             </Link>
           ))}
         </div>
       </section>
 
-      <div className="dash-split">
-        <section className="sd-section" aria-labelledby="dash-trend-title">
-          <h2 className="sd-h2" id="dash-trend-title">Calls</h2>
+      <div className="ws-columns">
+        <ActivityFeed summary={s} />
+        <section className="ws-card" aria-labelledby="dash-trend-title">
+          <h2 className="sd-h2" id="dash-trend-title" style={{ marginBottom: 12 }}>Calls, last 14 days</h2>
           {s.trend ? <TrendChart trend={s.trend} /> : <p className="dash-note">Call history is not available right now.</p>}
           <div className="dash-test">
             <Mic className="dash-test__icon" aria-hidden="true" />
@@ -240,13 +221,11 @@ export function DashboardPanel({ readiness }: { readiness: Readiness | undefined
             </div>
             <Link href="/assistants" className="sd-link">
               Start a test <span className="sd-sr">call in the browser</span>
+              <ArrowRight className="sd-navlink__icon" aria-hidden="true" />
             </Link>
           </div>
         </section>
-        <IntegrationStatus readiness={readiness} />
       </div>
-
-      <ActivityFeed summary={s} />
     </>
   );
 }

@@ -22,7 +22,7 @@
 export const PAGE = {
   eyebrow: "SCHEDULING",
   title: "Availability",
-  detail: "The rules the server uses to decide which times a client can request.",
+  detail: "Your opening hours and booking rules. Callers and your booking page are only offered times that fit them.",
   loading: "Loading availability settings…",
   failed: "Availability settings couldn't be loaded. Try again shortly.",
 } as const;
@@ -50,7 +50,7 @@ export function initialTabFromSearch(search: string): AvailabilityTab {
 
 export const SETTINGS = {
   timezoneHeading: "Time zone",
-  timezoneLabel: "IANA time zone",
+  timezoneLabel: "Time zone",
   timezoneHelp: "Every time on this page is shown in this zone.",
   hoursHeading: "Weekly hours",
   hoursHelp: "Days without hours are closed.",

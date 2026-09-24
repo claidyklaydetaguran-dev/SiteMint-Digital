@@ -112,7 +112,7 @@ export default function CalendarPage() {
         <div>
           <span className="sd-eyebrow">{PAGE.eyebrow}</span>
           <h1 className="sd-page__title">{PAGE.title}</h1>
-          <p className="sd-page__meta">{PAGE.breadcrumb}</p>
+          <p className="sd-page__meta">{PAGE.detail}</p>
         </div>
       </div>
 

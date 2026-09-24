@@ -1,54 +1,23 @@
 /**
- * V5 customer-shell foundation — a small status pill shared by Setup, Overview
- * and Settings.
+ * A small status pill shared by Overview, Setup, Settings and Assistants.
  *
  * A status is always a word, never a colour alone: the label is rendered as
- * text and the tone only adds a second, non-exclusive signal. Colours are
- * read from the `--sm-*` (V5 mint) token names first — so the moment
- * `tokens-v5.css` lands (V5-BLUEPRINT.md §2, PR-1) this component picks the
- * approved palette up with no code change — and fall back to the `--sd-*`
- * semantic roles already defined on `.sd-app` in `v2-dashboard.css`, which
- * this file does not have permission to edit or import from directly.
+ * text and the tone only adds a second, non-exclusive signal. Styled by the
+ * SiteMint Workspace system (`styles/workspace.css`, `ws-pill`), so the same
+ * state looks the same on every page in light and dark appearance.
  */
 
 export type StatusTone = "done" | "live" | "next" | "pending" | "blocked" | "warn" | "neutral";
 
-const TONE_STYLE: Record<StatusTone, { color: string; background: string; border: string }> = {
-  done: {
-    color: "var(--sm-mint-700, var(--sd-accent-ink, #051824))",
-    background: "var(--sm-mint-500, var(--sd-accent, #27e9b5))",
-    border: "transparent",
-  },
-  live: {
-    color: "var(--sm-mint-700, var(--sd-accent-ink, #051824))",
-    background: "var(--sm-mint-500, var(--sd-accent, #27e9b5))",
-    border: "transparent",
-  },
-  next: {
-    color: "var(--sm-mint-700, var(--sd-text, #051824))",
-    background: "transparent",
-    border: "var(--sm-mint-500, var(--sd-accent, #27e9b5))",
-  },
-  pending: {
-    color: "var(--sd-muted-text, #5c7181)",
-    background: "var(--sd-muted-surface, #f6fbfa)",
-    border: "var(--sd-border-strong, rgba(59,82,101,.24))",
-  },
-  blocked: {
-    color: "var(--sm-amber-600, var(--sd-warn, #8a5200))",
-    background: "var(--sm-amber-100, var(--sd-warn-surface, #fdf6ec))",
-    border: "var(--sd-warn-border, rgba(138,82,0,.28))",
-  },
-  warn: {
-    color: "var(--sm-amber-600, var(--sd-warn, #8a5200))",
-    background: "var(--sm-amber-100, var(--sd-warn-surface, #fdf6ec))",
-    border: "var(--sd-warn-border, rgba(138,82,0,.28))",
-  },
-  neutral: {
-    color: "var(--sd-text-muted, #3b5265)",
-    background: "transparent",
-    border: "var(--sd-border-strong, rgba(59,82,101,.24))",
-  },
+/** Workspace pill tones: live (working), progress (in hand), attention, off, neutral. */
+const PILL_TONE: Record<StatusTone, string> = {
+  done: "live",
+  live: "live",
+  next: "progress",
+  pending: "off",
+  blocked: "attention",
+  warn: "progress",
+  neutral: "neutral",
 };
 
 export interface StatusChipProps {
@@ -56,20 +25,18 @@ export interface StatusChipProps {
   tone: StatusTone;
   /** Visually hidden context appended for assistive technology, e.g. "— done". */
   srSuffix?: string;
+  /** Show a leading dot (used for the overall receptionist status). */
+  dot?: boolean;
+  /** Visually hidden context placed before the label, e.g. "Receptionist status: ". */
+  srPrefix?: string;
 }
 
-export function StatusChip({ label, tone, srSuffix }: StatusChipProps) {
-  const style = TONE_STYLE[tone];
+export function StatusChip({ label, tone, srSuffix, dot, srPrefix }: StatusChipProps) {
+  const pill = PILL_TONE[tone];
   return (
-    <span
-      className="sd-tier"
-      data-tone={tone}
-      style={{
-        color: style.color,
-        background: style.background,
-        borderColor: style.border,
-      }}
-    >
+    <span className="ws-pill sd-tier" data-tone={pill}>
+      {dot && <span className="ws-dot" data-tone={pill === "off" ? "neutral" : pill} aria-hidden="true" />}
+      {srPrefix && <span className="sd-sr">{srPrefix}</span>}
       {label}
       {srSuffix && <span className="sd-sr">{srSuffix}</span>}
     </span>

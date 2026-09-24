@@ -383,3 +383,91 @@ export interface PageCopy {
 export function pageCopy(): PageCopy {
   return { eyebrow: "Dashboard", title: "Overview" };
 }
+
+// ─── Readiness → headline and next step (SiteMint Workspace, 2026-09-24) ──
+
+/** The readiness shape these helpers need, kept structural so this module stays pure. */
+export interface ReadinessLike {
+  state: string;
+  detail: string;
+  next: { label: string; path: string } | null;
+  steps: Array<{
+    number: number;
+    title: string;
+    summary: string;
+    state: string;
+    checks: Array<{ key: string; label: string; state: string; detail: string; fixPath: string | null }>;
+  }>;
+}
+
+export interface SetupNextStep {
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+}
+
+const ROUTE_ACTION: Array<[RegExp, string]> = [
+  [/^\/assistants/, "Open your assistant"],
+  [/^\/channels\/phone-number/, "Set up a phone number"],
+  [/^\/channels\/transfer-contacts/, "Open transfer contacts"],
+  [/^\/scheduling\/calendar/, "Open calendar"],
+  [/^\/scheduling\//, "Open scheduling"],
+  [/^\/activity\/calls/, "View calls"],
+  [/^\/account\/settings/, "Open settings"],
+  [/^\/verify-email/, "Confirm your email"],
+  [/^\/setup/, "Continue setup"],
+];
+
+/** A verb phrase for the button that leads to `path`. */
+export function actionLabelFor(path: string): string {
+  return ROUTE_ACTION.find(([pattern]) => pattern.test(path))?.[1] ?? "Continue";
+}
+
+/**
+ * The next thing to do, taken from the first unfinished check that has a
+ * place to fix it — so the card names the action ("Publish your
+ * receptionist") rather than the check ("Published"), which read as a state
+ * that had already happened. Falls back to the server's own `next`.
+ */
+export function readinessNextStep(r: ReadinessLike | undefined): SetupNextStep | null {
+  if (!r || !r.next) return null;
+  for (const step of r.steps) {
+    for (const c of step.checks) {
+      if ((c.state === "todo" || c.state === "attention") && c.fixPath) {
+        const [first, ...rest] = c.detail.split(/(?<=\.)\s+/);
+        const title = (first ?? c.label).replace(/\.$/, "");
+        const context = `Step ${step.number} of ${r.steps.length}: ${step.title}.`;
+        return {
+          title,
+          detail: rest.length > 0 ? `${rest.join(" ")} ${context}` : context,
+          actionLabel: actionLabelFor(c.fixPath),
+          href: c.fixPath,
+        };
+      }
+    }
+  }
+  return { title: r.next.label, detail: r.detail, actionLabel: actionLabelFor(r.next.path), href: r.next.path };
+}
+
+const HEADLINES: Record<string, string> = {
+  setting_up: "Your receptionist is being set up",
+  ready_to_test: "Ready for a test call",
+  ready_to_activate_phone: "Tested and ready for a phone number",
+  phone_connected: "Phone number connected",
+  live_call_verified: "Answering calls",
+  paused: "Your receptionist is paused",
+  needs_attention: "Something needs your attention",
+  not_checked: "Status not checked",
+};
+
+/** A plain-language headline for an overall readiness state. */
+export function readinessHeadline(state: string | undefined): string {
+  return (state && HEADLINES[state]) || "Status not checked";
+}
+
+/** Steps complete, for the progress bar and its text alternative. */
+export function readinessProgress(r: ReadinessLike | undefined): { done: number; total: number } | null {
+  if (!r || r.steps.length === 0) return null;
+  return { done: r.steps.filter((s) => s.state === "done").length, total: r.steps.length };
+}

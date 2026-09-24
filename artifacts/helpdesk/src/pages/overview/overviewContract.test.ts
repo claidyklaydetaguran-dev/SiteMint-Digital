@@ -31,6 +31,10 @@ import {
   buildNextBestAction,
   buildTodayFigures,
   buildUsage,
+  actionLabelFor,
+  readinessHeadline,
+  readinessNextStep,
+  readinessProgress,
   countToday,
   deriveReceptionistState,
   recentCalls,
@@ -742,6 +746,45 @@ check(
   !/transition:[^;]*\b(width|height|top|left|margin|padding|filter|background-position)\b/.test(cssSrc),
 );
 check("hover transforms are gated behind a fine pointer", cssSrc.includes("@media (hover: hover) and (pointer: fine)"));
+
+// ─── SiteMint Workspace: readiness headline and next step ─────────────────
+
+section("workspace next step (2026-09-24)");
+
+{
+  const live = {
+    state: "setting_up",
+    detail: "Finish the steps below, then test your receptionist in the browser.",
+    next: { label: "Published", path: "/assistants" },
+    steps: [
+      { number: 1, title: "Business information", summary: "", state: "done", checks: [{ key: "email", label: "Confirmed email", state: "done", detail: "Saved.", fixPath: null }] },
+      { number: 3, title: "What it can do", summary: "", state: "done", checks: [{ key: "booking", label: "Book appointments", state: "off", detail: "Off.", fixPath: "/scheduling/appointment-types" }] },
+      {
+        number: 4,
+        title: "Test and activate",
+        summary: "",
+        state: "current",
+        checks: [
+          { key: "published", label: "Published", state: "todo", detail: "Publish your receptionist.", fixPath: "/assistants" },
+          { key: "phone", label: "Phone number", state: "todo", detail: "Connect a phone number after your test call.", fixPath: "/channels/phone-number" },
+        ],
+      },
+    ],
+  };
+  const next = readinessNextStep(live);
+  eq("the next step names the action, not the check label", next?.title, "Publish your receptionist");
+  check("the next step never reads as a finished state", next?.title !== "Published");
+  eq("an 'off' optional capability is not treated as the next step", next?.href, "/assistants");
+  eq("the button is a verb phrase for its destination", next?.actionLabel, "Open your assistant");
+  check("the detail says where the step sits in setup", /Step 4 of 3: Test and activate\./.test(next?.detail ?? ""));
+  eq("no readiness means no invented next step", readinessNextStep(undefined), null);
+  eq("a finished setup (no server next) has no next step", readinessNextStep({ ...live, next: null }), null);
+  eq("headline for setting up is plain language", readinessHeadline("setting_up"), "Your receptionist is being set up");
+  eq("an unknown state is reported as not checked, never as live", readinessHeadline("mystery"), "Status not checked");
+  eq("progress counts only finished steps", readinessProgress(live), { done: 2, total: 3 });
+  eq("unknown actions fall back to a neutral verb", actionLabelFor("/somewhere"), "Continue");
+}
+
 
 // ─── Result ────────────────────────────────────────────────────────────────
 
