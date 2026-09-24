@@ -22,7 +22,7 @@
 
 import { lazy, Suspense, type ComponentType } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowRight, CalendarDays, Mail, Mic, Phone, PhoneForwarded, CalendarCheck } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, ArrowRight, CalendarDays, Mail, Mic, PhoneCall, CalendarCheck } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
 import { useSession } from "@/hooks/useSession";
 import { relativeTime } from "@/lib/conversationUi";
@@ -153,7 +153,7 @@ function connectionRows(
     },
     {
       key: "phone",
-      icon: Phone,
+      icon: PhoneCall,
       label: "Phone number",
       ...(numberDisplay ? { state: "Connected", tone: "live" as Tone } : checkWord(phone, { done: "Connected", todo: "Not connected" })),
       detail: numberDisplay ? numberDisplay : phone?.detail ?? "Not checked.",
@@ -183,7 +183,7 @@ function connectionRows(
     },
     {
       key: "transfer",
-      icon: PhoneForwarded,
+      icon: ArrowLeftRight,
       label: "Call transfers",
       ...checkWord(transfer, { done: "On", todo: "Off" }),
       detail: transfer?.detail ?? "Not checked.",

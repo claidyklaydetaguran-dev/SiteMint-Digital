@@ -42,14 +42,14 @@ import {
 } from "react";
 import { Link, useLocation } from "wouter";
 import {
+  Activity,
   CalendarDays,
   ChevronRight,
-  Inbox,
   LogOut,
   Menu,
   Monitor,
   Moon,
-  Phone,
+  Radio,
   Settings as SettingsIcon,
   Sun,
   X,
@@ -114,11 +114,15 @@ function railStatus(readiness: Readiness | undefined): { label: string; tone: Ra
   return { label: readiness.label, tone: "progress" };
 }
 
-/** Section icons for groups that hold more than one destination. */
+/**
+ * Section icons for groups that hold more than one destination. None of them
+ * is an icon a voice-gated nav record uses, so a build without the voice
+ * platform ships no gated-only icon (routes/voiceBoundaryContract).
+ */
 const SECTION_ICON: Record<string, LucideIcon> = {
   scheduling: CalendarDays,
-  activity: Inbox,
-  channels: Phone,
+  activity: Activity,
+  channels: Radio,
   account: SettingsIcon,
 };
 
