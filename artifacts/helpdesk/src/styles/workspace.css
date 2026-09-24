@@ -2181,3 +2181,20 @@
   align-self: flex-start;
   width: auto;
 }
+.sd-app.sd-app.sd-app .sd-figure {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.sd-app.sd-app.sd-app .sd-figure__value {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+@media (max-width: 40rem) {
+  .sd-app.sd-app.sd-app .sd-figures {
+    grid-template-columns: 1fr;
+  }
+  .sd-app.sd-app.sd-app .sd-figures > .sd-figure:first-child {
+    border-top: 0;
+  }
+}

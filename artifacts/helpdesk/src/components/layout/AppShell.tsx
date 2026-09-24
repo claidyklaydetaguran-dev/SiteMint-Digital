@@ -196,13 +196,20 @@ function RailNav({ location, onNavigate }: { location: string; onNavigate: () =>
  * pages next to this one are one tap away without opening the menu.
  */
 function SectionTabs({ location }: { location: string }) {
+  const listRef = useRef<HTMLUListElement | null>(null);
   const group = visibleNavGroups(voicePlatformEnabled).find(
     (g) => g.items.length > 1 && g.items.some((item) => isNavItemActive(item, location)),
   );
+  // Keep the current page’s tab in view when the row is wider than the screen.
+  useEffect(() => {
+    const list = listRef.current;
+    const active = list?.querySelector<HTMLElement>("[aria-current=\"page\"]");
+    if (list && active) list.scrollLeft = Math.max(0, active.offsetLeft - 16);
+  }, [location]);
   if (!group) return null;
   return (
     <nav className="ws-sectiontabs" aria-label={`${group.label} pages`}>
-      <ul>
+      <ul ref={listRef}>
         {group.items.map((item) => {
           const active = isNavItemActive(item, location);
           return (
