@@ -11,8 +11,8 @@ import { clientIpFromForwardedChain, trustedProxyHopsForLimiters, verifiedVisito
 import { publicFormLimit, CONTACT_IP_LIMIT, PUBLIC_FORM_SHARED_BUCKET_LIMIT } from "./contactProtection.js";
 
 describe("trustedProxyHopsForLimiters", () => {
-  it("defaults to two hops in production (Google Cloud load balancer writes client,balancer) and none elsewhere", () => {
-    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production" })).toBe(2);
+  it("defaults to four hops in production (client + three platform-written entries, measured) and none elsewhere", () => {
+    expect(trustedProxyHopsForLimiters({ NODE_ENV: "production" })).toBe(4);
     expect(trustedProxyHopsForLimiters({ NODE_ENV: "development" })).toBe(0);
     expect(trustedProxyHopsForLimiters({})).toBe(0);
   });

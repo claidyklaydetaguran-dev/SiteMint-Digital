@@ -90,16 +90,19 @@ setInterval(() => {
 
 /**
  * Number of reverse-proxy hops whose X-Forwarded-For entries may be trusted.
- * `TRUSTED_PROXY_HOPS` when set (0–10); otherwise 2 in production and 0
+ * `TRUSTED_PROXY_HOPS` when set (0–10); otherwise 4 in production and 0
  * elsewhere, where no proxy exists and the socket address is the client.
  *
- * Why 2 (measured live, 2026-09-24): Replit deployments sit behind a Google
- * Cloud HTTPS load balancer, which appends `<client-ip>,<load-balancer-ip>`
- * to X-Forwarded-For. With one trusted hop every limiter keyed on the
- * balancer's own address, which differs from request to request, so no
- * caller was ever limited (23 consecutive direct posts, no 429) while the
- * few balancer addresses that repeat could lock unrelated visitors out. The
- * client as the balancer observed it is the SECOND entry from the right.
+ * Why 4 (measured live, 2026-09-24, from the chain a tripped honeypot logs):
+ * a request that reaches this Replit deployment directly carries
+ * `<client>, <platform>, <platform>, <platform>` in X-Forwarded-For — the
+ * platform ingress writes three entries after the client (all Google Cloud
+ * addresses; the socket peer is a further internal proxy). Requests relayed
+ * by the marketing proxy carry the same three, then the proxy's egress and
+ * three more. The client as the platform observed it is therefore the
+ * FOURTH entry from the right; with 1 or 2 hops every limiter keyed on a
+ * per-request platform address and nobody was ever limited (23 consecutive
+ * direct posts, no 429). Anything further left is caller-written.
  */
 export function trustedProxyHopsForLimiters(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env["TRUSTED_PROXY_HOPS"];
@@ -107,7 +110,7 @@ export function trustedProxyHopsForLimiters(env: NodeJS.ProcessEnv = process.env
     const n = Number(raw);
     return Number.isInteger(n) && n >= 0 && n <= 10 ? n : 0;
   }
-  return env["NODE_ENV"] === "production" ? 2 : 0;
+  return env["NODE_ENV"] === "production" ? 4 : 0;
 }
 
 /**

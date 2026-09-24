@@ -108,23 +108,32 @@ const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "p
  * Visitor identity for the upstream limiters (launch follow-up, 2026-09-24).
  * Behind this proxy every visitor reaches the API from this server's egress
  * address, so per-address limits collapsed into one shared bucket. The
- * address this server's own edge observed is the SECOND X-Forwarded-For
- * entry from the right: Replit's Google Cloud load balancer appends
- * `<client-ip>,<load-balancer-ip>`, so the rightmost entry is the balancer's
- * own (per-request varying) address and anything further left was written by
- * the visitor and is forgeable (measured live 2026-09-24; the earlier
- * "rightmost" reading keyed every visitor on the balancer). A chain shorter
- * than those two entries did not come through the balancer, so the socket
- * address is used. It is forwarded as `x-sitemint-visitor` with an
+ * address this server's own edge observed sits PLATFORM_HOPS entries from the
+ * right of X-Forwarded-For: the Replit ingress writes three platform
+ * addresses after the visitor (`<visitor>, <platform>, <platform>, <platform>`,
+ * measured live 2026-09-24 from the chain the API logs on a tripped
+ * honeypot), so the rightmost entries vary per request and anything left of
+ * the visitor was written by the visitor and is forgeable. `PROXY_PLATFORM_HOPS`
+ * (0–10) overrides the measured default of 3 if the platform topology
+ * changes. A chain too short to contain the platform entries did not come
+ * through the ingress, so the socket address is used. It is forwarded as
+ * `x-sitemint-visitor` with an
  * HMAC-SHA256 signature over `PROXY_VISITOR_SECRET`; the API only honours a
  * valid signature, and any client-supplied copy of these headers is dropped
  * here first. Without the secret nothing is added and behaviour is unchanged.
  */
 const VISITOR_SECRET = process.env.PROXY_VISITOR_SECRET || "";
+const PLATFORM_HOPS = (() => {
+  const raw = process.env.PROXY_PLATFORM_HOPS;
+  if (raw === undefined || raw === "") return 3;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 10 ? n : 3;
+})();
 function observedVisitor(req) {
   const raw = req.headers["x-forwarded-for"];
   const chain = String(Array.isArray(raw) ? raw.join(",") : raw || "").split(",").map((s) => s.trim()).filter(Boolean);
-  return chain.length >= 2 ? chain[chain.length - 2] : (req.socket.remoteAddress || "");
+  const idx = chain.length - 1 - PLATFORM_HOPS;
+  return idx >= 0 ? chain[idx] : (req.socket.remoteAddress || "");
 }
 
 function proxy(req, res, { htmlIsMiss = false } = {}) {
