@@ -20,7 +20,10 @@ import { voiceSmsConsents, voiceSmsOutbox, type VoiceSmsOutboxRow } from "@works
 import {
   isVoiceSmsEnabled,
   loadVoiceSmsConfig,
+  loadVoiceSmsCaps,
+  resolveVoiceSmsPublicOrigin,
   defaultSmsTransport,
+  type VoiceSmsCaps,
   type SmsTransport,
   type VoiceSmsConfig,
 } from "./smsCore.js";
@@ -128,6 +131,10 @@ export async function enqueueMissedCallFollowup(input: {
 export interface SendBatchDeps {
   isEnabled?: () => boolean;
   loadConfig?: () => VoiceSmsConfig;
+  loadCaps?: () => VoiceSmsCaps;
+  /** Texts already sent today (UTC), per firm and in total. */
+  countSentToday?: (dayStart: Date) => Promise<{ total: number; byFirm: Map<number, number> }>;
+  statusCallbackUrl?: string | null;
   transport?: SmsTransport;
   now?: () => Date;
   logger?: (event: string, meta: Record<string, unknown>) => void;
@@ -158,8 +165,29 @@ export async function sendQueuedVoiceSms(limit = 10, deps: SendBatchDeps = {}): 
   } catch {
     return summary; // misconfigured => inert, never a partial send
   }
+  let caps: VoiceSmsCaps;
+  try {
+    caps = (deps.loadCaps ?? loadVoiceSmsCaps)();
+  } catch {
+    return summary; // a cap the operator believes is set must exist: inert, never uncapped
+  }
   const transport = deps.transport ?? defaultSmsTransport;
   const now = deps.now?.() ?? new Date();
+  const origin = deps.statusCallbackUrl !== undefined ? null : resolveVoiceSmsPublicOrigin();
+  const statusCallbackUrl = deps.statusCallbackUrl ?? (origin ? `${origin}/api/voice/sms/status` : null);
+
+  // A row left in 'sending' by a crash may or may not have gone out. Sending
+  // it again could text the caller twice, so it is closed as failed with a
+  // reason the office can see, never retried.
+  if (!deps.transport) {
+    await db
+      .update(voiceSmsOutbox)
+      .set({ status: "failed", errorCode: "interrupted", updatedAt: now })
+      .where(sql`${voiceSmsOutbox.status} = 'sending' AND ${voiceSmsOutbox.updatedAt} < ${new Date(now.getTime() - 10 * 60_000)}`);
+  }
+
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const sentToday = await (deps.countSentToday ?? countSentTodayInDb)(dayStart);
 
   const claimed = await db
     .update(voiceSmsOutbox)
@@ -177,6 +205,19 @@ export async function sendQueuedVoiceSms(limit = 10, deps: SendBatchDeps = {}): 
   summary.claimed = claimed.length;
 
   for (const row of claimed as VoiceSmsOutboxRow[]) {
+    // Spending caps, checked before consent so a capped row costs nothing.
+    // A confirmation that cannot go today is closed, not held: arriving
+    // tomorrow it would read as a new message about a stale appointment.
+    const firmCount = sentToday.byFirm.get(row.firmId) ?? 0;
+    if (sentToday.total >= caps.totalPerDay || firmCount >= caps.perFirmPerDay) {
+      await db
+        .update(voiceSmsOutbox)
+        .set({ status: "failed", errorCode: "daily_cap_reached", updatedAt: new Date() })
+        .where(eq(voiceSmsOutbox.id, row.id));
+      summary.failed += 1;
+      deps.logger?.("voice_sms_cap_reached", { firmId: row.firmId, firmCount, total: sentToday.total });
+      continue;
+    }
     const consent = await getConsent(row.firmId, row.toE164);
     if (consent !== "granted") {
       await db
@@ -186,8 +227,10 @@ export async function sendQueuedVoiceSms(limit = 10, deps: SendBatchDeps = {}): 
       summary.blocked += 1;
       continue;
     }
-    const result = await transport(config, row.toE164, row.body);
+    const result = await transport(config, row.toE164, row.body, statusCallbackUrl ? { statusCallbackUrl } : undefined);
     if (result.ok) {
+      sentToday.total += 1;
+      sentToday.byFirm.set(row.firmId, firmCount + 1);
       await db
         .update(voiceSmsOutbox)
         .set({ status: "sent", providerMessageSid: result.providerMessageSid, sentAt: new Date(), updatedAt: new Date() })
@@ -246,10 +289,57 @@ export function startVoiceSmsWorker(log: {
   void tick();
 }
 
+async function countSentTodayInDb(dayStart: Date): Promise<{ total: number; byFirm: Map<number, number> }> {
+  const rows = await db
+    .select({ firmId: voiceSmsOutbox.firmId, n: sql<number>`count(*)::int` })
+    .from(voiceSmsOutbox)
+    .where(sql`${voiceSmsOutbox.status} = 'sent' AND ${voiceSmsOutbox.sentAt} >= ${dayStart}`)
+    .groupBy(voiceSmsOutbox.firmId);
+  const byFirm = new Map<number, number>();
+  let total = 0;
+  for (const r of rows) {
+    byFirm.set(r.firmId, Number(r.n));
+    total += Number(r.n);
+  }
+  return { total, byFirm };
+}
+
+/**
+ * Twilio's delivery states in the order they happen. Callbacks can arrive out
+ * of order, so a later-arriving "sent" must never overwrite "delivered".
+ * Terminal states (delivered/undelivered/failed) are never replaced.
+ */
+const DELIVERY_RANK: Record<string, number> = {
+  accepted: 1,
+  queued: 2,
+  sending: 3,
+  sent: 4,
+  delivered: 10,
+  undelivered: 10,
+  failed: 10,
+  read: 11,
+};
+
+export function shouldReplaceDeliveryStatus(current: string | null | undefined, next: string): boolean {
+  const nextRank = DELIVERY_RANK[next];
+  if (nextRank === undefined) return false;
+  if (!current) return true;
+  const currentRank = DELIVERY_RANK[current] ?? 0;
+  if (currentRank >= 10 && nextRank < 11) return false;
+  return nextRank > currentRank;
+}
+
 /** Delivery-status callback: updates the row owning this provider sid. Unknown sids are ignored (never an error path an attacker can probe). */
 export async function recordDeliveryStatus(providerMessageSid: string, deliveryStatus: string): Promise<void> {
+  const next = deliveryStatus.slice(0, 32).toLowerCase();
+  const [row] = await db
+    .select({ id: voiceSmsOutbox.id, deliveryStatus: voiceSmsOutbox.deliveryStatus })
+    .from(voiceSmsOutbox)
+    .where(eq(voiceSmsOutbox.providerMessageSid, providerMessageSid))
+    .limit(1);
+  if (!row || !shouldReplaceDeliveryStatus(row.deliveryStatus, next)) return;
   await db
     .update(voiceSmsOutbox)
-    .set({ deliveryStatus: deliveryStatus.slice(0, 32), updatedAt: new Date() })
-    .where(eq(voiceSmsOutbox.providerMessageSid, providerMessageSid));
+    .set({ deliveryStatus: next, updatedAt: new Date() })
+    .where(eq(voiceSmsOutbox.id, row.id));
 }

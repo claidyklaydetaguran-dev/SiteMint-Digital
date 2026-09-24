@@ -404,13 +404,13 @@ async function runBookAppointment(
     args.appointmentTypeId,
     startUtc,
     { name: args.customerName, phone: args.customerPhone ?? null, email: args.customerEmail ?? null },
-    // Text messages are deferred: no SMS consent is recorded from a call.
-    // Email consent is recorded only when the caller heard the address read
-    // back and asked to be written to — the schema refuses the flag without an
-    // address, and this refuses it without both.
+    // Text and email consent are recorded only on the caller's explicit yes,
+    // with the number or address read back to them — the schema refuses
+    // either flag without its contact detail, and this refuses it without
+    // both.
     {
       phoneConsent: true,
-      smsConsent: false,
+      smsConsent: args.smsConsent === true && typeof args.customerPhone === "string",
       emailConsent: args.emailConfirmed === true && typeof args.customerEmail === "string",
     },
     now,
@@ -450,15 +450,20 @@ async function runBookAppointment(
   // P5: consent-gated confirmation text (best-effort; the outbox enforces
   // consent and the send-time flag — a failure here never fails the booking).
   try {
-    await deps.enqueueBookingConfirmation?.({
-      firmId,
-      rawPhone: args.customerPhone ?? null,
-      requestPublicId: result.request.publicId,
-      spokenSummary: confirmed
-        ? `Your appointment is confirmed — reference ${result.request.publicId}. Reply STOP to opt out.`
-        : `Your appointment request is in — reference ${result.request.publicId}. The office will confirm shortly. Reply STOP to opt out.`,
-      callerConsented: false, // texts are deferred; nothing is sent from a call
-    });
+    if (args.smsConsent === true && typeof args.customerPhone === "string") {
+      // Carriers expect the sender named in the message itself.
+      const sender = ((await deps.loadBusinessName?.(firmId).catch(() => "")) || "").trim().slice(0, 60);
+      const prefix = sender ? `${sender}: ` : "";
+      await deps.enqueueBookingConfirmation?.({
+        firmId,
+        rawPhone: args.customerPhone,
+        requestPublicId: result.request.publicId,
+        spokenSummary: confirmed
+          ? `${prefix}Your appointment is confirmed. Reference ${result.request.publicId}. Reply STOP to opt out.`
+          : `${prefix}We have your appointment request. The office will confirm shortly. Reference ${result.request.publicId}. Reply STOP to opt out.`,
+        callerConsented: true,
+      });
+    }
   } catch {
     // outbox unavailability must not undo a successful booking
   }

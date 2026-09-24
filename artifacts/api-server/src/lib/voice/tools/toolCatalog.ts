@@ -81,12 +81,20 @@ export const bookAppointmentArgs = z
      * `save_message.emailCopyRequested`.
      */
     emailConfirmed: z.boolean().optional(),
+    /**
+     * The caller was asked whether they want a text confirmation at the
+     * number read back to them, and said yes. Only this authorizes a text.
+     */
     smsConsent: z.boolean().optional(),
   })
   .strict()
   .refine(
     (v) => v.emailConfirmed !== true || typeof v.customerEmail === "string",
     { message: "a confirmed email requires the caller's email address" },
+  )
+  .refine(
+    (v) => v.smsConsent !== true || typeof v.customerPhone === "string",
+    { message: "a text confirmation requires the caller's phone number" },
   );
 
 export const rescheduleAppointmentArgs = z
@@ -180,9 +188,11 @@ export const TOOL_PARAMETER_SCHEMAS: Record<VoiceToolName, JsonObject> = {
         description:
           "True only if you read the email address back to the caller, they confirmed it was right, and they asked to be emailed about this appointment. Never true otherwise.",
       },
-      // No smsConsent here: text messages to callers are deferred, so the
-      // receptionist is never invited to offer one. The argument parser still
-      // tolerates it from assistants published before this change.
+      smsConsent: {
+        type: "boolean",
+        description:
+          "True only if you asked the caller whether they want a text message confirming this appointment, read the number back to them in customerPhone, and they said yes. Never true otherwise.",
+      },
     },
   },
   reschedule_appointment: {

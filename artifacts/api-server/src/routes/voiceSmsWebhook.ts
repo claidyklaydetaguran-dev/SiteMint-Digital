@@ -12,6 +12,7 @@ import {
   classifyInboundKeyword,
   isVoiceSmsEnabled,
   loadVoiceSmsConfig,
+  resolveVoiceSmsPublicOrigin,
   verifyTwilioSignature,
   type VoiceSmsConfig,
 } from "../lib/voiceSms/smsCore.js";
@@ -54,7 +55,8 @@ function requireVerified(req: Request, res: Response): { config: VoiceSmsConfig;
     return undefined;
   }
   const params = paramsOf(req);
-  const url = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+  const origin = resolveVoiceSmsPublicOrigin();
+  const url = origin ? `${origin}${req.originalUrl}` : `${req.protocol}://${req.get("host")}${req.originalUrl}`;
   const signature = req.get("x-twilio-signature");
   if (!verifyTwilioSignature(config.authToken, url, params, signature ?? undefined)) {
     req.log.warn("[voice sms] signature verification failed");

@@ -10,6 +10,51 @@ export const VOICE_SMS_ENABLED_ENV_VAR = "VOICE_SMS_ENABLED";
 export const VOICE_TWILIO_ACCOUNT_SID_ENV_VAR = "VOICE_TWILIO_ACCOUNT_SID";
 export const VOICE_TWILIO_AUTH_TOKEN_ENV_VAR = "VOICE_TWILIO_AUTH_TOKEN";
 export const VOICE_TWILIO_FROM_NUMBER_ENV_VAR = "VOICE_TWILIO_FROM_NUMBER";
+/**
+ * Public https origin Twilio reaches this API on (e.g.
+ * https://sitemintdigital.replit.app). Used for the URL a Twilio signature is
+ * computed over and for the delivery-status callback. Falls back to the
+ * origin of VOICE_SERVER_URL. Behind the platform's TLS proxy the request's
+ * own protocol reads "http", so a URL rebuilt from the request never matches
+ * what Twilio signed.
+ */
+export const VOICE_SMS_PUBLIC_ORIGIN_ENV_VAR = "VOICE_SMS_PUBLIC_ORIGIN";
+/** Spending cap: texts one business may send per UTC day (default 20, 1-500). */
+export const VOICE_SMS_DAILY_CAP_PER_FIRM_ENV_VAR = "VOICE_SMS_DAILY_CAP_PER_FIRM";
+/** Spending cap: texts the whole platform may send per UTC day (default 100, 1-5000). */
+export const VOICE_SMS_DAILY_CAP_TOTAL_ENV_VAR = "VOICE_SMS_DAILY_CAP_TOTAL";
+
+export function resolveVoiceSmsPublicOrigin(env: Record<string, string | undefined> = process.env): string | null {
+  for (const raw of [env[VOICE_SMS_PUBLIC_ORIGIN_ENV_VAR], env["VOICE_SERVER_URL"]]) {
+    if (!raw) continue;
+    try {
+      const u = new URL(raw.trim());
+      if (u.protocol === "https:") return u.origin;
+    } catch {
+      /* try the next source */
+    }
+  }
+  return null;
+}
+
+function boundedInt(raw: string | undefined, fallback: number, min: number, max: number, name: string): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw.trim());
+  if (!Number.isInteger(n) || n < min || n > max) throw new VoiceSmsConfigError(`${name} must be an integer in [${min}, ${max}].`);
+  return n;
+}
+
+export interface VoiceSmsCaps {
+  perFirmPerDay: number;
+  totalPerDay: number;
+}
+
+export function loadVoiceSmsCaps(env: Record<string, string | undefined> = process.env): VoiceSmsCaps {
+  return {
+    perFirmPerDay: boundedInt(env[VOICE_SMS_DAILY_CAP_PER_FIRM_ENV_VAR], 20, 1, 500, VOICE_SMS_DAILY_CAP_PER_FIRM_ENV_VAR),
+    totalPerDay: boundedInt(env[VOICE_SMS_DAILY_CAP_TOTAL_ENV_VAR], 100, 1, 5000, VOICE_SMS_DAILY_CAP_TOTAL_ENV_VAR),
+  };
+}
 
 export function isVoiceSmsEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env[VOICE_SMS_ENABLED_ENV_VAR] === "true";
@@ -86,10 +131,15 @@ export type SmsSendResult =
   | { ok: true; providerMessageSid: string }
   | { ok: false; retryable: boolean; errorCode: string };
 
-export type SmsTransport = (config: VoiceSmsConfig, to: string, body: string) => Promise<SmsSendResult>;
+export type SmsTransport = (
+  config: VoiceSmsConfig,
+  to: string,
+  body: string,
+  options?: { statusCallbackUrl?: string },
+) => Promise<SmsSendResult>;
 
 /** Production transport: pinned Twilio host, basic auth, one message per call. */
-export const defaultSmsTransport: SmsTransport = async (config, to, body) => {
+export const defaultSmsTransport: SmsTransport = async (config, to, body, options) => {
   const url = `${TWILIO_API_HOST}/2010-04-01/Accounts/${encodeURIComponent(config.accountSid)}/Messages.json`;
   const auth = Buffer.from(`${config.accountSid}:${config.authToken}`, "utf8").toString("base64");
   let response: Response;
@@ -97,7 +147,14 @@ export const defaultSmsTransport: SmsTransport = async (config, to, body) => {
     response = await fetch(url, {
       method: "POST",
       headers: { authorization: `Basic ${auth}`, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: to, From: config.fromNumber, Body: body }).toString(),
+      // Twilio calls the status URL only when it is named per message, so
+      // without it no delivery or failure is ever reported back.
+      body: new URLSearchParams({
+        To: to,
+        From: config.fromNumber,
+        Body: body,
+        ...(options?.statusCallbackUrl ? { StatusCallback: options.statusCallbackUrl } : {}),
+      }).toString(),
     });
   } catch {
     return { ok: false, retryable: true, errorCode: "network_error" };
@@ -119,14 +176,20 @@ export const defaultSmsTransport: SmsTransport = async (config, to, body) => {
 // ── inbound keyword classification (STOP/START compliance) ───────────────────
 
 const STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
-const START_WORDS = new Set(["start", "unstop", "yes"]);
+// "yes" is deliberately not a START word: a caller who opted out and later
+// answers a question with "yes" must not be silently re-subscribed.
+const START_WORDS = new Set(["start", "unstop"]);
+// HELP/INFO are answered by Twilio's own opt-out handling on the number; they
+// are classified here so they never count as anything else.
+const HELP_WORDS = new Set(["help", "info"]);
 
-export type InboundKeyword = "stop" | "start" | "other";
+export type InboundKeyword = "stop" | "start" | "help" | "other";
 
 /** Carrier-compliant single-word matching on the trimmed, lowercased body. */
 export function classifyInboundKeyword(body: string | undefined): InboundKeyword {
   const word = (body ?? "").trim().toLowerCase();
   if (STOP_WORDS.has(word)) return "stop";
   if (START_WORDS.has(word)) return "start";
+  if (HELP_WORDS.has(word)) return "help";
   return "other";
 }
