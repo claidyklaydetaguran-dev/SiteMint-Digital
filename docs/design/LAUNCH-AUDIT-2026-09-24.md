@@ -80,6 +80,23 @@ The Chromium readout in §0b.4 is a desktop result only and is not evidence of i
 
 As of this record neither the SiteMint-Digital nor the Web Asset Builder workspace has `PROXY_VISITOR_SECRET` set (checked by presence only; no value read), so production still runs the interim shared 20/hour bucket. The intended public configuration is per-visitor 5/hour, which requires the same secret in both apps' deployment secrets and a republish of both. The owner enters the secret; this session never types, prints or logs it. Live acceptance after republish: visitor A (this workstation's egress) sends empty contact posts until 429 (expected after five); visitor B (a Replit shell egress) still gets 400; a forged `X-Forwarded-For` and forged `x-sitemint-visitor`/`-sig` from A neither open a new bucket nor cause a 500. A mismatched secret would show as B receiving 429 (every visitor collapsed onto the proxy egress at 5/hour), so the same test also proves the two secrets match.
 
+### 7. Visitor-keyed limits — activated and proven (2026-09-24, ~12:30–13:50 UTC)
+
+**Secret.** The owner generated one value and entered it in both apps' Secrets; this session never saw, typed or logged it. On the Web Asset Builder it was already in the production secrets list; on SiteMint-Digital the publish pane reported it "out of sync" and its own "Add secret" control copied the workspace value into the deployment (no value shown).
+
+**What the first activation exposed.** With both secrets in place the limiter key still differed on every request and never equalled the caller: 23 consecutive direct empty posts never reached 429, and the honeypot log showed both the direct key and the signed visitor as Google Cloud addresses. The hop count was a guess (one, then two) built on the assumption that the platform writes one or two entries. The honeypot branch now logs the raw `X-Forwarded-For` chain, the socket peer and the names of the address headers (private deployment logs only; commit 91dd0470), and one diagnostic publish measured the truth:
+
+- direct request → `<client>, <platform>, <platform>, <platform>` (4 entries; the socket peer is a further internal proxy);
+- request relayed by the marketing proxy → the same three, then the proxy's egress, then three more (8 entries; a caller-forged entry appears left of the client and makes 9).
+
+So the client is the **fourth entry from the right** at both edges. Commit 767ee6c5: production default `TRUSTED_PROXY_HOPS` 4 (env override kept); the marketing proxy signs the entry `PROXY_PLATFORM_HOPS` (default 3, env override) from the right. Marketing package 0d91bb42. CI green: https://github.com/claidyklaydetaguran-dev/SiteMint-Digital/actions/runs/36006459152.
+
+**Live result (empty bodies only, no rows created).** Backend at 0d91bb42, marketing `release.json` → `sourceCommit 767ee6c5`. Honeypot log: direct key = this workstation's address; proxied key = `v:` + the same address, also with a forged `X-Forwarded-For` in front. Visitor A through the apex: 400 ×5 then **429 429**; A with a forged `X-Forwarded-For` → 429; A with forged `x-sitemint-visitor`/`-sig` → 429 (still A's bucket, no 500). A directly against `*.replit.app`: 400 ×4 (one honeypot already counted) then **429 429**; forged signed header there → 429. Visitor B (a Replit shell, different egress) at the same time: 400 400 400, and B forging A's address in `X-Forwarded-For` → 400 (cannot join or drain A's bucket). Discovery empty → 400 (its own limiter). The interim shared 20/hour bucket is gone; public forms are 5/hour per visitor as designed.
+
+**Marketing publish trap, recurred.** A plain `git checkout` in the SiteMint-Digital workspace restores the five tracked `.replit-artifact` manifests and the repo `.replit`; the next publish through Adjust settings re-detected "artifact mode", started the api-server instead of the marketing server and failed at Promote ("crash looping"), leaving the previous release serving. Fixed by re-running the committed `replit-deployment-config.mjs` (parks the manifests, writes the run command) before publishing; noted in the deploy memory as a pre-publish check.
+
+**Remaining limits.** The CRM staff limiters (`staffAuth.deriveClientIp`) still default to the socket address unless `TRUSTED_PROXY_HOPS` is set in the Web Asset Builder deployment; setting it to 4 there would key them per visitor too (owner decision, no code change). The measured topology is Replit's and may change; the honeypot log is the instrument to re-check it, and both hop counts are env-overridable without a code change.
+
 ## 1. Baseline reconciliation
 
 | Question | Answer (verified 2026-09-24) |
