@@ -103,6 +103,14 @@ export interface ToolSchedulingDeps {
    */
   confirmRequest?: (firmId: number, publicId: string) => Promise<string>;
   /**
+   * Cancels a BOOKED appointment and removes its calendar event — the same
+   * service the dashboard's Cancel calls for a booked row. The pending-row
+   * cancel above cannot touch a booked row, so without this a caller could
+   * never cancel or move an appointment the office had confirmed. Answers
+   * "cancelled", or anything else when nothing changed.
+   */
+  cancelBookedRequest?: (firmId: number, publicId: string) => Promise<string>;
+  /**
    * V7: persists a message for the business. Resolves only on a durable write;
    * anything else must reject, because the spoken confirmation is emitted
    * strictly after this resolves.
@@ -202,6 +210,11 @@ async function defaultDeps(): Promise<ToolSchedulingDeps> {
       // path and the dashboard path are the same code with the same gates.
       const { calendarSyncDeps } = await import("../../calendar/calendarSyncDeps.js");
       return sync.approveRequestToBooked(firmId, publicId, calendarSyncDeps());
+    },
+    cancelBookedRequest: async (firmId, publicId) => {
+      const sync = await import("../../calendar/calendarEventSync.js");
+      const { calendarSyncDeps } = await import("../../calendar/calendarSyncDeps.js");
+      return (await sync.cancelBookedRequest(firmId, publicId, calendarSyncDeps())).outcome;
     },
     enqueueBookingConfirmation: async (input) => {
       const outbox = await import("../../voiceSms/outboxService.js");
@@ -474,6 +487,19 @@ async function runCancelAppointment(
   args: CancelAppointmentArgs,
   deps: ToolSchedulingDeps,
 ): Promise<string> {
+  const existing = await deps.findRequestByPublicId(firmId, args.requestId);
+  if (existing?.status === "booked") {
+    if (!deps.cancelBookedRequest) return "I can't cancel a confirmed appointment on this call. Take a message and the office will cancel it.";
+    const outcome = await deps.cancelBookedRequest(firmId, args.requestId);
+    return outcome === "cancelled"
+      ? "The appointment is cancelled and taken out of the calendar."
+      : "I couldn't cancel it just now. Take a message so the office can cancel it — do not tell the caller it is cancelled.";
+  }
+  // A repeated delivery of a cancel that already worked: say so, rather than
+  // "couldn't find", which would make the caller think it never happened.
+  if (existing && (existing.status === "cancelled" || existing.status === "rescheduled")) {
+    return "That appointment is already cancelled.";
+  }
   const cancelled = await deps.cancelAppointmentRequestByPublicId(firmId, args.requestId);
   return cancelled
     ? "The appointment is cancelled."
@@ -529,6 +555,34 @@ async function runRescheduleAppointment(
     return LIVE_STATUSES.has(created.request.status)
       ? `Already moved — this is the same change, not another one. New reference id ${created.request.publicId}. Repeat what you already told the caller; do not say it is confirmed.`
       : "That change didn't go through, and the original appointment is unchanged. The office can help.";
+  }
+
+  // A confirmed original is only given up for a confirmed replacement.
+  // Releasing it for a time that is merely requested would leave the caller
+  // with nothing if the office declines the new one.
+  if (old.status === "booked") {
+    const newConfirmed =
+      deps.confirmRequest !== undefined && deps.cancelBookedRequest !== undefined
+        ? (await deps.confirmRequest(firmId, created.request.publicId).catch(() => "failed")) === "booked"
+        : false;
+    if (!newConfirmed) {
+      await deps.cancelAppointmentRequestByPublicId(firmId, created.request.publicId);
+      return "I couldn't confirm the new time on this call, so the caller keeps their current appointment. Take a message with the time they'd prefer and the office will move it.";
+    }
+    const released = await deps.cancelBookedRequest!(firmId, args.requestId);
+    if (released !== "cancelled") {
+      // The new time is confirmed but the old one could not be released:
+      // tell the truth and let the office tidy the calendar.
+      await deps.openIssue?.({
+        firmId,
+        level: "warning",
+        code: "tool_execution_failed",
+        message: "A caller moved a confirmed appointment on a call, but the original time could not be released. Cancel the original from Appointments.",
+        dedupeKey: `reschedule-release:${args.requestId}`,
+      }).catch(() => undefined);
+    }
+    await enqueueCallerAppointmentAck(firmId, created.request, true, deps);
+    return `Moved and confirmed in the calendar. New reference id ${created.request.publicId}. Tell the caller the new time is booked.`;
   }
 
   const cancelledOld = await deps.cancelAppointmentRequestByPublicId(firmId, args.requestId);

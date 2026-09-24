@@ -387,6 +387,86 @@ describe("toolDispatcher", () => {
     expect(results[0]!.result).toContain("couldn't find the original");
   });
 
+  // J3 / H-1: a confirmed appointment could not be cancelled or moved by the
+  // caller — the pending-only cancel answered "couldn't find".
+  it("cancels a BOOKED appointment through the calendar service, not the pending-only cancel", async () => {
+    const BOOKED = requestRow({ publicId: "66666666-6666-4666-8666-666666666666", status: "booked" });
+    const booked: string[] = [];
+    const { deps, log } = makeDeps({
+      findRequestByPublicId: async () => BOOKED,
+      cancelBookedRequest: async (_f, publicId) => {
+        booked.push(publicId);
+        return "cancelled";
+      },
+    });
+    const [r] = await dispatchToolCalls(FIRM, [{ toolCallId: "t1", name: "cancel_appointment", args: { requestId: BOOKED.publicId } }], CTX, deps);
+    expect(booked).toEqual([BOOKED.publicId]);
+    expect(log.cancels).toEqual([]);
+    expect(r!.result).toMatch(/cancelled and taken out of the calendar/);
+  });
+
+  it("never tells the caller a booked appointment is cancelled when the cancel did not happen", async () => {
+    const BOOKED = requestRow({ status: "booked" });
+    const { deps } = makeDeps({ findRequestByPublicId: async () => BOOKED, cancelBookedRequest: async () => "conflict" });
+    const [r] = await dispatchToolCalls(FIRM, [{ toolCallId: "t1", name: "cancel_appointment", args: { requestId: BOOKED.publicId } }], CTX, deps);
+    expect(r!.result).toMatch(/do not tell the caller it is cancelled/);
+  });
+
+  it("a repeated cancel of an already-cancelled appointment says so, not 'couldn't find'", async () => {
+    const GONE = requestRow({ status: "cancelled" });
+    const { deps, log } = makeDeps({ findRequestByPublicId: async () => GONE });
+    const [r] = await dispatchToolCalls(FIRM, [{ toolCallId: "t1", name: "cancel_appointment", args: { requestId: GONE.publicId } }], CTX, deps);
+    expect(r!.result).toBe("That appointment is already cancelled.");
+    expect(log.cancels).toEqual([]);
+  });
+
+  it("moves a BOOKED appointment only when the new time is confirmed, then releases the original", async () => {
+    const OLD = requestRow({ publicId: "77777777-7777-4777-8777-777777777777", status: "booked" });
+    const order: string[] = [];
+    const { deps, log } = makeDeps({
+      findRequestByPublicId: async () => OLD,
+      confirmRequest: async (_f, id) => {
+        order.push("confirm:" + id);
+        return "booked";
+      },
+      cancelBookedRequest: async (_f, id) => {
+        order.push("release:" + id);
+        return "cancelled";
+      },
+    });
+    const [r] = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "t1", name: "reschedule_appointment", args: { requestId: OLD.publicId, newStartIso: "2026-09-01T15:00:00.000Z" } }],
+      CTX,
+      deps,
+    );
+    expect(order).toEqual(["confirm:" + requestRow().publicId, "release:" + OLD.publicId]);
+    expect(log.cancels).toEqual([]);
+    expect(r!.result).toMatch(/Moved and confirmed/);
+  });
+
+  it("keeps the caller's confirmed appointment when the new time cannot be confirmed", async () => {
+    const OLD = requestRow({ publicId: "88888888-8888-4888-8888-888888888888", status: "booked" });
+    const released: string[] = [];
+    const { deps, log } = makeDeps({
+      findRequestByPublicId: async () => OLD,
+      confirmRequest: async () => "no_connection",
+      cancelBookedRequest: async (_f, id) => {
+        released.push(id);
+        return "cancelled";
+      },
+    });
+    const [r] = await dispatchToolCalls(
+      FIRM,
+      [{ toolCallId: "t1", name: "reschedule_appointment", args: { requestId: OLD.publicId, newStartIso: "2026-09-01T15:00:00.000Z" } }],
+      CTX,
+      deps,
+    );
+    expect(released).toEqual([]);
+    expect(log.cancels).toEqual([requestRow().publicId]); // the unconfirmed replacement is released
+    expect(r!.result).toMatch(/keeps their current appointment/);
+  });
+
   it("turns an executor throw into the safe line plus an error-level issue", async () => {
     const { deps, log } = makeDeps({
       getDayAvailability: async () => {
