@@ -756,8 +756,11 @@ export default function AssistantBuilder() {
         // why (not activated, paused for payment, cancelled).
         const apiErr = err instanceof AssistantApiRequestError ? err : undefined;
         setTestSessionError(
-          apiErr?.code === "service_not_active" || apiErr?.code === "service_access_unavailable"
-            ? publishRouteErrorMessage(apiErr.code, apiErr.message)
+          // The message is already bounded and sanitized by the API client.
+          // Deliberately not routed through the publish copy table, which a
+          // build with publishing off must not ship.
+          (apiErr?.code === "service_not_active" || apiErr?.code === "service_access_unavailable") && apiErr.message
+            ? apiErr.message
             : BROWSER_TEST_SESSION_ERROR,
         );
       })
