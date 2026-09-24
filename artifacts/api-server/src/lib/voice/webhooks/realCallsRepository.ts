@@ -165,6 +165,37 @@ export async function readStoredToolCallResults(firmId: number, eventKey: string
   return isStoredResults(stored) ? { state: "stored", results: stored.results } : { state: "pending" };
 }
 
+/**
+ * Records what SiteMint answered to a transfer request on its stored event, so
+ * the call record can say "not put through" instead of "outcome unknown" when
+ * nobody was dialled. Merge, never replace; firm-scoped.
+ */
+export async function recordTransferResolution(
+  firmId: number,
+  eventKey: string,
+  resolution: "resolved" | `declined:${string}`,
+): Promise<void> {
+  const [row] = await db
+    .select({ id: providerWebhookEvents.id, payload: providerWebhookEvents.payload })
+    .from(providerWebhookEvents)
+    .where(
+      and(
+        eq(providerWebhookEvents.firmId, firmId),
+        eq(providerWebhookEvents.provider, VAPI_PROVIDER_NAME),
+        eq(providerWebhookEvents.eventKey, eventKey),
+      ),
+    )
+    .limit(1);
+  if (!row) return;
+  await db
+    .update(providerWebhookEvents)
+    .set({
+      payload: { ...(row.payload as Record<string, unknown>), siteMintTransferResolution: resolution },
+      updatedAt: new Date(),
+    })
+    .where(eq(providerWebhookEvents.id, row.id));
+}
+
 /** Writes execution results onto the stored event row (merge, never replace the event payload). */
 export async function storeToolCallResults(
   firmId: number,

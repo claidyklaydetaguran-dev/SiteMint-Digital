@@ -33,7 +33,9 @@ import {
   storeVapiWebhookEvent,
   readStoredToolCallResults,
   storeToolCallResults,
+  recordTransferResolution,
 } from "../lib/voice/webhooks/realCallsRepository.js";
+import { buildVapiTransferDestination } from "../lib/voice/providers/vapi/transferDestination.js";
 import { buildVapiEventKey } from "../lib/voice/webhooks/eventKey.js";
 import { dispatchToolCalls } from "../lib/voice/tools/toolDispatcher.js";
 import { openVoiceIssue } from "../lib/voiceIssues/voiceIssueService.js";
@@ -164,6 +166,10 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
   // the firm's approved destination list with the business-hours guard.
   // Failure is a spoken outcome, never a dropped call.
   if (message.type === "transfer-destination-request") {
+    // Best-effort: the spoken answer never waits on, or fails because of, the
+    // bookkeeping that lets the call record say what happened.
+    const noteResolution = (resolution: "resolved" | `declined:${string}`) =>
+      recordTransferResolution(firmId, buildVapiEventKey(message), resolution).catch(() => undefined);
     try {
       await storeVapiWebhookEvent(firmId, message);
 
@@ -178,6 +184,7 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
       // state transfers nobody.
       if (!(await isCapabilityExecutable(firmId, "transfer"))) {
         req.log.info({ firmId, reason: "capability_not_executable" }, "[voice webhook] transfer refused");
+        await noteResolution("declined:not_enabled");
         res.status(200).json({ error: TRANSFER_UNAVAILABLE_LINE });
         return;
       }
@@ -185,20 +192,16 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
       const resolution = await resolveTransferDestination(firmId);
       if (resolution.ok) {
         req.log.info({ firmId, callId: message.call.id }, "[voice webhook] transfer destination resolved");
-        // No transferPlan is sent. This repository models no provider transfer
-        // mode, and inventing one here would put provider vocabulary in a route
-        // rather than in the provider module — while changing nothing: the
-        // handover is already the blind one that transferOutcome.ts reports
-        // (connectionKnowable: false), because the assistant leaves the call.
+        // Warm transfer, built in the provider module: the caller holds while
+        // the contact is dialled, and a busy or unanswered line brings the
+        // assistant back to take a message instead of dropping the caller.
+        await noteResolution("resolved");
         res.status(200).json({
-          destination: {
-            type: "number",
-            number: resolution.destinationE164,
-            message: `Connecting you to ${resolution.label}.`,
-          },
+          destination: buildVapiTransferDestination({ destinationE164: resolution.destinationE164, label: resolution.label }),
         });
       } else {
         req.log.info({ firmId, reason: resolution.reason }, "[voice webhook] transfer unavailable");
+        await noteResolution(`declined:${resolution.reason}`);
         // Each reason gets its own truthful line. "No one is available" would be
         // wrong for a business that simply has not set a contact up yet, and
         // "the office is closed" would be wrong for one whose contact has not
@@ -211,6 +214,7 @@ router.post("/voice/webhooks/vapi", async (req: Request, res: Response) => {
       }
     } catch (err) {
       req.log.error({ firmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[voice webhook] transfer resolution failed");
+      await noteResolution("declined:error");
       res.status(200).json({ error: "I could not reach anyone to transfer you, but I can take a detailed message." });
     }
     return;

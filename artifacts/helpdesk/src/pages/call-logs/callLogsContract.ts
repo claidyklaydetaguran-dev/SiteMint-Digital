@@ -477,14 +477,14 @@ export function everyRenderableString(): string[] {
    "unknown" is the correct and final answer, not a fault, and the note says
    so rather than leaving a business wondering what went wrong. */
 
-export type TransferStateKey = "none" | "requested" | "accepted" | "connected" | "failed" | "unknown";
+export type TransferStateKey = "none" | "requested" | "accepted" | "connected" | "failed" | "unknown" | "declined";
 
 export const TRANSFER = {
   heading: "Transfer to a person",
   destinationLabel: "Put through to",
   evidenceLabel: "What the provider reported",
   blindNote:
-    "Once a call is handed over, the assistant leaves it. Nothing after that point is visible to SiteMint, so \u201cwe don\u2019t know\u201d is the most this can honestly say.",
+    "If nobody answers, the assistant comes back on the line and offers to take a message. Once someone answers, the assistant hands the call over and leaves it, so SiteMint can\u2019t see whether the two of you spoke.",
 } as const;
 
 export const TRANSFER_STATE: Record<TransferStateKey, { label: string; detail: string; tone: "settled" | "open" | "attention" | "failed" }> = {
@@ -517,6 +517,11 @@ export const TRANSFER_STATE: Record<TransferStateKey, { label: string; detail: s
   unknown: {
     label: "Outcome unknown",
     detail: "The call was handed over and nothing conclusive came back.",
+    tone: "attention",
+  },
+  declined: {
+    label: "Not put through",
+    detail: "The caller asked for a person, but no contact could take the call then. The assistant offered to take a message instead.",
     tone: "attention",
   },
 };
