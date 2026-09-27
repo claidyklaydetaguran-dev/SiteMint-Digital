@@ -353,17 +353,15 @@ export function MintCinemaHero({ receptionist = false }: { receptionist?: boolea
               : "Websites, apps and connected systems. Thoughtfully designed. Built around you."}
           </p>
           <div className="actions">
-            <a className="button" href={receptionist ? "/start?service=ai-receptionist" : "/discovery"}>
-              {receptionist ? "Get started" : "Let’s build your next chapter"}
+            <a className="button" href={receptionist ? "/ai-receptionist/signup" : "/discovery"}>
+              {receptionist ? "Sign up" : "Let’s build your next chapter"}
             </a>
-            <a className="button outline" href={anchor}>
-              {receptionist ? "See how it works" : "Explore SiteMint"}
+            <a className="button outline" href={receptionist ? "/ai-receptionist/dashboard/login" : anchor}>
+              {receptionist ? "Sign in" : "Explore SiteMint"}
             </a>
           </div>
           {receptionist && (
-            <a className="mint-cinema__signin" href="/ai-receptionist/dashboard/login">
-              Already with SiteMint? Sign in
-            </a>
+            <p className="mint-cinema__signin">Free setup and a simulated demo. Subscribe before activating live service.</p>
           )}
         </div>
         <div className="mint-cinema__foot">

@@ -58,7 +58,7 @@ export default function StartV3() {
           </h1>
           <p className="v3-lede reveal-fade-up">
             {isReceptionist ? (
-              "Start with a conversation about your calls. We'll help you plan the setup, understand the costs and test your receptionist before you rely on it."
+              "Tell us about your calls. We’ll review your volume, setup and expected usage, then explain the subscription, included usage, any overages and setup in a quote before activation."
             ) : (
               <>
                 Every SiteMint project starts with a short discovery brief. It's
@@ -71,7 +71,7 @@ export default function StartV3() {
             <Link
               href={
                 isReceptionist
-                  ? `${ROUTES.start}?service=ai-receptionist#request-pricing`
+                  ? `${ROUTES.discovery}?service=ai-receptionist`
                   : ROUTES.discovery
               }
               className="v3-btn v3-btn--primary"
@@ -84,7 +84,7 @@ export default function StartV3() {
           </div>
         </div>
       </section>
-      <InquiryContext />
+      {!isReceptionist && <InquiryContext />}
 
       {!isReceptionist && (
         <section className="v3-section" data-tone="white">

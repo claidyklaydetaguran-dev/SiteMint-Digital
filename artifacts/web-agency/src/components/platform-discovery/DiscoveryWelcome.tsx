@@ -6,6 +6,7 @@ interface DiscoveryWelcomeProps {
   hasDraft: boolean;
   onStart: () => void;
   onRestoreDraft: () => void;
+  isReceptionist?: boolean;
 }
 
 const WHAT_WE_ASK = [
@@ -19,7 +20,7 @@ const WHAT_WE_ASK = [
   "Delivery timeline, budget, and how to reach you",
 ];
 
-export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: DiscoveryWelcomeProps) {
+export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft, isReceptionist = false }: DiscoveryWelcomeProps) {
   return (
     <div className="mint-discovery-welcome"><div className="mint-discovery-intro">
       {/* Icon badge */}
@@ -41,13 +42,12 @@ export function DiscoveryWelcome({ hasDraft, onStart, onRestoreDraft }: Discover
 
       {/* Headline */}
       <h1 className="pp-font-display text-3xl font-semibold text-[hsl(var(--sm-color-text-primary))] leading-tight">
-        Let's plan your project together
+        {isReceptionist ? "Tell us about the calls you want help with" : "Let's plan your project together"}
       </h1>
       <p className="mt-3 text-base leading-relaxed text-[hsl(var(--sm-color-text-secondary))]">
-        This guided planner helps us understand your business, your customers,
-        and what success looks like for you. You describe the outcome you
-        want — we choose the right way to build it — and your answers become
-        a personalized plan and proposal, at no cost.
+        {isReceptionist
+          ? "Share your business and what callers need. We'll review your expected call volume, setup and usage, then discuss a quote before activation. AI Receptionist is already selected in the brief."
+          : "This guided planner helps us understand your business, your customers, and what success looks like for you. Your answers become the starting point for a proposed plan, at no cost."}
       </p>
 
       {/* Time estimate chip */}
