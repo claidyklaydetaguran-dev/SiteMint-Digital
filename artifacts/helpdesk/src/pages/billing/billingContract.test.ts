@@ -955,16 +955,13 @@ check(
   /key: "billing", label: "Billing", href: "\/account\/billing"[\s\S]{0,80}voiceGated: false/.test(navSrc),
 );
 check(
-  // D-6 adds exactly one flag, VITE_BILLING_CHECKOUT_ENABLED, read directly
-  // in billingContract.ts rather than through the shared `lib/featureFlags.ts`
-  // module that documents itself as the single import site for VITE_*
-  // flags. That file is outside this session's edit scope (helpdesk
-  // nav/shell/flags belong to a different owner); consolidating this flag
-  // into it is reported to that owner rather than done here. No *other*
-  // flag or voice-platform gating was introduced.
-  "the route adds exactly the one documented D-6 flag, no voice-platform gating",
+  // Billing itself remains available in SMS-only builds. Its additional
+  // voice-plan panel must be removed from those builds, not merely hidden.
+  "checkout retains its own flag and only the voice-plan panel is build-gated",
   (routeCode.match(/import\.meta\.env\.VITE_BILLING_CHECKOUT_ENABLED/g) ?? []).length >= 1 &&
-    !/featureFlags|voicePlatformEnabled|VITE_VOICE/.test(routeCode),
+    !/import\.meta\.env\.VITE_VOICE/.test(routeCode) &&
+    /const VoicePlanStatus = voicePlatformEnabled \? lazy\(/.test(pageCode) &&
+    /export default function Billing\(/.test(pageCode),
 );
 check(
   "voice gating is untouched by this route",
