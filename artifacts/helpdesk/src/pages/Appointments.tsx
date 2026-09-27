@@ -1,3 +1,4 @@
+import { WorkspaceTabs } from "@/components/layout/WorkspaceNavigation";
 /**
  * V5 PR-7/PR-8 — the Appointments screen: requests list + detail drawer.
  *
@@ -8,7 +9,8 @@
  * tied to one row) so it lives in an overflow menu at the page head.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearch } from "wouter";
 import { useSession } from "@/hooks/useSession";
 import { useAvailabilityConfig, useAppointmentRequests } from "@/hooks/useAvailability";
 import { useReconcileCalendar } from "@/hooks/useCalendar";
@@ -38,17 +40,30 @@ import {
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-appointments.css";
 import { OwnerOnly } from "@/components/common/OwnerOnly";
+import { WeekNavigator, calendarDay } from "@/components/booking/WeekNavigator";
 
 export default function Appointments() {
+  const searchParams = useSearch();
   const { data: me, isLoading } = useSession();
   const configQuery = useAvailabilityConfig();
   const requestsQuery = useAppointmentRequests();
   const reconcileMutation = useReconcileCalendar();
 
+  const [groupFilter, setGroupFilter] = useState<(typeof GROUP_ORDER)[number]>("decide");
+  const [dayFilter, setDayFilter] = useState<string|null>(null);
   const [selected, setSelected] = useState<AppointmentRequest | null>(null);
   const [reconcileNotice, setReconcileNotice] = useState<{ title: string; detail: string; tone: "ok" | "error" } | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
   const [addNotice, setAddNotice] = useState<{ title: string; detail: string; tone: "ok" | "warn" } | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(searchParams).get("id");
+    const row = requestsQuery.data?.items.find(item => item.id === id);
+    if (!row) return;
+    setSelected(row);
+    const groups = groupRequests([row]);
+    const group = GROUP_ORDER.find(key => groups[key].length > 0);
+    if (group) setGroupFilter(group);
+  }, [requestsQuery.data, searchParams]);
 
   const handleReconcile = useCallback(async () => {
     if (reconcileMutation.isPending) return;
@@ -82,10 +97,11 @@ export default function Appointments() {
   // reschedule or cancel that changes the selected row's state is reflected
   // in the drawer immediately, without a second read.
   const selectedLive = selected ? items.find((r) => r.id === selected.id) ?? null : null;
-  const grouped = groupRequests(items);
+  const timezone = configQuery.data?.config.timezone || "UTC";
+  const grouped = groupRequests(dayFilter ? items.filter(item => calendarDay(item.startUtc,timezone) === dayFilter) : items);
 
   return (
-    <div className="sa-page sd-enter">
+    <div className="sa-page sd-enter cf-appointments">
       <div className="sd-page__head">
         <div>
           <span className="sd-eyebrow">{PAGE.eyebrow}</span>
@@ -123,6 +139,7 @@ export default function Appointments() {
           </OwnerOnly>
         </div>
       </div>
+      <WorkspaceTabs location="/scheduling/appointments" />
 
       {reconcileNotice && (
         <div className="sa-notice" data-tone={reconcileNotice.tone} role={reconcileNotice.tone === "error" ? "alert" : "status"}>
@@ -147,7 +164,9 @@ export default function Appointments() {
         />
       )}
 
-      <div className="sa-requests">
+      <div className="mc-filterbar" aria-label="Appointment views">{GROUP_ORDER.map(id => <button key={id} type="button" aria-pressed={groupFilter === id} onClick={() => {setGroupFilter(id);setSelected(null);}}>{id === "decide" ? "Requests" : id === "confirmed" ? "Confirmed" : "History"} ({grouped[id].length})</button>)}</div>
+
+      <div className="mc-appointment-layout" data-selected={selectedLive !== null}><div className="sa-requests"><WeekNavigator timezone={timezone} value={dayFilter} onChange={setDayFilter} dates={items.map(item=>item.startUtc)}/>
         {requestsQuery.isLoading && (
           <p className="sa-status" role="status" aria-live="polite">{REQUESTS.loading}</p>
         )}
@@ -164,7 +183,7 @@ export default function Appointments() {
           status column on every row to tell them apart is work the page should
           be doing.
         */}
-        {!requestsQuery.isLoading && !requestsQuery.isError && GROUP_ORDER.map((groupId) => {
+        {!requestsQuery.isLoading && !requestsQuery.isError && GROUP_ORDER.filter(id => id === groupFilter).map((groupId) => {
           const group = GROUPS[groupId];
           const rows = grouped[groupId];
           // Closed rows are history; an empty history is not worth a panel.
@@ -189,11 +208,11 @@ export default function Appointments() {
         })}
       </div>
 
-      <AppointmentDetailDrawer
+      <AppointmentDetailDrawer inline key={selectedLive?.id ?? "empty"}
         request={selectedLive}
         config={configQuery.data?.config}
         onClose={() => setSelected(null)}
-      />
+      /></div>
     </div>
   );
 }

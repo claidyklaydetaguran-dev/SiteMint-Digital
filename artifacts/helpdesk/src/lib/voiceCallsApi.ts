@@ -40,6 +40,8 @@ export interface TransferOutcome {
 }
 
 export interface RealCallSummary {
+  /** Stored summary, optional for deployments predating the overview redesign. */
+  summary?: string | null;
   callId: string;
   source: "vapi_twilio";
   channel: CallChannel;

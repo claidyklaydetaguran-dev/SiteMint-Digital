@@ -22,6 +22,14 @@ describe("resolveServiceAccess", () => {
     }
   });
 
+  it("requires a subscription in production even if the optional enforcement flag is missing or false", async () => {
+    for (const value of [undefined, "", "false", "TRUE"]) {
+      const env = { NODE_ENV: "production", VOICE_SERVICE_ACCESS_REQUIRED: value, VOICE_PLAN_CATALOG_JSON: CATALOG };
+      expect(await resolveServiceAccess(1, { env, findSubscription: none })).toEqual({ allowed: false, reason: "not_activated" });
+      expect((await resolveServiceAccess(1, { env, findSubscription: sub("pilot", "active") })).allowed).toBe(true);
+    }
+  });
+
   it("allows an active or grace subscription whose plan is in the catalog", async () => {
     expect(await resolveServiceAccess(1, { env: on, findSubscription: sub("pilot", "active") })).toEqual({
       allowed: true, basis: "subscription", planCode: "pilot", state: "active",

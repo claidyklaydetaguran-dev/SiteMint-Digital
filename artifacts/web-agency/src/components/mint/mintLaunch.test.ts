@@ -105,8 +105,8 @@ describe("3. wordmark restart", () => {
 
 describe("4. receptionist calls to action", () => {
   it("uses the approved labels", () => {
-    expect(hero).toContain('"Request pricing"');
-    expect(hero).toContain('"See how it works"');
+    expect(hero).toContain('"Sign up"');
+    expect(hero).toContain('"Sign in"');
     expect(hero).not.toContain("Plan my receptionist");
     expect(hero).not.toContain("Explore a sample call");
   });
@@ -115,8 +115,8 @@ describe("4. receptionist calls to action", () => {
     expect(receptionist).not.toMatch(/Hear a demo call/);
   });
   it("routes to working journeys", () => {
-    expect(hero).toContain('"/discovery?service=ai-receptionist"');
-    expect(hero).toContain('"#example"');
+    expect(hero).toContain('"/ai-receptionist/signup"');
+    expect(hero).toContain('"/ai-receptionist/dashboard/login"');
   });
 });
 
@@ -208,7 +208,7 @@ describe("8. follow-up 2026-09-24: arrows, Safari hero, proxy visitor identity",
     for (const f of ["src/components/mint/MintReceptionist.tsx", "src/pages/StartV3.tsx", "src/components/mint/InquiryContext.tsx", "src/components/v5/pricingTiersV5.ts", "src/components/mint/MintHome.tsx"]) {
       expect(read(f), f).not.toMatch(/pilot pricing|Assisted pilot/i);
     }
-    expect(receptionist).toContain('"Request pricing"');
+    expect(receptionist).toContain('"Sign up"');
   });
   it("the marketing proxy strips client copies of the visitor headers and signs its own", () => {
     expect(server).toMatch(/key === "x-sitemint-visitor" \|\| key === "x-sitemint-visitor-sig"\) continue/);

@@ -1,3 +1,4 @@
+import { WorkspaceTabs } from "@/components/layout/WorkspaceNavigation";
 /**
  * Frontend V2 Phase 12 — the Billing workspace.
  *
@@ -198,16 +199,17 @@ export default function Billing() {
       <div className="sd-page__head">
         <div>
           <span className="sd-eyebrow">{page.eyebrow}</span>
-          <h1 className="sd-page__title">{page.title}</h1>
-          <p className="sb-lede">{page.detail}</p>
+          <h1 className="sd-page__title">Settings</h1>
+          <p className="sb-lede">Manage your business and subscription.</p>
         </div>
       </div>
+      <WorkspaceTabs location="/account/billing" />
 
       <VoicePlanStatus />
 
       {/* Two local views over the same session values. No route change, no
           request, no content that is reachable only in one of them. */}
-      <div className="sb-views" role="tablist" aria-label="Billing views">
+      <div id="billing-options" className="sb-views" role="tablist" aria-label="Billing views">
         {views().map((item) => (
           <button
             key={item.id}

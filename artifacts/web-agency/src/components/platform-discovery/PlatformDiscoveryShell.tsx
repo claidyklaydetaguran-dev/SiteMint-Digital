@@ -272,6 +272,7 @@ export function PlatformDiscoveryShell() {
           }}
         >
           <p className="mb-2 text-sm font-semibold text-[hsl(var(--sm-color-text-primary))]">What happens next</p>
+          <p className="mb-3 text-sm text-[hsl(var(--sm-color-text-secondary))]">Check your email for an acknowledgment and a client-portal invitation. Existing clients can use their current portal account. Your inquiry is reviewed first; a project appears after approval. If an email does not arrive, contact us with your submission reference.</p>
           <ol className="space-y-1.5">
             {[
               "Our team reviews your answers",

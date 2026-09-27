@@ -1,6 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, discoverySubmissions, formSubmissions } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
+import { inviteDiscoverySubmitter } from "../lib/discoveryPortal.js";
 import { calculateLeadScore, calculateTags, recommendPackage } from "../lib/generators.js";
 import { sendFormEmails } from "../lib/email.js";
 import { discoveryIpLimiter, getClientIp, publicFormLimit } from "../lib/contactProtection.js";
@@ -33,21 +35,31 @@ router.post("/discovery/submit", async (req: Request, res: Response) => {
       res.status(400).json({ error: "Missing required fields: contactName, companyName, email" });
       return;
     }
-    // Count only submissions that passed the shape check, so a typo retry
-    // does not burn the visitor's allowance.
-    discoveryIpLimiter.record(ip);
-
-    const name = String(data.contactName);
-    const email = String(data.email);
+    const name = String(data.contactName).trim();
+    const email = String(data.email).trim().toLowerCase();
+    if (!name || name.length > 200 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: "Enter your name and a valid email address." });
+      return;
+    }
     const phone = data.phone ? String(data.phone) : null;
     const company = String(data.companyName);
     const services = Array.isArray(data.services) ? (data.services as string[]) : [];
+    discoveryIpLimiter.record(ip);
 
     const leadScore = calculateLeadScore(data);
     const tags = calculateTags(data, leadScore);
     const pkg = recommendPackage(data);
 
-    const [submission] = await db
+    const meta = data.plannerMeta as { idempotencyKey?: unknown } | undefined;
+    const rawKey = typeof meta?.idempotencyKey === "string" ? meta.idempotencyKey : "";
+    const intakeKey = /^[a-zA-Z0-9-]{16,100}$/.test(rawKey) ? `legacy:${rawKey}` : null;
+    const saved = await db.transaction(async tx => {
+    if (intakeKey) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${intakeKey}))`);
+      const [existing] = await tx.select().from(discoverySubmissions).where(eq(discoverySubmissions.idempotencyKey,intakeKey)).limit(1);
+      if (existing) return { submission: existing, formSub: null, duplicate: true, conflict: !isDeepStrictEqual(existing.formData,data) };
+    }
+    const [submission] = await tx
       .insert(discoverySubmissions)
       .values({
         contactName: name,
@@ -64,10 +76,11 @@ router.post("/discovery/submit", async (req: Request, res: Response) => {
         status: "New",
         recommendedPackage: pkg,
         formData: data,
+        idempotencyKey: intakeKey,
       })
       .returning();
 
-    const [formSub] = await db
+    const [formSub] = await tx
       .insert(formSubmissions)
       .values({
         formName: "Discovery Form",
@@ -82,6 +95,19 @@ router.post("/discovery/submit", async (req: Request, res: Response) => {
         emailClientSent: "pending",
       })
       .returning();
+
+    return { submission, formSub, duplicate: false, conflict: false };
+    });
+    const { submission, formSub } = saved;
+    if (saved.conflict) {
+      res.status(409).json({ message: "This submission key already belongs to a different brief. Please try again." });
+      return;
+    }
+    if (saved.duplicate || !formSub) {
+      try { await inviteDiscoverySubmitter(submission.id); } catch { req.log.warn({ id: submission.id }, "Discovery portal invitation needs staff review"); }
+      res.status(200).json({ success: true, id: submission.id });
+      return;
+    }
 
     // The lead is persisted above; a mail-layer failure (missing provider
     // key, provider outage) must be recorded on the row, never turned into a
@@ -108,18 +134,23 @@ router.post("/discovery/submit", async (req: Request, res: Response) => {
       };
     }
 
-    await db
+    try { await db
       .update(formSubmissions)
       .set({
         emailTeamSent: emailResult.teamSent ? "sent" : "failed",
         emailClientSent: emailResult.clientSent ? "sent" : "failed",
       })
-      .where(eq(formSubmissions.id, formSub.id));
+      .where(eq(formSubmissions.id, formSub.id)); }
+    catch { req.log.warn({ id: submission.id }, "Saved discovery email status needs reconciliation"); }
 
     if (emailResult.errors.length > 0) {
       req.log.warn({ errors: emailResult.errors, id: submission.id }, "Some discovery emails failed");
     }
 
+    // Portal setup is secondary to intake: a delivery/configuration failure
+    // must not turn a saved inquiry into a reported submission failure.
+    try { await inviteDiscoverySubmitter(submission.id); }
+    catch { req.log.warn({ id: submission.id }, "Discovery portal invitation needs staff review"); }
     req.log.info({ id: submission.id, score: leadScore, pkg, teamSent: emailResult.teamSent, clientSent: emailResult.clientSent }, "Discovery form submitted");
     res.status(201).json({ success: true, id: submission.id });
   } catch (err) {

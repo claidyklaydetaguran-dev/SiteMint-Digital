@@ -34,6 +34,7 @@
 
 import {
   Suspense,
+  lazy,
   useCallback,
   useEffect,
   useRef,
@@ -43,6 +44,7 @@ import {
 import { Link, useLocation } from "wouter";
 import {
   Activity,
+  Leaf,
   CalendarDays,
   ChevronRight,
   LogOut,
@@ -84,6 +86,10 @@ import "@/styles/v5-app.css";
 // SiteMint Workspace (Mint Clarity) — the authoritative layer; supersedes
 // mint-workspace.css. ROLLBACK: swap this import back to mint-workspace.css.
 import "@/styles/workspace.css";
+import "@/styles/mint-clarity-workspace.css";
+import "@/styles/clarity-fidelity.css";
+import "@/styles/clarity-final.css";
+import { WorkspaceNavigation, WorkspaceTabs, WorkspaceQuote } from "./WorkspaceNavigation";
 
 const DESKTOP_QUERY = "(min-width: 64rem)";
 
@@ -545,11 +551,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sd-rail__head">
           <Link href="/" className="sd-rail__brand" onClick={closeIfDrawer}>
             <span className="ws-brandmark" aria-hidden="true">
-              S
+              s
             </span>
             {/* One flex item per line, so the words keep their spacing. */}
             <span className="ws-brandtext">
-              <span>SiteMint</span>
+              <span>SiteMint <small className="cf-brand-digital">Digital</small></span>
               <span className="ws-brandtext__sub sd-rail__brand-accent">AI Receptionist</span>
             </span>
           </Link>
@@ -592,25 +598,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
-        <RailNav location={location} onNavigate={closeIfDrawer} />
+        <WorkspaceNavigation location={location} onNavigate={closeIfDrawer} />
 
         <div className="sd-rail__foot">
           {/* V5 PR-8 — a voice-enabled build shows the combined minutes/SMS
               indicator (`UsageRailIndicatorGate`); every other build keeps the
               existing SMS trial meter exactly as before. */}
-          {voicePlatformEnabled ? (
-            <Suspense fallback={null}>
-              <UsageRailIndicatorGate />
-            </Suspense>
-          ) : (
-            <UsageMeter
-              isPaid={isPaid}
-              planTier={me.firm.planTier}
-              used={me.conversationCount}
-              limit={me.firm.trialConversationsLimit}
-              onNavigate={closeIfDrawer}
-            />
-          )}
           <AppearanceControl />
           <button type="button" className="sd-railbtn" onClick={handleLogout}>
             <LogOut className="sd-railbtn__icon" aria-hidden="true" />
@@ -642,11 +635,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="sd-topbar__spacer" aria-hidden="true" />
         </header>
 
+        {voicePlatformEnabled && <Suspense fallback={null}><ClarityHeaderGate/></Suspense>}
         <main id="sd-main" className="sd-workspace" tabIndex={-1}>
-          {isDesktop ? <ShellCrumbs location={location} /> : <SectionTabs location={location} />}
+          <WorkspaceQuote location={location} />
+          {!["/account/billing", "/account/settings", "/scheduling/appointments", "/activity/inquiries", "/activity/texts"].includes(location.split("?")[0]) && <WorkspaceTabs location={location} />}
           {children}
         </main>
       </div>
     </div>
   );
 }
+
+const ClarityHeaderGate = lazy(() => import('./ClarityHeader').then(m=>({default:m.ClarityHeader})));

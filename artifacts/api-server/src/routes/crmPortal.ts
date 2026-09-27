@@ -31,7 +31,7 @@ import {
   crmPortalProposalAcceptances, crmPortalSessions,
   crmAttachments, crmAttachmentBlobs, crmDocumentRequests,
   crmLeads, crmSupportTickets, crmSupportMessages,
-  crmQuotes, crmActivities,
+  crmQuotes, crmActivities, discoverySubmissions,
   CRM_SUPPORT_REQUEST_TYPES,
   TRANSACTION_RECEIVED_STATUS,
   PORTAL_ACCEPTANCE_LABEL,
@@ -887,6 +887,10 @@ router.get("/portal/overview", requirePortalAuth(), async (req: Request, res: Re
   const contact = await scopedContact(leadId);
   if (!contact) { refuse(res); return; }
 
+  // Only the authenticated contact's linked inquiries, with an explicit
+  // public field allowlist. Never expose scoring, internal notes or formData.
+  const inquiryRows = await db.select({id:discoverySubmissions.id,company:discoverySubmissions.companyName,createdAt:discoverySubmissions.createdAt,crmStatus:discoverySubmissions.crmStatus,convertedProjectId:discoverySubmissions.convertedProjectId}).from(discoverySubmissions).where(eq(discoverySubmissions.leadId,leadId)).orderBy(desc(discoverySubmissions.createdAt)).limit(30);
+
   const [projects, documents, requests, tickets, transactions, quotes, invoices] = await Promise.all([
     scopedProjects(leadId),
     scopedDocuments(leadId),
@@ -915,6 +919,7 @@ router.get("/portal/overview", requirePortalAuth(), async (req: Request, res: Re
 
   res.json({
     contact: { name: contact.name, company: contact.company },
+    inquiries: inquiryRows.map(row => ({id:row.id,company:row.company,createdAt:row.createdAt,status:row.convertedProjectId ? "Project created" : row.crmStatus === "Reviewed" ? "Under review" : row.crmStatus === "Proposal Generated" ? "Proposal preparation" : row.crmStatus === "Archived" ? "Closed" : "Received"})),
     counts: {
       projects: projects.length,
       documents: documents.length,

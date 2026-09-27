@@ -17,6 +17,7 @@ import type { AssistantDraft } from "@/hooks/useAssistantDrafts";
 import { voicePlatformEnabled, voicePublishEnabled, voiceBrowserTestEnabled, voiceSyncEnabled } from "@/lib/featureFlags";
 import { useWorkspaceBusinessInfo, type WorkspaceBusinessInfo } from "@/hooks/useWorkspaceBusinessInfo";
 
+import { AssistantSimulation } from "@/components/common/AssistantSimulation";
 import ActionsTab from "@/pages/assistant-builder/ActionsTab";
 import ConfigurationTab from "@/pages/assistant-builder/ConfigurationTab";
 import PromptTab from "@/pages/assistant-builder/PromptTab";
@@ -214,21 +215,72 @@ export function BuilderShell({
 
       <PageHeader
         eyebrow={BUILDER_PAGE.eyebrow}
-        title={draft.setup.assistantName || BUILDER_PAGE.untitled}
-        description={activeTabLabel}
+        title="Your assistant"
+        description="Customize your receptionist’s business details, voice, and call behavior."
         breadcrumb={
           <Link href={backHref} className="sd-link">
             <ArrowLeft className="sd-navlink__icon" aria-hidden="true" />
             {BUILDER_PAGE.back}
           </Link>
         }
-        action={<span className="sd-chip">{statusBadge}</span>}
+        action={<div className="cl-builder-save"><span className="sd-chip">{statusBadge}</span>{footerRight}</div>}
       />
 
+      {headerBanner && <section className="sd-section">{headerBanner}</section>}
+      {browserTestInBuild && testPanel && <section className="sd-section">{testPanel}</section>}
+
+      <nav className="cf-builder-tabs" aria-label={BUILDER_PAGE.sectionsLabel}>
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--sd-space-2, .5rem)",
+          }}
+        >
+          {BUILDER_TABS.map((t) => (
+            <li key={t.key}>
+              <Button
+                type="button"
+                variant={tab === t.key ? "default" : "outline"}
+                size="sm"
+                aria-current={tab === t.key ? "page" : undefined}
+                onClick={() => onTabChange(t.key)}
+              >
+                {({configuration:"Business",voice:"Voice",actions:"Call handling",testing:"Test",prompt:"Advanced"})[t.key]}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div className="mc-builder-layout"><div style={{ minWidth: 0 }}>
       {/* The name is edited once, here, so it stays visible from every
           section — it used to be both a header field and a field inside the
           first section, two inputs bound to one value on one screen. */}
-      <section className="sd-section" aria-label={BUILDER_PAGE.identityLabel}>
+
+
+
+        {tab === "testing" ? (
+          <TestAndPublishPanel
+            statusBadge={statusBadge}
+            testControl={testControl}
+            publishControl={publishControl}
+            syncControl={syncControl}
+          />
+        ) : (
+          <fieldset
+            disabled={contentDisabled}
+            className="si-form"
+            style={{ maxWidth: "none", border: 0, margin: 0, padding: 0, minWidth: 0 }}
+          >
+            <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
+          </fieldset>
+        )}
+
+      <details className="cl-builder-identity"><summary>Assistant name and identity</summary>
         <div className="si-form" style={{ maxWidth: "none" }}>
           <div className="si-field">
             <label className="si-label" htmlFor="assistant-name">
@@ -252,55 +304,7 @@ export function BuilderShell({
             </p>
           </div>
         </div>
-      </section>
-
-      {headerBanner && <section className="sd-section">{headerBanner}</section>}
-      {browserTestInBuild && testPanel && <section className="sd-section">{testPanel}</section>}
-
-      <nav aria-label={BUILDER_PAGE.sectionsLabel}>
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "var(--sd-space-2, .5rem)",
-          }}
-        >
-          {BUILDER_TABS.map((t) => (
-            <li key={t.key}>
-              <Button
-                type="button"
-                variant={tab === t.key ? "default" : "outline"}
-                size="sm"
-                aria-current={tab === t.key ? "page" : undefined}
-                onClick={() => onTabChange(t.key)}
-              >
-                {t.label}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <div style={{ minWidth: 0 }}>
-        {tab === "testing" ? (
-          <TestAndPublishPanel
-            statusBadge={statusBadge}
-            testControl={testControl}
-            publishControl={publishControl}
-            syncControl={syncControl}
-          />
-        ) : (
-          <fieldset
-            disabled={contentDisabled}
-            className="si-form"
-            style={{ maxWidth: "none", border: 0, margin: 0, padding: 0, minWidth: 0 }}
-          >
-            <TabPanel tab={tab} draft={draft} update={update} businessInfo={businessInfo.data} />
-          </fieldset>
-        )}
+      </details>
 
         {/* Technical guidance is secondary, so it sits at the foot of the
             Advanced section rather than in a bar over every screen. */}
@@ -338,7 +342,8 @@ export function BuilderShell({
         )}
       </div>
 
-      <div className="sd-section">{footerRight}</div>
+      <AssistantSimulation draft={draft} /></div>
+
     </div>
   );
 }

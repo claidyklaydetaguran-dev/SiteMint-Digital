@@ -607,7 +607,7 @@ check(
 );
 check(
   "it precedes the navigation destinations in the drawer's tab order",
-  shellCode.indexOf("ref={closeRef}") < shellCode.indexOf("<RailNav"),
+  shellCode.indexOf("ref={closeRef}") < shellCode.indexOf("<WorkspaceNavigation"),
 );
 check(
   "it reserves a 44x44 target and takes the rail's own focus ring",
@@ -629,7 +629,7 @@ check(
 );
 check(
   "the drawer's navigation destinations are unchanged by this control",
-  shellCode.includes("<RailNav location={location} onNavigate={closeIfDrawer} />"),
+  shellCode.includes("<WorkspaceNavigation location={location} onNavigate={closeIfDrawer} />"),
 );
 check(
   "scroll lock compensates for the scrollbar so it cannot shift the layout",
@@ -708,11 +708,7 @@ for (const [tier, label] of [
 check(
   "the empty state names what happens next and where to change it",
   pageCode.includes("No conversations yet") &&
-    // 2026-09-24: the empty state describes the messaging channel honestly
-    // (caller SMS is not included yet) and points at the calls and appointment
-    // sections that do hold the firm's activity.
-    /Caller SMS is not included yet/.test(pageCode) &&
-    /review calls and\s+appointment requests in their own sections/.test(pageCode),
+    /Review caller texts in Inbox and appointment requests in Appointments/.test(pageCode),
 );
 
 // ─── 12. Design tokens have not drifted from the approved system ──────────

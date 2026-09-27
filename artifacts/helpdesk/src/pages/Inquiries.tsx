@@ -1,3 +1,4 @@
+import { WorkspaceTabs } from "@/components/layout/WorkspaceNavigation";
 /**
  * V7 — the Inquiries screen: the messages the assistant took, the follow-up
  * workflow (New / In progress / Resolved), and honest delivery status for the
@@ -21,8 +22,8 @@
  * called" when the truth is the assistant could never have saved a message.
  */
 
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { Link, useSearch } from "wouter";
 import { useSession } from "@/hooks/useSession";
 import {
   useAssistantCapabilities,
@@ -76,7 +77,17 @@ const NEXT_ACTIONS: ReadonlyArray<{ status: InquiryStatus; label: string }> = [
 ];
 
 export default function Inquiries() {
+  const searchParams = useSearch();
   const { data: me, isLoading: sessionLoading } = useSession();
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const id = new URLSearchParams(window.location.search).get("id");
+    return id && Number.isFinite(Number(id)) ? Number(id) : null;
+  });
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const id = new URLSearchParams(searchParams).get("id");
+    if (id && Number.isFinite(Number(id))) setSelectedId(Number(id));
+  }, [searchParams]);
   const [tab, setTab] = useState<InquiryStatus | "all">("all");
   const [urgency, setUrgency] = useState<UrgencyFilter>("all");
   const inquiriesQuery = useInquiries(tab);
@@ -85,6 +96,14 @@ export default function Inquiries() {
   const updateStatus = useUpdateInquiryStatus();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [failedId, setFailedId] = useState<number | null>(null);
+  const initialSelection = useRef(false);
+  useEffect(() => {
+    const first=inquiriesQuery.data?.items[0];
+    if (!initialSelection.current && first) {
+      initialSelection.current=true;
+      if (window.matchMedia('(min-width: 761px)').matches && !selectedId) setSelectedId(first.id);
+    }
+  }, [inquiriesQuery.data, selectedId]);
 
   if (sessionLoading || inquiriesQuery.isLoading) {
     return <PageSkeleton label={PAGE.loading} list />;
@@ -92,7 +111,7 @@ export default function Inquiries() {
   if (!me) return null;
 
   const allItems = inquiriesQuery.data?.items ?? [];
-  const items = allItems.filter((inquiry) => matchesUrgency(inquiry, urgency));
+  const items = allItems.filter((inquiry) => matchesUrgency(inquiry, urgency) && `${inquiry.callerName} ${inquiry.topic} ${inquiry.callbackPhone ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   const counts = inquiriesQuery.data?.counts ?? { new: 0, in_progress: 0, resolved: 0 };
   const notifications = notificationsQuery.data?.items ?? [];
 
@@ -121,51 +140,15 @@ export default function Inquiries() {
   };
 
   return (
-    <div className="sd-page sd-enter">
+    <div className="sd-page sd-enter cf-inbox">
       <div className="sd-page__head">
         <div>
           <span className="sd-eyebrow">{PAGE.eyebrow}</span>
-          <h1 className="sd-page__title">{PAGE.title}</h1>
+          <h1 className="sd-page__title">Inbox</h1>
           <p className="sd-page__meta">{PAGE.detail}</p>
         </div>
       </div>
-
-      <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label={PAGE.title}>
-        {TABS.map((entry) => (
-          <button
-            key={entry.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === entry.key}
-            onClick={() => setTab(entry.key)}
-            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-              tab === entry.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-card-border bg-card text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {entry.label}
-            <span className="ml-1.5 opacity-70">{tabCount(entry.key)}</span>
-          </button>
-        ))}
-      </div>
-
-      <label className="mb-4 flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-          {URGENCY_FILTER_LABEL}
-        </span>
-        <select
-          className="w-fit rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          value={urgency}
-          onChange={(e) => setUrgency(e.target.value as UrgencyFilter)}
-        >
-          {URGENCY_FILTERS.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <WorkspaceTabs location="/activity/inquiries" />
 
       {inquiriesQuery.isError && (
         <section className="sd-error" role="alert">
@@ -211,9 +194,47 @@ export default function Inquiries() {
         </div>
       )}
 
-      {!inquiriesQuery.isError && items.length > 0 && (
+      {!inquiriesQuery.isError && allItems.length > 0 && (<div className="mc-call-layout cl-inbox-layout" data-selected={items.some(item => item.id === selectedId)}><div className="mc-call-list">      <label className="sd-sr" htmlFor="message-search">Search messages</label><input id="message-search" className="mc-search" value={search} onChange={e => {setSearch(e.target.value);setSelectedId(null);}} placeholder="Search messages" />
+      <div className="cl-inbox-toolbar"><div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label={PAGE.title}>
+        {TABS.map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === entry.key}
+            onClick={() => {setTab(entry.key);setSelectedId(null);}}
+            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              tab === entry.key
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-card-border bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {entry.label}
+            <span className="ml-1.5 opacity-70">{tabCount(entry.key)}</span>
+          </button>
+        ))}
+      </div>
+
+      <label className="mb-4 flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          {URGENCY_FILTER_LABEL}
+        </span>
+        <select
+          className="w-fit rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
+          value={urgency}
+          onChange={(e) => {setUrgency(e.target.value as UrgencyFilter);setSelectedId(null);}}
+        >
+          {URGENCY_FILTERS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label></div>
+
+{items.map(item => <button type="button" key={item.id} className="mc-call-row" aria-pressed={item.id === selectedId} onClick={() => setSelectedId(item.id)}><strong><span className="cf-initials">{item.callerName.split(" ").map(n=>n[0]).slice(0,2).join("")}</span>{item.callerName}</strong><small>{formatWhen(item.createdAt)}</small><span>{item.topic}</span><small>{followUpLabel(item.followUpStatus)}</small></button>)}</div><div className="mc-call-detail"><button className="mc-mobile-back" type="button" onClick={() => setSelectedId(null)}>Back to messages</button>{selectedId === null && <div className="mc-detail-placeholder"><h2>Select a message</h2><p>Read the request and manage follow-up.</p></div>}
         <ul className="sd-list">
-          {items.map((inquiry) => (
+          {items.filter(inquiry => inquiry.id === selectedId).map((inquiry) => (
             <li className="sd-list__item" key={inquiry.id}>
               <div className="flex flex-col gap-3 rounded-lg border border-card-border bg-card p-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -301,10 +322,10 @@ export default function Inquiries() {
               </div>
             </li>
           ))}
-        </ul>
+        </ul></div>{items.filter(item=>item.id===selectedId).map(item=><aside className="cl-card cl-contact-context" key={item.id}><span className="cl-avatar">{item.callerName.charAt(0)}</span><h2>{item.callerName}</h2><p>Caller details</p><dl><dt>Phone</dt><dd>{item.callbackPhone || "Not provided"}</dd><dt>Email</dt><dd>{item.callbackEmail || "Not provided"}</dd><dt>Follow-up</dt><dd>{followUpLabel(item.followUpStatus)}</dd><dt>Received</dt><dd>{formatWhen(item.createdAt)}</dd></dl><Link className="cl-add" href={callDetailHref(item.callId)}>View associated call</Link><p className="cl-muted">Details captured from this caller’s message.</p></aside>)}</div>
       )}
 
-      <section className="mt-8">
+      <details className="cl-card cl-notification-details"><summary>Notification delivery history</summary>
         <h2 className="text-lg font-semibold text-foreground">{COPY.notificationsTitle}</h2>
         <p className="mb-3 text-sm text-muted-foreground">{COPY.notificationsDetail}</p>
         {notificationsQuery.isError ? (
@@ -362,7 +383,7 @@ export default function Inquiries() {
             ))}
           </ul>
         )}
-      </section>
+      </details>
     </div>
   );
 }

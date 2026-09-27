@@ -81,10 +81,12 @@ export function AppointmentDetailDrawer({
   request,
   config,
   onClose,
+  inline = false,
 }: {
   request: AppointmentRequest | null;
   config: AvailabilityConfig | undefined;
   onClose: () => void;
+  inline?: boolean;
 }) {
   const approveMutation = useApproveAppointmentRequest();
   const cancelCalendarMutation = useCancelBookedAppointment();
@@ -162,15 +164,10 @@ export function AppointmentDetailDrawer({
 
   const open = request !== null;
 
-  return (
-    <Sheet open={open} onOpenChange={(next) => { if (!next) handleClose(); }}>
-      <SheetContent className="overflow-y-auto sm:max-w-md">
+  const content = (<>
         {request && (
           <>
-            <SheetHeader>
-              <SheetTitle>{contactName(request.contact)}</SheetTitle>
-              <SheetDescription>{contactDetail(request.contact)}</SheetDescription>
-            </SheetHeader>
+            <div className="cf-appointment-person"><span className="cl-avatar">{contactName(request.contact).split(" ").map(n=>n[0]).slice(0,2).join("")}</span><div><h2 className="sd-h2">{contactName(request.contact)}</h2><p className="ws-page-lede">{contactDetail(request.contact)}</p></div></div>
 
             <div className="mt-6 space-y-6">
               <section aria-labelledby="drawer-status-h">
@@ -265,9 +262,9 @@ export function AppointmentDetailDrawer({
             </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
-  );
+  </>);
+  if (inline) return <aside className="mc-appointment-detail">{request ? <><button className="mc-appointment-close" type="button" onClick={handleClose}>Back to appointments</button>{content}</> : <div className="mc-detail-placeholder"><h2>Select an appointment</h2><p>Review the request and choose the next step.</p></div>}</aside>;
+  return <Sheet open={open} onOpenChange={(next) => { if (!next) handleClose(); }}><SheetContent className="overflow-y-auto sm:max-w-md"><SheetHeader className="sr-only"><SheetTitle>Appointment details</SheetTitle><SheetDescription>Review and manage this appointment.</SheetDescription></SheetHeader>{content}</SheetContent></Sheet>;
 }
 
 /** A minimal slot picker for the reschedule flow, reusing the same days/slots endpoints the booking flows use, scoped to the request's own appointment type. */

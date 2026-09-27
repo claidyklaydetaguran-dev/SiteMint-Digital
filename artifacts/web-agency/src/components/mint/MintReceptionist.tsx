@@ -424,7 +424,7 @@ export function MintReceptionist() {
             <summary>{"How does pricing work?"}</summary>
             <p>
               {
-                "Pricing is by request. We’ll review your call volume, setup and expected usage, then give you a clear quote before activation. The proposal explains the subscription, included usage, any overage charges and setup scope."
+                "Create an account to set up your assistant and try a simulated demo for free. Live service requires a subscription. Your plan, included usage and any additional charges must be confirmed before activation. Billing and Usage are available inside Settings."
               }
             </p>
           </details>
@@ -432,7 +432,7 @@ export function MintReceptionist() {
             <summary>{"Can I try it before committing?"}</summary>
             <p>
               {
-                "We’ll walk you through an assisted demonstration and test your setup together before launch. The examples above illustrate the intended experience."
+                "Yes. Free setup includes a simulated demo with no real calls, texts or bookings. Live service requires a subscription and completed activation checks."
               }
             </p>
           </details>
@@ -441,14 +441,14 @@ export function MintReceptionist() {
       <section className="cta wrap">
         <h2>{"A better first hello starts here."}</h2>
         <p>
-          {"Let’s talk about your calls, your team and the setup you need."}
+          {"Set up your business, shape your assistant and explore a simulated conversation."}
         </p>
         <div className="actions">
-          <a className="button " href="/discovery?service=ai-receptionist">
-            {"Request pricing"}
+          <a className="button " href="/ai-receptionist/signup">
+            {"Sign up"}
           </a>
-          <a className="button outline" href="/ai-receptionist/signup">
-            {"Create an account"}
+          <a className="button outline" href="/ai-receptionist/dashboard/login">
+            {"Sign in"}
           </a>
         </div>
       </section>

@@ -53,15 +53,7 @@ export function AppointmentRequestsList({
 
   return (
     <ul className="sa-list">
-      <li className="sa-list__head" aria-hidden="true">
-        <span>{REQUESTS.columnClient}</span>
-        <span>{REQUESTS.columnType}</span>
-        <span>{REQUESTS.columnWhen}</span>
-        <span>{REQUESTS.columnStatus}</span>
-        <span>{REQUESTS.columnSource}</span>
-      </li>
-
-      {items.map((req) => {
+      {[...items].sort((a,b)=>Date.parse(a.startUtc)-Date.parse(b.startUtc)).map((req) => {
         const test = isTestRequest(req.contact);
         return (
           <li key={req.id} className="sa-row">
@@ -72,22 +64,23 @@ export function AppointmentRequestsList({
               onClick={() => onSelect(req)}
               aria-label={`${REQUESTS.openRecord}: ${contactName(req.contact)}`}
             >
-              <div className="sa-row__client">
+              <time className="cf-agenda-time" dateTime={req.startUtc}>{new Date(req.startUtc).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit",timeZone:timezone})}<small>{new Date(req.startUtc).toLocaleDateString(undefined,{month:"short",day:"numeric",timeZone:timezone})}{!zoneKnown && " UTC"}</small></time>
+              <div className="sa-row__client"><span className="cf-initials" aria-hidden="true">{contactName(req.contact).split(" ").map(n=>n[0]).slice(0,2).join("")}</span><div>
                 <span className="sa-row__name">
                   {contactName(req.contact)}
                   {test && <span className="sd-chip" data-tier="test"> {REQUESTS.testChip}</span>}
                 </span>
                 <span className="sa-row__contact">{contactDetail(req.contact)}</span>
-              </div>
+              </div></div>
               <div className="sa-row__cell" data-label={REQUESTS.columnType}>{typeName(config, req.appointmentTypeId)}</div>
-              <div className="sa-row__cell" data-label={REQUESTS.columnWhen}>
+              <div className="sd-sr" data-label={REQUESTS.columnWhen}>
                 {slotDateTime(req.startUtc, timezone)}
                 {!zoneKnown && " UTC"}
               </div>
               <div className="sa-row__cell" data-label={REQUESTS.columnStatus}>
                 <span className="sa-state" data-tone={requestStateTone(req.state)}>{requestStateLabel(req.state)}</span>
               </div>
-              <div className="sa-row__cell" data-label={REQUESTS.columnSource}>{sourceLabel(req.source)}</div>
+              <div className="sd-sr" data-label={REQUESTS.columnSource}>{sourceLabel(req.source)}</div>
             </button>
           </li>
         );

@@ -198,7 +198,7 @@ check(
     !/function planLabel/.test(contractCode),
 );
 
-eq("a trial plan reads as the shared verified label", planLabel("trial"), "Free Trial");
+eq("a trial plan reads as the shared verified label", planLabel("trial"), "Free setup");
 eq("a paid plan reads as a neutral verified label", planLabel("paid"), "Paid plan");
 eq(
   "an unrecognised plan is echoed verbatim, never renamed",
@@ -497,7 +497,7 @@ eq(
   "a trial record shows plan, usage and the trial limit",
   planFields(planLabel("trial"), usageModel("trial", 12, 20)),
   [
-    { label: "Current plan", value: "Free Trial" },
+    { label: "Current plan", value: "Free setup" },
     // Relabelled deliberately: this allowance counts text-message (SMS) intake
     // conversations for the life of the account, not calls and not per period.
     { label: "SMS conversation usage", value: "12 of 20" },
@@ -1101,7 +1101,7 @@ if (!existsSync(distDir)) {
   eq("no removed phrase survives into the built Billing code", bannedHits(routeOnly), []);
   check(
     "the plan label reaches the built output from the shared helper",
-    built.includes("Paid plan") && built.includes("Free Trial"),
+    built.includes("Paid plan") && built.includes("Free setup"),
   );
   // The three surfaces that name a plan — rail, Settings, Billing — now share
   // one mapping, so the invented name must exist in no chunk at all.

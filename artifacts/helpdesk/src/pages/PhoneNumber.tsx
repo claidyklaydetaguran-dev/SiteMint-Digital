@@ -85,7 +85,9 @@ export default function PhoneNumber() {
       {view === "none-assigned" && (
         <>
           <p className="sd-page__meta">{COPY.noneDetail}</p>
-          <NumberSetupRequest />
+          <OwnerOnly fallback={<StaffReadOnlyNote text="An owner can request a phone number or connect the business’s existing number." />}>
+            <NumberSetupRequest />
+          </OwnerOnly>
         </>
       )}
 
