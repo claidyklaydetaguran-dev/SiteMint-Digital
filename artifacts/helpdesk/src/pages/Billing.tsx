@@ -52,7 +52,7 @@ import { WorkspaceTabs } from "@/components/layout/WorkspaceNavigation";
  * documents the evidence for both.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/hooks/useSession";
 import {
   CHECKOUT_PATH,
@@ -79,7 +79,8 @@ import {
 } from "@/pages/billing/billingContract";
 import "@/styles/v2-dashboard.css";
 import "@/styles/v2-billing.css";
-import { VoicePlanStatus } from "@/pages/billing/VoicePlanStatus";
+import { voicePlatformEnabled } from "@/lib/featureFlags";
+const VoicePlanStatus = voicePlatformEnabled ? lazy(() => import("@/pages/billing/VoicePlanStatus").then(m => ({ default: m.VoicePlanStatus }))) : () => null;
 import { OwnerOnly, StaffReadOnlyNote } from "@/components/common/OwnerOnly";
 
 export default function Billing() {
@@ -205,7 +206,7 @@ export default function Billing() {
       </div>
       <WorkspaceTabs location="/account/billing" />
 
-      <VoicePlanStatus />
+      <Suspense fallback={<p role="status">Loading plan details…</p>}><VoicePlanStatus /></Suspense>
 
       {/* Two local views over the same session values. No route change, no
           request, no content that is reachable only in one of them. */}

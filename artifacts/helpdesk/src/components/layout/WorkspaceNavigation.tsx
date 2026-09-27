@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { LayoutDashboard, Phone, Inbox, CalendarDays, Bot, Settings, CreditCard } from "lucide-react";
+import { LayoutDashboard, Phone, Inbox, MessageSquare, CalendarDays, Bot, Settings, CreditCard } from "lucide-react";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { ROUTES } from "@/lib/routes";
 
@@ -26,7 +26,7 @@ export function WorkspaceNavigation({ location, onNavigate }: { location: string
     { label: "Overview", href: ROUTES.overview, icon: LayoutDashboard },
     { label: "Assistant", href: voicePlatformEnabled ? ROUTES.assistants : ROUTES.setup, icon: Bot },
     ...(voicePlatformEnabled ? [{ label: "Calls", href: ROUTES.calls, icon: Phone }] : []),
-    { label: "Inbox", href: voicePlatformEnabled ? ROUTES.inquiries : ROUTES.conversations, icon: Inbox },
+    { label: "Inbox", href: voicePlatformEnabled ? ROUTES.inquiries : ROUTES.conversations, icon: voicePlatformEnabled ? Inbox : MessageSquare },
     { label: "Appointments", href: ROUTES.appointments, icon: CalendarDays },
     { label: "Settings", href: ROUTES.settings, icon: Settings },
   ];

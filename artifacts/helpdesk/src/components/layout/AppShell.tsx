@@ -646,4 +646,4 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-const ClarityHeaderGate = lazy(() => import('./ClarityHeader').then(m=>({default:m.ClarityHeader})));
+const ClarityHeaderGate = voicePlatformEnabled ? lazy(() => import('./ClarityHeader').then(m=>({default:m.ClarityHeader}))) : () => null;
