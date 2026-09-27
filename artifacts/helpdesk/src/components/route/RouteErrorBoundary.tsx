@@ -35,21 +35,22 @@ interface RouteErrorBoundaryProps {
 
 interface RouteErrorBoundaryState {
   hasError: boolean;
+  chunkError: boolean;
 }
 
 export class RouteErrorBoundary extends Component<
   RouteErrorBoundaryProps,
   RouteErrorBoundaryState
 > {
-  state: RouteErrorBoundaryState = { hasError: false };
+  state: RouteErrorBoundaryState = { hasError: false, chunkError: false };
 
-  static getDerivedStateFromError(): RouteErrorBoundaryState {
-    return { hasError: true };
+  static getDerivedStateFromError(error: unknown): RouteErrorBoundaryState {
+    return { hasError: true, chunkError: isChunkLoadError(error) };
   }
 
   componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
     if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
-      this.setState({ hasError: false });
+      this.setState({ hasError: false, chunkError: false });
     }
   }
 
@@ -71,7 +72,13 @@ export class RouteErrorBoundary extends Component<
   }
 
   private handleRetry = () => {
-    this.setState({ hasError: false });
+    // React.lazy caches a rejected import. An explicit user retry must fetch
+    // the current document and asset map rather than retry that cached failure.
+    if (this.state.chunkError) {
+      window.location.reload();
+      return;
+    }
+    this.setState({ hasError: false, chunkError: false });
   };
 
   private handleOverview = () => {
@@ -94,11 +101,12 @@ export class RouteErrorBoundary extends Component<
             {routeLabel ? `${routeLabel} failed to load.` : "This section failed to load."}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Something went wrong loading this part of the dashboard. Nothing has
-            been lost. Try again, or return to the overview.
+            {this.state.chunkError
+              ? "A website update is available. Reload this page to load the current version. Unsaved changes on this page may need to be entered again."
+              : "Something went wrong loading this part of the dashboard. Try again, or return to the overview."}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button onClick={this.handleRetry}>Try again</Button>
+            <Button onClick={this.handleRetry}>{this.state.chunkError ? "Reload page" : "Try again"}</Button>
             <Button variant="outline" onClick={this.handleOverview}>
               Go to overview
             </Button>
