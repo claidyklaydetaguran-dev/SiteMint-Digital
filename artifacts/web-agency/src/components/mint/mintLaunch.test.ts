@@ -15,7 +15,7 @@
  *     pause on tab switch must not be mistaken for a visitor pause.
  *  3. Wordmark restart — the logo is a full reload that starts at the top,
  *     but modified clicks keep native behaviour and the href stays "/".
- *  4. Receptionist CTAs — "Get started" / "See how it works", wired to the
+ *  4. Receptionist CTAs — "Request pricing" / "See how it works", wired to the
  *     assisted-pilot inquiry and the written example conversations.
  *  5. In-page anchors — every `/ai-receptionist#…` target must exist.
  *  6. Poster preloads — index.html no longer preloads the retired V4 hero
@@ -105,7 +105,7 @@ describe("3. wordmark restart", () => {
 
 describe("4. receptionist calls to action", () => {
   it("uses the approved labels", () => {
-    expect(hero).toContain('"Get started"');
+    expect(hero).toContain('"Request pricing"');
     expect(hero).toContain('"See how it works"');
     expect(hero).not.toContain("Plan my receptionist");
     expect(hero).not.toContain("Explore a sample call");
@@ -115,7 +115,7 @@ describe("4. receptionist calls to action", () => {
     expect(receptionist).not.toMatch(/Hear a demo call/);
   });
   it("routes to working journeys", () => {
-    expect(hero).toContain('"/start?service=ai-receptionist"');
+    expect(hero).toContain('"/discovery?service=ai-receptionist"');
     expect(hero).toContain('"#example"');
   });
 });

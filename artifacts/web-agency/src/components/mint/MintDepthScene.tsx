@@ -149,7 +149,7 @@ export function MintReceptionistGuide() {
             prepare your assistant, test the handoffs and agree on activation.
           </p>
         </div>
-        <a className="button" href="/start?service=ai-receptionist">
+        <a className="button" href="/discovery?service=ai-receptionist">
           Plan my receptionist
         </a>
       </div>

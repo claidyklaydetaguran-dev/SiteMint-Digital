@@ -444,7 +444,7 @@ export function MintReceptionist() {
           {"Let’s talk about your calls, your team and the setup you need."}
         </p>
         <div className="actions">
-          <a className="button " href="/start?service=ai-receptionist">
+          <a className="button " href="/discovery?service=ai-receptionist">
             {"Request pricing"}
           </a>
           <a className="button outline" href="/ai-receptionist/signup">

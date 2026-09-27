@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearch } from "wouter";
 import { useForm, FormProvider } from "react-hook-form";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,8 +60,12 @@ const STEP_COMPONENTS = [
 ];
 
 export function PlatformDiscoveryShell() {
+  const isReceptionist = new URLSearchParams(useSearch()).get("service") === "ai-receptionist";
+  const initialValues: DiscoveryDraft = isReceptionist
+    ? { ...defaultDiscoveryDraft, projectDirection: { ...defaultDiscoveryDraft.projectDirection, primaryType: "ai_receptionist" } }
+    : defaultDiscoveryDraft;
   const form = useForm<DiscoveryDraft>({
-    defaultValues: defaultDiscoveryDraft,
+    defaultValues: initialValues,
     resolver: discoveryResolver,
     shouldUnregister: false,
     mode: "onSubmit",
@@ -98,7 +103,7 @@ export function PlatformDiscoveryShell() {
 
   function handleStart() {
     clearDraft();
-    form.reset(defaultDiscoveryDraft);
+    form.reset(initialValues);
     setCurrentStep(0);
     setPhase("form");
   }
@@ -144,7 +149,7 @@ export function PlatformDiscoveryShell() {
     if (!confirmed) return;
     clearDraft();
     clearSubmissionSession();
-    form.reset(defaultDiscoveryDraft);
+    form.reset(initialValues);
     setValidatedSubmission(null);
     setSubmitState({ kind: "idle" });
     setCurrentStep(0);
@@ -220,6 +225,7 @@ export function PlatformDiscoveryShell() {
         hasDraft={savedDraft !== null}
         onStart={handleStart}
         onRestoreDraft={handleRestoreDraft}
+        isReceptionist={isReceptionist}
       />
     );
   }
@@ -238,12 +244,12 @@ export function PlatformDiscoveryShell() {
           <CheckCircle2 size={28} aria-hidden="true" className="text-[hsl(var(--sm-mint-700))]" />
         </span>
         <h1 className="pp-font-display mt-5 text-2xl font-semibold text-[hsl(var(--sm-color-text-primary))]">
-          You're all set — we'll be in touch soon
+          {isReceptionist ? "Your pricing request is with SiteMint" : "Your project brief is with SiteMint"}
         </h1>
         <p className="mt-4 text-[hsl(var(--sm-color-text-secondary))] leading-relaxed">
           {isDuplicate
-            ? "This brief was already received — no need to resubmit. Our team will review your answers and reach out within 24–48 hours with a personalized scope of work and proposal."
-            : "Thank you for taking the time to walk us through your project. Our team will review your answers and reach out within 24–48 hours with a personalized scope of work and proposal."}
+            ? "We already received this brief. There is no need to submit it again."
+            : "Your answers were recorded in SiteMint’s CRM for our team to review. We’ll reply using the contact details you gave us."}
         </p>
 
         {reference && (
@@ -269,8 +275,8 @@ export function PlatformDiscoveryShell() {
           <ol className="space-y-1.5">
             {[
               "Our team reviews your answers",
-              "We prepare a personalized scope of work and proposal",
-              "We reach out within 24–48 hours to schedule a discovery call",
+              isReceptionist ? "We review your call volume, setup and expected usage" : "We prepare a proposed scope of work",
+              "We contact you to discuss the next step and a clear quote",
             ].map((step, i) => (
               <li key={step} className="flex items-start gap-2.5 text-sm text-[hsl(var(--sm-color-text-secondary))]">
                 <span
@@ -287,14 +293,14 @@ export function PlatformDiscoveryShell() {
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <a
-            href="/"
+            href={isReceptionist ? "/ai-receptionist" : "/"}
             className="inline-flex h-10 items-center rounded-md border px-5 text-sm font-medium transition-colors"
             style={{
               borderColor: "hsl(var(--sm-color-border-default))",
               color: "hsl(var(--sm-color-text-primary))",
             }}
           >
-            Back to home
+            {isReceptionist ? "Back to AI Receptionist" : "Back to SiteMint"}
           </a>
           <Button type="button" variant="ghost" className="text-sm" onClick={handleStartOver}>
             Submit another project
@@ -350,6 +356,10 @@ export function PlatformDiscoveryShell() {
         <div aria-live="polite" className="sr-only">
           {announcement}
         </div>
+
+        <a href={isReceptionist ? "/ai-receptionist" : "/"} className="mb-5 inline-flex min-h-11 items-center text-sm font-medium text-[hsl(var(--sm-mint-700))] underline underline-offset-4">
+          {isReceptionist ? "Back to AI Receptionist" : "Back to SiteMint"}
+        </a>
 
         <div className="dv5-grid">
           <DiscoveryStepRail currentStep={currentStep} />

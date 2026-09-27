@@ -94,8 +94,16 @@ export function ContentFunctionalityStep() {
       </div>
 
       <div className="space-y-2">
-        <Label>Anything else about scope we should know? (optional)</Label>
-        <Textarea {...register("projectScope.additionalRequirements", { setValueAs: toOptionalText })} rows={3} />
+        <Label>
+          {primaryType === "ai_receptionist"
+            ? "About how many calls do you receive each month, and what should happen after each call? (optional)"
+            : "Anything else about scope we should know? (optional)"}
+        </Label>
+        <Textarea
+          {...register("projectScope.additionalRequirements", { setValueAs: toOptionalText })}
+          rows={3}
+          placeholder={primaryType === "ai_receptionist" ? "For example: about 80 calls; answer questions, book consultations and send us a follow-up." : undefined}
+        />
       </div>
 
       <AssetStatusField name="readiness.contentStatus" label="Website content / copy" />

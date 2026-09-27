@@ -353,8 +353,8 @@ export function MintCinemaHero({ receptionist = false }: { receptionist?: boolea
               : "Websites, apps and connected systems. Thoughtfully designed. Built around you."}
           </p>
           <div className="actions">
-            <a className="button" href={receptionist ? "/start?service=ai-receptionist" : "/discovery"}>
-              {receptionist ? "Get started" : "Let’s build your next chapter"}
+            <a className="button" href={receptionist ? "/discovery?service=ai-receptionist" : "/discovery"}>
+              {receptionist ? "Request pricing" : "Let’s build your next chapter"}
             </a>
             <a className="button outline" href={anchor}>
               {receptionist ? "See how it works" : "Explore SiteMint"}
