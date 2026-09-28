@@ -19,6 +19,19 @@ describe("private call recording transport", () => {
       headers: { Authorization: "Bearer test-only-private-key" }, redirect: "manual",
     }));
   });
+  it("accepts signed R2 recordings from the authenticated provider", async () => {
+    const url = "https://hipaa-recordings.94bdb67bb98da30b06bdd917725c037d.r2.cloudflarestorage.com/call.wav?X-Amz-Signature=test";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location: url } })));
+    expect(await provider().getCallRecording(id)).toEqual({ url });
+  });
+  it.each([
+    "https://bucket.94bdb67bb98da30b06bdd917725c037d.r2.cloudflarestorage.com.evil.example/x?s=1",
+    "https://bucket.invalid.r2.cloudflarestorage.com/x?s=1",
+    "https://bucket.94bdb67bb98da30b06bdd917725c037d.r2.cloudflarestorage.com/x",
+  ])("rejects malformed or unsigned R2 locations %s", async (location) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location } })));
+    await expect(provider().getCallRecording(id)).rejects.toThrow("Recording location is unavailable.");
+  });
   it.each([404, 410])("keeps an absent artifact distinct from a provider failure (%s)", async (status) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
     expect(await provider().getCallRecording(id)).toBeUndefined();
