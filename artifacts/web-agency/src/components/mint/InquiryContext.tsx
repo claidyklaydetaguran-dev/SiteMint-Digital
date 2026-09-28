@@ -57,7 +57,7 @@ export function InquiryContext() {
       {scope && <pre>{scope}</pre>}
       <div className="mint-inquiry-actions">
         {isReceptionist ? (
-          <a className="button" href="/discovery">
+          <a className="button" href="/discovery?service=ai-receptionist">
             Request pricing
           </a>
         ) : (

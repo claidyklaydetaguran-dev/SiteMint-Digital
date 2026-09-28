@@ -28,9 +28,9 @@ export const COPY = {
   callsLabel: "Calls",
   minutesUsedLabel: "Minutes used",
   includedLabel: "Included minutes",
-  includedUnlimited: "No limit set",
+  includedUnlimited: "Not configured",
   remainingLabel: "Minutes remaining",
-  remainingUnlimited: "Not limited",
+  remainingUnlimited: "Not available",
 
   warningTitle: "Approaching your included minutes",
   warningDetail: "You've used most of your included minutes for this period.",

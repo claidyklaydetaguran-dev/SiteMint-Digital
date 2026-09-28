@@ -51,7 +51,7 @@ const NEXT_STEPS = [
   },
   {
     title: "Test before you take real calls",
-    body: "You can publish your assistant and talk to it from your browser as soon as setup is saved. Answering a real business phone number is connected separately, when you are ready.",
+    body: "Free setup includes a scripted simulation with no real call or booking. Publishing, live browser calls and answering a phone number require an active subscription and completed activation checks.",
   },
 ];
 

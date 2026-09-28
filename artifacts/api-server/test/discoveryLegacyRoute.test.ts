@@ -100,6 +100,12 @@ function fakeUpdate(table: unknown) {
 db.insert = fakeInsert;
 // @ts-expect-error -- intentional monkey-patch of the shared db singleton for this test process only.
 db.update = fakeUpdate;
+// Intake now saves both records atomically. Portal delivery is covered in its
+// isolated unit suite; this fake refuses its select before any real I/O.
+(db as any).transaction = async (fn: any) => fn({ insert: fakeInsert, execute: async () => undefined, select: () => ({from: (table: unknown) => ({where: () => ({limit: async () => {
+  if (table !== discoverySubmissions) throw new Error("portal tested separately");
+  return insertedSubmissions.filter(row => row.idempotencyKey === "legacy:test-key-1234567890");
+}})})}) });
 
 // ── Monkey-patch global fetch (intercepts the Resend SDK's outbound call) ──
 
@@ -219,6 +225,21 @@ async function run() {
     } finally {
       dbShouldThrowOnInsert = false;
     }
+  });
+
+  await withServer(async baseUrl => {
+    const payload = {contactName:"Repeat",companyName:"Repeat Co",email:"repeat@example.com",plannerMeta:{idempotencyKey:"test-key-1234567890"}};
+    const post = (body: unknown) => fetch(`${baseUrl}/api/discovery/submit`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const first = await post(payload);
+    const firstBody = await first.json() as {id:number};
+    const count = insertedSubmissions.length;
+    const mails = resendFetchCallCount;
+    const retry = await post(payload);
+    const retryBody = await retry.json() as {id:number};
+    check("planner retry returns the original reference",first.status===201 && retry.status===200 && firstBody.id===retryBody.id);
+    check("planner retry does not duplicate records or acknowledgments", insertedSubmissions.length===count && resendFetchCallCount===mails);
+    const conflict = await post({...payload,companyName:"Different company"});
+    check("same key with changed answers is rejected",conflict.status===409);
   });
 
   globalThis.fetch = originalFetch;

@@ -38,7 +38,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 export default defineConfig({
-  schema: path.join(__dirname, "./src/schema/discovery/index.ts"),
+  schema: path.join(__dirname, "./src/schema/discovery/index.ts").split(path.sep).join("/"),
   out: "./drizzle/discovery",
   dialect: "postgresql",
   // AR-001Z. Its own journal, so this domain's watermark is its own. Sharing

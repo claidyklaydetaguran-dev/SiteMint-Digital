@@ -48,6 +48,7 @@ const Calendar = lazy(() => import("@/pages/Calendar"));
 const Appointments = lazy(() => import("@/pages/Appointments"));
 const TestBooking = lazy(() => import("@/pages/TestBooking"));
 
+const TextInbox = lazy(() => import("@/pages/TextInbox"));
 const Inbox = lazy(() => import("@/pages/Inbox"));
 const Contacts = lazy(() => import("@/pages/Contacts"));
 const ContactDetail = lazy(() => import("@/pages/ContactDetail"));
@@ -213,6 +214,7 @@ function Router() {
             <Route path={ROUTES.appointments} component={Appointments} />
             <Route path={ROUTES.testBooking} component={TestBooking} />
 
+            <Route path="/activity/texts" component={TextInbox} />
             <Route path={ROUTES.conversations} component={Inbox} />
             <Route path={ROUTES.contacts} component={Contacts} />
             <Route path={ROUTES.contactDetail} component={ContactDetail} />

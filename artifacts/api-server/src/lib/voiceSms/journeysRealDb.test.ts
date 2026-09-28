@@ -157,6 +157,25 @@ suite("journeys 3 and 4 on a real database", () => {
     expect(thread[0]).toMatchObject({ direction: "out", status: "queued" });
   });
 
+  it("contact summaries correlate each count and consent to the contact AND its firm", async () => {
+    const { listContactsForFirm } = await import("../voiceContacts/contactsQuery.js");
+    const phone = "+15550199007";
+    const [a] = await db.insert(voice.voiceContacts).values({ firmId: firmA, phoneE164: phone, origin: "manual" }).returning();
+    const [b] = await db.insert(voice.voiceContacts).values({ firmId: firmB, phoneE164: phone, origin: "manual" }).returning();
+    await db.insert(voice.voiceCallLinks).values([
+      { firmId: firmA, contactId: a!.id, callId: `summary-a-${STAMP}` },
+      { firmId: firmB, contactId: b!.id, callId: `summary-b-${STAMP}` },
+      { firmId: firmB, contactId: b!.id, callId: `summary-b2-${STAMP}` },
+    ]);
+    await outbox.recordConsent(firmB, phone, "stopped", "sms_stop");
+    await texts.storeInboundText({ firmId: firmB, fromE164: phone, toE164: "+18604839097", body: "[TEST] B only", providerMessageSid: `SMsummary${STAMP}`, keyword: "other" });
+    const summaryA = (await listContactsForFirm(firmA, phone, 10))[0]!;
+    const summaryB = (await listContactsForFirm(firmB, phone, 10))[0]!;
+    expect(summaryA).toMatchObject({ id: a!.id, callCount: 1, unreadTexts: 0, optedOut: false });
+    expect(summaryB).toMatchObject({ id: b!.id, callCount: 2, unreadTexts: 1, optedOut: true });
+    expect(await listContactsForFirm(firmA, undefined, 10, `summary-b-${STAMP}`)).toEqual([]);
+  });
+
   it("the database refuses a text kind or contact origin the migration did not add", async () => {
     await expect(
       db.insert(voice.voiceSmsOutbox).values({ firmId: firmA, toE164: "+15550199005", kind: "marketing", body: "x", dedupeKey: `bad-${STAMP}` }),

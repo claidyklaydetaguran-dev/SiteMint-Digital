@@ -203,6 +203,7 @@ export class VapiVoiceProvider implements VoiceProvider {
       }
       const storageHost = /^(?:[a-z0-9-]+\.)+s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/.test(url.hostname)
         || /^s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/.test(url.hostname)
+        || /^[a-z0-9-]+\.[a-f0-9]{32}\.r2\.cloudflarestorage\.com$/.test(url.hostname)
         || url.hostname === "storage.googleapis.com"
         || /^[a-z0-9-]+\.storage\.googleapis\.com$/.test(url.hostname)
         || /^[a-z0-9-]+\.supabase\.co$/.test(url.hostname);

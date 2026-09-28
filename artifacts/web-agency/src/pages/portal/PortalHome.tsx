@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { FileUp, FolderKanban, FileText, LifeBuoy } from "lucide-react";
 
 interface Overview {
+  inquiries?: Array<{ id: number; company: string; createdAt: string; status: string }>;
   contact: { name: string; company: string | null };
   counts: { projects: number; documents: number; documentsRequested: number; openRequests: number };
   paidToDate: number;
@@ -82,6 +83,12 @@ export default function PortalHome() {
           </p>
 
           {state.data.nextActionForYou && <NextAction action={state.data.nextActionForYou} />}
+
+          {!!state.data.inquiries?.length && <PortalCard>
+            <h2 className="text-lg font-semibold">Your inquiries</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Your brief is with SiteMint. A project appears here after approval.</p>
+            <ul className="mt-4 divide-y divide-border">{state.data.inquiries.map(inquiry => <li key={inquiry.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><strong>{inquiry.company}</strong><p className="text-sm text-muted-foreground">Reference #{inquiry.id} · {new Date(inquiry.createdAt).toLocaleDateString()}</p></div><span className="rounded-full bg-teal-50 px-3 py-1 text-sm text-teal-900 dark:bg-teal-950 dark:text-teal-100">{inquiry.status}</span></li>)}</ul>
+          </PortalCard>}
 
           {/* One column at 375px, two from 640px. Nothing here can overflow
               sideways: every value is short and every label truncates. */}

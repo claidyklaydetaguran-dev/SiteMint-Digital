@@ -7,6 +7,8 @@
 import { useSession } from "@/hooks/useSession";
 import { useUsage } from "@/hooks/useUsage";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
+import { Link } from "wouter";
+import { ROUTES } from "@/lib/routes";
 import {
   COPY,
   PAGE,
@@ -80,6 +82,9 @@ export default function Usage() {
           )}
 
           <p className="sd-page__meta">{COPY.billingPeriodLabel}: {periodLabel(usageQuery.data.period)}</p>
+          {usageQuery.data.includedMinutes == null && (
+            <p className="sd-page__meta">No included call allowance is recorded for this period. This does not mean unlimited or active calling. <Link href={ROUTES.billing}>Review plan and activation</Link>.</p>
+          )}
 
           <dl className="sd-figures">
             <div className="sd-figure">

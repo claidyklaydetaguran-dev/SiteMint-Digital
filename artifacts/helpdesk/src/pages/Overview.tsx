@@ -25,6 +25,7 @@ import { Link } from "wouter";
 import { AlertTriangle, ArrowLeftRight, ArrowRight, CalendarDays, Mail, Mic, PhoneCall, CalendarCheck } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
 import { useSession } from "@/hooks/useSession";
+import { useAppointmentRequests } from "@/hooks/useAvailability";
 import { relativeTime } from "@/lib/conversationUi";
 import { voicePlatformEnabled } from "@/lib/featureFlags";
 import { NextActionCard } from "@/components/common/NextActionCard";
@@ -252,7 +253,8 @@ function StatusCard({
         <NextActionCard title={next.title} detail={next.detail} actionLabel={next.actionLabel} href={next.href} />
       </div>
 
-      <div className="ws-hero__side">
+      <details className="ws-hero__side mc-connections-disclosure">
+        <summary>Connections and readiness</summary>
         <div className="sd-section__head" style={{ marginBottom: 4 }}>
           <h2 className="ws-side-title">Connections</h2>
           <Link href="/setup" className="sd-link">
@@ -289,14 +291,14 @@ function StatusCard({
             );
           })}
         </ul>
-      </div>
+      </details>
     </section>
   );
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
-export default function Overview() {
+function LegacyOverview() {
   const {
     data: conversations,
     isLoading: convsLoading,
@@ -311,6 +313,7 @@ export default function Overview() {
   const openIssuesCount = useOpenIssuesCount();
   const pendingRequests = usePendingAppointmentRequestsCount();
   const recentCallsQuery = useRecentCalls();
+  const appointments = useAppointmentRequests();
 
   if (sessionLoading || convsLoading || setup.loading || readiness.isLoading) {
     return <OverviewSkeleton />;
@@ -370,7 +373,7 @@ export default function Overview() {
     <div className="sd-page sd-enter">
       <PageHeader
         eyebrow={todayLabel()}
-        title={greeting()}
+        title="Your day, at a glance"
         description={
           progress && progress.done < progress.total
             ? `Here is where ${session.firm.name}'s receptionist stands. ${progress.done} of ${progress.total} setup steps are complete.`
@@ -413,6 +416,14 @@ export default function Overview() {
             <DashboardPanel readiness={r} />
           </Suspense>
         )}
+
+        <section className="sd-section" aria-labelledby="upcoming-appointments">
+          <div className="sd-section__head"><h2 className="sd-h2" id="upcoming-appointments">Upcoming appointments</h2><Link className="sd-link" href="/scheduling/appointments">View appointments <ArrowRight size={16} aria-hidden="true"/></Link></div>
+          {appointments.isLoading ? <p role="status">Loading appointments…</p> : appointments.isError ? <p>Appointments could not be loaded. <button className="sd-link" onClick={() => void appointments.refetch()}>Try again</button></p> : (() => {
+            const upcoming = (appointments.data?.items ?? []).filter(item => item.state === "booked" && Date.parse(item.startUtc) >= Date.now()).sort((a,b) => Date.parse(a.startUtc)-Date.parse(b.startUtc)).slice(0,4);
+            return upcoming.length ? <ul className="sd-list">{upcoming.map(item => <li className="sd-list__item" key={item.id}><Link className="sd-row" href="/scheduling/appointments"><strong>{item.contact?.name || "Appointment"}</strong><span>{new Date(item.startUtc).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</span><span className="sd-chip">Confirmed</span></Link></li>)}</ul> : <p className="ws-page-lede">No upcoming confirmed appointments. New requests appear in Appointments for review.</p>;
+          })()}
+        </section>
 
         {convsError ? (
           <section className="sd-error" role="alert" aria-labelledby="sd-error-title">
@@ -494,8 +505,7 @@ export default function Overview() {
                     <h3 className="sd-empty__title">No conversations yet</h3>
                     <p className="sd-empty__detail">
                       Messages appear here when a supported messaging channel is configured.
-                      Caller SMS is not included yet; review calls and
-                      appointment requests in their own sections.
+                      Review caller texts in Inbox and appointment requests in Appointments.
                     </p>
                   </div>
                 ) : (
@@ -532,7 +542,7 @@ export default function Overview() {
                 are a separate allowance shown on Usage. */}
             {usage.isPaid
               ? `${usage.used} SMS conversations recorded, all time.`
-              : `Trial: ${usage.used} of ${usage.limit} SMS conversations used, all time${usage.percent !== null ? ` (${usage.percent}%)` : ""}.`}
+              : `Free setup · ${usage.used} SMS conversations recorded, all time. Live service requires activation.`}
           </span>
           <Link href="/account/billing" className="sd-link">
             View billing
@@ -542,3 +552,6 @@ export default function Overview() {
     </div>
   );
 }
+
+const ClarityOverview = voicePlatformEnabled ? lazy(() => import('./overview/ClarityOverview')) : null;
+export default function Overview(){ return ClarityOverview ? <Suspense fallback={<OverviewSkeleton/>}><ClarityOverview/></Suspense> : <LegacyOverview/>; }

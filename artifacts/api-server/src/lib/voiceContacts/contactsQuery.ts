@@ -7,7 +7,8 @@
 // import or touch lib/voiceContacts/contactLinker.ts (the P5 call-linking
 // module), which stays exactly as it is.
 
-import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, or, sql, getTableName } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@workspace/db";
 import { voiceContacts, voiceCallLinks, voiceCallReviews, voiceSmsConsents, voiceMessages, voiceSmsInbound } from "@workspace/db/schema/voice";
 import { intakeConversations } from "@workspace/db/schema";
@@ -30,6 +31,11 @@ export interface ContactListItem {
   /** J4: texts from this contact nobody at the business has opened yet. */
   unreadTexts: number;
 }
+
+// Drizzle strips Column qualifiers inside raw single-table SELECT expressions.
+// Explicit identifiers keep correlated subqueries scoped to the outer contact.
+const qualified = (column: AnyPgColumn) =>
+  sql`${sql.identifier(getTableName(column.table))}.${sql.identifier(column.name)}`;
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
@@ -75,35 +81,35 @@ export async function listContactsForFirm(
       lastCallId: voiceContacts.lastCallId,
       origin: voiceContacts.origin,
       email: voiceContacts.email,
-      callCount: sql<number>`(SELECT COUNT(*) FROM ${voiceCallLinks} WHERE ${voiceCallLinks.contactId} = ${voiceContacts.id})::int`,
+      callCount: sql<number>`(SELECT COUNT(*) FROM ${voiceCallLinks} WHERE ${qualified(voiceCallLinks.contactId)} = ${qualified(voiceContacts.id)} AND ${qualified(voiceCallLinks.firmId)} = ${qualified(voiceContacts.firmId)})::int`,
       conversationCount: sql<number>`(
         SELECT COUNT(*) FROM ${intakeConversations}
-        WHERE ${intakeConversations.firmId} = ${voiceContacts.firmId} AND ${intakeConversations.callerPhone} = ${voiceContacts.phoneE164}
+        WHERE ${qualified(intakeConversations.firmId)} = ${qualified(voiceContacts.firmId)} AND ${qualified(intakeConversations.callerPhone)} = ${qualified(voiceContacts.phoneE164)}
       )::int`,
       unreadTexts: sql<number>`(
         SELECT COUNT(*) FROM ${voiceSmsInbound}
-        WHERE ${voiceSmsInbound.firmId} = ${voiceContacts.firmId}
-          AND ${voiceSmsInbound.fromE164} = ${voiceContacts.phoneE164}
-          AND ${voiceSmsInbound.readAt} IS NULL
+        WHERE ${qualified(voiceSmsInbound.firmId)} = ${qualified(voiceContacts.firmId)}
+          AND ${qualified(voiceSmsInbound.fromE164)} = ${qualified(voiceContacts.phoneE164)}
+          AND ${qualified(voiceSmsInbound.readAt)} IS NULL
       )::int`,
       optedOut: sql<boolean>`EXISTS (
         SELECT 1 FROM ${voiceSmsConsents}
-        WHERE ${voiceSmsConsents.firmId} = ${voiceContacts.firmId}
-          AND ${voiceSmsConsents.phoneE164} = ${voiceContacts.phoneE164}
-          AND ${voiceSmsConsents.status} = 'stopped'
+        WHERE ${qualified(voiceSmsConsents.firmId)} = ${qualified(voiceContacts.firmId)}
+          AND ${qualified(voiceSmsConsents.phoneE164)} = ${qualified(voiceContacts.phoneE164)}
+          AND ${qualified(voiceSmsConsents.status)} = 'stopped'
       )`,
       disposition: sql<string | null>`(
-        SELECT ${voiceCallReviews.reviewState} FROM ${voiceCallReviews}
-        WHERE ${voiceCallReviews.firmId} = ${voiceContacts.firmId} AND ${voiceCallReviews.callId} = ${voiceContacts.lastCallId}
+        SELECT ${qualified(voiceCallReviews.reviewState)} FROM ${voiceCallReviews}
+        WHERE ${qualified(voiceCallReviews.firmId)} = ${qualified(voiceContacts.firmId)} AND ${qualified(voiceCallReviews.callId)} = ${qualified(voiceContacts.lastCallId)}
         LIMIT 1
       )`,
       nextAppointmentAt: sql<string | null>`(
-        SELECT ${schedulingAppointmentRequests.requestedStartAt} FROM ${schedulingAppointmentRequests}
-        WHERE ${schedulingAppointmentRequests.firmId} = ${voiceContacts.firmId}
-          AND ${schedulingAppointmentRequests.customerPhone} = ${voiceContacts.phoneE164}
-          AND ${schedulingAppointmentRequests.status} = 'booked'
-          AND ${schedulingAppointmentRequests.requestedStartAt} > now()
-        ORDER BY ${schedulingAppointmentRequests.requestedStartAt} ASC
+        SELECT ${qualified(schedulingAppointmentRequests.requestedStartAt)} FROM ${schedulingAppointmentRequests}
+        WHERE ${qualified(schedulingAppointmentRequests.firmId)} = ${qualified(voiceContacts.firmId)}
+          AND ${qualified(schedulingAppointmentRequests.customerPhone)} = ${qualified(voiceContacts.phoneE164)}
+          AND ${qualified(schedulingAppointmentRequests.status)} = 'booked'
+          AND ${qualified(schedulingAppointmentRequests.requestedStartAt)} > now()
+        ORDER BY ${qualified(schedulingAppointmentRequests.requestedStartAt)} ASC
         LIMIT 1
       )`,
     })
@@ -183,7 +189,7 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
   const [callCountRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(voiceCallLinks)
-    .where(eq(voiceCallLinks.contactId, contact.id));
+    .where(and(eq(voiceCallLinks.contactId, contact.id), eq(voiceCallLinks.firmId, firmId)));
   const [conversationRows, optedOutRow, dispositionRow, nextAppointmentRow, callLinkRows] = await Promise.all([
     db
       .select({ id: intakeConversations.id, lastMessageAt: intakeConversations.lastMessageAt, status: intakeConversations.status })
@@ -216,7 +222,7 @@ export async function getContactDetailForFirm(firmId: number, contactId: number)
       )
       .orderBy(schedulingAppointmentRequests.requestedStartAt)
       .limit(1),
-    db.select({ callId: voiceCallLinks.callId, createdAt: voiceCallLinks.createdAt }).from(voiceCallLinks).where(eq(voiceCallLinks.contactId, contact.id)).orderBy(desc(voiceCallLinks.createdAt)).limit(50),
+    db.select({ callId: voiceCallLinks.callId, createdAt: voiceCallLinks.createdAt }).from(voiceCallLinks).where(and(eq(voiceCallLinks.contactId, contact.id), eq(voiceCallLinks.firmId, firmId))).orderBy(desc(voiceCallLinks.createdAt)).limit(50),
   ]);
 
   // Call STATE is derived (provider_webhook_events is the source of truth —

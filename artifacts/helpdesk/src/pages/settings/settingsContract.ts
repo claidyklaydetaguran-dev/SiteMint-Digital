@@ -44,7 +44,7 @@ export function planLabel(planTier: string | null | undefined): string | null {
   const raw = (planTier ?? "").trim();
   if (raw === "") return null;
   if (raw === "paid") return "Paid plan";
-  if (raw === "trial") return "Free Trial";
+  if (raw === "trial") return "Free setup";
   return raw;
 }
 

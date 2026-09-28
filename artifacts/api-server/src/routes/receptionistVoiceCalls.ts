@@ -69,6 +69,7 @@ function serializeSummary(call: RealCallRecord) {
     // Only the word, on the list. The evidence behind it belongs on the
     // detail, where there is room to say why.
     transferState: call.transfer.state,
+    summary: call.summary?.slice(0, 500) ?? null,
   };
 }
 

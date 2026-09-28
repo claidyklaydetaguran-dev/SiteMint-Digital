@@ -501,7 +501,7 @@ export function voicePlanStatusCopy(view: VoiceSubscriptionView): { title: strin
   const sub = view.subscription ?? null;
   const state = sub?.state;
   if (state === "active") {
-    return { title: "Active", detail: "Your receptionist is activated and can answer calls.", tone: "live" };
+      return { title: "Subscription active", detail: "Your subscription is active. Check Overview for phone, assistant and calendar readiness before taking live calls.", tone: "live" };
   }
   if (state === "grace") {
     return {
@@ -520,5 +520,5 @@ export function voicePlanStatusCopy(view: VoiceSubscriptionView): { title: strin
     // Enforcement is off for this workspace: nothing blocks the receptionist.
     return { title: "No plan required", detail: "Your receptionist isn’t tied to a plan on this workspace.", tone: "live" };
   }
-  return { title: "Not activated", detail: "Your receptionist isn’t activated yet. Choose a plan, or contact SiteMint to activate it.", tone: "off" };
+    return { title: "Free setup", detail: "Build your assistant and try a simulated demo. Live calls require a subscription and completed activation checks. No live call credits are included in free setup.", tone: "off" };
 }

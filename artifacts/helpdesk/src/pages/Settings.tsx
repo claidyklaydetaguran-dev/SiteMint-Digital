@@ -1,3 +1,4 @@
+import { WorkspaceTabs } from "@/components/layout/WorkspaceNavigation";
 /**
  * V5 customer-shell foundation — the Settings workspace (D-7).
  *
@@ -110,6 +111,8 @@ export default function Settings() {
   // ── Profile form ──────────────────────────────────────────────────────
   const [profile, setProfile] = useState<ProfileFormValues>(EMPTY_PROFILE_FORM);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
+  const [profileLoadAttempt, setProfileLoadAttempt] = useState(0);
   const [profileError, setProfileError] = useState("");
   const [profileFieldError, setProfileFieldError] = useState<string | undefined>(undefined);
   const [contactEmailError, setContactEmailError] = useState<string | undefined>(undefined);
@@ -118,6 +121,8 @@ export default function Settings() {
   useEffect(() => {
     if (!me) return;
     let cancelled = false;
+    setProfileLoaded(false);
+    setProfileLoadFailed(false);
     fetchBusinessProfile()
       .then((body) => {
         if (cancelled) return;
@@ -136,18 +141,17 @@ export default function Settings() {
       })
       .catch(() => {
         if (cancelled) return;
-        // A read failure leaves the form blank with the browser timezone
-        // preselected — never a fabricated business name or address.
-        setProfile((f) => ({ ...f, timezone: f.timezone || browserTimezone() }));
-        setProfileLoaded(true);
+        // Never allow a failed read to turn into an editable blank profile.
+        setProfileLoadFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [me]);
+  }, [me?.firm.id, profileLoadAttempt]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profileLoaded || saveState === "saving") return;
     setProfileError("");
     setProfileFieldError(undefined);
     setContactEmailError(undefined);
@@ -170,6 +174,7 @@ export default function Settings() {
         contactName: saved.primaryContact.name,
         contactEmail: saved.primaryContact.email,
         defaultLocation: saved.defaultLocation,
+        timezone: saved.timezone || f.timezone,
       }));
       setSaveState("saved");
       qc.invalidateQueries({ queryKey: ["agent-config"] });
@@ -179,6 +184,7 @@ export default function Settings() {
       // old timezone and Setup still calling step 1 unfinished.
       qc.invalidateQueries({ queryKey: ["availability"] });
       qc.invalidateQueries({ queryKey: ["setup"] });
+      qc.invalidateQueries({ queryKey: SESSION_KEY });
       window.setTimeout(() => setSaveState("idle"), 2500);
     } catch {
       setSaveState("error");
@@ -277,6 +283,7 @@ export default function Settings() {
           <p className="sg-lede">{page.detail}</p>
         </div>
       </div>
+      <WorkspaceTabs location="/account/settings" />
 
       {calendarState && (
         <div
@@ -329,6 +336,7 @@ export default function Settings() {
           </h2>
         </div>
         <OwnerOnly fallback={<StaffReadOnlyNote text="Only an owner of this business can change the business profile." />}>
+        {profileLoadFailed && <div className="si-alert" role="alert"><span className="si-alert__text">We couldn’t load your business profile. Your saved details have not been changed.</span><button type="button" className="sd-error__action" onClick={() => setProfileLoadAttempt((attempt) => attempt + 1)}>Retry loading profile</button></div>}
         <form className="si-form" onSubmit={handleProfileSubmit} noValidate>
           {profileError && (
             <div className="si-alert" role="alert">

@@ -26,12 +26,14 @@ import { PlatformDiscoveryShell } from "@/components/platform-discovery/Platform
 // professional redesign (2026-09-09): that brand is now the typography-only
 // BrandWordmark — the diamond mark is retired from public surfaces.
 import { BrandWordmark } from "@/components/v5/BrandWordmark";
+import { useSearch } from "wouter";
 
 const PAGE_TITLE = "Start a Project — SiteMint Digital";
 const PAGE_DESCRIPTION =
   "Tell us about your project. SiteMint will review your answers and prepare a personalized proposal and scope of work within 24–48 hours.";
 
 export default function DiscoveryPage() {
+  const isReceptionist = new URLSearchParams(useSearch()).get("service") === "ai-receptionist";
   // Centralised per-route meta (title/description/canonical/OG) — the ad-hoc
   // title effect predated usePageMeta and left the canonical pointing at "/",
   // which the prerender workstream (2026-09-07) surfaced.
@@ -58,10 +60,10 @@ export default function DiscoveryPage() {
             <BrandWordmark />
           </a>
           <a
-            href="/"
-            className="text-sm text-[hsl(var(--sm-color-text-secondary))] hover:text-[hsl(var(--sm-color-text-primary))] transition-colors"
+            href={isReceptionist ? "/ai-receptionist" : "/"}
+            className="relative z-20 inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-[hsl(var(--sm-color-text-secondary))] hover:bg-[hsl(var(--sm-color-bg-subtle))] hover:text-[hsl(var(--sm-color-text-primary))] focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            ← Back to home
+            {isReceptionist ? "← Back to AI Receptionist" : "← Back to SiteMint"}
           </a>
         </div>
       </header>

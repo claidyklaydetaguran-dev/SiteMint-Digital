@@ -198,7 +198,7 @@ check(
     !/function planLabel/.test(contractCode),
 );
 
-eq("a trial plan reads as the shared verified label", planLabel("trial"), "Free Trial");
+eq("a trial plan reads as the shared verified label", planLabel("trial"), "Free setup");
 eq("a paid plan reads as a neutral verified label", planLabel("paid"), "Paid plan");
 eq(
   "an unrecognised plan is echoed verbatim, never renamed",
@@ -497,7 +497,7 @@ eq(
   "a trial record shows plan, usage and the trial limit",
   planFields(planLabel("trial"), usageModel("trial", 12, 20)),
   [
-    { label: "Current plan", value: "Free Trial" },
+    { label: "Current plan", value: "Free setup" },
     // Relabelled deliberately: this allowance counts text-message (SMS) intake
     // conversations for the life of the account, not calls and not per period.
     { label: "SMS conversation usage", value: "12 of 20" },
@@ -955,16 +955,13 @@ check(
   /key: "billing", label: "Billing", href: "\/account\/billing"[\s\S]{0,80}voiceGated: false/.test(navSrc),
 );
 check(
-  // D-6 adds exactly one flag, VITE_BILLING_CHECKOUT_ENABLED, read directly
-  // in billingContract.ts rather than through the shared `lib/featureFlags.ts`
-  // module that documents itself as the single import site for VITE_*
-  // flags. That file is outside this session's edit scope (helpdesk
-  // nav/shell/flags belong to a different owner); consolidating this flag
-  // into it is reported to that owner rather than done here. No *other*
-  // flag or voice-platform gating was introduced.
-  "the route adds exactly the one documented D-6 flag, no voice-platform gating",
+  // Billing itself remains available in SMS-only builds. Its additional
+  // voice-plan panel must be removed from those builds, not merely hidden.
+  "checkout retains its own flag and only the voice-plan panel is build-gated",
   (routeCode.match(/import\.meta\.env\.VITE_BILLING_CHECKOUT_ENABLED/g) ?? []).length >= 1 &&
-    !/featureFlags|voicePlatformEnabled|VITE_VOICE/.test(routeCode),
+    !/import\.meta\.env\.VITE_VOICE/.test(routeCode) &&
+    /const VoicePlanStatus = voicePlatformEnabled \? lazy\(/.test(pageCode) &&
+    /export default function Billing\(/.test(pageCode),
 );
 check(
   "voice gating is untouched by this route",
@@ -1101,7 +1098,7 @@ if (!existsSync(distDir)) {
   eq("no removed phrase survives into the built Billing code", bannedHits(routeOnly), []);
   check(
     "the plan label reaches the built output from the shared helper",
-    built.includes("Paid plan") && built.includes("Free Trial"),
+    built.includes("Paid plan") && built.includes("Free setup"),
   );
   // The three surfaces that name a plan — rail, Settings, Billing — now share
   // one mapping, so the invented name must exist in no chunk at all.

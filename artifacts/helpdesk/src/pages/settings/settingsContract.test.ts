@@ -97,7 +97,7 @@ eq("a null email renders the concise unavailable treatment, never a guess", acco
 eq("the unavailable treatment is stated once, plainly", NOT_AVAILABLE, "Not available");
 eq("a blank plan omits the row entirely rather than inventing a tier", accountFields(firm({ planTier: "" })).map((f) => f.label), ["Business", "Email", "Member since"]);
 eq("a paid plan reads as a neutral verified label", planLabel("paid"), "Paid plan");
-eq("a trial plan reuses the shared verified label", planLabel("trial"), "Free Trial");
+eq("a trial plan reuses the shared verified label", planLabel("trial"), "Free setup");
 check("the plan label never names a product this repository does not have", !/pro|premium|enterprise|unlimited/i.test(planLabel("paid") ?? ""));
 eq("an unrecognised plan is echoed verbatim, never renamed", planLabel("enterprise_legacy_2019"), "enterprise_legacy_2019");
 check("only the two verified tiers are reported as known", isKnownPlan("paid") && isKnownPlan("trial") && !isKnownPlan("x"));

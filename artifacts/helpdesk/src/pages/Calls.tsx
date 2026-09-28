@@ -25,8 +25,9 @@
  * beside the list is of what actually matched.
  */
 
+import CallLogDetail from "./CallLogDetail";
 import { Link } from "wouter";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useSession } from "@/hooks/useSession";
 import { useRealCallsList } from "@/hooks/useVoiceCalls";
 import { CALL_CHANNELS, INTERNAL_CALL_STATES, type RealCallSummary } from "@/lib/voiceCallsApi";
@@ -191,7 +192,17 @@ export default function Calls() {
   const { data: me, isLoading: sessionLoading } = useSession();
   const calls = useRealCallsList();
   const [announcement, setAnnouncement] = useState("");
+  const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<CallFilters>(NO_FILTERS);
+  const initialSelection = useRef(false);
+  useEffect(() => {
+    const first=calls.data?.items[0];
+    if (!initialSelection.current && first) {
+      initialSelection.current=true;
+      if (window.matchMedia('(min-width: 761px)').matches && !selectedCallId) setSelectedCallId(first.callId);
+    }
+  }, [calls.data, selectedCallId]);
 
   const retry = useCallback(() => {
     setAnnouncement(LIST.announceRetrying);
@@ -207,7 +218,7 @@ export default function Calls() {
 
   // One instant for the whole pass, so every row in a render is measured
   // against the same boundary and the list cannot disagree with its count.
-  const visible = useMemo(() => applyFilters(items, filters, new Date()), [items, filters]);
+  const visible = useMemo(() => applyFilters(items, filters, new Date()).filter(call => (callerNumberText(call) + " " + call.callId).toLowerCase().includes(search.toLowerCase())), [items, filters, search]);
 
   if (sessionLoading) {
     return (
@@ -227,7 +238,7 @@ export default function Calls() {
   const nothingMatched = settled && items.length > 0 && visible.length === 0;
 
   return (
-    <div className="sd-page sd-enter">
+    <div className="sd-page sd-enter cf-calls">
       <div className="sd-page__head">
         <div>
           <span className="sd-eyebrow">{PAGE.eyebrow}</span>
@@ -241,9 +252,10 @@ export default function Calls() {
           {LIST.heading}
         </h2>
 
-        {settled && items.length > 0 && <Controls filters={filters} onChange={setFilters} />}
+        <div className="cf-call-controls"><label className="sd-sr" htmlFor="call-search">Search calls by number or ID</label><input id="call-search" className="mc-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search calls by number or ID" />
+        {settled && items.length > 0 && <Controls filters={filters} onChange={setFilters} />}</div>
 
-        {showTable && <p className="sc-count">{recordCount(visible.length)}</p>}
+
 
         <p className="sd-sr" role="status" aria-live="polite">
           {announcement}
@@ -281,37 +293,10 @@ export default function Calls() {
           </div>
         )}
 
-        {showTable && (
-          <div className="sc-tablewrap">
-            <table className="sc-table" role="table">
-              <thead className="sc-table__head" role="rowgroup">
-                <tr role="row">
-                  <th scope="col" role="columnheader" className="sc-col sc-col--caller">
-                    {LIST.colCaller}
-                  </th>
-                  <th scope="col" role="columnheader" className="sc-col">
-                    {CONTROLS.channelLabel}
-                  </th>
-                  <th scope="col" role="columnheader" className="sc-col sc-col--time">
-                    {LIST.colStarted}
-                  </th>
-                  <th scope="col" role="columnheader" className="sc-col sc-col--duration">
-                    {LIST.colDuration}
-                  </th>
-                  <th scope="col" role="columnheader" className="sc-col sc-col--state">
-                    {LIST.colState}
-                  </th>
-                </tr>
-              </thead>
-              <tbody role="rowgroup">
-                {visible.map((call) => (
-                  <CallRow key={call.callId} call={call} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+        {showTable && <div className="mc-call-layout" data-selected={visible.some(c => c.callId === selectedCallId)}>
+          <div className="mc-call-list cf-call-table" aria-label="Call records"><h2>{visible.length} calls</h2><div className="cf-call-columns"><span>Caller</span><span>Date & time</span><span>Duration</span><span>Outcome</span></div>{visible.map(call => <button type="button" className="mc-call-row" key={call.callId} aria-pressed={selectedCallId === call.callId} onClick={() => setSelectedCallId(call.callId)}><strong>{callerNumberText(call)}</strong><small>{formatListTime(call.startedAt)}</small><small>{formatDuration(call.durationSec)}</small><span className="sd-chip">{stateLabel(call)}</span></button>)}</div>
+          <div className="mc-call-detail">{selectedCallId && visible.some(c => c.callId === selectedCallId) ? <><button className="mc-mobile-back" type="button" onClick={() => setSelectedCallId(null)}>Back to calls</button><CallLogDetail key={selectedCallId} selectedCallId={selectedCallId}/></> : <div className="mc-detail-placeholder"><h2>Select a call</h2><p>Review its outcome, messages and available recording here.</p></div>}</div>
+        </div>}      </section>
     </div>
   );
 }

@@ -6,13 +6,14 @@
 // This is the single answer to "is this business activated?", read by every
 // route that would spend provider time.
 //
-// VOICE_SERVICE_ACCESS_REQUIRED ("true" exactly) turns enforcement on. With it
-// on, a business is activated only by a subscription row in `active` or
+// Enforcement is always on in production. VOICE_SERVICE_ACCESS_REQUIRED
+// ("true" exactly) also enables it elsewhere. A business is activated only
+// by a subscription row in `active` or
 // `grace` whose plan is in the catalog — a paid Stripe subscription, or a plan
 // the operator granted (pilot) through PUT /admin/voice/firms/:id/subscription.
-// `suspended` and `canceled` are not activated: service stops, and the owner
-// is told why. With it off, nothing changes, so staging and tests behave as
-// before.
+// `suspended` and `canceled` cannot publish, synchronize or start browser test
+// calls. Previously assigned inbound numbers require their separate lifecycle
+// controls. With the flag off outside production, staging and tests behave as before.
 //
 // Numbers stay operator-assigned, so phone calls are already under operator
 // control; this gate covers the paths a customer can start alone.
@@ -34,7 +35,8 @@ export interface ServiceAccessDeps {
 }
 
 export function isServiceAccessRequired(env: Record<string, string | undefined> = process.env): boolean {
-  return env[VOICE_SERVICE_ACCESS_REQUIRED_ENV_VAR] === "true";
+  // Public production sign-ups must never gain paid provider access from a missing flag.
+  return env.NODE_ENV === "production" || env[VOICE_SERVICE_ACCESS_REQUIRED_ENV_VAR] === "true";
 }
 
 async function productionFindSubscription(firmId: number): Promise<{ planCode: string; state: string } | undefined> {

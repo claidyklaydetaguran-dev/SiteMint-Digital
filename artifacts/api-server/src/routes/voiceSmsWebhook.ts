@@ -71,7 +71,7 @@ function requireVerified(req: Request, res: Response): { config: VoiceSmsConfig;
 router.post("/voice/sms/inbound", async (req: Request, res: Response) => {
   const verified = requireVerified(req, res);
   if (!verified) return;
-  const { params } = verified;
+  const { params, config } = verified;
 
   const from = normalizePhoneE164(params["From"]);
   const firmIdRaw = Number(params["firmId"] ?? NaN); // never trusted — see below
@@ -88,12 +88,15 @@ router.post("/voice/sms/inbound", async (req: Request, res: Response) => {
     try {
       firmId = await resolveFirmIdForInboundSmsNumber(to.e164);
     } catch {
-      firmId = undefined; // resolution failure falls through to the env pin
+      // An inventory outage is not evidence that this is a legacy number.
+      // Refuse delivery so a configured provider retry can recover it.
+      res.status(503).json({ error: "Temporarily unavailable" });
+      return;
     }
   }
-  if (firmId === undefined) {
+  if (firmId === undefined && to?.e164 === config.fromNumber) {
     const pinned = Number(process.env["VOICE_SMS_OWNER_FIRM_ID"] ?? NaN);
-    firmId = Number.isInteger(pinned) ? pinned : undefined;
+    firmId = Number.isInteger(pinned) && pinned > 0 ? pinned : undefined;
   }
   if (!from || firmId === undefined) {
     // Acknowledge so Twilio doesn't retry, but change nothing.
@@ -129,6 +132,8 @@ router.post("/voice/sms/inbound", async (req: Request, res: Response) => {
       });
     } catch (err) {
       req.log.error({ firmId: ownerFirmId, errorClass: err instanceof Error ? err.name : "unknown" }, "[voice sms] inbound text not stored");
+      res.status(503).json({ error: "Temporarily unavailable" });
+      return;
     }
   }
   // No auto-reply from the voice number: HELP and STOP replies come from the

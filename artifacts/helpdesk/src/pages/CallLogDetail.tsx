@@ -288,6 +288,10 @@ function Record({ call }: { call: RealCallDetail }) {
         </dl>
       </header>
 
+      <section className="sc-doc" aria-labelledby="sc-summary">
+        <h2 className="sc-doc__heading" id="sc-summary">{DETAIL.summaryHeading}</h2>
+        {call.summary && call.summary.trim() !== "" ? <p className="sc-prose">{call.summary}</p> : <p className="sc-absent">{NOT_PROVIDED}</p>}
+      </section>
       <CallRecording
         key={`${call.callId}:${call.artifactPolicy}`}
         callId={call.callId}
@@ -297,6 +301,7 @@ function Record({ call }: { call: RealCallDetail }) {
         canDelete={viewer.isOwner}
       />
 
+      <details className="cl-call-extra"><summary>Recording policy, transcript and call details</summary>
       <section className="sc-doc" aria-labelledby="sc-retention">
         <h2 className="sc-doc__heading" id="sc-retention">
           {DETAIL.retentionHeading}
@@ -323,17 +328,6 @@ function Record({ call }: { call: RealCallDetail }) {
         </section>
       )}
 
-      <section className="sc-doc" aria-labelledby="sc-summary">
-        <h2 className="sc-doc__heading" id="sc-summary">
-          {DETAIL.summaryHeading}
-        </h2>
-        {call.summary && call.summary.trim() !== "" ? (
-          <p className="sc-prose">{call.summary}</p>
-        ) : (
-          <p className="sc-absent">{NOT_PROVIDED}</p>
-        )}
-      </section>
-
       <section className="sc-doc" aria-labelledby="sc-analysis">
         <h2 className="sc-doc__heading" id="sc-analysis">
           {DETAIL.analysisHeading}
@@ -343,15 +337,16 @@ function Record({ call }: { call: RealCallDetail }) {
 
       <TransferSection call={call} />
 
+      </details>
       <LinkedRecords callId={call.callId} />
     </div>
   );
 }
 
-export default function CallLogDetail() {
+export default function CallLogDetail({ selectedCallId }: { selectedCallId?: string } = {}) {
   const params = useParams<{ id: string }>();
   const { data: me, isLoading: sessionLoading } = useSession();
-  const detail = useRealCallDetail(params.id);
+  const detail = useRealCallDetail(selectedCallId ?? params.id);
   const [announcement, setAnnouncement] = useState("");
 
   const retry = useCallback(() => {
