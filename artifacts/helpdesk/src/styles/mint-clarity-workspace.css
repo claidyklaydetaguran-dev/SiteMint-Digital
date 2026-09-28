@@ -107,3 +107,22 @@
  .mc-mobile-back,.mc-appointment-close {position:relative;z-index:1;scroll-margin-top:88px;min-height:44px;}
 }
 .sd-app.sd-app.sd-app .ws-overview > .sd-section {margin-top:0;}
+
+/* Mint leaf contours: quiet framing for the working panels, in both themes. */
+.sd-app.sd-app.sd-app .sd-workspace {
+ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='340' viewBox='0 0 900 340'%3E%3Cpath d='M420 0H900V130C710 78 705 295 260 330C540 240 442 88 420 0Z' fill='%238abfa6' fill-opacity='.10'/%3E%3Cpath d='M680 0H900V45C690 180 525 95 390 270C484 50 618 132 680 0Z' fill='%238abfa6' fill-opacity='.13'/%3E%3Cpath d='M480 265C645 110 790 180 900 52' fill='none' stroke='%238abfa6' stroke-opacity='.18'/%3E%3C/svg%3E");
+ background-repeat:no-repeat;
+ background-position:top right;
+ background-size:min(900px,100%) 340px;
+}
+.sd-app.sd-app.sd-app .sd-rail {
+ background-image:radial-gradient(ellipse at 0 90%,rgb(138 191 166 / 12%),transparent 55%);
+}
+.sd-app .cl-page-heading {padding:8px 0 12px;}
+.sd-app .cl-setup-strip {border-inline-start:3px solid var(--ws-green);}
+.sd-app .cl-card {box-shadow:0 3px 15px rgb(23 63 53 / 3%);}
+.sd-app .cl-metric:hover {border-color:var(--ws-line-strong);}
+.dark .sd-app.sd-app.sd-app .sd-navlink__icon {color:#a5d8c7;}
+@media (forced-colors:active) {
+ .sd-app.sd-app.sd-app .sd-workspace,.sd-app.sd-app.sd-app .sd-rail {background-image:none;}
+}
